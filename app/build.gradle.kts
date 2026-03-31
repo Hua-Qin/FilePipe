@@ -1,3 +1,4 @@
+import com.android.build.api.dsl.ApplicationExtension
 import java.util.Properties
 
 plugins {
@@ -35,10 +36,9 @@ val hasReleaseSigning =
         releaseKeyAlias != null &&
         releaseKeyPassword != null
 
-android {
+extensions.configure<ApplicationExtension>("android") {
     namespace = "dev.bikram.filepipe"
     compileSdk = 36
-
     defaultConfig {
         applicationId = "dev.bikram.filepipe"
         minSdk = 30
