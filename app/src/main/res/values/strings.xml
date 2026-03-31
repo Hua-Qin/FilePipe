@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Media Organizer</string>
+
+    <!-- Bottom nav labels -->
+    <string name="nav_rules">Rules</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Rules screen -->
+    <string name="rules_empty_title">No rules yet</string>
+    <string name="rules_empty_subtitle">Tap Add Rule to create your first organizing rule</string>
+    <string name="rules_add_rule">+ Add Rule</string>
+    <string name="rule_card_types">Types</string>
+    <string name="rule_card_types_none">None</string>
+    <string name="rule_card_from">From</string>
+    <string name="rule_card_from_none">No sources</string>
+    <string name="rule_card_destination_not_set">Not set</string>
+    <string name="rule_delete_confirm">Delete rule?</string>
+    <string name="rule_delete_message">This will also remove any scheduled runs for this rule.</string>
+
+    <!-- Rule detail screen -->
+    <string name="new_rule">New Rule</string>
+    <string name="edit_rule">Edit Rule</string>
+    <string name="rule_name_label">Rule name</string>
+    <string name="rule_name_placeholder">e.g. Photos Backup</string>
+    <string name="source_folders_label">Source Folders</string>
+    <string name="add_source_folder">Add source folders</string>
+    <string name="file_types_label">File Types</string>
+    <string name="add_file_type">Add type</string>
+    <string name="destination_label">Destination Folder</string>
+    <string name="pick_folder">Pick folder</string>
+    <string name="change_destination">Change destination</string>
+    <string name="rule_section_extensions_title">File extensions</string>
+    <string name="rule_section_extensions_subtitle">Which file types this rule applies to</string>
+    <string name="rule_section_source_subtitle">Scan files from these folders</string>
+    <string name="rule_section_destination_subtitle">Files matching the extensions are moved here</string>
+    <string name="rule_section_schedule_subtitle">Optional automatic runs</string>
+    <string name="remove_schedule">Remove schedule</string>
+    <string name="add_schedule_chip">Add schedule</string>
+    <string name="unsaved_changes_title">Unsaved changes</string>
+    <string name="unsaved_changes_message">What would you like to do?</string>
+    <string name="discard_changes">Discard</string>
+    <string name="keep_editing">Keep editing</string>
+    <string name="save_and_exit">Save &amp; exit</string>
+    <string name="schedule_label">Schedule (optional)</string>
+    <string name="enable_schedule">Enable automatic schedule</string>
+    <string name="schedule_frequency">Frequency</string>
+    <string name="schedule_daily">Daily</string>
+    <string name="schedule_weekly">Weekly</string>
+    <string name="schedule_day">Day of week</string>
+    <string name="schedule_time">Time</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+
+    <!-- Run screen -->
+    <string name="run_title">Run Rules</string>
+    <string name="run_select_all">Select All</string>
+    <string name="run_deselect_all">Deselect All</string>
+    <string name="run_button">Run Selected (%d)</string>
+    <string name="run_empty">No rules to run. Create a rule first.</string>
+    <string name="run_in_progress">Running…</string>
+    <string name="run_complete">Completed</string>
+    <string name="run_now">Run now</string>
+
+    <!-- History screen -->
+    <string name="history_title">History</string>
+    <string name="history_empty_title">No history yet</string>
+    <string name="history_empty_subtitle">Run some rules to see your file move history here</string>
+    <string name="history_triggered_manual">Manual</string>
+    <string name="history_triggered_scheduled">Scheduled</string>
+    <string name="history_files_moved">%d files moved</string>
+    <string name="history_files_failed">%d failed</string>
+    <string name="history_clear">Clear history</string>
+    <string name="history_clear_content_description">Clear all history</string>
+    <string name="history_clear_confirm_title">Clear all history?</string>
+    <string name="history_clear_confirm_message">This removes all run records and file move details. Rules are not affected.</string>
+
+    <!-- Status labels -->
+    <string name="status_success">Success</string>
+    <string name="status_partial">Partial</string>
+    <string name="status_failed">Failed</string>
+    <string name="status_in_progress">Running</string>
+
+    <!-- Permission screen -->
+    <string name="permission_title">Storage Access Required</string>
+    <string name="permission_message">Media Organizer needs access to all files to move media between folders. Please grant \"All files access\" in the next screen.</string>
+    <string name="permission_grant">Grant Access</string>
+
+    <!-- Notification -->
+    <string name="notification_channel_name">File Organizer</string>
+    <string name="notification_channel_desc">Shows progress when organizing files</string>
+    <string name="notification_running">Running: %s</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_theme_section">Appearance</string>
+    <string name="settings_backup_section">Rules backup</string>
+    <string name="settings_export_folder_hint">The JSON file is written here when you export or when auto-export runs.</string>
+    <string name="settings_no_folder_chosen">No folder chosen</string>
+    <string name="settings_choose_export_folder">Choose export folder</string>
+    <string name="settings_export_now">Export now</string>
+    <string name="settings_import_rules">Import rules</string>
+    <string name="settings_auto_export_on_change">Auto-export on rule changes</string>
+    <string name="settings_auto_export_on_change_hint">Writes rules whenever you save, delete, or toggle a rule.</string>
+    <string name="settings_scheduled_export">Daily scheduled export</string>
+    <string name="settings_scheduled_export_hint">Exports rules about once per day (requires export folder).</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">System</string>
+    <string name="theme_material_you">Material You</string>
+    <string name="settings_material_you_hint">Uses wallpaper colors on Android 12+. Black (OLED) keeps dark surfaces and uses these accents.</string>
+    <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
+    <string name="theme_black">Black (OLED)</string>
+
+    <!-- Days of week -->
+    <string-array name="days_of_week">
+        <item>Monday</item>
+        <item>Tuesday</item>
+        <item>Wednesday</item>
+        <item>Thursday</item>
+        <item>Friday</item>
+        <item>Saturday</item>
+        <item>Sunday</item>
+    </string-array>
+</resources>
