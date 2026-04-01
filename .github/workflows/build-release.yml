@@ -1,7 +1,7 @@
 # Manual-only release build (workflow_dispatch). No push/tag triggers.
 #
 # - Git tag: creates v{versionName} from app/build.gradle.kts at the workflow commit (github.sha).
-# - APK: single universal release APK (no split-per-ABI in app/build.gradle.kts).
+# - APK: single universal release APK, renamed to filepipe-v{versionName}.apk for artifact + release.
 # - GitHub Release: always draft; publish from the Releases UI when ready.
 # - Run from any branch (e.g. main); the tagged commit is the commit that was built.
 
@@ -31,6 +31,7 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: platforms;android-36 build-tools;36.0.0
+          log-accepted-android-sdk-licenses: false
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -67,6 +68,19 @@ jobs:
 
       - name: Assemble signed release
         run: ./gradlew :app:assembleRelease --no-configuration-cache
+
+      - name: Rename release APK
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          release_dir="app/build/outputs/apk/release"
+          src="${release_dir}/app-release.apk"
+          dest="${release_dir}/filepipe-v${version}.apk"
+          if [ ! -f "$src" ]; then
+            echo "Expected APK not found: $src"
+            ls -la "$release_dir" || true
+            exit 1
+          fi
+          mv "$src" "$dest"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

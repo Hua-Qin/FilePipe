@@ -1,9 +1,9 @@
 package dev.bikram.filepipe.ui.feedback
 
-import android.content.Context
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.VibratorManager
 import android.view.HapticFeedbackConstants
 import android.view.SoundEffectConstants
 import android.view.View
@@ -31,11 +31,10 @@ fun View.performSwipeThresholdHaptic() {
     } else {
         performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
     }
-    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
+    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
     } else {
-        @Suppress("DEPRECATION")
-        vibrator.vibrate(55)
-    }
+        context.getSystemService(Vibrator::class.java)
+    } ?: return
+    vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
 }
