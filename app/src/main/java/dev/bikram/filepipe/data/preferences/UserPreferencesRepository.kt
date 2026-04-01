@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -24,6 +25,9 @@ private object PrefKeys {
     val EXPORT_FOLDER_URI = stringPreferencesKey("export_folder_uri")
     val AUTO_EXPORT_ON_CHANGE = booleanPreferencesKey("auto_export_on_change")
     val SCHEDULED_EXPORT = booleanPreferencesKey("scheduled_export_enabled")
+    val LOG_RETENTION_DAYS = intPreferencesKey("log_retention_days")
+    val SWIPE_START_TO_END = stringPreferencesKey("swipe_start_to_end")
+    val SWIPE_END_TO_START = stringPreferencesKey("swipe_end_to_start")
 }
 
 @Singleton
@@ -50,7 +54,14 @@ class UserPreferencesRepository @Inject constructor(
             useMaterialYou = useMaterialYou,
             exportFolderUri = prefs[PrefKeys.EXPORT_FOLDER_URI].orEmpty(),
             autoExportOnRuleChange = prefs[PrefKeys.AUTO_EXPORT_ON_CHANGE] ?: false,
-            scheduledExportEnabled = prefs[PrefKeys.SCHEDULED_EXPORT] ?: false
+            scheduledExportEnabled = prefs[PrefKeys.SCHEDULED_EXPORT] ?: false,
+            logRetentionDays = prefs[PrefKeys.LOG_RETENTION_DAYS] ?: 30,
+            swipeStartToEnd = prefs[PrefKeys.SWIPE_START_TO_END]
+                ?.let { runCatching { SwipeAction.valueOf(it) }.getOrNull() }
+                ?: SwipeAction.DUPLICATE,
+            swipeEndToStart = prefs[PrefKeys.SWIPE_END_TO_START]
+                ?.let { runCatching { SwipeAction.valueOf(it) }.getOrNull() }
+                ?: SwipeAction.DELETE
         )
     }
 
@@ -74,5 +85,17 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setScheduledExportEnabled(enabled: Boolean) {
         dataStore.edit { it[PrefKeys.SCHEDULED_EXPORT] = enabled }
+    }
+
+    suspend fun setLogRetentionDays(days: Int) {
+        dataStore.edit { it[PrefKeys.LOG_RETENTION_DAYS] = days }
+    }
+
+    suspend fun setSwipeStartToEnd(action: SwipeAction) {
+        dataStore.edit { it[PrefKeys.SWIPE_START_TO_END] = action.name }
+    }
+
+    suspend fun setSwipeEndToStart(action: SwipeAction) {
+        dataStore.edit { it[PrefKeys.SWIPE_END_TO_START] = action.name }
     }
 }

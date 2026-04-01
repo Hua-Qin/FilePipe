@@ -3,9 +3,15 @@ package dev.bikram.filepipe.ui.screens.ruledetail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.domain.model.ConflictPolicy
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
+import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleSchedule
+import dev.bikram.filepipe.domain.model.RuleTemplate
+import dev.bikram.filepipe.domain.usecase.PreviewRuleUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
 import dev.bikram.filepipe.domain.usecase.ValidateRuleUseCase
@@ -24,30 +30,44 @@ import javax.inject.Inject
 data class RuleDetailUiState(
     val id: Long = 0,
     val name: String = "",
-    val sourceFolderUris: List<String> = emptyList(),
-    val destinationFolderUri: String = "",
+    val sourceFolderPaths: List<String> = emptyList(),
+    val destinationFolderPath: String = "",
     val fileExtensions: List<String> = emptyList(),
     val isEnabled: Boolean = true,
     val schedule: RuleSchedule? = null,
+    val conflictPolicy: ConflictPolicy = ConflictPolicy.RENAME_SUFFIX,
+    val operationMode: OperationMode = OperationMode.MOVE,
+    val scanSubdirectories: Boolean = false,
+    val icon: RuleIcon = RuleIcon.DEFAULT,
     val isLoading: Boolean = true,
     val isSaved: Boolean = false,
-    val errors: List<String> = emptyList()
+    val errors: List<String> = emptyList(),
+    val previewFiles: List<FileEntry>? = null,
+    val isPreviewLoading: Boolean = false
 )
 
 private data class RuleSnapshot(
     val name: String,
-    val sourceFolderUris: List<String>,
-    val destinationFolderUri: String,
+    val sourceFolderPaths: List<String>,
+    val destinationFolderPath: String,
     val fileExtensions: List<String>,
-    val schedule: RuleSchedule?
+    val schedule: RuleSchedule?,
+    val conflictPolicy: ConflictPolicy,
+    val operationMode: OperationMode,
+    val scanSubdirectories: Boolean,
+    val icon: RuleIcon
 )
 
 private fun RuleDetailUiState.toSnapshot(): RuleSnapshot = RuleSnapshot(
     name = name.trim(),
-    sourceFolderUris = sourceFolderUris.toList(),
-    destinationFolderUri = destinationFolderUri,
+    sourceFolderPaths = sourceFolderPaths.toList(),
+    destinationFolderPath = destinationFolderPath,
     fileExtensions = fileExtensions.toList(),
-    schedule = schedule
+    schedule = schedule,
+    conflictPolicy = conflictPolicy,
+    operationMode = operationMode,
+    scanSubdirectories = scanSubdirectories,
+    icon = icon
 )
 
 @HiltViewModel
@@ -56,6 +76,7 @@ class RuleDetailViewModel @Inject constructor(
     private val ruleRepository: RuleRepository,
     private val scheduleRulesUseCase: ScheduleRulesUseCase,
     private val validateRuleUseCase: ValidateRuleUseCase,
+    private val previewRuleUseCase: PreviewRuleUseCase,
     private val rulesAutoExportTrigger: RulesAutoExportTrigger
 ) : ViewModel() {
 
@@ -87,11 +108,15 @@ class RuleDetailViewModel @Inject constructor(
                 it.copy(
                     id = rule.id,
                     name = rule.name,
-                    sourceFolderUris = rule.sourceFolderUris,
-                    destinationFolderUri = rule.destinationFolderUri,
+                    sourceFolderPaths = rule.sourceFolderPaths,
+                    destinationFolderPath = rule.destinationFolderPath,
                     fileExtensions = rule.fileExtensions,
                     isEnabled = rule.isEnabled,
                     schedule = rule.schedule,
+                    conflictPolicy = rule.conflictPolicy,
+                    operationMode = rule.operationMode,
+                    scanSubdirectories = rule.scanSubdirectories,
+                    icon = rule.icon,
                     isLoading = false
                 )
             }
@@ -104,21 +129,36 @@ class RuleDetailViewModel @Inject constructor(
 
     fun setName(name: String) = _uiState.update { it.copy(name = name, errors = emptyList()) }
 
-    fun addSourceFolder(uri: String) = _uiState.update {
-        if (uri in it.sourceFolderUris) it
-        else it.copy(sourceFolderUris = it.sourceFolderUris + uri)
+    fun addSourceFolder(path: String) = _uiState.update {
+        if (path in it.sourceFolderPaths) it
+        else it.copy(sourceFolderPaths = it.sourceFolderPaths + path)
     }
 
-    fun removeSourceFolder(uri: String) = _uiState.update {
-        it.copy(sourceFolderUris = it.sourceFolderUris - uri)
+    fun removeSourceFolder(path: String) = _uiState.update {
+        it.copy(sourceFolderPaths = it.sourceFolderPaths - path)
     }
 
-    fun setDestination(uri: String) = _uiState.update { it.copy(destinationFolderUri = uri) }
+    fun replaceSourceFolder(previousPath: String, newPath: String) = _uiState.update { state ->
+        if (previousPath !in state.sourceFolderPaths) state
+        else {
+            val withoutPrevious = state.sourceFolderPaths - previousPath
+            val nextPaths =
+                if (newPath in withoutPrevious) withoutPrevious
+                else withoutPrevious + newPath
+            state.copy(sourceFolderPaths = nextPaths)
+        }
+    }
+
+    fun setDestination(path: String) = _uiState.update { it.copy(destinationFolderPath = path) }
 
     fun addExtension(ext: String) = _uiState.update {
-        val normalized = ext.lowercase().let { extension -> if (extension.startsWith(".")) extension else ".$extension" }
+        val normalized = ext.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
         if (normalized in it.fileExtensions) it
         else it.copy(fileExtensions = it.fileExtensions + normalized)
+    }
+
+    fun addExtensions(exts: List<String>) {
+        exts.forEach { addExtension(it) }
     }
 
     fun removeExtension(ext: String) = _uiState.update {
@@ -127,17 +167,42 @@ class RuleDetailViewModel @Inject constructor(
 
     fun setSchedule(schedule: RuleSchedule?) = _uiState.update { it.copy(schedule = schedule) }
 
+    fun setConflictPolicy(policy: ConflictPolicy) = _uiState.update { it.copy(conflictPolicy = policy) }
+
+    fun setOperationMode(mode: OperationMode) = _uiState.update { it.copy(operationMode = mode) }
+
+    fun setScanSubdirectories(enabled: Boolean) = _uiState.update { it.copy(scanSubdirectories = enabled) }
+
+    fun setIcon(icon: RuleIcon) = _uiState.update { it.copy(icon = icon) }
+
+    fun applyTemplate(template: RuleTemplate) {
+        _uiState.update { state ->
+            val mergedSources = (state.sourceFolderPaths + template.suggestedSourcePaths).distinct()
+            state.copy(
+                name = if (state.name.isBlank()) template.name else state.name,
+                fileExtensions = template.extensions,
+                operationMode = template.operationMode,
+                scanSubdirectories = template.scanSubdirectories,
+                sourceFolderPaths = mergedSources,
+                icon = template.suggestedIcon
+            )
+        }
+    }
+
+    fun dismissPreview() = _uiState.update { it.copy(previewFiles = null) }
+
+    fun loadPreview() = viewModelScope.launch {
+        val state = _uiState.value
+        if (state.sourceFolderPaths.isEmpty() || state.fileExtensions.isEmpty()) return@launch
+        _uiState.update { it.copy(isPreviewLoading = true, previewFiles = null) }
+        val rule = buildRuleFromState(state)
+        val files = previewRuleUseCase(rule)
+        _uiState.update { it.copy(previewFiles = files, isPreviewLoading = false) }
+    }
+
     fun save() = viewModelScope.launch {
         val state = _uiState.value
-        val rule = Rule(
-            id = state.id,
-            name = state.name.trim(),
-            sourceFolderUris = state.sourceFolderUris,
-            destinationFolderUri = state.destinationFolderUri,
-            fileExtensions = state.fileExtensions,
-            isEnabled = state.isEnabled,
-            schedule = state.schedule
-        )
+        val rule = buildRuleFromState(state)
 
         when (val result = validateRuleUseCase(rule)) {
             is ValidateRuleUseCase.Result.Invalid -> {
@@ -163,4 +228,18 @@ class RuleDetailViewModel @Inject constructor(
         rulesAutoExportTrigger.maybeExportAfterRuleChange()
         _uiState.update { it.copy(isSaved = true) }
     }
+
+    private fun buildRuleFromState(state: RuleDetailUiState) = Rule(
+        id = state.id,
+        name = state.name.trim(),
+        sourceFolderPaths = state.sourceFolderPaths,
+        destinationFolderPath = state.destinationFolderPath,
+        fileExtensions = state.fileExtensions,
+        isEnabled = state.isEnabled,
+        schedule = state.schedule,
+        conflictPolicy = state.conflictPolicy,
+        operationMode = state.operationMode,
+        scanSubdirectories = state.scanSubdirectories,
+        icon = state.icon
+    )
 }

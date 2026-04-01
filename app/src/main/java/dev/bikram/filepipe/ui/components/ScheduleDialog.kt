@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.ScheduleType
+import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,6 +43,7 @@ fun ScheduleDialog(
     onDismiss: () -> Unit,
     onSave: (RuleSchedule?) -> Unit
 ) {
+    val playTap = rememberPlayTapSound()
     var scheduleType by remember { mutableStateOf(initialSchedule?.type ?: ScheduleType.DAILY) }
     var hour by remember { mutableIntStateOf(initialSchedule?.hour ?: 2) }
     var minute by remember { mutableIntStateOf(initialSchedule?.minute ?: 0) }
@@ -158,6 +160,7 @@ fun ScheduleDialog(
         confirmButton = {
             Button(
                 onClick = {
+                    playTap()
                     onSave(
                         RuleSchedule(
                             type = scheduleType,
@@ -176,14 +179,23 @@ fun ScheduleDialog(
             Row {
                 if (initialSchedule != null) {
                     OutlinedButton(
-                        onClick = { onSave(null) },
+                        onClick = {
+                            playTap()
+                            onSave(null)
+                        },
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("Remove", color = MaterialTheme.colorScheme.error)
                     }
                     Spacer(Modifier.width(8.dp))
                 }
-                OutlinedButton(onClick = onDismiss, shape = RoundedCornerShape(12.dp)) {
+                OutlinedButton(
+                    onClick = {
+                        playTap()
+                        onDismiss()
+                    },
+                    shape = RoundedCornerShape(12.dp)
+                ) {
                     Text("Cancel")
                 }
             }

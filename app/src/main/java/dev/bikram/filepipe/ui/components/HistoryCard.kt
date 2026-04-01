@@ -42,12 +42,14 @@ fun HistoryCard(
             ) {
                 Text(
                     text = history.ruleName,
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.weight(1f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                StatusChip(status = history.status)
+                val noChanges = history.status == RunStatus.SUCCESS &&
+                    history.totalFilesMoved == 0 && history.totalFilesFailed == 0
+                StatusChip(status = history.status, noChanges = noChanges)
             }
 
             Spacer(Modifier.height(6.dp))
@@ -57,42 +59,39 @@ fun HistoryCard(
                 TriggerType.SCHEDULED -> "Scheduled"
             }
             val timeLabel = formatTime(history.startedAt)
-            Text(
-                text = "$triggerLabel · $timeLabel",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            if (history.totalFilesMoved > 0 || history.totalFilesFailed > 0) {
-                Spacer(Modifier.height(4.dp))
-                val summary = buildString {
+            val fileSummary = when {
+                history.totalFilesMoved == 0 && history.totalFilesFailed == 0 -> "No files affected"
+                else -> buildString {
                     if (history.totalFilesMoved > 0) append("${history.totalFilesMoved} moved")
                     if (history.totalFilesFailed > 0) {
                         if (isNotEmpty()) append(", ")
                         append("${history.totalFilesFailed} failed")
                     }
                 }
-                Text(
-                    text = summary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
             }
+            Text(
+                text = "$triggerLabel · $timeLabel · $fileSummary",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
 
 @Composable
-fun StatusChip(status: RunStatus, modifier: Modifier = Modifier) {
-    val (label, containerColor) = when (status) {
-        RunStatus.SUCCESS -> "Success" to MaterialTheme.colorScheme.primaryContainer
-        RunStatus.PARTIAL_FAILURE -> "Partial" to MaterialTheme.colorScheme.tertiaryContainer
-        RunStatus.FAILED -> "Failed" to MaterialTheme.colorScheme.errorContainer
-        RunStatus.IN_PROGRESS -> "Running" to MaterialTheme.colorScheme.secondaryContainer
+fun StatusChip(status: RunStatus, noChanges: Boolean = false, modifier: Modifier = Modifier) {
+    val (label, containerColor) = when {
+        noChanges -> "No changes" to MaterialTheme.colorScheme.surfaceVariant
+        else -> when (status) {
+            RunStatus.SUCCESS -> "Success" to MaterialTheme.colorScheme.primaryContainer
+            RunStatus.PARTIAL_FAILURE -> "Partial" to MaterialTheme.colorScheme.tertiaryContainer
+            RunStatus.FAILED -> "Failed" to MaterialTheme.colorScheme.errorContainer
+            RunStatus.IN_PROGRESS -> "Running" to MaterialTheme.colorScheme.secondaryContainer
+        }
     }
     AssistChip(
         onClick = {},
-        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
         modifier = modifier,
         colors = AssistChipDefaults.assistChipColors(containerColor = containerColor)
     )

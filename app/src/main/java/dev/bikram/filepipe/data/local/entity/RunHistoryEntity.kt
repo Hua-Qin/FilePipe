@@ -18,7 +18,8 @@ data class RunHistoryEntity(
     val totalFilesFound: Int = 0,
     val totalFilesMoved: Int = 0,
     val totalFilesFailed: Int = 0,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isReversed: Boolean = false
 )
 
 fun RunHistoryEntity.toDomain(): RunHistory = RunHistory(
@@ -32,5 +33,6 @@ fun RunHistoryEntity.toDomain(): RunHistory = RunHistory(
     totalFilesFound = totalFilesFound,
     totalFilesMoved = totalFilesMoved,
     totalFilesFailed = totalFilesFailed,
-    errorMessage = errorMessage
+    errorMessage = errorMessage,
+    isReversed = isReversed
 )

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Media Organizer</string>
+    <string name="app_name">File Pipe</string>
 
     <!-- Bottom nav labels -->
     <string name="nav_rules">Rules</string>
@@ -10,7 +10,7 @@
     <!-- Rules screen -->
     <string name="rules_empty_title">No rules yet</string>
     <string name="rules_empty_subtitle">Tap Add Rule to create your first organizing rule</string>
-    <string name="rules_add_rule">+ Add Rule</string>
+    <string name="rules_add_rule">Add Rule</string>
     <string name="rule_card_types">Types</string>
     <string name="rule_card_types_none">None</string>
     <string name="rule_card_from">From</string>
@@ -28,9 +28,17 @@
     <string name="add_source_folder">Add source folders</string>
     <string name="file_types_label">File Types</string>
     <string name="add_file_type">Add type</string>
-    <string name="destination_label">Destination Folder</string>
+    <string name="destination_label">To</string>
     <string name="pick_folder">Pick folder</string>
     <string name="change_destination">Change destination</string>
+    <string name="rule_icon_picker_cd">Choose rule icon</string>
+    <string name="rule_icon_label_default">Default</string>
+    <string name="rule_icon_label_image">Images</string>
+    <string name="rule_icon_label_screenshot">Screenshots</string>
+    <string name="rule_icon_label_video">Video</string>
+    <string name="rule_icon_label_music">Music</string>
+    <string name="rule_icon_label_download">Downloads</string>
+    <string name="rule_icon_label_document">Documents</string>
     <string name="rule_section_extensions_title">File extensions</string>
     <string name="rule_section_extensions_subtitle">Which file types this rule applies to</string>
     <string name="rule_section_source_subtitle">Scan files from these folders</string>
@@ -85,11 +93,11 @@
 
     <!-- Permission screen -->
     <string name="permission_title">Storage Access Required</string>
-    <string name="permission_message">Media Organizer needs access to all files to move media between folders. Please grant \"All files access\" in the next screen.</string>
+    <string name="permission_message">File Pipe needs access to all files to move media between folders. Please grant \"All files access\" in the next screen.</string>
     <string name="permission_grant">Grant Access</string>
 
     <!-- Notification -->
-    <string name="notification_channel_name">File Organizer</string>
+    <string name="notification_channel_name">File Pipe</string>
     <string name="notification_channel_desc">Shows progress when organizing files</string>
     <string name="notification_running">Running: %s</string>
 
@@ -110,9 +118,43 @@
     <string name="theme_dark">Dark</string>
     <string name="theme_system">System</string>
     <string name="theme_material_you">Material You</string>
-    <string name="settings_material_you_hint">Uses wallpaper colors on Android 12+. Black (OLED) keeps dark surfaces and uses these accents.</string>
+    <string name="settings_material_you_hint">Uses wallpaper colors on Android 12+.</string>
     <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
     <string name="theme_black">Black (OLED)</string>
+
+    <!-- Rule detail — new fields -->
+    <string name="preview_rule">Preview matching files</string>
+    <string name="rule_scan_subdirs_label">Scan subdirectories</string>
+    <string name="rule_section_operation_title">Operation</string>
+    <string name="rule_operation_mode_label">Mode</string>
+    <string name="operation_move">Move</string>
+    <string name="operation_copy">Copy</string>
+    <string name="rule_conflict_policy_label">If file already exists</string>
+    <string name="conflict_skip">Skip</string>
+    <string name="conflict_overwrite">Overwrite</string>
+    <string name="conflict_rename">Rename</string>
+
+    <!-- Preview sheet -->
+    <string name="preview_title">Preview</string>
+    <string name="preview_empty">No matching files found in the selected source folders.</string>
+    <string name="preview_count">%d file(s) would be affected</string>
+
+    <!-- Template picker -->
+    <string name="template_picker_title">Start from a template</string>
+    <string name="template_skip">Start blank</string>
+
+    <!-- Settings — history section -->
+    <string name="settings_history_section">History</string>
+    <string name="settings_log_retention">Log retention</string>
+    <string name="settings_log_retention_hint">How long to keep run history records.</string>
+
+    <!-- Notification — run summary -->
+    <string name="notification_summary_channel_name">Run Summary</string>
+    <string name="notification_summary_channel_desc">Shows a summary after each rule run completes</string>
+    <string name="notification_summary_title">%s complete</string>
+    <string name="notification_summary_body_moved">%d files moved</string>
+    <string name="notification_summary_body_copied">%d files copied</string>
+    <string name="notification_summary_body_partial">%1$d moved, %2$d failed</string>
 
     <!-- Days of week -->
     <string-array name="days_of_week">

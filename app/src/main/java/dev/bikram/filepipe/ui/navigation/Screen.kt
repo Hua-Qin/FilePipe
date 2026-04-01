@@ -15,4 +15,9 @@ sealed class Screen(val route: String) {
         fun createRoute(historyId: Long) = "history_detail/$historyId"
         const val ARG_HISTORY_ID = "historyId"
     }
+
+    data object HistoryForRule : Screen("history_for_rule/{ruleId}") {
+        fun createRoute(ruleId: Long) = "history_for_rule/$ruleId"
+        const val ARG_RULE_ID = "ruleId"
+    }
 }

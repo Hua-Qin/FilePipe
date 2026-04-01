@@ -1,131 +1,114 @@
 package dev.bikram.filepipe.data.repository
 
-import android.content.Context
-import android.net.Uri
-import android.provider.DocumentsContract
-import androidx.documentfile.provider.DocumentFile
+import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
-import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.domain.model.OperationMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
 import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class FileOperationRepository @Inject constructor(
-    @param:ApplicationContext private val context: Context
-) {
+class FileOperationRepository @Inject constructor() {
+
     /**
-     * Lists all files in the given SAF tree URI whose extensions match the provided list.
-     * Uses a single ContentResolver query (efficient for large directories).
+     * Lists all files in the given folder whose extensions match the provided list.
+     * Optionally scans subdirectories up to [maxDepth] levels deep.
      */
     suspend fun listMatchingFiles(
-        folderUriString: String,
-        extensions: List<String>
+        folderPath: String,
+        extensions: List<String>,
+        scanSubdirectories: Boolean = false,
+        maxDepth: Int = 5
     ): List<FileEntry> = withContext(Dispatchers.IO) {
-        val treeUri = Uri.parse(folderUriString)
-        val lowerExtensions = extensions.map { it.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" } }
+        val folder = File(folderPath)
+        if (!folder.exists() || !folder.canRead()) return@withContext emptyList()
 
-        val childrenUri = try {
-            DocumentsContract.buildChildDocumentsUriUsingTree(
-                treeUri,
-                DocumentsContract.getTreeDocumentId(treeUri)
-            )
-        } catch (e: Exception) {
-            return@withContext emptyList()
+        val lowerExtensions = extensions.map { it.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" } }.toSet()
+
+        if (scanSubdirectories) {
+            folder.walkTopDown()
+                .maxDepth(maxDepth)
+                .filter { it.isFile && ".${it.extension.lowercase()}" in lowerExtensions }
+                .map { FileEntry(it) }
+                .toList()
+        } else {
+            folder.listFiles()
+                ?.filter { it.isFile && ".${it.extension.lowercase()}" in lowerExtensions }
+                ?.map { FileEntry(it) }
+                ?: emptyList()
         }
-
-        val results = mutableListOf<FileEntry>()
-        val cursor = context.contentResolver.query(
-            childrenUri,
-            arrayOf(
-                DocumentsContract.Document.COLUMN_DOCUMENT_ID,
-                DocumentsContract.Document.COLUMN_DISPLAY_NAME,
-                DocumentsContract.Document.COLUMN_MIME_TYPE,
-                DocumentsContract.Document.COLUMN_SIZE
-            ),
-            null, null, null
-        ) ?: return@withContext emptyList()
-
-        cursor.use {
-            while (it.moveToNext()) {
-                val docId = it.getString(0) ?: continue
-                val name = it.getString(1) ?: continue
-                val mimeType = it.getString(2) ?: continue
-                val size = it.getLong(3)
-
-                // Skip directories
-                if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) continue
-
-                val nameLower = name.lowercase()
-                val matches = lowerExtensions.any { ext -> nameLower.endsWith(ext) }
-                if (!matches) continue
-
-                val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-                results.add(FileEntry(docUri, name, mimeType, size))
-            }
-        }
-        results
     }
 
     /**
-     * Moves a file to the destination folder.
-     * Copy + delete strategy via ContentResolver streams.
+     * Moves or copies a file to the destination folder, applying the given conflict policy.
      */
     suspend fun moveFile(
         sourceEntry: FileEntry,
-        destFolderUriString: String
+        destFolderPath: String,
+        conflictPolicy: ConflictPolicy,
+        operationMode: OperationMode
     ): FileMoved = withContext(Dispatchers.IO) {
-        val destFolderUri = Uri.parse(destFolderUriString)
-        val destFolder = DocumentFile.fromTreeUri(context, destFolderUri)
-        if (destFolder == null || !destFolder.exists()) {
+        val destFolder = File(destFolderPath)
+        if (!destFolder.exists() || !destFolder.canWrite()) {
             return@withContext FileMoved(
                 fileName = sourceEntry.name,
-                sourceUri = sourceEntry.uri.toString(),
+                sourceUri = sourceEntry.file.absolutePath,
                 destinationUri = "",
                 fileSizeBytes = sourceEntry.size,
                 success = false,
-                errorMessage = "Destination folder not accessible"
+                errorMessage = "Destination folder not accessible: $destFolderPath"
             )
         }
 
-        // createFile auto-renames if a file with the same name already exists
-        val destFile = destFolder.createFile(sourceEntry.mimeType, sourceEntry.name)
-        if (destFile == null) {
-            return@withContext FileMoved(
-                fileName = sourceEntry.name,
-                sourceUri = sourceEntry.uri.toString(),
-                destinationUri = "",
-                fileSizeBytes = sourceEntry.size,
-                success = false,
-                errorMessage = "Failed to create destination file"
-            )
+        val existingDest = File(destFolder, sourceEntry.name)
+        if (existingDest.exists()) {
+            when (conflictPolicy) {
+                ConflictPolicy.SKIP -> {
+                    return@withContext FileMoved(
+                        fileName = sourceEntry.name,
+                        sourceUri = sourceEntry.file.absolutePath,
+                        destinationUri = existingDest.absolutePath,
+                        fileSizeBytes = sourceEntry.size,
+                        success = true,
+                        skipped = true
+                    )
+                }
+                ConflictPolicy.OVERWRITE -> {
+                    existingDest.delete()
+                }
+                ConflictPolicy.RENAME_SUFFIX -> {
+                    // handled by resolveDestFile below
+                }
+            }
+        }
+
+        val destFile = if (conflictPolicy == ConflictPolicy.RENAME_SUFFIX) {
+            resolveDestFile(sourceEntry.name, destFolder)
+        } else {
+            File(destFolder, sourceEntry.name)
         }
 
         return@withContext try {
-            context.contentResolver.openInputStream(sourceEntry.uri)?.use { input ->
-                context.contentResolver.openOutputStream(destFile.uri)?.use { output ->
-                    input.copyTo(output)
-                }
+            sourceEntry.file.copyTo(destFile, overwrite = false)
+            if (operationMode == OperationMode.MOVE) {
+                sourceEntry.file.delete()
             }
-            // Delete source to complete the "move"
-            DocumentsContract.deleteDocument(context.contentResolver, sourceEntry.uri)
-
             FileMoved(
                 fileName = sourceEntry.name,
-                sourceUri = sourceEntry.uri.toString(),
-                destinationUri = destFile.uri.toString(),
+                sourceUri = sourceEntry.file.absolutePath,
+                destinationUri = destFile.absolutePath,
                 fileSizeBytes = sourceEntry.size,
                 success = true
             )
         } catch (e: IOException) {
-            // Clean up partial destination file on failure
             try { destFile.delete() } catch (_: Exception) {}
             FileMoved(
                 fileName = sourceEntry.name,
-                sourceUri = sourceEntry.uri.toString(),
-                destinationUri = destFile.uri.toString(),
+                sourceUri = sourceEntry.file.absolutePath,
+                destinationUri = destFile.absolutePath,
                 fileSizeBytes = sourceEntry.size,
                 success = false,
                 errorMessage = e.message ?: "IO error"
@@ -133,17 +116,28 @@ class FileOperationRepository @Inject constructor(
         }
     }
 
-    fun hasPersistedPermission(uriString: String): Boolean {
-        val uri = Uri.parse(uriString)
-        return context.contentResolver.persistedUriPermissions.any {
-            it.uri == uri && it.isReadPermission && it.isWritePermission
+    fun isAccessible(folderPath: String): Boolean {
+        val folder = File(folderPath)
+        return folder.exists() && folder.canRead()
+    }
+
+    private fun resolveDestFile(name: String, destFolder: File): File {
+        var destFile = File(destFolder, name)
+        if (!destFile.exists()) return destFile
+        val ext = name.substringAfterLast('.', "")
+        val base = if (ext.isNotEmpty()) name.dropLast(ext.length + 1) else name
+        var n = 1
+        while (true) {
+            val candidate = if (ext.isNotEmpty()) "$base($n).$ext" else "$base($n)"
+            destFile = File(destFolder, candidate)
+            if (!destFile.exists()) return destFile
+            n++
         }
     }
 }
 
 data class FileEntry(
-    val uri: Uri,
-    val name: String,
-    val mimeType: String,
-    val size: Long
+    val file: File,
+    val name: String = file.name,
+    val size: Long = file.length()
 )

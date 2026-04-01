@@ -1,9 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base theme: no action bar, Compose handles the UI -->
-    <style name="Theme.MediaOrganizer" parent="android:Theme.Material.Light.NoActionBar">
+    <!--
+      DayNight + AppCompatDelegate lets in-app Light/Dark follow user choice instead of
+      system "extended dark" / force-dark tinting light UIs on newer Android releases.
+    -->
+    <style name="Theme.FilePipe" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>
+        <item name="android:forceDarkAllowed">false</item>
     </style>
 </resources>

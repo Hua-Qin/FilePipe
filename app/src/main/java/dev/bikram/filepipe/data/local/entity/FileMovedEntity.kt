@@ -27,6 +27,7 @@ data class FileMovedEntity(
     val fileSizeBytes: Long,
     val movedAt: Long,
     val success: Boolean,
+    val skipped: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -39,6 +40,7 @@ fun FileMovedEntity.toDomain(): FileMoved = FileMoved(
     fileSizeBytes = fileSizeBytes,
     movedAt = movedAt,
     success = success,
+    skipped = skipped,
     errorMessage = errorMessage
 )
 
@@ -51,5 +53,6 @@ fun FileMoved.toEntity(runHistoryId: Long): FileMovedEntity = FileMovedEntity(
     fileSizeBytes = fileSizeBytes,
     movedAt = movedAt,
     success = success,
+    skipped = skipped,
     errorMessage = errorMessage
 )

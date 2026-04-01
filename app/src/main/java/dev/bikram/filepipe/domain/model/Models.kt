@@ -1,15 +1,23 @@
 package dev.bikram.filepipe.domain.model
 
+enum class ConflictPolicy { SKIP, OVERWRITE, RENAME_SUFFIX }
+
+enum class OperationMode { MOVE, COPY }
+
 data class Rule(
     val id: Long = 0,
     val name: String,
-    val sourceFolderUris: List<String>,
-    val destinationFolderUri: String,
+    val sourceFolderPaths: List<String>,
+    val destinationFolderPath: String,
     val fileExtensions: List<String>,
     val isEnabled: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
-    val schedule: RuleSchedule? = null
+    val schedule: RuleSchedule? = null,
+    val conflictPolicy: ConflictPolicy = ConflictPolicy.RENAME_SUFFIX,
+    val operationMode: OperationMode = OperationMode.MOVE,
+    val scanSubdirectories: Boolean = false,
+    val icon: RuleIcon = RuleIcon.DEFAULT
 )
 
 enum class ScheduleType { DAILY, WEEKLY }
@@ -34,7 +42,8 @@ data class RunHistory(
     val totalFilesFound: Int = 0,
     val totalFilesMoved: Int = 0,
     val totalFilesFailed: Int = 0,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isReversed: Boolean = false
 )
 
 enum class TriggerType { MANUAL, SCHEDULED }
@@ -52,6 +61,7 @@ data class FileMoved(
     val fileSizeBytes: Long,
     val movedAt: Long = System.currentTimeMillis(),
     val success: Boolean,
+    val skipped: Boolean = false,
     val errorMessage: String? = null
 )
 
@@ -65,12 +75,13 @@ data class RunResult(
     val startedAt: Long,
     val completedAt: Long
 ) {
-    val totalMoved: Int get() = filesMoved.count { it.success }
-    val totalFailed: Int get() = filesMoved.count { !it.success }
+    val totalMoved: Int get() = filesMoved.count { it.success && !it.skipped }
+    val totalSkipped: Int get() = filesMoved.count { it.skipped }
+    val totalFailed: Int get() = filesMoved.count { !it.success && !it.skipped }
     val status: RunStatus get() = when {
         filesMoved.isEmpty() -> RunStatus.SUCCESS
         totalFailed == 0 -> RunStatus.SUCCESS
-        totalMoved == 0 -> RunStatus.FAILED
+        totalMoved == 0 && totalSkipped == 0 -> RunStatus.FAILED
         else -> RunStatus.PARTIAL_FAILURE
     }
 }

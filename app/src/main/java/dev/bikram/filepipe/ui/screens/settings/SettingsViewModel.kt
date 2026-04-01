@@ -8,6 +8,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dev.bikram.filepipe.data.preferences.AppThemeMode
+import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.ImportRulesUseCase
@@ -90,6 +91,18 @@ class SettingsViewModel @Inject constructor(
         )
     }
 
+    fun setLogRetentionDays(days: Int) = viewModelScope.launch {
+        userPreferencesRepository.setLogRetentionDays(days)
+    }
+
+    fun setSwipeStartToEnd(action: SwipeAction) = viewModelScope.launch {
+        userPreferencesRepository.setSwipeStartToEnd(action)
+    }
+
+    fun setSwipeEndToStart(action: SwipeAction) = viewModelScope.launch {
+        userPreferencesRepository.setSwipeEndToStart(action)
+    }
+
     fun exportNow() = viewModelScope.launch {
         val folder = userPreferencesRepository.getPreferencesSnapshot().exportFolderUri
         if (folder.isBlank()) {
@@ -97,7 +110,7 @@ class SettingsViewModel @Inject constructor(
             return@launch
         }
         exportRulesUseCase.exportRulesToTreeUri(folder).fold(
-            onSuccess = { _userMessage.value = "Rules exported to ${ExportRulesUseCase.EXPORT_FILE_NAME}" },
+            onSuccess = { _userMessage.value = "Rules exported successfully" },
             onFailure = { _userMessage.value = "Export failed: ${it.message}" }
         )
     }

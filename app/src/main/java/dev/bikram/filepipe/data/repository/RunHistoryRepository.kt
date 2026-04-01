@@ -23,6 +23,9 @@ class RunHistoryRepository @Inject constructor(
     fun getAllHistory(): Flow<List<RunHistory>> =
         runHistoryDao.getAllHistory().map { it.map { entity -> entity.toDomain() } }
 
+    fun getHistoryForRule(ruleId: Long): Flow<List<RunHistory>> =
+        runHistoryDao.getHistoryForRule(ruleId).map { it.map { entity -> entity.toDomain() } }
+
     suspend fun getHistoryById(id: Long): RunHistory? =
         runHistoryDao.getHistoryById(id)?.toDomain()
 
@@ -64,6 +67,7 @@ class RunHistoryRepository @Inject constructor(
                     fileSizeBytes = fileMoved.fileSizeBytes,
                     movedAt = fileMoved.movedAt,
                     success = fileMoved.success,
+                    skipped = fileMoved.skipped,
                     errorMessage = fileMoved.errorMessage
                 )
             }
@@ -79,6 +83,21 @@ class RunHistoryRepository @Inject constructor(
                 errorMessage = errorMessage
             )
         )
+    }
+
+    suspend fun markRunReversed(historyId: Long) {
+        val history = runHistoryDao.getHistoryById(historyId) ?: return
+        runHistoryDao.updateHistory(history.copy(isReversed = true))
+    }
+
+    suspend fun deleteHistoryById(historyId: Long) {
+        runHistoryDao.deleteHistoryById(historyId)
+    }
+
+    suspend fun pruneOldHistory(retentionDays: Int) {
+        if (retentionDays <= 0) return
+        val threshold = System.currentTimeMillis() - (retentionDays * 86_400_000L)
+        runHistoryDao.deleteHistoryOlderThan(threshold)
     }
 
     suspend fun clearAllHistory() {

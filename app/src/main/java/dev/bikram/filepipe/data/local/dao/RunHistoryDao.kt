@@ -28,6 +28,9 @@ interface RunHistoryDao {
     @Query("DELETE FROM run_history WHERE startedAt < :olderThan")
     suspend fun deleteHistoryOlderThan(olderThan: Long)
 
+    @Query("DELETE FROM run_history WHERE id = :id")
+    suspend fun deleteHistoryById(id: Long)
+
     @Query("DELETE FROM run_history")
     suspend fun deleteAllHistory()
 }

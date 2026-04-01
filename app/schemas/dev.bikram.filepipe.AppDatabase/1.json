@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "10b191f4dbd110bda2449c074e142849",
+    "identityHash": "68c8789c193f92c97cea50ddca5dc35e",
     "entities": [
       {
         "tableName": "rules",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `sourceFolderUris` TEXT NOT NULL, `destinationFolderUri` TEXT NOT NULL, `fileExtensions` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `scheduleType` TEXT, `scheduleDayOfWeek` INTEGER, `scheduleHour` INTEGER, `scheduleMinute` INTEGER, `workManagerTag` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `sourceFolderPaths` TEXT NOT NULL, `destinationFolderPath` TEXT NOT NULL, `fileExtensions` TEXT NOT NULL, `isEnabled` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `scheduleType` TEXT, `scheduleDayOfWeek` INTEGER, `scheduleHour` INTEGER, `scheduleMinute` INTEGER, `workManagerTag` TEXT, `conflictPolicy` TEXT NOT NULL, `operationMode` TEXT NOT NULL, `scanSubdirectories` INTEGER NOT NULL, `iconKey` TEXT NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -21,14 +21,14 @@
             "notNull": true
           },
           {
-            "fieldPath": "sourceFolderUris",
-            "columnName": "sourceFolderUris",
+            "fieldPath": "sourceFolderPaths",
+            "columnName": "sourceFolderPaths",
             "affinity": "TEXT",
             "notNull": true
           },
           {
-            "fieldPath": "destinationFolderUri",
-            "columnName": "destinationFolderUri",
+            "fieldPath": "destinationFolderPath",
+            "columnName": "destinationFolderPath",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -80,6 +80,30 @@
             "fieldPath": "workManagerTag",
             "columnName": "workManagerTag",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "conflictPolicy",
+            "columnName": "conflictPolicy",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operationMode",
+            "columnName": "operationMode",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "scanSubdirectories",
+            "columnName": "scanSubdirectories",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iconKey",
+            "columnName": "iconKey",
+            "affinity": "TEXT",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -91,7 +115,7 @@
       },
       {
         "tableName": "run_history",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ruleId` INTEGER, `ruleName` TEXT NOT NULL, `triggeredBy` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `completedAt` INTEGER, `status` TEXT NOT NULL, `totalFilesFound` INTEGER NOT NULL, `totalFilesMoved` INTEGER NOT NULL, `totalFilesFailed` INTEGER NOT NULL, `errorMessage` TEXT)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `ruleId` INTEGER, `ruleName` TEXT NOT NULL, `triggeredBy` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `completedAt` INTEGER, `status` TEXT NOT NULL, `totalFilesFound` INTEGER NOT NULL, `totalFilesMoved` INTEGER NOT NULL, `totalFilesFailed` INTEGER NOT NULL, `errorMessage` TEXT, `isReversed` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -155,6 +179,12 @@
             "fieldPath": "errorMessage",
             "columnName": "errorMessage",
             "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isReversed",
+            "columnName": "isReversed",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -166,7 +196,7 @@
       },
       {
         "tableName": "files_moved",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `runHistoryId` INTEGER NOT NULL, `fileName` TEXT NOT NULL, `sourceUri` TEXT NOT NULL, `destinationUri` TEXT NOT NULL, `fileSizeBytes` INTEGER NOT NULL, `movedAt` INTEGER NOT NULL, `success` INTEGER NOT NULL, `errorMessage` TEXT, FOREIGN KEY(`runHistoryId`) REFERENCES `run_history`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `runHistoryId` INTEGER NOT NULL, `fileName` TEXT NOT NULL, `sourceUri` TEXT NOT NULL, `destinationUri` TEXT NOT NULL, `fileSizeBytes` INTEGER NOT NULL, `movedAt` INTEGER NOT NULL, `success` INTEGER NOT NULL, `skipped` INTEGER NOT NULL, `errorMessage` TEXT, FOREIGN KEY(`runHistoryId`) REFERENCES `run_history`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "id",
@@ -217,6 +247,12 @@
             "notNull": true
           },
           {
+            "fieldPath": "skipped",
+            "columnName": "skipped",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
             "fieldPath": "errorMessage",
             "columnName": "errorMessage",
             "affinity": "TEXT"
@@ -256,7 +292,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '10b191f4dbd110bda2449c074e142849')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '68c8789c193f92c97cea50ddca5dc35e')"
     ]
   }
 }

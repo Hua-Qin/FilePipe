@@ -40,8 +40,12 @@ class ExecuteRulesUseCase @Inject constructor(
 
         try {
             // Collect all matching files across all source folders
-            val fileEntries = rule.sourceFolderUris.flatMap { sourceUri ->
-                fileOperationRepository.listMatchingFiles(sourceUri, rule.fileExtensions)
+            val fileEntries = rule.sourceFolderPaths.flatMap { sourcePath ->
+                fileOperationRepository.listMatchingFiles(
+                    folderPath = sourcePath,
+                    extensions = rule.fileExtensions,
+                    scanSubdirectories = rule.scanSubdirectories
+                )
             }
 
             val total = fileEntries.size
@@ -52,12 +56,17 @@ class ExecuteRulesUseCase @Inject constructor(
                         ruleName = rule.name,
                         progress = index.toFloat() / total.coerceAtLeast(1),
                         currentFileName = entry.name,
-                        filesMoved = allFiles.count { it.success },
+                        filesMoved = allFiles.count { it.success && !it.skipped },
                         totalFiles = total
                     )
                 )
 
-                val result = fileOperationRepository.moveFile(entry, rule.destinationFolderUri)
+                val result = fileOperationRepository.moveFile(
+                    sourceEntry = entry,
+                    destFolderPath = rule.destinationFolderPath,
+                    conflictPolicy = rule.conflictPolicy,
+                    operationMode = rule.operationMode
+                )
                 allFiles.add(result)
             }
         } catch (e: Exception) {

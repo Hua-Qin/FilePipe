@@ -33,6 +33,7 @@ import dev.bikram.filepipe.ui.screens.historydetail.HistoryDetailScreen
 import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
+import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 
 private data class BottomNavItem(
     val screen: Screen,
@@ -64,6 +65,7 @@ private val bottomNavItems = listOf(
 
 @Composable
 fun AppNavigation() {
+    val playTap = rememberPlayTapSound()
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
@@ -83,6 +85,7 @@ fun AppNavigation() {
                         NavigationBarItem(
                             selected = selected,
                             onClick = {
+                                playTap()
                                 navController.navigate(item.screen.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
@@ -127,6 +130,9 @@ fun AppNavigation() {
                             launchSingleTop = true
                             restoreState = true
                         }
+                    },
+                    onNavigateToRuleHistory = { ruleId ->
+                        navController.navigate(Screen.HistoryForRule.createRoute(ruleId))
                     }
                 )
             }
@@ -158,6 +164,19 @@ fun AppNavigation() {
                 })
             ) {
                 HistoryDetailScreen(onNavigateBack = { navController.popBackStack() })
+            }
+            composable(
+                route = Screen.HistoryForRule.route,
+                arguments = listOf(navArgument(Screen.HistoryForRule.ARG_RULE_ID) {
+                    type = NavType.LongType
+                })
+            ) {
+                HistoryScreen(
+                    onHistoryClick = { historyId ->
+                        navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                    },
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
         }
     }

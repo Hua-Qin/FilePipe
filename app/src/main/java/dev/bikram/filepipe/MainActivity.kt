@@ -22,7 +22,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -33,9 +35,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.ui.navigation.AppNavigation
-import dev.bikram.filepipe.ui.theme.MediaOrganizerTheme
+import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.theme.FilePipeTheme
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -56,7 +60,16 @@ class MainActivity : ComponentActivity() {
             val preferences by userPreferencesRepository.preferencesFlow
                 .collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
 
-            MediaOrganizerTheme(
+            SideEffect {
+                val nightMode = when (preferences.themeMode) {
+                    AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
+                    AppThemeMode.DARK, AppThemeMode.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
+                    AppThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                }
+                AppCompatDelegate.setDefaultNightMode(nightMode)
+            }
+
+            FilePipeTheme(
                 themeMode = preferences.themeMode,
                 useMaterialYou = preferences.useMaterialYou
             ) {
@@ -84,6 +97,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun PermissionRequiredScreen(onGrantPermission: () -> Unit) {
+    val playTap = rememberPlayTapSound()
     Surface(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
@@ -112,7 +126,10 @@ private fun PermissionRequiredScreen(onGrantPermission: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(32.dp))
-            Button(onClick = onGrantPermission) {
+            Button(onClick = {
+                playTap()
+                onGrantPermission()
+            }) {
                 Text(stringResource(R.string.permission_grant))
             }
         }

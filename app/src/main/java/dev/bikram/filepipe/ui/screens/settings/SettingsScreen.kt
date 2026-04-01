@@ -1,6 +1,6 @@
 package dev.bikram.filepipe.ui.screens.settings
 
-import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -23,6 +23,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -34,11 +36,12 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +51,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
+import dev.bikram.filepipe.data.preferences.SwipeAction
+import dev.bikram.filepipe.ui.components.displayPath
+import dev.bikram.filepipe.ui.components.safTreeUriToPath
+import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 
 private val themePickerOrder = listOf(
     AppThemeMode.SYSTEM,
@@ -62,20 +69,19 @@ fun SettingsScreen(
     contentPadding: PaddingValues,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val playTap = rememberPlayTapSound()
     val preferences by viewModel.preferencesFlow.collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
     val topAppBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(topAppBarState)
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
 
     val folderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
-    ) { uri ->
+    ) { uri: Uri? ->
         if (uri != null) {
-            val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-            context.contentResolver.takePersistableUriPermission(uri, flags)
-            viewModel.setExportFolderUri(uri.toString())
+            val path = safTreeUriToPath(uri)
+            if (path != null) viewModel.setExportFolderUri(path)
         }
     }
 
@@ -101,7 +107,12 @@ fun SettingsScreen(
                 scrollBehavior = scrollBehavior
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = {
+            SnackbarHost(
+                snackbarHostState,
+                modifier = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
+            )
+        }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -133,7 +144,10 @@ fun SettingsScreen(
                                     .fillMaxWidth()
                                     .selectable(
                                         selected = selected,
-                                        onClick = { viewModel.setThemeMode(mode) },
+                                        onClick = {
+                                            playTap()
+                                            viewModel.setThemeMode(mode)
+                                        },
                                         role = Role.RadioButton
                                     )
                                     .padding(vertical = 4.dp),
@@ -169,7 +183,90 @@ fun SettingsScreen(
                             }
                             Switch(
                                 checked = preferences.useMaterialYou,
-                                onCheckedChange = { viewModel.setUseMaterialYou(it) }
+                                onCheckedChange = { enabled ->
+                                    playTap()
+                                    viewModel.setUseMaterialYou(enabled)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Swipe actions",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Swipe right →", style = MaterialTheme.typography.bodyLarge)
+                            SwipeActionDropdown(
+                                current = preferences.swipeStartToEnd,
+                                excluded = preferences.swipeEndToStart,
+                                onSelect = { viewModel.setSwipeStartToEnd(it) }
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("← Swipe left", style = MaterialTheme.typography.bodyLarge)
+                            SwipeActionDropdown(
+                                current = preferences.swipeEndToStart,
+                                excluded = preferences.swipeStartToEnd,
+                                onSelect = { viewModel.setSwipeEndToStart(it) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
+                ElevatedCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.elevatedCardColors(),
+                    elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            text = stringResource(R.string.settings_history_section),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = stringResource(R.string.settings_log_retention),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Text(
+                                    text = stringResource(R.string.settings_log_retention_hint),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            LogRetentionDropdown(
+                                currentDays = preferences.logRetentionDays,
+                                onSelect = { viewModel.setLogRetentionDays(it) }
                             )
                         }
                     }
@@ -196,7 +293,7 @@ fun SettingsScreen(
                         )
                         val folderLabel = preferences.exportFolderUri
                             .takeIf { it.isNotBlank() }
-                            ?.let { uri -> uri.takeLast(48) }
+                            ?.let { path -> displayPath(path) }
                             ?: stringResource(R.string.settings_no_folder_chosen)
                         Text(
                             text = folderLabel,
@@ -204,7 +301,10 @@ fun SettingsScreen(
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
                         OutlinedButton(
-                            onClick = { folderLauncher.launch(null) },
+                            onClick = {
+                                playTap()
+                                folderLauncher.launch(null)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.FolderOpen, contentDescription = null)
@@ -216,13 +316,19 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             OutlinedButton(
-                                onClick = { viewModel.exportNow() },
+                                onClick = {
+                                    playTap()
+                                    viewModel.exportNow()
+                                },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text(stringResource(R.string.settings_export_now))
                             }
                             OutlinedButton(
-                                onClick = { importLauncher.launch("application/json") },
+                                onClick = {
+                                    playTap()
+                                    importLauncher.launch("application/json")
+                                },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text(stringResource(R.string.settings_import_rules))
@@ -247,7 +353,10 @@ fun SettingsScreen(
                             }
                             Switch(
                                 checked = preferences.autoExportOnRuleChange,
-                                onCheckedChange = { viewModel.setAutoExportOnChange(it) }
+                                onCheckedChange = { enabled ->
+                                    playTap()
+                                    viewModel.setAutoExportOnChange(enabled)
+                                }
                             )
                         }
                         Spacer(Modifier.height(8.dp))
@@ -269,7 +378,10 @@ fun SettingsScreen(
                             }
                             Switch(
                                 checked = preferences.scheduledExportEnabled,
-                                onCheckedChange = { viewModel.setScheduledExportEnabled(it) }
+                                onCheckedChange = { enabled ->
+                                    playTap()
+                                    viewModel.setScheduledExportEnabled(enabled)
+                                }
                             )
                         }
                     }
@@ -285,6 +397,77 @@ fun SettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 24.dp, bottom = 8.dp)
+                )
+            }
+        }
+    }
+}
+
+private val LOG_RETENTION_OPTIONS = listOf(7, 14, 30, 90, -1)
+
+@Composable
+private fun logRetentionLabel(days: Int): String = when (days) {
+    7 -> "7 days"
+    14 -> "14 days"
+    30 -> "30 days"
+    90 -> "90 days"
+    else -> "Never"
+}
+
+@Composable
+private fun LogRetentionDropdown(currentDays: Int, onSelect: (Int) -> Unit) {
+    val playTap = rememberPlayTapSound()
+    var expanded by remember { mutableStateOf(false) }
+    OutlinedButton(onClick = {
+        playTap()
+        expanded = true
+    }) {
+        Text(logRetentionLabel(currentDays))
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            LOG_RETENTION_OPTIONS.forEach { option ->
+                DropdownMenuItem(
+                    text = { Text(logRetentionLabel(option)) },
+                    onClick = {
+                        playTap()
+                        onSelect(option)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun swipeActionLabel(action: SwipeAction): String = when (action) {
+    SwipeAction.DELETE -> "Delete"
+    SwipeAction.EDIT -> "Edit"
+    SwipeAction.DUPLICATE -> "Duplicate"
+    SwipeAction.VIEW_HISTORY -> "View history"
+}
+
+@Composable
+private fun SwipeActionDropdown(
+    current: SwipeAction,
+    excluded: SwipeAction,
+    onSelect: (SwipeAction) -> Unit
+) {
+    val playTap = rememberPlayTapSound()
+    var expanded by remember { mutableStateOf(false) }
+    OutlinedButton(onClick = {
+        playTap()
+        expanded = true
+    }) {
+        Text(swipeActionLabel(current))
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            SwipeAction.entries.filter { it != excluded }.forEach { action ->
+                DropdownMenuItem(
+                    text = { Text(swipeActionLabel(action)) },
+                    onClick = {
+                        playTap()
+                        onSelect(action)
+                        expanded = false
+                    }
                 )
             }
         }
