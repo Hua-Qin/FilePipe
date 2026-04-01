@@ -1,0 +1,528 @@
+package dev.bikram.filepipe.ui.screens.rules
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Deselect
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.Text
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.graphics.vector.ImageVector
+import dev.bikram.filepipe.R
+import dev.bikram.filepipe.data.preferences.SwipeAction
+import dev.bikram.filepipe.domain.model.Rule
+import dev.bikram.filepipe.ui.components.RuleCard
+import dev.bikram.filepipe.ui.feedback.performSwipeThresholdHaptic
+import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RulesScreen(
+    contentPadding: PaddingValues,
+    onCreateRule: () -> Unit,
+    onEditRule: (Long) -> Unit,
+    onNavigateToHistoryDetail: (Long) -> Unit,
+    onNavigateToHistoryList: () -> Unit,
+    onNavigateToRuleHistory: (Long) -> Unit,
+    viewModel: RulesViewModel = hiltViewModel()
+) {
+    val playTap = rememberPlayTapSound()
+    val rules by viewModel.rules.collectAsStateWithLifecycle()
+    val selectedRuleIds by viewModel.selectedRuleIds.collectAsStateWithLifecycle()
+    val progressMap by viewModel.progressMap.collectAsStateWithLifecycle()
+    val isRunning by viewModel.isRunning.collectAsStateWithLifecycle()
+    val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
+    val isCompactMode by viewModel.isCompactMode.collectAsStateWithLifecycle()
+    val cardModeOverrides by viewModel.cardModeOverrides.collectAsStateWithLifecycle()
+    val swipeStartToEnd by viewModel.swipeStartToEnd.collectAsStateWithLifecycle()
+    val swipeEndToStart by viewModel.swipeEndToStart.collectAsStateWithLifecycle()
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
+    var pendingDeleteRule by remember { mutableStateOf<Rule?>(null) }
+    var pendingDeleteSelected by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    val hasSelection = selectedRuleIds.isNotEmpty()
+
+    BackHandler(enabled = hasSelection) {
+        viewModel.clearSelection()
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.navigateAfterRun.collect { target ->
+            when (target) {
+                is RulesRunNavigation.HistoryDetail -> onNavigateToHistoryDetail(target.historyId)
+                is RulesRunNavigation.HistoryList -> onNavigateToHistoryList()
+            }
+        }
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.undoEvent.collect { event ->
+            val result = snackbarHostState.showSnackbar(
+                message = "${event.ruleName}: ${event.filesMoved} file(s) moved",
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Long
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoRun(event.historyId)
+            }
+        }
+    }
+
+    LaunchedEffect(viewModel) {
+        viewModel.deleteUndoEvent.collect { event ->
+            val count = event.rules.size
+            val label = if (count == 1) "\"${event.rules.first().name}\" deleted" else "$count rules deleted"
+            val result = snackbarHostState.showSnackbar(
+                message = label,
+                actionLabel = "Undo",
+                duration = SnackbarDuration.Long
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoDelete(event.rules)
+            }
+        }
+    }
+
+    LaunchedEffect(userMessage) {
+        val msg = userMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg)
+        viewModel.clearUserMessage()
+    }
+
+    Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        topBar = {
+            LargeTopAppBar(
+                title = { Text("Rules") },
+                scrollBehavior = scrollBehavior,
+                actions = {
+                    if (hasSelection && !isRunning) {
+                        IconButton(onClick = {
+                            playTap()
+                            viewModel.selectAll()
+                        }) {
+                            Icon(Icons.Default.SelectAll, contentDescription = stringResource(R.string.run_select_all))
+                        }
+                        IconButton(onClick = {
+                            playTap()
+                            viewModel.clearSelection()
+                        }) {
+                            Icon(Icons.Default.Deselect, contentDescription = stringResource(R.string.run_deselect_all))
+                        }
+                    } else {
+                        FilledTonalIconButton(onClick = {
+                            playTap()
+                            viewModel.toggleGlobalViewMode()
+                        }) {
+                            Icon(
+                                imageVector = if (isCompactMode) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
+                                contentDescription = if (isCompactMode) "Expand all" else "Collapse all"
+                            )
+                        }
+                    }
+                }
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        floatingActionButton = {
+            if (!hasSelection) {
+                ExtendedFloatingActionButton(
+                    onClick = {
+                        playTap()
+                        onCreateRule()
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null)
+                    Text(
+                        text = stringResource(R.string.rules_add_rule),
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+                }
+            }
+        },
+        bottomBar = {
+            if (hasSelection || isRunning) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 8.dp,
+                            bottom = contentPadding.calculateBottomPadding() + 8.dp
+                        )
+                ) {
+                    if (isRunning) {
+                        Text(
+                            text = stringResource(R.string.run_in_progress),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    } else {
+                        val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            FilledTonalIconButton(
+                                onClick = {
+                                    playTap()
+                                    pendingDeleteSelected = true
+                                },
+                                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete selected")
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    playTap()
+                                    viewModel.clearSelection()
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(stringResource(R.string.cancel))
+                            }
+                            Button(
+                                onClick = {
+                                    playTap()
+                                    viewModel.runSelected()
+                                },
+                                enabled = enabledSelectedCount > 0
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                                Text(text = "  ${stringResource(R.string.run_button, enabledSelectedCount)}")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
+        if (rules.isEmpty()) {
+            EmptyState(modifier = Modifier.padding(innerPadding))
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = innerPadding.calculateTopPadding() + 8.dp,
+                    bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 96.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(rules, key = { it.id }) { rule ->
+                    val isExpanded = viewModel.isCardExpanded(rule.id, isCompactMode, cardModeOverrides)
+                    SwipeToDismissRuleCard(
+                        rule = rule,
+                        isSelected = rule.id in selectedRuleIds,
+                        isExpanded = isExpanded,
+                        progress = progressMap[rule.id],
+                        isAnyRuleRunning = isRunning,
+                        swipeStartToEnd = swipeStartToEnd,
+                        swipeEndToStart = swipeEndToStart,
+                        onToggleEnabled = { enabled -> viewModel.toggleEnabled(rule, enabled) },
+                        onToggleSelectOrExpand = {
+                            if (hasSelection) viewModel.toggleSelection(rule.id)
+                            else viewModel.toggleCardExpansion(rule.id)
+                        },
+                        onLongClick = {
+                            viewModel.toggleSelection(rule.id)
+                        },
+                        onEdit = { onEditRule(rule.id) },
+                        onDelete = { pendingDeleteRule = rule },
+                        onDuplicate = { viewModel.duplicateRule(rule) },
+                        onRunRule = { viewModel.runRule(rule) },
+                        onViewHistory = { onNavigateToRuleHistory(rule.id) },
+                        modifier = Modifier.animateItem()
+                    )
+                }
+            }
+        }
+    }
+
+    pendingDeleteRule?.let { rule ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteRule = null },
+            title = { Text("Delete rule?") },
+            text = { Text("\"${rule.name}\" and its schedule will be removed.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    playTap()
+                    viewModel.deleteRule(rule)
+                    pendingDeleteRule = null
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    playTap()
+                    pendingDeleteRule = null
+                }) { Text("Cancel") }
+            }
+        )
+    }
+
+    if (pendingDeleteSelected) {
+        val count = selectedRuleIds.size
+        AlertDialog(
+            onDismissRequest = { pendingDeleteSelected = false },
+            title = { Text("Delete $count rule${if (count == 1) "" else "s"}?") },
+            text = { Text("This will also remove any scheduled runs for the selected rules.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    playTap()
+                    viewModel.deleteSelected()
+                    pendingDeleteSelected = false
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    playTap()
+                    pendingDeleteSelected = false
+                }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeToDismissRuleCard(
+    rule: Rule,
+    isSelected: Boolean,
+    isExpanded: Boolean,
+    progress: dev.bikram.filepipe.domain.model.RunProgress?,
+    isAnyRuleRunning: Boolean,
+    swipeStartToEnd: SwipeAction,
+    swipeEndToStart: SwipeAction,
+    onToggleEnabled: (Boolean) -> Unit,
+    onToggleSelectOrExpand: () -> Unit,
+    onLongClick: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDuplicate: () -> Unit,
+    onRunRule: () -> Unit,
+    onViewHistory: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val view = LocalView.current
+    val cardShape = RoundedCornerShape(16.dp)
+    val swipeAssigned = setOf(swipeStartToEnd, swipeEndToStart)
+    val cardIconPairs: List<Pair<ImageVector, () -> Unit>> = SwipeAction.entries
+        .filter { it !in swipeAssigned }
+        .map { action ->
+            action.icon() to { action.dispatch(onDelete, onEdit, onDuplicate, onViewHistory) }
+        }
+
+    BoxWithConstraints(modifier = modifier.clip(cardShape)) {
+        val dismissState = rememberSwipeToDismissBoxState(
+            confirmValueChange = { value ->
+                when (value) {
+                    SwipeToDismissBoxValue.EndToStart -> {
+                        swipeEndToStart.dispatch(onDelete, onEdit, onDuplicate, onViewHistory)
+                        false
+                    }
+                    SwipeToDismissBoxValue.StartToEnd -> {
+                        swipeStartToEnd.dispatch(onDelete, onEdit, onDuplicate, onViewHistory)
+                        false
+                    }
+                    else -> false
+                }
+            },
+            positionalThreshold = { totalDistance -> totalDistance * 0.33f }
+        )
+
+        LaunchedEffect(dismissState, rule.id) {
+            var previousTarget = SwipeToDismissBoxValue.Settled
+            snapshotFlow { dismissState.targetValue }.collect { target ->
+                val crossedIntoDismiss =
+                    target != SwipeToDismissBoxValue.Settled &&
+                        previousTarget == SwipeToDismissBoxValue.Settled
+                if (crossedIntoDismiss) {
+                    view.performSwipeThresholdHaptic()
+                }
+                previousTarget = target
+            }
+        }
+
+        SwipeToDismissBox(
+            state = dismissState,
+            modifier = Modifier.fillMaxWidth(),
+            backgroundContent = {
+                val isStartToEnd = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+                val action = if (isStartToEnd) swipeStartToEnd else swipeEndToStart
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .weight(1f)
+                        .background(action.backgroundColor(), cardShape)
+                        .padding(
+                            start = if (isStartToEnd) 24.dp else 0.dp,
+                            end = if (isStartToEnd) 0.dp else 24.dp
+                        ),
+                    contentAlignment = if (isStartToEnd) Alignment.CenterStart else Alignment.CenterEnd
+                ) {
+                    Icon(
+                        imageVector = action.icon(),
+                        contentDescription = null,
+                        tint = action.iconTint(),
+                        modifier = Modifier.size(32.dp)
+                    )
+                }
+            },
+            enableDismissFromStartToEnd = true
+        ) {
+            RuleCard(
+                rule = rule,
+                isSelected = isSelected,
+                isExpanded = isExpanded,
+                progress = progress,
+                onClick = onToggleSelectOrExpand,
+                onLongClick = onLongClick,
+                cardActions = cardIconPairs,
+                onToggleEnabled = onToggleEnabled,
+                onRunClick = onRunRule,
+                isAnyRuleRunning = isAnyRuleRunning
+            )
+        }
+    }
+}
+
+private fun SwipeAction.dispatch(
+    onDelete: () -> Unit,
+    onEdit: () -> Unit,
+    onDuplicate: () -> Unit,
+    onViewHistory: () -> Unit
+) = when (this) {
+    SwipeAction.DELETE -> onDelete()
+    SwipeAction.EDIT -> onEdit()
+    SwipeAction.DUPLICATE -> onDuplicate()
+    SwipeAction.VIEW_HISTORY -> onViewHistory()
+}
+
+private fun SwipeAction.icon(): ImageVector = when (this) {
+    SwipeAction.DELETE -> Icons.Default.Delete
+    SwipeAction.EDIT -> Icons.Default.Edit
+    SwipeAction.DUPLICATE -> Icons.Default.ContentCopy
+    SwipeAction.VIEW_HISTORY -> Icons.Default.History
+}
+
+@Composable
+private fun SwipeAction.backgroundColor() = when (this) {
+    SwipeAction.DELETE -> MaterialTheme.colorScheme.error.copy(alpha = 0.32f)
+    SwipeAction.EDIT -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f)
+    SwipeAction.DUPLICATE -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
+    SwipeAction.VIEW_HISTORY -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+}
+
+@Composable
+private fun SwipeAction.iconTint() = when (this) {
+    SwipeAction.DELETE -> MaterialTheme.colorScheme.error
+    SwipeAction.EDIT -> MaterialTheme.colorScheme.onTertiaryContainer
+    SwipeAction.DUPLICATE -> MaterialTheme.colorScheme.onSecondaryContainer
+    SwipeAction.VIEW_HISTORY -> MaterialTheme.colorScheme.onPrimaryContainer
+}
+
+@Composable
+private fun EmptyState(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            Icons.Default.Info,
+            contentDescription = null,
+            modifier = Modifier.size(72.dp),
+            tint = MaterialTheme.colorScheme.outlineVariant
+        )
+        Spacer(Modifier.height(16.dp))
+        Text(
+            stringResource(R.string.rules_empty_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            stringResource(R.string.rules_empty_subtitle),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.outlineVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
