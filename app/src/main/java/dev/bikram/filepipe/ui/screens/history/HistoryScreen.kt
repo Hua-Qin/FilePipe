@@ -21,10 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -59,6 +57,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.ui.components.HistoryCard
+import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.performSwipeThresholdHaptic
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 
@@ -118,6 +117,10 @@ fun HistoryScreen(
             LargeTopAppBar(
                 title = { Text(stringResource(R.string.history_title)) },
                 scrollBehavior = scrollBehavior,
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background,
+                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                ),
                 navigationIcon = {
                     if (onNavigateBack != null) {
                         IconButton(onClick = {
@@ -130,34 +133,14 @@ fun HistoryScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            if (groups.isNotEmpty()) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        playTap()
-                        showClearConfirm = true
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteSweep,
-                        contentDescription = stringResource(R.string.history_clear_content_description)
-                    )
-                    Text(
-                        text = stringResource(R.string.history_clear),
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-            }
-        }
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
         if (groups.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
+                    .padding(bottom = contentPadding.calculateBottomPadding())
                     .padding(32.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -178,7 +161,7 @@ fun HistoryScreen(
                 Text(
                     text = stringResource(R.string.history_empty_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.outlineVariant,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
                     textAlign = TextAlign.Center
                 )
             }
@@ -191,7 +174,7 @@ fun HistoryScreen(
                 start = 16.dp,
                 end = 16.dp,
                 top = innerPadding.calculateTopPadding() + 8.dp,
-                bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 88.dp
+                bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding()
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -239,17 +222,19 @@ private fun SwipeToDismissHistoryCard(
     modifier: Modifier = Modifier
 ) {
     val view = LocalView.current
+    val hapticEnabled = LocalHapticEnabled.current
     val cardShape = RoundedCornerShape(12.dp)
     BoxWithConstraints(modifier = modifier.clip(cardShape)) {
         val dismissState = rememberSwipeToDismissBoxState(
-            confirmValueChange = { value ->
-                if (value == SwipeToDismissBoxValue.EndToStart) {
-                    onDelete()
-                    false
-                } else false
-            },
             positionalThreshold = { totalDistance -> totalDistance * 0.33f }
         )
+
+        LaunchedEffect(dismissState.currentValue) {
+            if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
+                onDelete()
+                dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+            }
+        }
 
         LaunchedEffect(dismissState, history.id) {
             var previousTarget = SwipeToDismissBoxValue.Settled
@@ -257,7 +242,7 @@ private fun SwipeToDismissHistoryCard(
                 val crossedIntoDismiss =
                     target != SwipeToDismissBoxValue.Settled &&
                         previousTarget == SwipeToDismissBoxValue.Settled
-                if (crossedIntoDismiss) {
+                if (crossedIntoDismiss && hapticEnabled) {
                     view.performSwipeThresholdHaptic()
                 }
                 previousTarget = target

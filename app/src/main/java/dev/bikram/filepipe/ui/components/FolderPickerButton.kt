@@ -35,10 +35,26 @@ fun FolderPickerButton(
 }
 
 /**
- * Returns a user-friendly display path, stripping the /storage/emulated/0/ prefix.
- * External SD cards are shown as "SD Card/...".
+ * Returns a user-friendly display label for a folder.
+ * Accepts both SAF content:// URIs (new format) and legacy /storage/... absolute paths.
+ * Examples:
+ *   content://...tree/primary%3ADCIM%2FCamera  →  "DCIM/Camera"
+ *   /storage/emulated/0/Pictures               →  "Pictures"
+ *   content://...tree/1A2B-3C4D%3AMovies       →  "SD Card/Movies"
  */
 fun displayPath(path: String): String {
+    if (path.startsWith("content://")) {
+        return try {
+            val docId = DocumentsContract.getTreeDocumentId(Uri.parse(path))
+            val relative = docId.substringAfter(":", "")
+            when {
+                relative.isBlank() -> docId  // root of a volume
+                docId.startsWith("primary", ignoreCase = true) -> relative
+                else -> "SD Card/$relative"
+            }
+        } catch (_: Exception) { path }
+    }
+    // Legacy absolute path fallback
     val primary = "/storage/emulated/0/"
     if (path.startsWith(primary)) return path.removePrefix(primary)
     val sdCardPrefix = Regex("^/storage/[A-F0-9]{4}-[A-F0-9]{4}/")
@@ -102,8 +118,18 @@ fun absoluteStoragePathToTreeUri(path: String): Uri? {
 
 /**
  * Document URI derived from the tree (recommended for [ActivityResultContracts.OpenDocumentTree] initial location).
+ * For legacy absolute paths, converts via [absoluteStoragePathToTreeUri].
+ * For content:// URIs (SAF), uses them directly.
  */
 fun absoluteStoragePathToOpenTreeInitialUri(path: String): Uri? {
+    if (path.startsWith("content://")) {
+        // Already a SAF URI — just wrap as a document URI for the picker hint
+        return try {
+            val treeUri = Uri.parse(path)
+            val documentId = DocumentsContract.getTreeDocumentId(treeUri)
+            DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
+        } catch (_: Exception) { null }
+    }
     val treeUri = absoluteStoragePathToTreeUri(path) ?: return null
     val documentId = DocumentsContract.getTreeDocumentId(treeUri)
     return DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)

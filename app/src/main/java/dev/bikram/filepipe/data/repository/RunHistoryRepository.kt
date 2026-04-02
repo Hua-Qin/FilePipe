@@ -23,6 +23,9 @@ class RunHistoryRepository @Inject constructor(
     fun getAllHistory(): Flow<List<RunHistory>> =
         runHistoryDao.getAllHistory().map { it.map { entity -> entity.toDomain() } }
 
+    suspend fun getAllHistoryOnce(): List<RunHistory> =
+        runHistoryDao.getAllHistoryOnce().map { it.toDomain() }
+
     fun getHistoryForRule(ruleId: Long): Flow<List<RunHistory>> =
         runHistoryDao.getHistoryForRule(ruleId).map { it.map { entity -> entity.toDomain() } }
 

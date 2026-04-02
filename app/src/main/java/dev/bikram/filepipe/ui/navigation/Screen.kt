@@ -20,4 +20,11 @@ sealed class Screen(val route: String) {
         fun createRoute(ruleId: Long) = "history_for_rule/$ruleId"
         const val ARG_RULE_ID = "ruleId"
     }
+
+    data object OnboardingTitle : Screen("onboarding_title?fromSettings={fromSettings}") {
+        fun createRoute(fromSettings: Boolean = false) = "onboarding_title?fromSettings=$fromSettings"
+        const val ARG = "fromSettings"
+    }
+
+    data object OnboardingPrefs : Screen("onboarding_prefs")
 }

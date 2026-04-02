@@ -4,34 +4,42 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.TriggerType
+import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
 import dev.bikram.filepipe.domain.usecase.ExecuteRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
-import dev.bikram.filepipe.domain.usecase.UndoRunUseCase
+import dev.bikram.filepipe.shortcuts.AppShortcutsManager
+import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class UndoSnackbarEvent(
-    val historyId: Long,
-    val ruleName: String,
-    val filesMoved: Int
-)
-
 data class DeleteUndoEvent(val rules: List<Rule>)
+
+data class PreviewState(
+    val ruleName: String,
+    val isLoading: Boolean = true,
+    val results: List<PreviewFileResult> = emptyList()
+)
 
 sealed interface RulesRunNavigation {
     data class HistoryDetail(val historyId: Long) : RulesRunNavigation
@@ -43,13 +51,40 @@ class RulesViewModel @Inject constructor(
     private val ruleRepository: RuleRepository,
     private val scheduleRulesUseCase: ScheduleRulesUseCase,
     private val executeRulesUseCase: ExecuteRulesUseCase,
+    private val simulateRuleUseCase: SimulateRuleUseCase,
     private val rulesAutoExportTrigger: RulesAutoExportTrigger,
-    private val undoRunUseCase: UndoRunUseCase,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val appShortcutsManager: AppShortcutsManager,
+    private val pendingShortcutRepository: PendingShortcutRepository,
+    private val fileOperationRepository: FileOperationRepository
 ) : ViewModel() {
 
     val rules: StateFlow<List<Rule>> = ruleRepository.getAllRules()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val staleRuleIds: StateFlow<Set<Long>> = rules
+        .map { ruleList ->
+            withContext(Dispatchers.IO) {
+                ruleList.filter { rule ->
+                    val allPaths = rule.sourceFolderPaths + listOfNotNull(rule.destinationFolderPath.takeIf { it.isNotBlank() })
+                    allPaths.any { path ->
+                        !path.startsWith("content://") || !fileOperationRepository.isAccessible(path)
+                    }
+                }.map { it.id }.toSet()
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
+    init {
+        // Keep dynamic shortcuts up to date whenever rules change
+        rules.onEach { appShortcutsManager.updateShortcuts(it) }.launchIn(viewModelScope)
+
+        // Handle shortcut taps from launcher
+        pendingShortcutRepository.pendingRuleId.onEach { ruleId ->
+            val rule = rules.value.find { it.id == ruleId }
+            if (rule != null) runRule(rule)
+        }.launchIn(viewModelScope)
+    }
 
     val swipeStartToEnd: StateFlow<SwipeAction> = userPreferencesRepository.preferencesFlow
         .map { it.swipeStartToEnd }
@@ -72,9 +107,6 @@ class RulesViewModel @Inject constructor(
     private val _navigateAfterRun = MutableSharedFlow<RulesRunNavigation>(extraBufferCapacity = 1)
     val navigateAfterRun = _navigateAfterRun.asSharedFlow()
 
-    private val _undoEvent = MutableSharedFlow<UndoSnackbarEvent>(extraBufferCapacity = 1)
-    val undoEvent = _undoEvent.asSharedFlow()
-
     private val _deleteUndoEvent = MutableSharedFlow<DeleteUndoEvent>(extraBufferCapacity = 1)
     val deleteUndoEvent = _deleteUndoEvent.asSharedFlow()
 
@@ -82,6 +114,17 @@ class RulesViewModel @Inject constructor(
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 
     fun clearUserMessage() { _userMessage.value = null }
+
+    private val _previewState = MutableStateFlow<PreviewState?>(null)
+    val previewState: StateFlow<PreviewState?> = _previewState.asStateFlow()
+
+    fun startPreview(rule: Rule) = viewModelScope.launch {
+        _previewState.value = PreviewState(ruleName = rule.name, isLoading = true)
+        val results = simulateRuleUseCase(rule)
+        _previewState.value = PreviewState(ruleName = rule.name, isLoading = false, results = results)
+    }
+
+    fun dismissPreview() { _previewState.value = null }
 
     // Compact / expanded view mode
     // isCompactMode = global default; cardModeOverrides = cards that flip the global default
@@ -213,11 +256,8 @@ class RulesViewModel @Inject constructor(
 
         clearProgress()
 
-        // If files were moved, emit undo snackbar event; otherwise navigate to detail
         val result = results.firstOrNull()
-        if (result != null && result.totalMoved > 0) {
-            _undoEvent.emit(UndoSnackbarEvent(result.historyId, rule.name, result.totalMoved))
-        } else if (result != null) {
+        if (result != null) {
             _navigateAfterRun.emit(RulesRunNavigation.HistoryDetail(result.historyId))
         }
     }
@@ -234,12 +274,4 @@ class RulesViewModel @Inject constructor(
         _userMessage.value = "\"${copy.name}\" created"
     }
 
-    fun undoRun(historyId: Long) = viewModelScope.launch {
-        val result = undoRunUseCase(historyId)
-        _userMessage.value = when {
-            result.totalFailed == 0 -> "Undone: ${result.totalReversed} file(s) restored"
-            result.totalReversed == 0 -> "Undo failed: ${result.errors.firstOrNull() ?: "unknown error"}"
-            else -> "Partial undo: ${result.totalReversed} restored, ${result.totalFailed} failed"
-        }
-    }
 }

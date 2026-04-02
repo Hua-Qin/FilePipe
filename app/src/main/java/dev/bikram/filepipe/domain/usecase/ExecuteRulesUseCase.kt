@@ -42,9 +42,15 @@ class ExecuteRulesUseCase @Inject constructor(
             // Collect all matching files across all source folders
             val fileEntries = rule.sourceFolderPaths.flatMap { sourcePath ->
                 fileOperationRepository.listMatchingFiles(
-                    folderPath = sourcePath,
+                    folderUriString = sourcePath,
                     extensions = rule.fileExtensions,
-                    scanSubdirectories = rule.scanSubdirectories
+                    scanSubdirectories = rule.scanSubdirectories,
+                    filenamePattern = rule.filenamePattern,
+                    minFileSizeBytes = rule.minFileSizeBytes,
+                    maxFileSizeBytes = rule.maxFileSizeBytes,
+                    minAgeDays = rule.minAgeDays,
+                    maxAgeDays = rule.maxAgeDays,
+                    excludePatterns = rule.excludePatterns
                 )
             }
 
@@ -63,7 +69,7 @@ class ExecuteRulesUseCase @Inject constructor(
 
                 val result = fileOperationRepository.moveFile(
                     sourceEntry = entry,
-                    destFolderPath = rule.destinationFolderPath,
+                    destFolderUriString = rule.destinationFolderPath,
                     conflictPolicy = rule.conflictPolicy,
                     operationMode = rule.operationMode
                 )

@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
@@ -60,6 +59,8 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -88,10 +89,19 @@ import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.components.FileExtensionChips
 import dev.bikram.filepipe.ui.components.FolderPickerButton
 import dev.bikram.filepipe.ui.components.ScheduleDialog
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
-import dev.bikram.filepipe.ui.components.safTreeUriToPath
+import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.toImageVector
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.ui.text.input.KeyboardType
 
 private val SectionButtonShape = RoundedCornerShape(12.dp)
 
@@ -162,7 +172,7 @@ private fun RuleSectionCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RuleDetailScreen(
     onNavigateBack: () -> Unit,
@@ -176,29 +186,38 @@ fun RuleDetailScreen(
     var ruleIconMenuExpanded by remember { mutableStateOf(false) }
     val previewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val playTap = rememberPlayTapSound()
+    val bookmarkedFolders by viewModel.bookmarkedFolders.collectAsStateWithLifecycle()
+    var advancedExpanded by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     var pendingFolderPick by remember { mutableStateOf<FolderPickIntent?>(null) }
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
-        val pickedPath = uri?.let { safTreeUriToPath(it) }
-        if (pickedPath == null) {
+        if (uri == null) {
             pendingFolderPick = null
             return@rememberLauncherForActivityResult
         }
+        // Persist the grant so it survives reboots
+        context.contentResolver.takePersistableUriPermission(
+            uri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        )
+        val uriString = uri.toString()
         when (val pending = pendingFolderPick) {
-            FolderPickIntent.AddSource -> viewModel.addSourceFolder(pickedPath)
+            FolderPickIntent.AddSource -> viewModel.addSourceFolder(uriString)
             is FolderPickIntent.ReplaceSource ->
-                viewModel.replaceSourceFolder(pending.previousPath, pickedPath)
-            FolderPickIntent.SetDestination -> viewModel.setDestination(pickedPath)
+                viewModel.replaceSourceFolder(pending.previousPath, uriString)
+            FolderPickIntent.SetDestination -> viewModel.setDestination(uriString)
             null -> {}
         }
         pendingFolderPick = null
     }
 
-    fun launchFolderPicker(intent: FolderPickIntent, initialAbsolutePath: String?) {
+    fun launchFolderPicker(intent: FolderPickIntent, initialPath: String?) {
         pendingFolderPick = intent
-        folderPickerLauncher.launch(initialAbsolutePath?.let { absoluteStoragePathToOpenTreeInitialUri(it) })
+        folderPickerLauncher.launch(initialPath?.let { absoluteStoragePathToOpenTreeInitialUri(it) })
     }
 
     fun withTapSound(action: () -> Unit) {
@@ -208,6 +227,14 @@ fun RuleDetailScreen(
 
     LaunchedEffect(state.isSaved) {
         if (state.isSaved) onNavigateBack()
+    }
+
+    LaunchedEffect(state.removedRedundantFolders) {
+        if (state.removedRedundantFolders.isNotEmpty()) {
+            val names = state.removedRedundantFolders.joinToString(", ") { it.substringAfterLast('/') }
+            snackbarHostState.showSnackbar("Removed redundant subfolder(s): $names")
+            viewModel.dismissRedundantFolderNotice()
+        }
     }
 
     fun tryNavigateBack() {
@@ -221,6 +248,7 @@ fun RuleDetailScreen(
     BackHandler(onBack = ::tryNavigateBack)
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(if (viewModel.isNewRule) stringResource(R.string.new_rule) else stringResource(R.string.edit_rule)) },
@@ -367,13 +395,14 @@ fun RuleDetailScreen(
                 icon = Icons.Filled.Search
             ) {
                 state.sourceFolderPaths.forEach { path ->
+                    val isSourceBookmarked = path in bookmarkedFolders
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = path,
+                            text = displayPath(path),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
@@ -384,21 +413,69 @@ fun RuleDetailScreen(
                                     }
                                 }
                         )
+                        IconButton(onClick = { withTapSound { viewModel.toggleBookmark(path) } }) {
+                            Icon(
+                                imageVector = if (isSourceBookmarked) Icons.Filled.Bookmark else Icons.Outlined.Bookmark,
+                                contentDescription = stringResource(R.string.bookmark_toggle_cd),
+                                modifier = Modifier.size(18.dp),
+                                tint = if (isSourceBookmarked) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         IconButton(onClick = { withTapSound { viewModel.removeSourceFolder(path) } }) {
                             Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(18.dp))
                         }
                     }
                 }
+                val unusedBookmarks = bookmarkedFolders.filter {
+                    it.startsWith("content://") && it !in state.sourceFolderPaths
+                }
+                var bookmarkDropdownExpanded by remember { mutableStateOf(false) }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FolderPickerButton(
                         label = stringResource(R.string.add_source_folder),
                         onClick = { launchFolderPicker(FolderPickIntent.AddSource, null) },
                         modifier = Modifier.weight(1f)
                     )
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { if (unusedBookmarks.isNotEmpty()) bookmarkDropdownExpanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = SectionButtonShape,
+                            enabled = unusedBookmarks.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Bookmark,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text("  ${stringResource(R.string.bookmarks_choose)}")
+                        }
+                        DropdownMenu(
+                            expanded = bookmarkDropdownExpanded,
+                            onDismissRequest = { bookmarkDropdownExpanded = false }
+                        ) {
+                            unusedBookmarks.forEach { bookmarkPath ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = displayPath(bookmarkPath),
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    },
+                                    onClick = {
+                                        withTapSound {
+                                            viewModel.addSourceFolder(bookmarkPath)
+                                            bookmarkDropdownExpanded = false
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -424,33 +501,96 @@ fun RuleDetailScreen(
                 icon = Icons.Filled.FolderSpecial
             ) {
                 if (state.destinationFolderPath.isNotBlank()) {
-                    Text(
-                        text = state.destinationFolderPath,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            withTapSound {
-                                launchFolderPicker(
-                                    FolderPickIntent.SetDestination,
-                                    state.destinationFolderPath
+                    val isDestBookmarked = state.destinationFolderPath in bookmarkedFolders
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = displayPath(state.destinationFolderPath),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    withTapSound {
+                                        launchFolderPicker(
+                                            FolderPickIntent.SetDestination,
+                                            state.destinationFolderPath
+                                        )
+                                    }
+                                }
+                        )
+                        IconButton(onClick = { withTapSound { viewModel.toggleBookmark(state.destinationFolderPath) } }) {
+                            Icon(
+                                imageVector = if (isDestBookmarked) Icons.Filled.Bookmark else Icons.Outlined.Bookmark,
+                                contentDescription = stringResource(R.string.bookmark_toggle_cd),
+                                modifier = Modifier.size(18.dp),
+                                tint = if (isDestBookmarked) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                val unusedDestBookmarks = bookmarkedFolders.filter {
+                    it.startsWith("content://") && it != state.destinationFolderPath
+                }
+                var destBookmarkDropdownExpanded by remember { mutableStateOf(false) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FolderPickerButton(
+                        label = if (state.destinationFolderPath.isBlank()) {
+                            stringResource(R.string.pick_folder)
+                        } else {
+                            stringResource(R.string.change_destination)
+                        },
+                        onClick = {
+                            launchFolderPicker(
+                                FolderPickIntent.SetDestination,
+                                state.destinationFolderPath.takeIf { it.isNotBlank() }
+                            )
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { if (unusedDestBookmarks.isNotEmpty()) destBookmarkDropdownExpanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = SectionButtonShape,
+                            enabled = unusedDestBookmarks.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Bookmark,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text("  ${stringResource(R.string.bookmarks_choose)}")
+                        }
+                        DropdownMenu(
+                            expanded = destBookmarkDropdownExpanded,
+                            onDismissRequest = { destBookmarkDropdownExpanded = false }
+                        ) {
+                            unusedDestBookmarks.forEach { bookmarkPath ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = displayPath(bookmarkPath),
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    },
+                                    onClick = {
+                                        withTapSound {
+                                            viewModel.setDestination(bookmarkPath)
+                                            destBookmarkDropdownExpanded = false
+                                        }
+                                    }
                                 )
                             }
                         }
-                    )
-                }
-                FolderPickerButton(
-                    label = if (state.destinationFolderPath.isBlank()) {
-                        stringResource(R.string.pick_folder)
-                    } else {
-                        stringResource(R.string.change_destination)
-                    },
-                    onClick = {
-                        launchFolderPicker(
-                            FolderPickIntent.SetDestination,
-                            state.destinationFolderPath.takeIf { it.isNotBlank() }
-                        )
                     }
-                )
+                }
             }
 
             RuleSectionCard(
@@ -551,6 +691,126 @@ fun RuleDetailScreen(
                     ) {
                         Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(18.dp))
                         Text(text = "  ${stringResource(R.string.add_schedule_chip)}")
+                    }
+                }
+            }
+
+            // Advanced filters section
+            val hasAdvancedFilters = state.filenamePattern.isNotBlank() ||
+                state.minFileSizeMb.isNotBlank() || state.maxFileSizeMb.isNotBlank() ||
+                state.minAgeDays.isNotBlank() || state.maxAgeDays.isNotBlank() ||
+                state.excludePatternsText.isNotBlank()
+
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors()
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { advancedExpanded = !advancedExpanded },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Tune,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = if (hasAdvancedFilters) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.advanced_section_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (hasAdvancedFilters) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (hasAdvancedFilters && !advancedExpanded)
+                                    stringResource(R.string.advanced_section_filters_active)
+                                else
+                                    stringResource(R.string.advanced_section_subtitle),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = if (advancedExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    AnimatedVisibility(visible = advancedExpanded) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(top = 16.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = state.filenamePattern,
+                                onValueChange = viewModel::setFilenamePattern,
+                                label = { Text(stringResource(R.string.advanced_filename_pattern_label)) },
+                                placeholder = { Text(stringResource(R.string.advanced_filename_pattern_placeholder)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = state.minFileSizeMb,
+                                    onValueChange = viewModel::setMinFileSizeMb,
+                                    label = { Text(stringResource(R.string.advanced_min_size_label)) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = state.maxFileSizeMb,
+                                    onValueChange = viewModel::setMaxFileSizeMb,
+                                    label = { Text(stringResource(R.string.advanced_max_size_label)) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = state.minAgeDays,
+                                    onValueChange = viewModel::setMinAgeDays,
+                                    label = { Text(stringResource(R.string.advanced_min_age_label)) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = state.maxAgeDays,
+                                    onValueChange = viewModel::setMaxAgeDays,
+                                    label = { Text(stringResource(R.string.advanced_max_age_label)) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = state.excludePatternsText,
+                                onValueChange = viewModel::setExcludePatternsText,
+                                label = { Text(stringResource(R.string.advanced_exclude_patterns_label)) },
+                                placeholder = { Text(stringResource(R.string.advanced_exclude_placeholder)) },
+                                supportingText = { Text(stringResource(R.string.advanced_csv_hint)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                     }
                 }
             }

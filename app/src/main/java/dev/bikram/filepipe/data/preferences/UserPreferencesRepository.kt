@@ -28,6 +28,10 @@ private object PrefKeys {
     val LOG_RETENTION_DAYS = intPreferencesKey("log_retention_days")
     val SWIPE_START_TO_END = stringPreferencesKey("swipe_start_to_end")
     val SWIPE_END_TO_START = stringPreferencesKey("swipe_end_to_start")
+    val BOOKMARKED_FOLDERS = stringPreferencesKey("bookmarked_folders")
+    val HAS_SEEN_INTRO = booleanPreferencesKey("has_seen_intro")
+    val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback_enabled")
+    val PROGRESSIVE_BLUR = booleanPreferencesKey("progressive_blur_enabled")
 }
 
 @Singleton
@@ -61,7 +65,14 @@ class UserPreferencesRepository @Inject constructor(
                 ?: SwipeAction.DUPLICATE,
             swipeEndToStart = prefs[PrefKeys.SWIPE_END_TO_START]
                 ?.let { runCatching { SwipeAction.valueOf(it) }.getOrNull() }
-                ?: SwipeAction.DELETE
+                ?: SwipeAction.DELETE,
+            bookmarkedFolders = prefs[PrefKeys.BOOKMARKED_FOLDERS]
+                ?.split("|")
+                ?.filter { it.isNotBlank() }
+                ?: emptyList(),
+            hasSeenIntro = prefs[PrefKeys.HAS_SEEN_INTRO] ?: false,
+            hapticFeedbackEnabled = prefs[PrefKeys.HAPTIC_FEEDBACK] ?: true,
+            progressiveBlurEnabled = prefs[PrefKeys.PROGRESSIVE_BLUR] ?: true
         )
     }
 
@@ -97,5 +108,33 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setSwipeEndToStart(action: SwipeAction) {
         dataStore.edit { it[PrefKeys.SWIPE_END_TO_START] = action.name }
+    }
+
+    suspend fun addBookmark(path: String) {
+        dataStore.edit { prefs ->
+            val current = prefs[PrefKeys.BOOKMARKED_FOLDERS]?.split("|")?.filter { it.isNotBlank() } ?: emptyList()
+            if (path !in current) {
+                prefs[PrefKeys.BOOKMARKED_FOLDERS] = (current + path).joinToString("|")
+            }
+        }
+    }
+
+    suspend fun removeBookmark(path: String) {
+        dataStore.edit { prefs ->
+            val current = prefs[PrefKeys.BOOKMARKED_FOLDERS]?.split("|")?.filter { it.isNotBlank() } ?: emptyList()
+            prefs[PrefKeys.BOOKMARKED_FOLDERS] = current.filter { it != path }.joinToString("|")
+        }
+    }
+
+    suspend fun markIntroSeen() {
+        dataStore.edit { it[PrefKeys.HAS_SEEN_INTRO] = true }
+    }
+
+    suspend fun setHapticFeedbackEnabled(enabled: Boolean) {
+        dataStore.edit { it[PrefKeys.HAPTIC_FEEDBACK] = enabled }
+    }
+
+    suspend fun setProgressiveBlurEnabled(enabled: Boolean) {
+        dataStore.edit { it[PrefKeys.PROGRESSIVE_BLUR] = enabled }
     }
 }

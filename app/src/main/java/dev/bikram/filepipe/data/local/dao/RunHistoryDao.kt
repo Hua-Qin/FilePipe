@@ -13,6 +13,9 @@ interface RunHistoryDao {
     @Query("SELECT * FROM run_history ORDER BY startedAt DESC")
     fun getAllHistory(): Flow<List<RunHistoryEntity>>
 
+    @Query("SELECT * FROM run_history ORDER BY startedAt DESC")
+    suspend fun getAllHistoryOnce(): List<RunHistoryEntity>
+
     @Query("SELECT * FROM run_history WHERE id = :id")
     suspend fun getHistoryById(id: Long): RunHistoryEntity?
 

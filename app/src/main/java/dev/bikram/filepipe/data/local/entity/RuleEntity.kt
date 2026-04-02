@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import dev.bikram.filepipe.domain.model.ConflictPolicy
@@ -27,7 +28,15 @@ data class RuleEntity(
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
     val scanSubdirectories: Boolean = false,
-    val iconKey: String = RuleIcon.DEFAULT.name
+    val iconKey: String = RuleIcon.DEFAULT.name,
+    // Advanced filters (added in DB version 2)
+    val filenamePattern: String? = null,
+    val minFileSizeBytes: Long? = null,
+    val maxFileSizeBytes: Long? = null,
+    val minAgeDays: Int? = null,
+    val maxAgeDays: Int? = null,
+    @ColumnInfo(defaultValue = "[]")
+    val excludePatterns: List<String> = emptyList()
 )
 
 fun RuleEntity.toDomain(): Rule = Rule(
@@ -50,7 +59,13 @@ fun RuleEntity.toDomain(): Rule = Rule(
     conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
     operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),
     scanSubdirectories = scanSubdirectories,
-    icon = RuleIcon.fromStored(iconKey)
+    icon = RuleIcon.fromStored(iconKey),
+    filenamePattern = filenamePattern,
+    minFileSizeBytes = minFileSizeBytes,
+    maxFileSizeBytes = maxFileSizeBytes,
+    minAgeDays = minAgeDays,
+    maxAgeDays = maxAgeDays,
+    excludePatterns = excludePatterns
 )
 
 fun Rule.toEntity(): RuleEntity = RuleEntity(
@@ -70,5 +85,11 @@ fun Rule.toEntity(): RuleEntity = RuleEntity(
     conflictPolicy = conflictPolicy.name,
     operationMode = operationMode.name,
     scanSubdirectories = scanSubdirectories,
-    iconKey = icon.name
+    iconKey = icon.name,
+    filenamePattern = filenamePattern,
+    minFileSizeBytes = minFileSizeBytes,
+    maxFileSizeBytes = maxFileSizeBytes,
+    minAgeDays = minAgeDays,
+    maxAgeDays = maxAgeDays,
+    excludePatterns = excludePatterns
 )

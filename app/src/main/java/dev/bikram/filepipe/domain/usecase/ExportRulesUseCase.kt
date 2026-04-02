@@ -1,34 +1,76 @@
 package dev.bikram.filepipe.domain.usecase
 
+import android.content.Context
+import android.net.Uri
+import android.provider.DocumentsContract
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
-import dev.bikram.filepipe.domain.export.buildRulesBackupJson
+import dev.bikram.filepipe.data.repository.RunHistoryRepository
+import dev.bikram.filepipe.domain.export.buildAppBackupJson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
 class ExportRulesUseCase @Inject constructor(
-    private val ruleRepository: RuleRepository
+    @param:ApplicationContext private val context: Context,
+    private val ruleRepository: RuleRepository,
+    private val runHistoryRepository: RunHistoryRepository,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) {
     suspend fun exportRulesToTreeUri(folderPath: String): Result<Unit> = withContext(Dispatchers.IO) {
         if (folderPath.isBlank()) return@withContext Result.failure(IllegalStateException("No export folder"))
+
+        val rules = ruleRepository.getAllRules().first()
+        val allHistory = runHistoryRepository.getAllHistoryOnce()
+        val historyWithFiles = allHistory.map { run ->
+            run to runHistoryRepository.getFilesForRunOnce(run.id)
+        }
+        val settings = userPreferencesRepository.getPreferencesSnapshot()
+
+        val json = buildAppBackupJson(rules, historyWithFiles, settings)
+        val dateSuffix = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
+        val fileName = "filepipe_backup_$dateSuffix.json"
+
+        if (folderPath.startsWith("content://")) {
+            writeToContentUri(folderPath, fileName, json)
+        } else {
+            writeToFilePath(folderPath, fileName, json)
+        }
+    }
+
+    private fun writeToContentUri(folderUriString: String, fileName: String, json: String): Result<Unit> {
+        val treeUri = Uri.parse(folderUriString)
+        return runCatching {
+            val docTreeUri = DocumentsContract.buildDocumentUriUsingTree(
+                treeUri,
+                DocumentsContract.getTreeDocumentId(treeUri)
+            )
+            val docUri = DocumentsContract.createDocument(
+                context.contentResolver,
+                docTreeUri,
+                "application/json",
+                fileName
+            ) ?: throw IOException("Failed to create document in cloud folder")
+            context.contentResolver.openOutputStream(docUri)?.use { stream ->
+                stream.write(json.toByteArray(Charsets.UTF_8))
+            } ?: throw IOException("Failed to open output stream for cloud document")
+        }.fold(onSuccess = { Result.success(Unit) }, onFailure = { Result.failure(it) })
+    }
+
+    private fun writeToFilePath(folderPath: String, fileName: String, json: String): Result<Unit> {
         val folder = File(folderPath)
         if (!folder.exists() || !folder.canWrite()) {
-            return@withContext Result.failure(IllegalStateException("Export folder not accessible: $folderPath"))
+            return Result.failure(IllegalStateException("Export folder not accessible: $folderPath"))
         }
-        val rules = ruleRepository.getAllRules().first()
-        val json = buildRulesBackupJson(rules)
-        val dateSuffix = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-        val fileName = "filepipe_rules_$dateSuffix.json"
-        runCatching {
+        return runCatching {
             File(folder, fileName).writeText(json, Charsets.UTF_8)
-        }.fold(
-            onSuccess = { Result.success(Unit) },
-            onFailure = { Result.failure(it) }
-        )
+        }.fold(onSuccess = { Result.success(Unit) }, onFailure = { Result.failure(it) })
     }
 }

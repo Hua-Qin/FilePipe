@@ -17,7 +17,14 @@ data class Rule(
     val conflictPolicy: ConflictPolicy = ConflictPolicy.RENAME_SUFFIX,
     val operationMode: OperationMode = OperationMode.MOVE,
     val scanSubdirectories: Boolean = false,
-    val icon: RuleIcon = RuleIcon.DEFAULT
+    val icon: RuleIcon = RuleIcon.DEFAULT,
+    // Advanced filters
+    val filenamePattern: String? = null,
+    val minFileSizeBytes: Long? = null,
+    val maxFileSizeBytes: Long? = null,
+    val minAgeDays: Int? = null,
+    val maxAgeDays: Int? = null,
+    val excludePatterns: List<String> = emptyList()
 )
 
 enum class ScheduleType { DAILY, WEEKLY }
@@ -85,6 +92,18 @@ data class RunResult(
         else -> RunStatus.PARTIAL_FAILURE
     }
 }
+
+// ---
+
+data class PreviewFileResult(
+    val fileName: String,
+    val sourcePath: String,
+    val simulatedDestPath: String,
+    val wouldSkip: Boolean,
+    val wouldOverwrite: Boolean,
+    val renamedTo: String?,
+    val sizeBytes: Long
+)
 
 // ---
 

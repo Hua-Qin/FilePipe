@@ -11,8 +11,10 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -23,9 +25,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -36,6 +40,8 @@ import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -68,6 +74,7 @@ fun RuleCard(
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
     isAnyRuleRunning: Boolean,
+    hasStaleFolder: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     ElevatedCard(
@@ -96,7 +103,8 @@ fun RuleCard(
                     cardActions = cardActions,
                     onToggleEnabled = onToggleEnabled,
                     onRunClick = onRunClick,
-                    isAnyRuleRunning = isAnyRuleRunning
+                    isAnyRuleRunning = isAnyRuleRunning,
+                    hasStaleFolder = hasStaleFolder
                 )
             } else {
                 CompactContent(
@@ -128,69 +136,87 @@ private fun CompactContent(
     val runInProgress = progress != null && !progress.isComplete
     val runBlocked = isAnyRuleRunning && progress == null
 
+    val typesText = rule.fileExtensions.take(4).joinToString(" · ") +
+        if (rule.fileExtensions.size > 4) " +${rule.fileExtensions.size - 4}" else ""
+    val destText = displayPath(rule.destinationFolderPath).takeIf { it.isNotBlank() } ?: ""
+    val infoText = listOf(typesText, destText).filter { it.isNotBlank() }.joinToString("  |  ")
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Switch(
-                checked = rule.isEnabled,
-                onCheckedChange = { enabled ->
-                    playTap()
-                    onToggleEnabled(enabled)
-                },
-                modifier = Modifier.height(24.dp)
-            )
-            Icon(
-                imageVector = rule.icon.toImageVector(),
-                contentDescription = null,
-                modifier = Modifier.size(28.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = rule.name,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            FilledTonalIconButton(
-                onClick = {
-                    playTap()
-                    onRunClick()
-                },
-                enabled = rule.isEnabled && !runInProgress && !runBlocked,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.run_now), modifier = Modifier.size(18.dp))
-            }
-        }
-        if (rule.fileExtensions.isNotEmpty() || rule.sourceFolderPaths.isNotEmpty()) {
-            Spacer(Modifier.height(10.dp))
-            val typesText = rule.fileExtensions.take(4).joinToString(" · ") +
-                if (rule.fileExtensions.size > 4) " +${rule.fileExtensions.size - 4}" else ""
-            val destText = displayPath(rule.destinationFolderPath).takeIf { it.isNotBlank() } ?: ""
-            val infoText = listOf(typesText, destText).filter { it.isNotBlank() }.joinToString("  |  ")
-            if (infoText.isNotBlank()) {
+        ListItem(
+            headlineContent = {
                 Text(
-                    text = infoText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = rule.name,
+                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
-        }
-        if (progress != null && !progress.isComplete) {
-            Spacer(Modifier.height(6.dp))
+            },
+            supportingContent = if (infoText.isNotBlank()) {
+                {
+                    Text(
+                        text = infoText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            } else null,
+            leadingContent = {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = rule.icon.toImageVector(),
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            },
+            trailingContent = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Switch(
+                        checked = rule.isEnabled,
+                        onCheckedChange = { enabled ->
+                            playTap()
+                            onToggleEnabled(enabled)
+                        }
+                    )
+                    FilledTonalIconButton(
+                        onClick = {
+                            playTap()
+                            onRunClick()
+                        },
+                        enabled = rule.isEnabled && !runInProgress && !runBlocked,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = stringResource(R.string.run_now),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            },
+            colors = ListItemDefaults.colors()
+        )
+        if (runInProgress) {
             LinearProgressIndicator(
-                progress = { if (progress.totalFiles > 0) progress.progress else 0f },
+                progress = { if (progress!!.totalFiles > 0) progress.progress else 0f },
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -207,7 +233,8 @@ private fun ExpandedContent(
     cardActions: List<Pair<ImageVector, () -> Unit>>,
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
-    isAnyRuleRunning: Boolean
+    isAnyRuleRunning: Boolean,
+    hasStaleFolder: Boolean = false
 ) {
     val playTap = rememberPlayTapSound()
     Column(Modifier.padding(16.dp)) {
@@ -292,40 +319,46 @@ private fun ExpandedContent(
 
             Spacer(Modifier.height(8.dp))
 
-            Text(
-                text = stringResource(R.string.rule_card_from),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
+            val notSet = stringResource(R.string.rule_card_destination_not_set)
+            val fromText = if (rule.sourceFolderPaths.isEmpty()) {
+                stringResource(R.string.rule_card_from_none)
+            } else {
+                val shown = rule.sourceFolderPaths.take(3)
+                val extra = rule.sourceFolderPaths.size - shown.size
+                shown.joinToString(", ") { displayPath(it) } + if (extra > 0) ", +$extra" else ""
+            }
+            LabeledInfoSingleLine(
+                label = stringResource(R.string.rule_card_from),
+                value = fromText
             )
             Spacer(Modifier.height(4.dp))
-            if (rule.sourceFolderPaths.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.rule_card_from_none),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    rule.sourceFolderPaths.forEach { path ->
-                        Text(
-                            text = displayPath(path),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+            LabeledInfoSingleLine(
+                label = stringResource(R.string.rule_card_to),
+                value = if (rule.destinationFolderPath.isEmpty()) notSet
+                        else displayPath(rule.destinationFolderPath),
+                rowModifier = Modifier.padding(start = 16.dp)
+            )
+
+            if (hasStaleFolder) {
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.rule_card_stale_folder_warning),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
                 }
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            val notSet = stringResource(R.string.rule_card_destination_not_set)
-            LabeledInfo(
-                label = stringResource(R.string.destination_label),
-                value = if (rule.destinationFolderPath.isEmpty()) notSet
-                        else displayPath(rule.destinationFolderPath)
-            )
 
             rule.schedule?.let { schedule ->
                 Spacer(Modifier.height(4.dp))
@@ -440,6 +473,25 @@ private fun LabeledInfo(label: String, value: String) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 4,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun LabeledInfoSingleLine(label: String, value: String, rowModifier: Modifier = Modifier) {
+    Row(modifier = rowModifier.fillMaxWidth()) {
+        Text(
+            text = "$label: ",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
     }
 }

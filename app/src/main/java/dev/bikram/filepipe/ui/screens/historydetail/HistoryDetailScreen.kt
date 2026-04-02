@@ -1,6 +1,12 @@
 package dev.bikram.filepipe.ui.screens.historydetail
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.webkit.MimeTypeMap
+import android.widget.Toast
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,6 +50,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
+import android.net.Uri
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
@@ -220,6 +228,7 @@ private fun SummaryRow(label: String, value: String) {
 
 @Composable
 private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val isSuccess = file.success && !file.skipped
     val iconColor = when {
         file.skipped -> MaterialTheme.colorScheme.outline
@@ -233,7 +242,13 @@ private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
     }
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (isSuccess) Modifier.clickable {
+                    openFileWithDefaultApp(context, file.destinationUri)
+                } else Modifier
+            ),
         shape = RoundedCornerShape(12.dp),
         color = containerColor,
         tonalElevation = 1.dp
@@ -324,6 +339,26 @@ private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+private fun openFileWithDefaultApp(context: Context, uriString: String) {
+    if (uriString.isBlank()) {
+        Toast.makeText(context, "File location not available", Toast.LENGTH_SHORT).show()
+        return
+    }
+    val uri = Uri.parse(uriString)
+    val fileName = uriString.substringAfterLast('/')
+    val ext = fileName.substringAfterLast('.', "").lowercase()
+    val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "*/*"
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mimeType)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, "No app found to open this file type", Toast.LENGTH_SHORT).show()
     }
 }
 

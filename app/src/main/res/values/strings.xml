@@ -16,6 +16,8 @@
     <string name="rule_card_from">From</string>
     <string name="rule_card_from_none">No sources</string>
     <string name="rule_card_destination_not_set">Not set</string>
+    <string name="rule_card_to">To</string>
+    <string name="rule_card_stale_folder_warning">One or more folders need re-selection — tap Edit</string>
     <string name="rule_delete_confirm">Delete rule?</string>
     <string name="rule_delete_message">This will also remove any scheduled runs for this rule.</string>
 
@@ -24,13 +26,13 @@
     <string name="edit_rule">Edit Rule</string>
     <string name="rule_name_label">Rule name</string>
     <string name="rule_name_placeholder">e.g. Photos Backup</string>
-    <string name="source_folders_label">Source Folders</string>
-    <string name="add_source_folder">Add source folders</string>
+    <string name="source_folders_label">Source folders</string>
+    <string name="add_source_folder">Pick folders</string>
     <string name="file_types_label">File Types</string>
     <string name="add_file_type">Add type</string>
-    <string name="destination_label">To</string>
+    <string name="destination_label">Destination folder</string>
     <string name="pick_folder">Pick folder</string>
-    <string name="change_destination">Change destination</string>
+    <string name="change_destination">Change folder</string>
     <string name="rule_icon_picker_cd">Choose rule icon</string>
     <string name="rule_icon_label_default">Default</string>
     <string name="rule_icon_label_image">Images</string>
@@ -120,6 +122,24 @@
     <string name="theme_material_you">Material You</string>
     <string name="settings_material_you_hint">Uses wallpaper colors on Android 12+.</string>
     <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title_subtitle">Organize your files automatically.</string>
+    <string name="onboarding_lets_begin">Let\'s Begin</string>
+    <string name="onboarding_get_started">Get Started</string>
+    <string name="onboarding_prefs_title">Preferences</string>
+    <string name="onboarding_prefs_subtitle">Configure some basic settings to get started.</string>
+    <string name="onboarding_prefs_settings_section">App Settings</string>
+    <string name="onboarding_prefs_theme_label">Theme</string>
+
+    <!-- Feedback / new settings -->
+    <string name="settings_feedback_section">Feedback</string>
+    <string name="settings_haptic_feedback">Haptic Feedback</string>
+    <string name="settings_haptic_feedback_desc">Tap sounds and swipe vibrations</string>
+    <string name="settings_progressive_blur">Progressive Blur</string>
+    <string name="settings_progressive_blur_desc">Frosted blur behind the tab bar on Android 12 and up; a stronger fade on older versions</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_desc">Run summaries and reminders</string>
     <string name="theme_black">Black (OLED)</string>
 
     <!-- Rule detail — new fields -->
@@ -148,6 +168,9 @@
     <string name="settings_log_retention">Log retention</string>
     <string name="settings_log_retention_hint">How long to keep run history records.</string>
 
+    <!-- Notification actions -->
+    <string name="notification_action_undo">Undo</string>
+
     <!-- Notification — run summary -->
     <string name="notification_summary_channel_name">Run Summary</string>
     <string name="notification_summary_channel_desc">Shows a summary after each rule run completes</string>
@@ -155,6 +178,26 @@
     <string name="notification_summary_body_moved">%d files moved</string>
     <string name="notification_summary_body_copied">%d files copied</string>
     <string name="notification_summary_body_partial">%1$d moved, %2$d failed</string>
+
+    <!-- Advanced filters section -->
+    <string name="advanced_section_title">Advanced filters</string>
+    <string name="advanced_section_subtitle">Optional filters to narrow matching files</string>
+    <string name="advanced_section_filters_active">Filters active</string>
+    <string name="advanced_filename_pattern_label">Filename pattern</string>
+    <string name="advanced_filename_pattern_placeholder">e.g. Screenshot_*</string>
+    <string name="advanced_min_size_label">Min size (MB)</string>
+    <string name="advanced_max_size_label">Max size (MB)</string>
+    <string name="advanced_min_age_label">Min age (days)</string>
+    <string name="advanced_max_age_label">Max age (days)</string>
+    <string name="advanced_exclude_patterns_label">Exclude patterns</string>
+    <string name="advanced_add_exclude">Add exclude pattern</string>
+    <string name="advanced_exclude_placeholder">e.g. .nomedia</string>
+    <string name="advanced_csv_hint">Separate multiple patterns with commas</string>
+
+    <!-- Folder bookmarks -->
+    <string name="bookmark_toggle_cd">Toggle bookmark</string>
+    <string name="bookmarks_quick_pick">Bookmarks</string>
+    <string name="bookmarks_choose">Bookmarks</string>
 
     <!-- Days of week -->
     <string-array name="days_of_week">

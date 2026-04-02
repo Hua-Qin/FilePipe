@@ -12,9 +12,15 @@ class PreviewRuleUseCase @Inject constructor(
         if (rule.sourceFolderPaths.isEmpty() || rule.fileExtensions.isEmpty()) return emptyList()
         return rule.sourceFolderPaths.flatMap { path ->
             fileOperationRepository.listMatchingFiles(
-                folderPath = path,
+                folderUriString = path,
                 extensions = rule.fileExtensions,
-                scanSubdirectories = rule.scanSubdirectories
+                scanSubdirectories = rule.scanSubdirectories,
+                filenamePattern = rule.filenamePattern,
+                minFileSizeBytes = rule.minFileSizeBytes,
+                maxFileSizeBytes = rule.maxFileSizeBytes,
+                minAgeDays = rule.minAgeDays,
+                maxAgeDays = rule.maxAgeDays,
+                excludePatterns = rule.excludePatterns
             )
         }
     }

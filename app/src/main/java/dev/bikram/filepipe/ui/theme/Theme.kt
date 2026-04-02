@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.graphics.ColorUtils
 import dev.bikram.filepipe.data.preferences.AppThemeMode
+import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.LocalTapSound
 
 private val LightColors = lightColorScheme(
@@ -29,6 +30,8 @@ private val LightColors = lightColorScheme(
     tertiary = Teal40,
     background = Color(0xFFE2E8F0),
     surface = Color(0xFFF8FAFC),
+    surfaceDim = Color(0xFFE2E8F0),
+    surfaceBright = Color(0xFFFFFFFF),
     surfaceContainerLowest = Color(0xFFEEF2F7),
     surfaceContainerLow = Color(0xFFF3F6FA),
     surfaceContainer = Color(0xFFF6F8FC),
@@ -42,6 +45,8 @@ private val DarkColors = darkColorScheme(
     tertiary = Teal80,
     background = Color(0xFF0D1117),
     surface = Color(0xFF161B22),
+    surfaceDim = Color(0xFF0D1117),
+    surfaceBright = Color(0xFF2D333B),
     surfaceContainerLowest = Color(0xFF0D1117),
     surfaceContainerLow = Color(0xFF1C2128),
     surfaceContainer = Color(0xFF22272E),
@@ -57,6 +62,8 @@ private val BlackOledColors = darkColorScheme(
     tertiary = Teal80,
     background = Color.Black,
     surface = Color.Black,
+    surfaceDim = Color.Black,
+    surfaceBright = Color(0xFF2E2E2E),
     surfaceContainerLowest = Color.Black,
     surfaceContainerLow = Color(0xFF222222),
     surfaceContainer = Color(0xFF262626),
@@ -73,14 +80,16 @@ private fun ColorScheme.increaseBackgroundCardContrast(): ColorScheme {
             background = Color(ColorUtils.blendARGB(backgroundArgb, AndroidColor.BLACK, 0.06f)),
             surfaceContainerLow = Color(ColorUtils.blendARGB(surfaceContainerLow.toArgb(), AndroidColor.WHITE, 0.07f)),
             surfaceContainer = Color(ColorUtils.blendARGB(surfaceContainer.toArgb(), AndroidColor.WHITE, 0.09f)),
-            surfaceContainerHigh = Color(ColorUtils.blendARGB(surfaceContainerHigh.toArgb(), AndroidColor.WHITE, 0.14f))
+            surfaceContainerHigh = Color(ColorUtils.blendARGB(surfaceContainerHigh.toArgb(), AndroidColor.WHITE, 0.14f)),
+            surfaceBright = Color(ColorUtils.blendARGB(surfaceBright.toArgb(), AndroidColor.WHITE, 0.12f))
         )
     } else {
         copy(
             background = Color(ColorUtils.blendARGB(backgroundArgb, AndroidColor.BLACK, 0.05f)),
             surfaceContainerLow = Color(ColorUtils.blendARGB(surfaceContainerLow.toArgb(), AndroidColor.WHITE, 0.1f)),
             surfaceContainer = Color(ColorUtils.blendARGB(surfaceContainer.toArgb(), AndroidColor.WHITE, 0.12f)),
-            surfaceContainerHigh = Color(ColorUtils.blendARGB(surfaceContainerHigh.toArgb(), AndroidColor.WHITE, 0.16f))
+            surfaceContainerHigh = Color(ColorUtils.blendARGB(surfaceContainerHigh.toArgb(), AndroidColor.WHITE, 0.16f)),
+            surfaceBright = Color(ColorUtils.blendARGB(surfaceBright.toArgb(), AndroidColor.WHITE, 0.08f))
         )
     }
 }
@@ -102,6 +111,7 @@ private fun oledSurfacesFrom(dynamicScheme: ColorScheme): ColorScheme = dynamicS
 fun FilePipeTheme(
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     useMaterialYou: Boolean = false,
+    hapticFeedbackEnabled: Boolean = true,
     content: @Composable () -> Unit
 ) {
     val context = LocalContext.current
@@ -130,7 +140,7 @@ fun FilePipeTheme(
     SideEffect {
         view.isSoundEffectsEnabled = true
     }
-    val playTapSound = remember(view) {
+    val realTapSound = remember(view) {
         val lastTapTimeMs = longArrayOf(0L)
         val minTapSoundSpacingMs = 85L
         {
@@ -143,8 +153,13 @@ fun FilePipeTheme(
             }
         }
     }
+    val noopSound = remember { {} }
+    val playTapSound = if (hapticFeedbackEnabled) realTapSound else noopSound
 
-    CompositionLocalProvider(LocalTapSound provides playTapSound) {
+    CompositionLocalProvider(
+        LocalTapSound provides playTapSound,
+        LocalHapticEnabled provides hapticFeedbackEnabled
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = AppTypography,

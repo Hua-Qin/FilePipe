@@ -1,24 +1,66 @@
 package dev.bikram.filepipe.ui.navigation
 
+import android.os.Build
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.outlined.List
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FloatingToolbarDefaults
+import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -28,12 +70,19 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.screens.history.HistoryScreen
+import dev.bikram.filepipe.ui.screens.history.HistoryViewModel
 import dev.bikram.filepipe.ui.screens.historydetail.HistoryDetailScreen
+import dev.bikram.filepipe.ui.screens.onboarding.OnboardingPrefsScreen
+import dev.bikram.filepipe.ui.screens.onboarding.OnboardingTitleScreen
 import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
+import dev.bikram.filepipe.ui.modifiers.BlurDirection
+import dev.bikram.filepipe.ui.modifiers.progressiveBlur
 
 private data class BottomNavItem(
     val screen: Screen,
@@ -64,7 +113,10 @@ private val bottomNavItems = listOf(
 )
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    hasSeenIntro: Boolean = true,
+    preferences: AppPreferences = AppPreferences()
+) {
     val playTap = rememberPlayTapSound()
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -74,110 +126,318 @@ fun AppNavigation() {
         currentDestination?.hierarchy?.any { destination -> destination.route == it.screen.route } == true
     }
 
-    Scaffold(
-        bottomBar = {
-            if (showBottomBar) {
-                NavigationBar {
-                    bottomNavItems.forEach { item ->
-                        val selected = currentDestination
-                            ?.hierarchy
-                            ?.any { destination -> destination.route == item.screen.route } == true
-                        NavigationBarItem(
-                            selected = selected,
+    val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val floatingBarHeight = 64.dp
+    val scrimHeight = navBarInset + floatingBarHeight + 24.dp
+    val contentPaddingBottom = if (showBottomBar) scrimHeight else navBarInset
+    val density = LocalDensity.current
+    val bottomBlurHeightPx = with(density) { scrimHeight.toPx() }
+    val progressiveBottomBlurModifier = if (showBottomBar && preferences.progressiveBlurEnabled) {
+        Modifier.progressiveBlur(
+            blurRadius = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) 40f else 0f,
+            height = bottomBlurHeightPx,
+            direction = BlurDirection.BOTTOM,
+            showGradientOverlay = true
+        )
+    } else {
+        Modifier
+    }
+
+    // Activity-scoped VMs for nav bar FAB actions
+    val historyVm: HistoryViewModel = hiltViewModel()
+    val settingsVm: SettingsViewModel = hiltViewModel()
+
+    var showClearHistoryDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val fabMessage by settingsVm.userMessage.collectAsStateWithLifecycle()
+
+    LaunchedEffect(fabMessage) {
+        val msg = fabMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(msg)
+        settingsVm.clearUserMessage()
+    }
+
+    val currentTab = bottomNavItems.find { item ->
+        currentDestination?.hierarchy?.any { it.route == item.screen.route } == true
+    }?.screen
+
+    if (showClearHistoryDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryDialog = false },
+            title = { Text(stringResource(R.string.history_clear_confirm_title)) },
+            text = { Text(stringResource(R.string.history_clear_confirm_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    playTap()
+                    showClearHistoryDialog = false
+                    historyVm.clearAllHistory()
+                }) { Text(stringResource(R.string.history_clear)) }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    playTap()
+                    showClearHistoryDialog = false
+                }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(progressiveBottomBlurModifier),
+            bottomBar = {}
+        ) { _ ->
+            NavHost(
+                navController = navController,
+                startDestination = if (hasSeenIntro) Screen.Rules.route else Screen.OnboardingTitle.createRoute(),
+                enterTransition = { slideInHorizontally { it } + fadeIn() },
+                exitTransition = { slideOutHorizontally { -it / 3 } + fadeOut() },
+                popEnterTransition = { slideInHorizontally { -it } + fadeIn() },
+                popExitTransition = { slideOutHorizontally { it } + fadeOut() }
+            ) {
+                composable(
+                    route = Screen.OnboardingTitle.route,
+                    arguments = listOf(navArgument(Screen.OnboardingTitle.ARG) {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    })
+                ) { backStack ->
+                    val fromSettings = backStack.arguments?.getBoolean(Screen.OnboardingTitle.ARG) ?: false
+                    OnboardingTitleScreen(
+                        fromSettings = fromSettings,
+                        onLetsBegan = {
+                            if (fromSettings) navController.popBackStack()
+                            else navController.navigate(Screen.OnboardingPrefs.route)
+                        }
+                    )
+                }
+
+                composable(Screen.OnboardingPrefs.route) {
+                    OnboardingPrefsScreen(
+                        onBack = { navController.popBackStack() },
+                        onComplete = {
+                            navController.navigate(Screen.Rules.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
+                    )
+                }
+
+                composable(Screen.Rules.route) {
+                    RulesScreen(
+                        contentPadding = PaddingValues(bottom = contentPaddingBottom),
+                        onEditRule = { ruleId -> navController.navigate(Screen.RuleDetail.createRoute(ruleId)) },
+                        onNavigateToHistoryDetail = { historyId ->
+                            navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
+                                launchSingleTop = true
+                            }
+                        },
+                        onNavigateToHistoryList = {
+                            navController.navigate(Screen.History.route) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        onNavigateToRuleHistory = { ruleId ->
+                            navController.navigate(Screen.HistoryForRule.createRoute(ruleId))
+                        }
+                    )
+                }
+                composable(
+                    route = Screen.RuleDetail.route,
+                    arguments = listOf(navArgument(Screen.RuleDetail.ARG_RULE_ID) {
+                        type = NavType.LongType
+                    })
+                ) {
+                    RuleDetailScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+                composable(Screen.History.route) {
+                    HistoryScreen(
+                        contentPadding = PaddingValues(bottom = contentPaddingBottom),
+                        onHistoryClick = { historyId ->
+                            navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                        }
+                    )
+                }
+                composable(Screen.Settings.route) {
+                    SettingsScreen(
+                        contentPadding = PaddingValues(bottom = contentPaddingBottom),
+                        onOpenIntro = {
+                            navController.navigate(Screen.OnboardingTitle.createRoute(fromSettings = true))
+                        }
+                    )
+                }
+                composable(
+                    route = Screen.HistoryDetail.route,
+                    arguments = listOf(navArgument(Screen.HistoryDetail.ARG_HISTORY_ID) {
+                        type = NavType.LongType
+                    })
+                ) {
+                    HistoryDetailScreen(onNavigateBack = { navController.popBackStack() })
+                }
+                composable(
+                    route = Screen.HistoryForRule.route,
+                    arguments = listOf(navArgument(Screen.HistoryForRule.ARG_RULE_ID) {
+                        type = NavType.LongType
+                    })
+                ) {
+                    HistoryScreen(
+                        onHistoryClick = { historyId ->
+                            navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                        },
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = contentPaddingBottom + 8.dp)
+        )
+
+        if (showBottomBar) {
+            FloatingNavBar(
+                items = bottomNavItems,
+                currentDestination = currentDestination,
+                onItemClick = { item ->
+                    playTap()
+                    navController.navigate(item.screen.route) {
+                        popUpTo(navController.graph.findStartDestination().id) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
+                fabContent = {
+                    val containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                    val contentColor = MaterialTheme.colorScheme.primary
+                    val fabModifier = Modifier.size(56.dp)
+                    when (currentTab) {
+                        Screen.Rules -> FloatingActionButton(
                             onClick = {
                                 playTap()
-                                navController.navigate(item.screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
+                                navController.navigate(Screen.RuleDetail.createRoute())
                             },
-                            icon = {
-                                if (selected) item.selectedIcon() else item.unselectedIcon()
+                            modifier = fabModifier,
+                            containerColor = containerColor,
+                            contentColor = contentColor
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.rules_add_rule))
+                        }
+
+                        Screen.History -> FloatingActionButton(
+                            onClick = {
+                                playTap()
+                                showClearHistoryDialog = true
                             },
-                            label = { Text(stringResource(item.label)) }
+                            modifier = fabModifier,
+                            containerColor = containerColor,
+                            contentColor = contentColor
+                        ) {
+                            Icon(Icons.Default.DeleteSweep, contentDescription = stringResource(R.string.history_clear))
+                        }
+
+                        Screen.Settings -> FloatingActionButton(
+                            onClick = {
+                                playTap()
+                                settingsVm.exportNow()
+                            },
+                            modifier = fabModifier,
+                            containerColor = containerColor,
+                            contentColor = contentColor
+                        ) {
+                            Icon(Icons.Default.SaveAlt, contentDescription = stringResource(R.string.settings_export_now))
+                        }
+
+                        else -> {}
+                    }
+                },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun FloatingNavBar(
+    items: List<BottomNavItem>,
+    currentDestination: NavDestination?,
+    onItemClick: (BottomNavItem) -> Unit,
+    fabContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    HorizontalFloatingToolbar(
+        expanded = true,
+        floatingActionButton = fabContent,
+        modifier = modifier
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
+        colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(
+            toolbarContainerColor = MaterialTheme.colorScheme.primary,
+            toolbarContentColor = MaterialTheme.colorScheme.onPrimary
+        )
+    ) {
+        items.forEachIndexed { index, item ->
+            val selected = currentDestination
+                ?.hierarchy
+                ?.any { it.route == item.screen.route } == true
+
+            val labelWidth by animateDpAsState(
+                targetValue = if (selected) 72.dp else 0.dp,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                ),
+                label = "nav_label_$index"
+            )
+
+            IconButton(
+                onClick = { onItemClick(item) },
+                modifier = Modifier
+                    .height(48.dp)
+                    .width(48.dp + labelWidth),
+                colors = if (selected) {
+                    IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
+                } else {
+                    IconButtonDefaults.iconButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = if (selected) 6.dp else 0.dp)
+                ) {
+                    Box(modifier = Modifier.size(24.dp)) {
+                        if (selected) item.selectedIcon() else item.unselectedIcon()
+                    }
+                    if (labelWidth > 4.dp) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = stringResource(item.label),
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1
                         )
                     }
                 }
             }
         }
-    ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = Screen.Rules.route,
-            enterTransition = { slideInHorizontally { it } + fadeIn() },
-            exitTransition = { slideOutHorizontally { -it / 3 } + fadeOut() },
-            popEnterTransition = { slideInHorizontally { -it } + fadeIn() },
-            popExitTransition = { slideOutHorizontally { it } + fadeOut() }
-        ) {
-            composable(Screen.Rules.route) {
-                RulesScreen(
-                    contentPadding = innerPadding,
-                    onCreateRule = { navController.navigate(Screen.RuleDetail.createRoute()) },
-                    onEditRule = { ruleId -> navController.navigate(Screen.RuleDetail.createRoute(ruleId)) },
-                    onNavigateToHistoryDetail = { historyId ->
-                        navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
-                            launchSingleTop = true
-                        }
-                    },
-                    onNavigateToHistoryList = {
-                        navController.navigate(Screen.History.route) {
-                            popUpTo(navController.graph.findStartDestination().id) {
-                                saveState = true
-                            }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    onNavigateToRuleHistory = { ruleId ->
-                        navController.navigate(Screen.HistoryForRule.createRoute(ruleId))
-                    }
-                )
-            }
-            composable(
-                route = Screen.RuleDetail.route,
-                arguments = listOf(navArgument(Screen.RuleDetail.ARG_RULE_ID) {
-                    type = NavType.LongType
-                })
-            ) {
-                RuleDetailScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-            composable(Screen.History.route) {
-                HistoryScreen(
-                    contentPadding = innerPadding,
-                    onHistoryClick = { historyId ->
-                        navController.navigate(Screen.HistoryDetail.createRoute(historyId))
-                    }
-                )
-            }
-            composable(Screen.Settings.route) {
-                SettingsScreen(contentPadding = innerPadding)
-            }
-            composable(
-                route = Screen.HistoryDetail.route,
-                arguments = listOf(navArgument(Screen.HistoryDetail.ARG_HISTORY_ID) {
-                    type = NavType.LongType
-                })
-            ) {
-                HistoryDetailScreen(onNavigateBack = { navController.popBackStack() })
-            }
-            composable(
-                route = Screen.HistoryForRule.route,
-                arguments = listOf(navArgument(Screen.HistoryForRule.ARG_RULE_ID) {
-                    type = NavType.LongType
-                })
-            ) {
-                HistoryScreen(
-                    onHistoryClick = { historyId ->
-                        navController.navigate(Screen.HistoryDetail.createRoute(historyId))
-                    },
-                    onNavigateBack = { navController.popBackStack() }
-                )
-            }
-        }
     }
 }
+

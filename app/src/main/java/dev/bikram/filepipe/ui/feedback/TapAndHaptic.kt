@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 
 val LocalTapSound = staticCompositionLocalOf<() -> Unit> { { } }
+val LocalHapticEnabled = staticCompositionLocalOf { true }
 
 @Composable
 fun rememberPlayTapSound(): () -> Unit = LocalTapSound.current

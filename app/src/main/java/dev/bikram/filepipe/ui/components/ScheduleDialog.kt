@@ -18,7 +18,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -84,7 +84,7 @@ fun ScheduleDialog(
                         label = { Text("Frequency") },
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeExpanded) },
                         modifier = Modifier
-                            .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
                             .fillMaxWidth()
                     )
                     ExposedDropdownMenu(
@@ -116,7 +116,7 @@ fun ScheduleDialog(
                             label = { Text("Day") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(dayExpanded) },
                             modifier = Modifier
-                                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = true)
+                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
                                 .fillMaxWidth()
                         )
                         ExposedDropdownMenu(

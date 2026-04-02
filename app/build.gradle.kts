@@ -83,6 +83,21 @@ extensions.configure<ApplicationExtension>("android") {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("github") {
+            dimension = "distribution"
+            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+        }
+        create("playstore") {
+            dimension = "distribution"
+            buildConfigField("String", "GITHUB_REPO", "\"\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "false")
+        }
     }
 
     lint {
@@ -100,7 +115,7 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.compose.material3)
+    implementation("androidx.compose.material3:material3:1.5.0-alpha16")
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.material.icons.extended)
     debugImplementation(libs.compose.ui.tooling)

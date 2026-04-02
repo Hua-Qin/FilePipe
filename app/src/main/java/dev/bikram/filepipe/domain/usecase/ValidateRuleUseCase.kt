@@ -15,6 +15,9 @@ class ValidateRuleUseCase @Inject constructor() {
             if (rule.sourceFolderPaths.isEmpty()) add("At least one source folder is required")
             if (rule.destinationFolderPath.isBlank()) add("Destination folder is required")
             if (rule.fileExtensions.isEmpty()) add("At least one file type is required")
+            if (rule.destinationFolderPath.isNotBlank() &&
+                rule.sourceFolderPaths.any { it == rule.destinationFolderPath }
+            ) add("Source and destination folders cannot be the same")
             rule.schedule?.let { schedule ->
                 if (schedule.hour !in 0..23) add("Invalid hour in schedule")
                 if (schedule.minute !in 0..59) add("Invalid minute in schedule")

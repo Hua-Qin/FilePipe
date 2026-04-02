@@ -1,8 +1,11 @@
 package dev.bikram.filepipe.ui.screens.ruledetail
 
+import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.domain.model.ConflictPolicy
@@ -22,6 +25,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -39,11 +43,19 @@ data class RuleDetailUiState(
     val operationMode: OperationMode = OperationMode.MOVE,
     val scanSubdirectories: Boolean = false,
     val icon: RuleIcon = RuleIcon.DEFAULT,
+    // Advanced filters (shown as display strings in UI)
+    val filenamePattern: String = "",
+    val minFileSizeMb: String = "",
+    val maxFileSizeMb: String = "",
+    val minAgeDays: String = "",
+    val maxAgeDays: String = "",
+    val excludePatternsText: String = "",
     val isLoading: Boolean = true,
     val isSaved: Boolean = false,
     val errors: List<String> = emptyList(),
     val previewFiles: List<FileEntry>? = null,
-    val isPreviewLoading: Boolean = false
+    val isPreviewLoading: Boolean = false,
+    val removedRedundantFolders: List<String> = emptyList()
 )
 
 private data class RuleSnapshot(
@@ -55,7 +67,13 @@ private data class RuleSnapshot(
     val conflictPolicy: ConflictPolicy,
     val operationMode: OperationMode,
     val scanSubdirectories: Boolean,
-    val icon: RuleIcon
+    val icon: RuleIcon,
+    val filenamePattern: String,
+    val minFileSizeMb: String,
+    val maxFileSizeMb: String,
+    val minAgeDays: String,
+    val maxAgeDays: String,
+    val excludePatternsText: String
 )
 
 private fun RuleDetailUiState.toSnapshot(): RuleSnapshot = RuleSnapshot(
@@ -67,7 +85,13 @@ private fun RuleDetailUiState.toSnapshot(): RuleSnapshot = RuleSnapshot(
     conflictPolicy = conflictPolicy,
     operationMode = operationMode,
     scanSubdirectories = scanSubdirectories,
-    icon = icon
+    icon = icon,
+    filenamePattern = filenamePattern,
+    minFileSizeMb = minFileSizeMb,
+    maxFileSizeMb = maxFileSizeMb,
+    minAgeDays = minAgeDays,
+    maxAgeDays = maxAgeDays,
+    excludePatternsText = excludePatternsText
 )
 
 @HiltViewModel
@@ -77,7 +101,8 @@ class RuleDetailViewModel @Inject constructor(
     private val scheduleRulesUseCase: ScheduleRulesUseCase,
     private val validateRuleUseCase: ValidateRuleUseCase,
     private val previewRuleUseCase: PreviewRuleUseCase,
-    private val rulesAutoExportTrigger: RulesAutoExportTrigger
+    private val rulesAutoExportTrigger: RulesAutoExportTrigger,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
     private val ruleId: Long = savedStateHandle[Screen.RuleDetail.ARG_RULE_ID] ?: Screen.RuleDetail.NEW_RULE_ID
@@ -91,6 +116,10 @@ class RuleDetailViewModel @Inject constructor(
     val isDirty: StateFlow<Boolean> = combine(_uiState, _baseline) { state, baseline ->
         baseline != null && state.toSnapshot() != baseline
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val bookmarkedFolders: StateFlow<List<String>> = userPreferencesRepository.preferencesFlow
+        .map { it.bookmarkedFolders }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     init {
         if (!isNewRule) {
@@ -117,6 +146,12 @@ class RuleDetailViewModel @Inject constructor(
                     operationMode = rule.operationMode,
                     scanSubdirectories = rule.scanSubdirectories,
                     icon = rule.icon,
+                    filenamePattern = rule.filenamePattern ?: "",
+                    minFileSizeMb = rule.minFileSizeBytes?.let { bytes -> "${bytes / 1024 / 1024}" } ?: "",
+                    maxFileSizeMb = rule.maxFileSizeBytes?.let { bytes -> "${bytes / 1024 / 1024}" } ?: "",
+                    minAgeDays = rule.minAgeDays?.toString() ?: "",
+                    maxAgeDays = rule.maxAgeDays?.toString() ?: "",
+                    excludePatternsText = rule.excludePatterns.joinToString(", "),
                     isLoading = false
                 )
             }
@@ -129,9 +164,38 @@ class RuleDetailViewModel @Inject constructor(
 
     fun setName(name: String) = _uiState.update { it.copy(name = name, errors = emptyList()) }
 
-    fun addSourceFolder(path: String) = _uiState.update {
-        if (path in it.sourceFolderPaths) it
-        else it.copy(sourceFolderPaths = it.sourceFolderPaths + path)
+    private fun removeRedundantPaths(paths: List<String>): Pair<List<String>, List<String>> {
+        val toRemove = paths.filter { child ->
+            paths.any { parent -> parent != child && isChildFolder(child, parent) }
+        }
+        return (paths - toRemove.toSet()) to toRemove
+    }
+
+    private fun isChildFolder(child: String, parent: String): Boolean {
+        if (child.startsWith("content://") && parent.startsWith("content://")) {
+            return try {
+                val childId = DocumentsContract.getTreeDocumentId(Uri.parse(child))
+                val parentId = DocumentsContract.getTreeDocumentId(Uri.parse(parent))
+                val childVolume = childId.substringBefore(":")
+                val parentVolume = parentId.substringBefore(":")
+                if (childVolume != parentVolume) return false
+                val childPath = childId.substringAfter(":", "")
+                val parentPath = parentId.substringAfter(":", "")
+                parentPath.isNotEmpty() && childPath.startsWith("$parentPath/")
+            } catch (_: Exception) { false }
+        }
+        return child.startsWith("$parent/")
+    }
+
+    fun addSourceFolder(path: String) = _uiState.update { state ->
+        val newPaths = if (path in state.sourceFolderPaths) state.sourceFolderPaths
+                       else state.sourceFolderPaths + path
+        if (state.scanSubdirectories) {
+            val (kept, removed) = removeRedundantPaths(newPaths)
+            state.copy(sourceFolderPaths = kept, removedRedundantFolders = removed)
+        } else {
+            state.copy(sourceFolderPaths = newPaths, removedRedundantFolders = emptyList())
+        }
     }
 
     fun removeSourceFolder(path: String) = _uiState.update {
@@ -171,9 +235,34 @@ class RuleDetailViewModel @Inject constructor(
 
     fun setOperationMode(mode: OperationMode) = _uiState.update { it.copy(operationMode = mode) }
 
-    fun setScanSubdirectories(enabled: Boolean) = _uiState.update { it.copy(scanSubdirectories = enabled) }
+    fun setScanSubdirectories(enabled: Boolean) = _uiState.update { state ->
+        if (enabled) {
+            val (kept, removed) = removeRedundantPaths(state.sourceFolderPaths)
+            state.copy(scanSubdirectories = true, sourceFolderPaths = kept, removedRedundantFolders = removed)
+        } else {
+            state.copy(scanSubdirectories = false, removedRedundantFolders = emptyList())
+        }
+    }
+
+    fun dismissRedundantFolderNotice() = _uiState.update { it.copy(removedRedundantFolders = emptyList()) }
 
     fun setIcon(icon: RuleIcon) = _uiState.update { it.copy(icon = icon) }
+
+    // Advanced filter setters
+    fun setFilenamePattern(pattern: String) = _uiState.update { it.copy(filenamePattern = pattern) }
+    fun setMinFileSizeMb(value: String) = _uiState.update { it.copy(minFileSizeMb = value) }
+    fun setMaxFileSizeMb(value: String) = _uiState.update { it.copy(maxFileSizeMb = value) }
+    fun setMinAgeDays(value: String) = _uiState.update { it.copy(minAgeDays = value) }
+    fun setMaxAgeDays(value: String) = _uiState.update { it.copy(maxAgeDays = value) }
+
+    fun setExcludePatternsText(text: String) = _uiState.update { it.copy(excludePatternsText = text) }
+
+    // Bookmark actions
+    fun toggleBookmark(path: String) = viewModelScope.launch {
+        val bookmarks = bookmarkedFolders.value
+        if (path in bookmarks) userPreferencesRepository.removeBookmark(path)
+        else userPreferencesRepository.addBookmark(path)
+    }
 
     fun applyTemplate(template: RuleTemplate) {
         _uiState.update { state ->
@@ -240,6 +329,13 @@ class RuleDetailViewModel @Inject constructor(
         conflictPolicy = state.conflictPolicy,
         operationMode = state.operationMode,
         scanSubdirectories = state.scanSubdirectories,
-        icon = state.icon
+        icon = state.icon,
+        filenamePattern = state.filenamePattern.takeIf { it.isNotBlank() },
+        minFileSizeBytes = state.minFileSizeMb.toLongOrNull()?.takeIf { it > 0 }?.let { it * 1024 * 1024 },
+        maxFileSizeBytes = state.maxFileSizeMb.toLongOrNull()?.takeIf { it > 0 }?.let { it * 1024 * 1024 },
+        minAgeDays = state.minAgeDays.toIntOrNull()?.takeIf { it > 0 },
+        maxAgeDays = state.maxAgeDays.toIntOrNull()?.takeIf { it > 0 },
+        excludePatterns = state.excludePatternsText
+            .split(",").map { it.trim() }.filter { it.isNotBlank() }
     )
 }
