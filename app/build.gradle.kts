@@ -43,8 +43,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "dev.bikram.filepipe"
         minSdk = 30
         targetSdk = 36
-        versionCode = 100
-        versionName = "1.0.0"
+        versionCode = 150
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -158,4 +158,6 @@ dependencies {
     implementation(libs.documentfile)
 
     implementation(libs.datastore.preferences)
+
+    implementation(libs.material.kolor)
 }

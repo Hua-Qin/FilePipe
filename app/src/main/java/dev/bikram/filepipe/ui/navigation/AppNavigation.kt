@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -48,6 +50,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +58,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -69,20 +74,21 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.screens.history.HistoryScreen
 import dev.bikram.filepipe.ui.screens.history.HistoryViewModel
 import dev.bikram.filepipe.ui.screens.historydetail.HistoryDetailScreen
-import dev.bikram.filepipe.ui.screens.onboarding.OnboardingPrefsScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingTitleScreen
 import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
-import dev.bikram.filepipe.ui.modifiers.BlurDirection
 import dev.bikram.filepipe.ui.modifiers.progressiveBlur
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
+import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 
 private data class BottomNavItem(
     val screen: Screen,
@@ -127,16 +133,19 @@ fun AppNavigation(
     }
 
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val floatingBarHeight = 64.dp
     val scrimHeight = navBarInset + floatingBarHeight + 24.dp
+    val topBlurHeight = statusBarInset + 64.dp
     val contentPaddingBottom = if (showBottomBar) scrimHeight else navBarInset
     val density = LocalDensity.current
     val bottomBlurHeightPx = with(density) { scrimHeight.toPx() }
-    val progressiveBottomBlurModifier = if (showBottomBar && preferences.progressiveBlurEnabled) {
+    val topBlurHeightPx = with(density) { topBlurHeight.toPx() }
+    val progressiveBlurModifier = if (showBottomBar && preferences.progressiveBlurEnabled) {
         Modifier.progressiveBlur(
             blurRadius = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) 40f else 0f,
-            height = bottomBlurHeightPx,
-            direction = BlurDirection.BOTTOM,
+            topHeight = topBlurHeightPx,
+            bottomHeight = bottomBlurHeightPx,
             showGradientOverlay = true
         )
     } else {
@@ -155,6 +164,12 @@ fun AppNavigation(
         val msg = fabMessage ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(msg)
         settingsVm.clearUserMessage()
+    }
+
+    LaunchedEffect(hasSeenIntro, preferences.autoCheckForUpdates) {
+        if (hasSeenIntro && BuildConfig.SHOW_UPDATES && preferences.autoCheckForUpdates) {
+            settingsVm.checkForUpdate(silent = true)
+        }
     }
 
     val currentTab = bottomNavItems.find { item ->
@@ -182,14 +197,35 @@ fun AppNavigation(
         )
     }
 
-    Box(Modifier.fillMaxSize()) {
-        Scaffold(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(progressiveBottomBlurModifier),
-            bottomBar = {}
-        ) { _ ->
-            NavHost(
+    CompositionLocalProvider(
+        LocalUseGradientBackground provides preferences.useGradientBackground,
+        LocalProgressiveBlurEnabled provides preferences.progressiveBlurEnabled
+    ) {
+        Box(Modifier.fillMaxSize()) {
+            if (preferences.useGradientBackground) {
+                val scheme = MaterialTheme.colorScheme
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(scheme.surface)
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0f to scheme.primaryContainer.copy(alpha = 0.45f),
+                                    0.55f to scheme.surface.copy(alpha = 0f)
+                                )
+                            )
+                        )
+                )
+            }
+            Scaffold(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(progressiveBlurModifier),
+                containerColor = if (preferences.useGradientBackground) Color.Transparent else MaterialTheme.colorScheme.background,
+                bottomBar = {}
+            ) { _ ->
+                NavHost(
                 navController = navController,
                 startDestination = if (hasSeenIntro) Screen.Rules.route else Screen.OnboardingTitle.createRoute(),
                 enterTransition = { slideInHorizontally { it } + fadeIn() },
@@ -208,18 +244,14 @@ fun AppNavigation(
                     OnboardingTitleScreen(
                         fromSettings = fromSettings,
                         onLetsBegan = {
-                            if (fromSettings) navController.popBackStack()
-                            else navController.navigate(Screen.OnboardingPrefs.route)
-                        }
-                    )
-                }
-
-                composable(Screen.OnboardingPrefs.route) {
-                    OnboardingPrefsScreen(
-                        onBack = { navController.popBackStack() },
-                        onComplete = {
-                            navController.navigate(Screen.Rules.route) {
-                                popUpTo(0) { inclusive = true }
+                            if (fromSettings) {
+                                navController.popBackStack()
+                            } else {
+                                settingsVm.markIntroSeen {
+                                    navController.navigate(Screen.Rules.route) {
+                                        popUpTo(0) { inclusive = true }
+                                    }
+                                }
                             }
                         }
                     )
@@ -322,7 +354,7 @@ fun AppNavigation(
                 fabContent = {
                     val containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
                     val contentColor = MaterialTheme.colorScheme.primary
-                    val fabModifier = Modifier.size(56.dp)
+                    val fabModifier = Modifier.size(64.dp)
                     when (currentTab) {
                         Screen.Rules -> FloatingActionButton(
                             onClick = {
@@ -366,6 +398,7 @@ fun AppNavigation(
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
+    }
     }
 }
 

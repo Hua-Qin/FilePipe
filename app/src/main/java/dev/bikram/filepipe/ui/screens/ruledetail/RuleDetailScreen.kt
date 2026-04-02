@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.ui.screens.ruledetail
 
 import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,8 +16,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -49,13 +56,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.MultiChoiceSegmentedButtonRow
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -66,6 +72,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,12 +82,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.ui.modifiers.progressiveBlur
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
+import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RuleIcon
@@ -247,71 +259,73 @@ fun RuleDetailScreen(
 
     BackHandler(onBack = ::tryNavigateBack)
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text(if (viewModel.isNewRule) stringResource(R.string.new_rule) else stringResource(R.string.edit_rule)) },
-                navigationIcon = {
-                    IconButton(onClick = { withTapSound(::tryNavigateBack) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { withTapSound { viewModel.loadPreview() } },
-                        enabled = state.sourceFolderPaths.isNotEmpty() && state.fileExtensions.isNotEmpty()
-                    ) {
-                        Icon(Icons.Default.Visibility, contentDescription = stringResource(R.string.preview_rule))
-                    }
-                }
+    val scrollState = rememberScrollState()
+    val density = LocalDensity.current
+    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val topContentPadding = statusTop + 64.dp
+    val bottomContentPadding = navBottom + 88.dp
+    val topBlurHeightPx = with(density) { topContentPadding.toPx() }
+    val bottomBlurHeightPx = with(density) { bottomContentPadding.toPx() }
+    val progressiveBlurEnabled = LocalProgressiveBlurEnabled.current
+    val blurRadiusPx =
+        if (progressiveBlurEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) 56f else 0f
+    val formBlurModifier =
+        if (progressiveBlurEnabled) {
+            Modifier.progressiveBlur(
+                blurRadius = blurRadiusPx,
+                topHeight = topBlurHeightPx,
+                bottomHeight = bottomBlurHeightPx,
+                showGradientOverlay = true,
+                overlayAlpha = 0.38f
             )
-        },
-        bottomBar = {
-            if (!state.isLoading) {
-                Surface(tonalElevation = 3.dp) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { withTapSound(::tryNavigateBack) },
-                            modifier = Modifier.weight(1f),
-                            shape = PillShape
-                        ) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                        Button(
-                            onClick = { withTapSound { viewModel.save() } },
-                            modifier = Modifier.weight(1f),
-                            shape = PillShape
-                        ) {
-                            Text(stringResource(R.string.save))
-                        }
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
-        if (state.isLoading) {
-            Column(
-                Modifier.fillMaxSize().padding(innerPadding),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) { CircularProgressIndicator() }
-            return@Scaffold
+        } else {
+            Modifier
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(
+                if (LocalUseGradientBackground.current) Modifier
+                else Modifier.background(MaterialTheme.colorScheme.background)
+            )
+    ) {
+        if (state.isLoading) {
+            CircularProgressIndicator(Modifier.align(Alignment.Center))
+        } else {
+            // Background inside this layer so the blur shader samples real pixels (see AppNavigation blur).
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(formBlurModifier)
+            ) {
+                val scheme = MaterialTheme.colorScheme
+                if (LocalUseGradientBackground.current) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(scheme.surface)
+                            .background(
+                                Brush.verticalGradient(
+                                    colorStops = arrayOf(
+                                        0f to scheme.primaryContainer.copy(alpha = 0.45f),
+                                        0.55f to scheme.surface.copy(alpha = 0f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize().background(scheme.background))
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+            Spacer(Modifier.height(topContentPadding))
             if (state.errors.isNotEmpty()) {
                 state.errors.forEach { error ->
                     Text(
@@ -331,15 +345,13 @@ fun RuleDetailScreen(
                     FilledTonalIconButton(
                         onClick = { withTapSound { ruleIconMenuExpanded = true } },
                         modifier = Modifier.size(52.dp),
-                        shape = SectionButtonShape,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-                        )
+                        shape = SectionButtonShape
                     ) {
                         Icon(
                             imageVector = state.icon.toImageVector(),
                             contentDescription = stringResource(R.string.rule_icon_picker_cd),
-                            modifier = Modifier.size(26.dp)
+                            modifier = Modifier.size(26.dp),
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     }
                     DropdownMenu(
@@ -359,7 +371,8 @@ fun RuleDetailScreen(
                                 leadingIcon = {
                                     Icon(
                                         imageVector = iconOption.toImageVector(),
-                                        contentDescription = null
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             )
@@ -815,8 +828,78 @@ fun RuleDetailScreen(
                 }
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(32.dp + bottomContentPadding))
+                }
+            }
         }
+
+        TopAppBar(
+            modifier = Modifier.align(Alignment.TopCenter),
+            title = { Text(if (viewModel.isNewRule) stringResource(R.string.new_rule) else stringResource(R.string.edit_rule)) },
+            navigationIcon = {
+                IconButton(onClick = { withTapSound(::tryNavigateBack) }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+            actions = {
+                IconButton(
+                    onClick = { withTapSound { viewModel.loadPreview() } },
+                    enabled = state.sourceFolderPaths.isNotEmpty() && state.fileExtensions.isNotEmpty()
+                ) {
+                    Icon(Icons.Default.Visibility, contentDescription = stringResource(R.string.preview_rule))
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent
+            )
+        )
+
+        if (!state.isLoading) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
+                color = Color.Transparent,
+                tonalElevation = 0.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { withTapSound(::tryNavigateBack) },
+                        modifier = Modifier.weight(1f),
+                        shape = PillShape
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Button(
+                        onClick = { withTapSound { viewModel.save() } },
+                        modifier = Modifier.weight(1f),
+                        shape = PillShape
+                    ) {
+                        Text(stringResource(R.string.save))
+                    }
+                }
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(
+                    bottom = if (state.isLoading) {
+                        navBottom + 16.dp
+                    } else {
+                        navBottom + 88.dp
+                    }
+                )
+        )
     }
 
     if (showDiscardDialog) {
@@ -880,7 +963,7 @@ fun RuleDetailScreen(
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
                 Text(
-                    text = "Pick a starting point — you can customize everything after.",
+                    text = "Pick a starting point - you can customize everything after.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 12.dp)

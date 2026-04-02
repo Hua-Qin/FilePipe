@@ -1,6 +1,8 @@
 package dev.bikram.filepipe.domain.export
 
+import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -15,14 +17,14 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class AppBackup(
-    val version: Int = 4,
+    val version: Int = 6,
     val exportedAtMillis: Long = System.currentTimeMillis(),
     val rules: List<RuleBackupDto>,
     val history: List<RunHistoryBackupDto> = emptyList(),
     val settings: SettingsBackupDto? = null
 )
 
-/** Kept for backward compatibility — parsed the same as AppBackup */
+/** Kept for backward compatibility - parsed the same as AppBackup */
 typealias RulesBackup = AppBackup
 
 @Serializable
@@ -82,14 +84,21 @@ data class FileMovedBackupDto(
 @Serializable
 data class SettingsBackupDto(
     val themeMode: String,
-    val useMaterialYou: Boolean,
-    val exportFolderUri: String,
-    val autoExportOnRuleChange: Boolean,
-    val scheduledExportEnabled: Boolean,
-    val logRetentionDays: Int,
-    val swipeStartToEnd: String,
-    val swipeEndToStart: String,
-    val bookmarkedFolders: List<String>
+    val colorSource: String? = null,
+    val themePaletteStyle: String? = null,
+    val useMaterialYou: Boolean? = null,
+    val exportFolderUri: String = "",
+    val autoExportOnRuleChange: Boolean = false,
+    val scheduledExportEnabled: Boolean = false,
+    val logRetentionDays: Int = 30,
+    val swipeStartToEnd: String = SwipeAction.DUPLICATE.name,
+    val swipeEndToStart: String = SwipeAction.DELETE.name,
+    val bookmarkedFolders: List<String> = emptyList(),
+    val hasSeenIntro: Boolean = false,
+    val hapticFeedbackEnabled: Boolean = true,
+    val progressiveBlurEnabled: Boolean = true,
+    val autoCheckForUpdates: Boolean = true,
+    val useGradientBackground: Boolean = true
 )
 
 private val jsonFormatter = Json {
@@ -149,14 +158,21 @@ fun FileMoved.toBackupDto(): FileMovedBackupDto = FileMovedBackupDto(
 
 fun AppPreferences.toBackupDto(): SettingsBackupDto = SettingsBackupDto(
     themeMode = themeMode.name,
-    useMaterialYou = useMaterialYou,
+    colorSource = colorSource.name,
+    themePaletteStyle = themePaletteStyle.name,
+    useMaterialYou = if (colorSource == AppColorSource.MATERIAL_YOU) true else false,
     exportFolderUri = exportFolderUri,
     autoExportOnRuleChange = autoExportOnRuleChange,
     scheduledExportEnabled = scheduledExportEnabled,
     logRetentionDays = logRetentionDays,
     swipeStartToEnd = swipeStartToEnd.name,
     swipeEndToStart = swipeEndToStart.name,
-    bookmarkedFolders = bookmarkedFolders
+    bookmarkedFolders = bookmarkedFolders,
+    hasSeenIntro = hasSeenIntro,
+    hapticFeedbackEnabled = hapticFeedbackEnabled,
+    progressiveBlurEnabled = progressiveBlurEnabled,
+    autoCheckForUpdates = autoCheckForUpdates,
+    useGradientBackground = useGradientBackground
 )
 
 fun RuleBackupDto.toDomain(): Rule = Rule(

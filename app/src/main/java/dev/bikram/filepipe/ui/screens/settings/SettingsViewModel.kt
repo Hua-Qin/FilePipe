@@ -3,14 +3,20 @@ package dev.bikram.filepipe.ui.screens.settings
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
+import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.R
+import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.ImportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
@@ -27,6 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -53,6 +60,16 @@ class SettingsViewModel @Inject constructor(
     private val _isCheckingUpdate = MutableStateFlow(false)
     val isCheckingUpdate: StateFlow<Boolean> = _isCheckingUpdate.asStateFlow()
 
+    /**
+     * null = not downloading. 0f..100f = determinate progress. -2f = indeterminate download (unknown size).
+     * -1f = installing (package installer).
+     */
+    private val _downloadProgress = MutableStateFlow<Float?>(null)
+    val downloadProgress: StateFlow<Float?> = _downloadProgress.asStateFlow()
+
+    private val _changelogUi = MutableStateFlow<ChangelogUiState>(ChangelogUiState.Hidden)
+    val changelogUi: StateFlow<ChangelogUiState> = _changelogUi.asStateFlow()
+
     init {
         viewModelScope.launch {
             val prefs = userPreferencesRepository.getPreferencesSnapshot()
@@ -66,12 +83,21 @@ class SettingsViewModel @Inject constructor(
         _userMessage.value = null
     }
 
+    fun markIntroSeen(onComplete: () -> Unit = {}) = viewModelScope.launch {
+        userPreferencesRepository.markIntroSeen()
+        onComplete()
+    }
+
     fun setThemeMode(mode: AppThemeMode) = viewModelScope.launch {
         userPreferencesRepository.setThemeMode(mode)
     }
 
-    fun setUseMaterialYou(enabled: Boolean) = viewModelScope.launch {
-        userPreferencesRepository.setUseMaterialYou(enabled)
+    fun setColorSource(source: AppColorSource) = viewModelScope.launch {
+        userPreferencesRepository.setColorSource(source)
+    }
+
+    fun setThemePaletteStyle(style: ThemePaletteStyle) = viewModelScope.launch {
+        userPreferencesRepository.setThemePaletteStyle(style)
     }
 
     fun setExportFolderUri(uriString: String) = viewModelScope.launch {
@@ -132,6 +158,14 @@ class SettingsViewModel @Inject constructor(
         userPreferencesRepository.setProgressiveBlurEnabled(enabled)
     }
 
+    fun setUseGradientBackground(enabled: Boolean) = viewModelScope.launch {
+        userPreferencesRepository.setUseGradientBackground(enabled)
+    }
+
+    fun setAutoCheckForUpdates(enabled: Boolean) = viewModelScope.launch {
+        userPreferencesRepository.setAutoCheckForUpdates(enabled)
+    }
+
     fun exportNow() = viewModelScope.launch {
         val folder = userPreferencesRepository.getPreferencesSnapshot().exportFolderUri
         if (folder.isBlank()) {
@@ -139,7 +173,7 @@ class SettingsViewModel @Inject constructor(
             return@launch
         }
         exportRulesUseCase.exportRulesToTreeUri(folder).fold(
-            onSuccess = { _userMessage.value = "Rules exported successfully" },
+            onSuccess = { _userMessage.value = "Backup exported successfully" },
             onFailure = { _userMessage.value = "Export failed: ${it.message}" }
         )
     }
@@ -154,46 +188,146 @@ class SettingsViewModel @Inject constructor(
             return@launch
         }
         importRulesUseCase.importFromJson(text).fold(
-            onSuccess = { count -> _userMessage.value = "Imported $count rules" },
+            onSuccess = { result ->
+                val parts = buildList {
+                    add("${result.rulesImported} rules")
+                    if (result.historyRunsImported > 0) {
+                        add("${result.historyRunsImported} history runs")
+                    }
+                    if (result.settingsRestored) add("settings")
+                }
+                _userMessage.value = "Imported ${parts.joinToString(", ")}"
+            },
             onFailure = { _userMessage.value = "Import failed: ${it.message}" }
         )
     }
 
-    fun checkForUpdate() = viewModelScope.launch {
+    fun checkForUpdate(silent: Boolean = false) = viewModelScope.launch {
         _isCheckingUpdate.value = true
+        _downloadProgress.value = null
+        _updateInfo.value = null
         val info = updateChecker.checkForUpdate()
         _isCheckingUpdate.value = false
         if (info != null) {
             _updateInfo.value = info
-        } else {
-            _userMessage.value = "You're up to date"
+        } else if (!silent) {
+            _userMessage.value = context.getString(R.string.settings_up_to_date)
         }
     }
 
     fun downloadAndInstall(downloadUrl: String) = viewModelScope.launch {
-        _userMessage.value = "Downloading update…"
-        withContext(Dispatchers.IO) {
+        _downloadProgress.value = 0f
+        val result = withContext(Dispatchers.IO) {
             runCatching {
-                val file = File(context.cacheDir, "filepipe_update.apk")
-                URL(downloadUrl).openStream().use { input ->
-                    file.outputStream().use { output -> input.copyTo(output) }
+                val connection = URL(downloadUrl).openConnection() as HttpURLConnection
+                connection.instanceFollowRedirects = true
+                try {
+                    connection.connect()
+                    val contentLength = connection.contentLength
+                    val file = File(context.cacheDir, "filepipe_update.apk")
+                    connection.inputStream.use { input ->
+                        file.outputStream().use { output ->
+                            val buffer = ByteArray(8192)
+                            var totalRead = 0L
+                            var readCount: Int
+                            if (contentLength > 0) {
+                                while (input.read(buffer).also { readCount = it } != -1) {
+                                    output.write(buffer, 0, readCount)
+                                    totalRead += readCount
+                                    val percent = (100f * totalRead / contentLength).coerceIn(0f, 100f)
+                                    _downloadProgress.value = percent
+                                }
+                            } else {
+                                _downloadProgress.value = -2f
+                                while (input.read(buffer).also { readCount = it } != -1) {
+                                    output.write(buffer, 0, readCount)
+                                }
+                            }
+                        }
+                    }
+                    _downloadProgress.value = -1f
+                    val uri = FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        file
+                    )
+                    val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    }
+                    withContext(Dispatchers.Main) {
+                        context.startActivity(installIntent)
+                    }
+                } finally {
+                    connection.disconnect()
                 }
-                val uri = FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    file
-                )
-                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
-                    setDataAndType(uri, "application/vnd.android.package-archive")
-                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
-                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+        }
+        result.onFailure {
+            _userMessage.value = "Download failed: ${it.message}"
+        }
+        _downloadProgress.value = null
+    }
+
+    fun openChangelogSheet() {
+        if (BuildConfig.GITHUB_REPO.isBlank()) return
+        viewModelScope.launch {
+            _changelogUi.value = ChangelogUiState.Loading
+            val loaded = withContext(Dispatchers.IO) {
+                runCatching { fetchRawChangelog() }
+            }
+            _changelogUi.value = loaded.fold(
+                onSuccess = { ChangelogUiState.Ready(it) },
+                onFailure = {
+                    ChangelogUiState.Failed(
+                        it.message ?: context.getString(R.string.settings_changelog_load_failed)
+                    )
                 }
-                context.startActivity(intent)
-            }.onFailure { _userMessage.value = "Download failed: ${it.message}" }
+            )
+        }
+    }
+
+    fun dismissChangelogSheet() {
+        _changelogUi.value = ChangelogUiState.Hidden
+    }
+
+    fun openAppNotificationSettings() {
+        val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            }
+        } else {
+            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(intent) }
+    }
+
+    private fun fetchRawChangelog(): String {
+        val repo = BuildConfig.GITHUB_REPO
+        val connection =
+            URL("https://raw.githubusercontent.com/$repo/main/CHANGELOG.md").openConnection() as HttpURLConnection
+        connection.instanceFollowRedirects = true
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 20_000
+        return try {
+            connection.connect()
+            connection.inputStream.bufferedReader().use { reader -> reader.readText() }
+        } finally {
+            connection.disconnect()
         }
     }
 
     companion object {
         private const val SCHEDULED_EXPORT_WORK_NAME = "scheduled_rules_export"
     }
+}
+
+sealed class ChangelogUiState {
+    data object Hidden : ChangelogUiState()
+    data object Loading : ChangelogUiState()
+    data class Ready(val text: String) : ChangelogUiState()
+    data class Failed(val message: String) : ChangelogUiState()
 }

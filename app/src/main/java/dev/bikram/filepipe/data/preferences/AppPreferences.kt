@@ -6,7 +6,8 @@ enum class SwipeAction {
 
 data class AppPreferences(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
-    val useMaterialYou: Boolean = false,
+    val colorSource: AppColorSource = AppColorSource.MATERIAL_YOU,
+    val themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     val exportFolderUri: String = "",
     val autoExportOnRuleChange: Boolean = false,
     val scheduledExportEnabled: Boolean = false,
@@ -16,7 +17,9 @@ data class AppPreferences(
     val bookmarkedFolders: List<String> = emptyList(),
     val hasSeenIntro: Boolean = false,
     val hapticFeedbackEnabled: Boolean = true,
-    val progressiveBlurEnabled: Boolean = true
+    val progressiveBlurEnabled: Boolean = true,
+    val autoCheckForUpdates: Boolean = true,
+    val useGradientBackground: Boolean = true
 ) {
     companion object {
         val DEFAULT = AppPreferences()

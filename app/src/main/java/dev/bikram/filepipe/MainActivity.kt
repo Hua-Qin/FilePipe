@@ -59,7 +59,8 @@ class MainActivity : ComponentActivity() {
 
             FilePipeTheme(
                 themeMode = preferences.themeMode,
-                useMaterialYou = preferences.useMaterialYou,
+                colorSource = preferences.colorSource,
+                themePaletteStyle = preferences.themePaletteStyle,
                 hapticFeedbackEnabled = preferences.hapticFeedbackEnabled
             ) {
                 if (hasSeenIntro != null) {

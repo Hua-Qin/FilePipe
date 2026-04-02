@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
@@ -84,6 +85,9 @@ import dev.bikram.filepipe.ui.components.RuleCard
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.performSwipeThresholdHaptic
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
+import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,13 +155,14 @@ fun RulesScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             LargeTopAppBar(
                 title = { Text("Rules") },
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    scrolledContainerColor = MaterialTheme.colorScheme.background
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
                 ),
                 actions = {
                     if (hasSelection && !isRunning) {
@@ -187,7 +192,12 @@ fun RulesScreen(
                 }
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            SnackbarHost(
+                snackbarHostState,
+                modifier = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
+            )
+        },
         bottomBar = {
             if (hasSelection || isRunning) {
                 Column(
@@ -197,7 +207,7 @@ fun RulesScreen(
                             start = 16.dp,
                             end = 16.dp,
                             top = 8.dp,
-                            bottom = contentPadding.calculateBottomPadding() + 8.dp
+                            bottom = contentPadding.calculateBottomPadding() + 4.dp
                         )
                 ) {
                     if (isRunning) {
@@ -266,7 +276,7 @@ fun RulesScreen(
                     start = 16.dp,
                     end = 16.dp,
                     top = innerPadding.calculateTopPadding() + 8.dp,
-                    bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 96.dp
+                    bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 56.dp
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -493,7 +503,7 @@ private fun SwipeToDismissRuleCard(
                     Modifier
                         .fillMaxHeight()
                         .weight(1f)
-                        .background(action.backgroundColor(), cardShape)
+                        .background(action.semanticSwipeBackground(), cardShape)
                         .padding(
                             start = if (isStartToEnd) 24.dp else 0.dp,
                             end = if (isStartToEnd) 0.dp else 24.dp
@@ -503,7 +513,7 @@ private fun SwipeToDismissRuleCard(
                     Icon(
                         imageVector = action.icon(),
                         contentDescription = null,
-                        tint = action.iconTint(),
+                        tint = action.semanticSwipeIconTint(),
                         modifier = Modifier.size(32.dp)
                     )
                 }
@@ -547,24 +557,6 @@ private fun SwipeAction.icon(): ImageVector = when (this) {
     SwipeAction.DUPLICATE -> Icons.Default.ContentCopy
     SwipeAction.PREVIEW -> Icons.Default.Visibility
     SwipeAction.VIEW_HISTORY -> Icons.Default.History
-}
-
-@Composable
-private fun SwipeAction.backgroundColor() = when (this) {
-    SwipeAction.EDIT -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f)
-    SwipeAction.DELETE -> MaterialTheme.colorScheme.error.copy(alpha = 0.32f)
-    SwipeAction.DUPLICATE -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-    SwipeAction.PREVIEW -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-    SwipeAction.VIEW_HISTORY -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
-}
-
-@Composable
-private fun SwipeAction.iconTint() = when (this) {
-    SwipeAction.EDIT -> MaterialTheme.colorScheme.onTertiaryContainer
-    SwipeAction.DELETE -> MaterialTheme.colorScheme.error
-    SwipeAction.DUPLICATE -> MaterialTheme.colorScheme.onSecondaryContainer
-    SwipeAction.PREVIEW -> MaterialTheme.colorScheme.onSecondaryContainer
-    SwipeAction.VIEW_HISTORY -> MaterialTheme.colorScheme.onPrimaryContainer
 }
 
 @Composable

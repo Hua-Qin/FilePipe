@@ -6,6 +6,8 @@ import dev.bikram.filepipe.data.local.entity.FileMovedEntity
 import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
 import dev.bikram.filepipe.data.local.entity.toDomain
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.export.FileMovedBackupDto
+import dev.bikram.filepipe.domain.export.RunHistoryBackupDto
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunResult
 import dev.bikram.filepipe.domain.model.RunStatus
@@ -106,4 +108,52 @@ class RunHistoryRepository @Inject constructor(
     suspend fun clearAllHistory() {
         runHistoryDao.deleteAllHistory()
     }
+
+    /**
+     * Replaces all history with backup rows. [ruleNameToId] maps rule name to the current DB rule id
+     * (first match if duplicate names). Clears existing history first.
+     */
+    suspend fun replaceHistoryFromBackup(
+        backupRuns: List<RunHistoryBackupDto>,
+        ruleNameToId: Map<String, Long>
+    ) {
+        clearAllHistory()
+        for (dto in backupRuns) {
+            val triggeredBy = runCatching { TriggerType.valueOf(dto.triggeredBy) }.getOrDefault(TriggerType.MANUAL)
+            val status = runCatching { RunStatus.valueOf(dto.status) }.getOrDefault(RunStatus.SUCCESS)
+            val filesFound = dto.files.size.coerceAtLeast(dto.totalFilesMoved + dto.totalFilesFailed)
+            val entity = RunHistoryEntity(
+                id = 0L,
+                ruleId = ruleNameToId[dto.ruleName],
+                ruleName = dto.ruleName,
+                triggeredBy = triggeredBy,
+                startedAt = dto.startedAt,
+                completedAt = dto.completedAt,
+                status = status,
+                totalFilesFound = filesFound,
+                totalFilesMoved = dto.totalFilesMoved,
+                totalFilesFailed = dto.totalFilesFailed,
+                errorMessage = dto.errorMessage,
+                isReversed = dto.isReversed
+            )
+            val newHistoryId = runHistoryDao.insertHistory(entity)
+            if (dto.files.isNotEmpty()) {
+                fileMovedDao.insertFilesMoved(dto.files.map { it.toEntity(newHistoryId) })
+            }
+        }
+    }
+
+    private fun FileMovedBackupDto.toEntity(runHistoryId: Long): FileMovedEntity =
+        FileMovedEntity(
+            id = 0L,
+            runHistoryId = runHistoryId,
+            fileName = fileName,
+            sourceUri = sourceUri,
+            destinationUri = destinationUri,
+            fileSizeBytes = fileSizeBytes,
+            movedAt = movedAt,
+            success = success,
+            skipped = skipped,
+            errorMessage = errorMessage
+        )
 }

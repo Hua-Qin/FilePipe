@@ -17,23 +17,22 @@ enum class BlurDirection {
     BOTTOM
 }
 
-private val progressiveBlurAgsl = """
+private val dualEdgeBlurAgsl = """
     uniform shader content;
     uniform float blurRadius;
-    uniform float height;
+    uniform float topHeight;
+    uniform float bottomHeight;
     uniform float contentHeight;
-    uniform int isTop;
 
     half4 main(float2 fragCoord) {
-        float progress;
-        if (isTop == 1) {
-            progress = 1.0 - clamp(fragCoord.y / height, 0.0, 1.0);
-        } else {
-            progress = 1.0 - clamp((contentHeight - fragCoord.y) / height, 0.0, 1.0);
-        }
+        float topProgress = topHeight > 0.0
+            ? 1.0 - clamp(fragCoord.y / topHeight, 0.0, 1.0)
+            : 0.0;
+        float bottomProgress = bottomHeight > 0.0
+            ? 1.0 - clamp((contentHeight - fragCoord.y) / bottomHeight, 0.0, 1.0)
+            : 0.0;
 
-        progress = pow(progress, 1.5);
-
+        float progress = pow(max(topProgress, bottomProgress), 1.5);
         float radius = progress * blurRadius;
 
         if (radius <= 0.0) {
@@ -52,7 +51,6 @@ private val progressiveBlurAgsl = """
         for (int x = -SAMPLES; x <= SAMPLES; x++) {
             for (int y = -SAMPLES; y <= SAMPLES; y++) {
                 float2 offset = (float2(float(x), float(y)) + jitter) * offsetScale;
-
                 float distSq = dot(offset, offset);
                 float radiusSq = radius * radius;
 
@@ -69,24 +67,25 @@ private val progressiveBlurAgsl = """
 """.trimIndent()
 
 /**
- * Progressive blur toward [direction], with optional frosted gradient (Essentials-style).
- * Full shader path requires API 33+; below that, only the gradient overlay runs.
+ * Progressive blur on both edges simultaneously.
+ * Full shader path requires API 33+; below that, only the gradient overlays run.
  */
 fun Modifier.progressiveBlur(
     blurRadius: Float,
-    height: Float,
-    direction: BlurDirection = BlurDirection.TOP,
-    showGradientOverlay: Boolean = true
+    topHeight: Float = 0f,
+    bottomHeight: Float = 0f,
+    showGradientOverlay: Boolean = true,
+    overlayAlpha: Float = 0.28f
 ): Modifier = composed {
-    val overlayColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.65f)
+    val overlayColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = overlayAlpha)
 
     val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && blurRadius > 0f) {
         Modifier.graphicsLayer {
-            val shader = RuntimeShader(progressiveBlurAgsl)
+            val shader = RuntimeShader(dualEdgeBlurAgsl)
             shader.setFloatUniform("blurRadius", blurRadius)
-            shader.setFloatUniform("height", height)
+            shader.setFloatUniform("topHeight", topHeight)
+            shader.setFloatUniform("bottomHeight", bottomHeight)
             shader.setFloatUniform("contentHeight", size.height)
-            shader.setIntUniform("isTop", if (direction == BlurDirection.TOP) 1 else 0)
 
             renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content")
                 .asComposeRenderEffect()
@@ -98,17 +97,22 @@ fun Modifier.progressiveBlur(
     val gradientModifier = if (showGradientOverlay) {
         Modifier.drawWithContent {
             drawContent()
-            val brush = when (direction) {
-                BlurDirection.TOP -> Brush.verticalGradient(
-                    colors = listOf(overlayColor, Color.Transparent),
-                    endY = height
-                )
-                BlurDirection.BOTTOM -> Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, overlayColor),
-                    startY = size.height - height
+            if (topHeight > 0f) {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(overlayColor, Color.Transparent),
+                        endY = topHeight
+                    )
                 )
             }
-            drawRect(brush = brush)
+            if (bottomHeight > 0f) {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, overlayColor),
+                        startY = size.height - bottomHeight
+                    )
+                )
+            }
         }
     } else {
         Modifier
@@ -116,3 +120,18 @@ fun Modifier.progressiveBlur(
 
     this.then(blurModifier).then(gradientModifier)
 }
+
+/**
+ * Single-edge progressive blur kept for backward compatibility.
+ */
+fun Modifier.progressiveBlur(
+    blurRadius: Float,
+    height: Float,
+    direction: BlurDirection = BlurDirection.TOP,
+    showGradientOverlay: Boolean = true
+): Modifier = progressiveBlur(
+    blurRadius = blurRadius,
+    topHeight = if (direction == BlurDirection.TOP) height else 0f,
+    bottomHeight = if (direction == BlurDirection.BOTTOM) height else 0f,
+    showGradientOverlay = showGradientOverlay
+)

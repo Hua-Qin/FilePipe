@@ -105,42 +105,69 @@
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
-    <string name="settings_theme_section">Appearance</string>
-    <string name="settings_backup_section">Rules backup</string>
-    <string name="settings_export_folder_hint">The JSON file is written here when you export or when auto-export runs.</string>
+    <string name="settings_appearance_section">Appearance</string>
+    <string name="settings_gradient_background">Gradient background</string>
+    <string name="settings_gradient_background_desc">Tinted background using your theme color</string>
+    <string name="settings_backup_section">Import/Export</string>
     <string name="settings_no_folder_chosen">No folder chosen</string>
-    <string name="settings_choose_export_folder">Choose export folder</string>
-    <string name="settings_export_now">Export now</string>
-    <string name="settings_import_rules">Import rules</string>
-    <string name="settings_auto_export_on_change">Auto-export on rule changes</string>
-    <string name="settings_auto_export_on_change_hint">Writes rules whenever you save, delete, or toggle a rule.</string>
+    <string name="settings_export_folder_hint">Folder for manual export and auto-export (rules, history, settings).</string>
+    <string name="settings_export_now">Export backup</string>
+    <string name="settings_import_rules">Import backup</string>
+    <string name="settings_auto_export_on_change">Auto-export on app exit</string>
+    <string name="settings_auto_export_on_change_hint">Full backup on exit after rule changes.</string>
     <string name="settings_scheduled_export">Daily scheduled export</string>
-    <string name="settings_scheduled_export_hint">Exports rules about once per day (requires export folder).</string>
+    <string name="settings_scheduled_export_hint">Exports backup about once per day (requires export folder).</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_system">System</string>
     <string name="theme_material_you">Material You</string>
     <string name="settings_material_you_hint">Uses wallpaper colors on Android 12+.</string>
+    <string name="theme_color_default">Default</string>
+    <string name="settings_theme_colors_hint">Accent and dynamic color source</string>
+    <string name="settings_palette_style">Palette style</string>
+    <string name="settings_palette_style_hint">How secondary and tertiary colors relate to the seed (preset accents only)</string>
+    <string name="theme_palette_tonal_spot">Tonal spot</string>
+    <string name="theme_palette_neutral">Neutral</string>
+    <string name="theme_palette_vibrant">Vibrant</string>
+    <string name="theme_palette_expressive">Expressive</string>
+    <string name="theme_palette_rainbow">Rainbow</string>
+    <string name="theme_palette_fruit_salad">Fruit salad</string>
+    <string name="theme_palette_monochrome">Monochrome</string>
+    <string name="theme_palette_fidelity">Fidelity</string>
+    <string name="theme_palette_content">Content</string>
     <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
+    <string name="settings_about_section">About</string>
+    <string name="settings_about_tagline">Organize your files automatically</string>
+    <string name="settings_view_on_github">View on GitHub</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_title_subtitle">Organize your files automatically.</string>
+    <string name="onboarding_title_subtitle">Organize your files automatically</string>
     <string name="onboarding_lets_begin">Let\'s Begin</string>
-    <string name="onboarding_get_started">Get Started</string>
-    <string name="onboarding_prefs_title">Preferences</string>
-    <string name="onboarding_prefs_subtitle">Configure some basic settings to get started.</string>
-    <string name="onboarding_prefs_settings_section">App Settings</string>
-    <string name="onboarding_prefs_theme_label">Theme</string>
-
+    <string name="onboarding_byline">by Bikram Agarwal</string>
     <!-- Feedback / new settings -->
-    <string name="settings_feedback_section">Feedback</string>
+    <string name="settings_touch_sound_section">Touch &amp; Sound</string>
     <string name="settings_haptic_feedback">Haptic Feedback</string>
     <string name="settings_haptic_feedback_desc">Tap sounds and swipe vibrations</string>
     <string name="settings_progressive_blur">Progressive Blur</string>
-    <string name="settings_progressive_blur_desc">Frosted blur behind the tab bar on Android 12 and up; a stronger fade on older versions</string>
+    <string name="settings_progressive_blur_desc">Frosted blur behind the tab bar on Android 12+</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_desc">Run summaries and reminders</string>
     <string name="theme_black">Black (OLED)</string>
+
+    <!-- Settings – Updates (GitHub builds) -->
+    <string name="settings_updates_section">Updates</string>
+    <string name="settings_auto_check_updates">Auto check for updates</string>
+    <string name="settings_auto_check_updates_desc">Check for updates at app launch</string>
+    <string name="settings_see_whats_new">See What\'s New?</string>
+    <string name="settings_check_for_updates">Check for updates</string>
+    <string name="settings_download_install">Download &amp; Install (v%1$s)</string>
+    <string name="settings_downloading">Downloading…</string>
+    <string name="settings_downloading_percent">Downloading %1$d%%</string>
+    <string name="settings_installing">Installing…</string>
+    <string name="settings_update_available">Version %1$s available</string>
+    <string name="settings_up_to_date">You\'re up to date</string>
+    <string name="settings_changelog_title">What\'s New</string>
+    <string name="settings_changelog_load_failed">Could not load changelog</string>
 
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>

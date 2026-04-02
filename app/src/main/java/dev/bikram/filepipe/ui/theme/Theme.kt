@@ -20,7 +20,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.graphics.ColorUtils
+import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
+import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.LocalTapSound
 
@@ -110,7 +112,8 @@ private fun oledSurfacesFrom(dynamicScheme: ColorScheme): ColorScheme = dynamicS
 @Composable
 fun FilePipeTheme(
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
-    useMaterialYou: Boolean = false,
+    colorSource: AppColorSource = AppColorSource.DEFAULT,
+    themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     hapticFeedbackEnabled: Boolean = true,
     content: @Composable () -> Unit
 ) {
@@ -124,14 +127,26 @@ fun FilePipeTheme(
         AppThemeMode.SYSTEM -> systemDark
     }
 
-    val useDynamic = useMaterialYou && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val useDynamic = colorSource == AppColorSource.MATERIAL_YOU && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+
+    val seedPrimary = colorSource.seedPrimary()
+    val seedLightScheme = remember(seedPrimary, themePaletteStyle) {
+        seedPrimary?.let { colorSchemeFromSeed(it, themePaletteStyle, darkTheme = false) }
+    }
+    val seedDarkScheme = remember(seedPrimary, themePaletteStyle) {
+        seedPrimary?.let { colorSchemeFromSeed(it, themePaletteStyle, darkTheme = true) }
+    }
 
     val colorScheme = when {
         themeMode == AppThemeMode.BLACK && useDynamic ->
             oledSurfacesFrom(dynamicDarkColorScheme(context))
+        themeMode == AppThemeMode.BLACK && seedPrimary != null && seedDarkScheme != null ->
+            oledSurfacesFrom(seedDarkScheme)
         themeMode == AppThemeMode.BLACK -> BlackOledColors
         useDynamic && darkTheme -> dynamicDarkColorScheme(context)
         useDynamic && !darkTheme -> dynamicLightColorScheme(context)
+        seedPrimary != null && darkTheme && seedDarkScheme != null -> seedDarkScheme
+        seedPrimary != null && !darkTheme && seedLightScheme != null -> seedLightScheme
         darkTheme -> DarkColors
         else -> LightColors
     }.increaseBackgroundCardContrast()
