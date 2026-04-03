@@ -17,6 +17,8 @@ coreKtx = "1.16.0"
 appcompat = "1.7.1"
 splashscreen = "1.0.1"
 datastore = "1.1.1"
+materialKolor = "5.0.0-alpha07"
+paging = "3.3.6"
 
 [libraries]
 # Compose BOM
@@ -68,6 +70,11 @@ documentfile = { group = "androidx.documentfile", name = "documentfile", version
 
 # DataStore
 datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastore" }
+
+material-kolor = { group = "com.materialkolor", name = "material-kolor", version.ref = "materialKolor" }
+paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
+paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
+room-paging = { group = "androidx.room", name = "room-paging", version.ref = "room" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

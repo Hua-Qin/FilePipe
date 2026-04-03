@@ -2,17 +2,18 @@ package dev.bikram.filepipe.ui.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -23,35 +24,62 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
+
+data class RuleCardAction(
+    val icon: ImageVector,
+    val label: String,
+    val onClick: () -> Unit
+)
 
 private val CardShape = RoundedCornerShape(16.dp)
 
@@ -64,20 +92,32 @@ fun RuleCard(
     progress: RunProgress?,
     onClick: () -> Unit,          // toggles expansion (or selection when in selection mode)
     onLongClick: () -> Unit,      // toggles selection
-    cardActions: List<Pair<ImageVector, () -> Unit>>, // non-swipe action icons shown in card
+    cardActions: List<RuleCardAction>, // non-swipe action icons shown in card
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
     isAnyRuleRunning: Boolean,
+    onPreviewRule: () -> Unit = {},
+    onViewHistory: () -> Unit = {},
+    hasStaleFolder: Boolean = false,
+    onStaleWarningClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val hoverInteraction = remember { MutableInteractionSource() }
+    val isHovered by hoverInteraction.collectIsHoveredAsState()
+    val elevation by animateDpAsState(
+        targetValue = if (isHovered) 8.dp else 2.dp,
+        label = "cardElevation"
+    )
     ElevatedCard(
         modifier = modifier
             .fillMaxWidth()
+            .hoverable(hoverInteraction)
             .then(
                 if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CardShape)
                 else Modifier
             ),
         shape = CardShape,
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = elevation),
         colors = CardDefaults.elevatedCardColors()
     ) {
         AnimatedContent(
@@ -96,7 +136,9 @@ fun RuleCard(
                     cardActions = cardActions,
                     onToggleEnabled = onToggleEnabled,
                     onRunClick = onRunClick,
-                    isAnyRuleRunning = isAnyRuleRunning
+                    isAnyRuleRunning = isAnyRuleRunning,
+                    hasStaleFolder = hasStaleFolder,
+                    onStaleWarningClick = onStaleWarningClick
                 )
             } else {
                 CompactContent(
@@ -113,7 +155,7 @@ fun RuleCard(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun CompactContent(
     rule: Rule,
@@ -128,72 +170,95 @@ private fun CompactContent(
     val runInProgress = progress != null && !progress.isComplete
     val runBlocked = isAnyRuleRunning && progress == null
 
+    val typesText = rule.fileExtensions.take(4).joinToString(" · ") +
+        if (rule.fileExtensions.size > 4) " +${rule.fileExtensions.size - 4}" else ""
+    val destText = displayPath(rule.destinationFolderPath).takeIf { it.isNotBlank() } ?: ""
+    val infoText = listOf(typesText, destText).filter { it.isNotBlank() }.joinToString("  |  ")
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Switch(
-                checked = rule.isEnabled,
-                onCheckedChange = { enabled ->
-                    playTap()
-                    onToggleEnabled(enabled)
-                },
-                modifier = Modifier.height(24.dp)
-            )
-            Icon(
-                imageVector = rule.icon.toImageVector(),
-                contentDescription = null,
-                modifier = Modifier.size(28.dp),
-                tint = MaterialTheme.colorScheme.primary
-            )
-            Text(
-                text = rule.name,
-                style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            FilledTonalIconButton(
-                onClick = {
-                    playTap()
-                    onRunClick()
-                },
-                enabled = rule.isEnabled && !runInProgress && !runBlocked,
-                modifier = Modifier.size(36.dp)
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = stringResource(R.string.run_now), modifier = Modifier.size(18.dp))
-            }
-        }
-        if (rule.fileExtensions.isNotEmpty() || rule.sourceFolderPaths.isNotEmpty()) {
-            Spacer(Modifier.height(10.dp))
-            val typesText = rule.fileExtensions.take(4).joinToString(" · ") +
-                if (rule.fileExtensions.size > 4) " +${rule.fileExtensions.size - 4}" else ""
-            val destText = displayPath(rule.destinationFolderPath).takeIf { it.isNotBlank() } ?: ""
-            val infoText = listOf(typesText, destText).filter { it.isNotBlank() }.joinToString("  |  ")
-            if (infoText.isNotBlank()) {
+        ListItem(
+            headlineContent = {
                 Text(
-                    text = infoText,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = rule.name,
+                    style = MaterialTheme.typography.titleMedium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-            }
-        }
-        if (progress != null && !progress.isComplete) {
-            Spacer(Modifier.height(6.dp))
-            LinearProgressIndicator(
-                progress = { if (progress.totalFiles > 0) progress.progress else 0f },
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
+            },
+            supportingContent = if (infoText.isNotBlank()) {
+                {
+                    Text(
+                        text = infoText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            } else null,
+            leadingContent = {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    RuleIconOrEmoji(
+                        iconEmoji = rule.iconEmoji,
+                        icon = rule.icon,
+                        vectorSize = 22.dp,
+                        emojiFontSize = 18.sp,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier
+                    )
+                }
+            },
+            trailingContent = {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Switch(
+                        checked = rule.isEnabled,
+                        onCheckedChange = { enabled ->
+                            playTap()
+                            onToggleEnabled(enabled)
+                        }
+                    )
+                    if (runInProgress) {
+                        Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                            CircularWavyProgressIndicator(
+                                progress = { if (progress!!.totalFiles > 0) progress.progress else 0f },
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
+                    } else {
+                        FilledTonalButton(
+                            onClick = { playTap(); onRunClick() },
+                            enabled = rule.isEnabled && !runBlocked,
+                            shape = RoundedCornerShape(50),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                horizontal = 12.dp, vertical = 8.dp
+                            )
+                        ) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+        )
     }
 }
 
@@ -204,17 +269,22 @@ private fun ExpandedContent(
     progress: RunProgress?,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    cardActions: List<Pair<ImageVector, () -> Unit>>,
+    cardActions: List<RuleCardAction>,
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
-    isAnyRuleRunning: Boolean
+    isAnyRuleRunning: Boolean,
+    hasStaleFolder: Boolean = false,
+    onStaleWarningClick: () -> Unit = {}
 ) {
     val playTap = rememberPlayTapSound()
-    Column(Modifier.padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .padding(16.dp)
+    ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -223,11 +293,13 @@ private fun ExpandedContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = rule.icon.toImageVector(),
-                    contentDescription = null,
-                    modifier = Modifier.size(28.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                RuleIconOrEmoji(
+                    iconEmoji = rule.iconEmoji,
+                    icon = rule.icon,
+                    vectorSize = 28.dp,
+                    emojiFontSize = 22.sp,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
                 )
                 Text(
                     text = rule.name,
@@ -247,19 +319,9 @@ private fun ExpandedContent(
             )
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             Spacer(Modifier.height(8.dp))
 
-            Text(
-                text = stringResource(R.string.rule_card_types),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(Modifier.height(4.dp))
             if (rule.fileExtensions.isEmpty()) {
                 Text(
                     text = stringResource(R.string.rule_card_types_none),
@@ -292,40 +354,55 @@ private fun ExpandedContent(
 
             Spacer(Modifier.height(8.dp))
 
-            Text(
-                text = stringResource(R.string.rule_card_from),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
+            val notSet = stringResource(R.string.rule_card_destination_not_set)
+            val fromText = if (rule.sourceFolderPaths.isEmpty()) {
+                stringResource(R.string.rule_card_from_none)
+            } else {
+                val shown = rule.sourceFolderPaths.take(3)
+                val extra = rule.sourceFolderPaths.size - shown.size
+                shown.joinToString(", ") { displayPath(it) } + if (extra > 0) ", +$extra" else ""
+            }
+            LabeledInfoSingleLine(
+                label = stringResource(R.string.rule_card_from),
+                value = fromText
             )
             Spacer(Modifier.height(4.dp))
-            if (rule.sourceFolderPaths.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.rule_card_from_none),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    rule.sourceFolderPaths.forEach { path ->
-                        Text(
-                            text = displayPath(path),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            val notSet = stringResource(R.string.rule_card_destination_not_set)
-            LabeledInfo(
-                label = stringResource(R.string.destination_label),
+            LabeledInfoSingleLine(
+                label = stringResource(R.string.rule_card_to),
                 value = if (rule.destinationFolderPath.isEmpty()) notSet
                         else displayPath(rule.destinationFolderPath)
             )
+
+            if (hasStaleFolder) {
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { playTap(); onStaleWarningClick() }
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = stringResource(R.string.rule_card_stale_folder_warning),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = stringResource(R.string.edit_rule),
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
 
             rule.schedule?.let { schedule ->
                 Spacer(Modifier.height(4.dp))
@@ -336,8 +413,12 @@ private fun ExpandedContent(
                         val dayName = schedule.dayOfWeek?.let { days.getOrNull(it - 2) } ?: "?"
                         "Weekly $dayName at %02d:%02d".format(schedule.hour, schedule.minute)
                     }
+                    ScheduleType.EVERY_N_HOURS -> {
+                        val hours = schedule.intervalHours ?: 1
+                        "Every ${hours}h"
+                    }
                 }
-                LabeledInfo(label = stringResource(R.string.schedule_label), value = scheduleText)
+                LabeledInfo(label = stringResource(R.string.schedule_card_label), value = scheduleText)
             }
 
             AnimatedVisibility(
@@ -355,33 +436,57 @@ private fun ExpandedContent(
                                 runProgress.totalFiles == 0 -> "No matching files found"
                                 else -> "${runProgress.filesMoved} / ${runProgress.totalFiles} files moved"
                             }
-                            Text(
-                                text = summary,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = if (runProgress.error != null) MaterialTheme.colorScheme.error
-                                        else MaterialTheme.colorScheme.primary
-                            )
-                            LinearProgressIndicator(progress = { 1f }, modifier = Modifier.fillMaxWidth())
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                                CircularWavyProgressIndicator(
+                                    progress = { 1f },
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Text(
+                                    text = summary,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (runProgress.error != null) MaterialTheme.colorScheme.error
+                                            else MaterialTheme.colorScheme.primary
+                                )
+                            }
                         } else if (runProgress.totalFiles > 0) {
+                            @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                            val progressSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
                             val animatedProgress by animateFloatAsState(
                                 targetValue = runProgress.progress,
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                                    stiffness = Spring.StiffnessLow
-                                ),
+                                animationSpec = progressSpec,
                                 label = "progress"
                             )
-                            Text(
-                                text = "Moving ${runProgress.currentFileName.ifBlank { "…" }} (${runProgress.filesMoved + 1} / ${runProgress.totalFiles})",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            LinearProgressIndicator(progress = { animatedProgress }, modifier = Modifier.fillMaxWidth())
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                                CircularWavyProgressIndicator(
+                                    progress = { animatedProgress },
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Text(
+                                    text = "Moving ${runProgress.currentFileName.ifBlank { "…" }} (${runProgress.filesMoved + 1} / ${runProgress.totalFiles})",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         } else {
-                            Text("Scanning…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                                CircularWavyProgressIndicator(modifier = Modifier.size(28.dp))
+                                Text("Scanning…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
@@ -395,32 +500,46 @@ private fun ExpandedContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                cardActions.forEach { (icon, onActionClick) ->
-                    IconButton(onClick = {
-                        playTap()
-                        onActionClick()
-                    }) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                cardActions.forEach { action ->
+                    @OptIn(ExperimentalMaterial3Api::class)
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                        tooltip = { PlainTooltip { Text(action.label) } },
+                        state = rememberTooltipState()
+                    ) {
+                        IconButton(onClick = {
+                            playTap()
+                            action.onClick()
+                        }) {
+                            Icon(
+                                imageVector = action.icon,
+                                contentDescription = action.label,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
             val runInProgress = progress != null && !progress.isComplete
             val runBlocked = isAnyRuleRunning && progress == null
-            FilledTonalButton(
-                onClick = {
-                    playTap()
-                    onRunClick()
-                },
-                enabled = rule.isEnabled && !runInProgress && !runBlocked,
-                shape = RoundedCornerShape(50)
+            @OptIn(ExperimentalMaterial3Api::class)
+            TooltipBox(
+                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                tooltip = { PlainTooltip { Text(stringResource(R.string.run_now)) } },
+                state = rememberTooltipState()
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(text = stringResource(R.string.run_now))
+                FilledTonalButton(
+                    onClick = {
+                        playTap()
+                        onRunClick()
+                    },
+                    enabled = rule.isEnabled && !runInProgress && !runBlocked,
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(text = stringResource(R.string.run_now))
+                }
             }
         }
     }
@@ -430,16 +549,39 @@ private fun ExpandedContent(
 private fun LabeledInfo(label: String, value: String) {
     Row {
         Text(
-            text = "$label: ",
+            text = "$label:",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(48.dp)
         )
         Text(
-            text = value,
+            text = " $value",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 4,
             overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun LabeledInfoSingleLine(label: String, value: String, rowModifier: Modifier = Modifier) {
+    Row(modifier = rowModifier.fillMaxWidth()) {
+        Text(
+            text = "$label:",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = TextAlign.End,
+            modifier = Modifier.width(48.dp)
+        )
+        Text(
+            text = " $value",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
         )
     }
 }

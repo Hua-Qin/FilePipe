@@ -1,16 +1,28 @@
 package dev.bikram.filepipe.ui.screens.historydetail
 
+import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
+import android.webkit.MimeTypeMap
+import android.widget.Toast
 import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,19 +45,24 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import android.net.Uri
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -53,11 +70,16 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
+import dev.bikram.filepipe.domain.model.isNoChangesRun
 import dev.bikram.filepipe.domain.model.TriggerType
 import dev.bikram.filepipe.ui.components.StatusChip
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.formatTime
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.R
+import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +92,10 @@ fun HistoryDetailScreen(
     val files by viewModel.files.collectAsStateWithLifecycle()
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer() ?: Modifier
+    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val topListPadding = statusTop + 64.dp
 
     LaunchedEffect(userMessage) {
         val msg = userMessage ?: return@LaunchedEffect
@@ -77,64 +103,109 @@ fun HistoryDetailScreen(
         viewModel.clearUserMessage()
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(history?.ruleName ?: "History Detail") },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        playTap()
-                        onNavigateBack()
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(
+                if (LocalUseGradientBackground.current) Modifier
+                else Modifier.background(MaterialTheme.colorScheme.background)
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 16.dp, end = 16.dp,
-                top = innerPadding.calculateTopPadding() + 8.dp,
-                bottom = 32.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(fullBleedBlurModifier)
         ) {
-            history?.let { h ->
-                item {
-                    RunSummaryCard(
-                        history = h,
-                        onUndo = {
-                            playTap()
-                            viewModel.undoRun()
+            val scheme = MaterialTheme.colorScheme
+            if (LocalUseGradientBackground.current) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(scheme.surface)
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0f to scheme.primaryContainer.copy(alpha = 0.45f),
+                                    0.55f to scheme.surface.copy(alpha = 0f)
+                                )
+                            )
+                        )
+                )
+            } else {
+                Box(Modifier.fillMaxSize().background(scheme.background))
+            }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = topListPadding + 8.dp,
+                    bottom = 32.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                history?.let { h ->
+                    item {
+                        RunSummaryCard(
+                            history = h,
+                            onUndo = {
+                                playTap()
+                                viewModel.undoRun()
+                            }
+                        )
+                    }
+                    if (files.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Files (${files.size})",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
                         }
-                    )
-                }
-                if (files.isNotEmpty()) {
-                    item {
-                        Text(
-                            "Files (${files.size})",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                        )
-                    }
-                    items(files, key = { it.id }) { file ->
-                        FileMovedCard(file, modifier = Modifier.animateItem())
-                    }
-                } else {
-                    item {
-                        Text(
-                            "No file records for this run.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        items(files, key = { it.id }) { file ->
+                            FileMovedCard(file, modifier = Modifier.animateItem())
+                        }
+                    } else {
+                        item {
+                            Text(
+                                "No file records for this run.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
         }
+
+        TopAppBar(
+            modifier = Modifier.align(Alignment.TopCenter),
+            title = {
+                Text(
+                    history?.ruleName ?: stringResource(R.string.history_detail_title)
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = {
+                    playTap()
+                    onNavigateBack()
+                }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent
+            )
+        )
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = navBottom + 16.dp)
+        )
     }
 }
 
@@ -150,8 +221,7 @@ private fun RunSummaryCard(history: RunHistory, onUndo: () -> Unit) {
                 Text("Run Summary", style = MaterialTheme.typography.titleMedium)
                 StatusChip(
                     status = history.status,
-                    noChanges = history.status == RunStatus.SUCCESS &&
-                        history.totalFilesMoved == 0 && history.totalFilesFailed == 0
+                    noChanges = history.isNoChangesRun()
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
@@ -220,6 +290,7 @@ private fun SummaryRow(label: String, value: String) {
 
 @Composable
 private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
     val isSuccess = file.success && !file.skipped
     val iconColor = when {
         file.skipped -> MaterialTheme.colorScheme.outline
@@ -233,7 +304,13 @@ private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
     }
 
     Surface(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(
+                if (isSuccess) Modifier.clickable {
+                    openFileWithDefaultApp(context, file.destinationUri)
+                } else Modifier
+            ),
         shape = RoundedCornerShape(12.dp),
         color = containerColor,
         tonalElevation = 1.dp
@@ -324,6 +401,26 @@ private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
                 }
             }
         }
+    }
+}
+
+private fun openFileWithDefaultApp(context: Context, uriString: String) {
+    if (uriString.isBlank()) {
+        Toast.makeText(context, "File location not available", Toast.LENGTH_SHORT).show()
+        return
+    }
+    val uri = Uri.parse(uriString)
+    val fileName = uriString.substringAfterLast('/')
+    val ext = fileName.substringAfterLast('.', "").lowercase()
+    val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "*/*"
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mimeType)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    try {
+        context.startActivity(intent)
+    } catch (_: ActivityNotFoundException) {
+        Toast.makeText(context, "No app found to open this file type", Toast.LENGTH_SHORT).show()
     }
 }
 

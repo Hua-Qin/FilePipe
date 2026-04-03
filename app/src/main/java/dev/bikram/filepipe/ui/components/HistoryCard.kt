@@ -7,18 +7,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
+import dev.bikram.filepipe.domain.model.isNoChangesRun
 import dev.bikram.filepipe.domain.model.TriggerType
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -30,9 +41,17 @@ fun HistoryCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val hoverInteraction = remember { MutableInteractionSource() }
+    val isHovered by hoverInteraction.collectIsHoveredAsState()
+    val elevation by animateDpAsState(
+        targetValue = if (isHovered) 8.dp else 2.dp,
+        label = "cardElevation"
+    )
     ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
-        onClick = onClick
+        modifier = modifier.fillMaxWidth().hoverable(hoverInteraction),
+        onClick = onClick,
+        elevation = CardDefaults.elevatedCardElevation(defaultElevation = elevation),
+        colors = CardDefaults.elevatedCardColors()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -47,8 +66,7 @@ fun HistoryCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                val noChanges = history.status == RunStatus.SUCCESS &&
-                    history.totalFilesMoved == 0 && history.totalFilesFailed == 0
+                val noChanges = history.isNoChangesRun()
                 StatusChip(status = history.status, noChanges = noChanges)
             }
 
@@ -78,9 +96,10 @@ fun HistoryCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatusChip(status: RunStatus, noChanges: Boolean = false, modifier: Modifier = Modifier) {
-    val (label, containerColor) = when {
+    val (label, targetColor) = when {
         noChanges -> "No changes" to MaterialTheme.colorScheme.surfaceVariant
         else -> when (status) {
             RunStatus.SUCCESS -> "Success" to MaterialTheme.colorScheme.primaryContainer
@@ -89,11 +108,16 @@ fun StatusChip(status: RunStatus, noChanges: Boolean = false, modifier: Modifier
             RunStatus.IN_PROGRESS -> "Running" to MaterialTheme.colorScheme.secondaryContainer
         }
     }
-    AssistChip(
+    val containerColor by animateColorAsState(
+        targetValue = targetColor,
+        animationSpec = tween(300),
+        label = "chipColor"
+    )
+    SuggestionChip(
         onClick = {},
         label = { Text(label, style = MaterialTheme.typography.labelMedium) },
         modifier = modifier,
-        colors = AssistChipDefaults.assistChipColors(containerColor = containerColor)
+        colors = SuggestionChipDefaults.suggestionChipColors(containerColor = containerColor)
     )
 }
 

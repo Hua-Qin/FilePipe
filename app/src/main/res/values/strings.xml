@@ -11,11 +11,12 @@
     <string name="rules_empty_title">No rules yet</string>
     <string name="rules_empty_subtitle">Tap Add Rule to create your first organizing rule</string>
     <string name="rules_add_rule">Add Rule</string>
-    <string name="rule_card_types">Types</string>
     <string name="rule_card_types_none">None</string>
     <string name="rule_card_from">From</string>
     <string name="rule_card_from_none">No sources</string>
     <string name="rule_card_destination_not_set">Not set</string>
+    <string name="rule_card_to">To</string>
+    <string name="rule_card_stale_folder_warning">One or more folders need re-selection — tap Edit</string>
     <string name="rule_delete_confirm">Delete rule?</string>
     <string name="rule_delete_message">This will also remove any scheduled runs for this rule.</string>
 
@@ -24,13 +25,13 @@
     <string name="edit_rule">Edit Rule</string>
     <string name="rule_name_label">Rule name</string>
     <string name="rule_name_placeholder">e.g. Photos Backup</string>
-    <string name="source_folders_label">Source Folders</string>
-    <string name="add_source_folder">Add source folders</string>
+    <string name="source_folders_label">Source folders</string>
+    <string name="add_source_folder">Pick folders</string>
     <string name="file_types_label">File Types</string>
     <string name="add_file_type">Add type</string>
-    <string name="destination_label">To</string>
+    <string name="destination_label">Destination folder</string>
     <string name="pick_folder">Pick folder</string>
-    <string name="change_destination">Change destination</string>
+    <string name="change_destination">Change folder</string>
     <string name="rule_icon_picker_cd">Choose rule icon</string>
     <string name="rule_icon_label_default">Default</string>
     <string name="rule_icon_label_image">Images</string>
@@ -52,15 +53,33 @@
     <string name="keep_editing">Keep editing</string>
     <string name="save_and_exit">Save &amp; exit</string>
     <string name="schedule_label">Schedule (optional)</string>
+    <string name="schedule_card_label">Run</string>
     <string name="enable_schedule">Enable automatic schedule</string>
     <string name="schedule_frequency">Frequency</string>
     <string name="schedule_daily">Daily</string>
     <string name="schedule_weekly">Weekly</string>
     <string name="schedule_day">Day of week</string>
     <string name="schedule_time">Time</string>
+    <string name="schedule_dialog_title">Set schedule</string>
+    <string name="schedule_hourly">Hourly</string>
+    <string name="schedule_interval_hours">Every (hours)</string>
+    <string name="schedule_interval_hours_helper">1 to 24 — use Daily for longer gaps</string>
+    <string name="schedule_remove_short">Remove</string>
+    <string name="schedule_pick_time">Choose time</string>
+    <string name="schedule_time_picker_title">Pick time</string>
+    <string name="schedule_time_input_mode_cd">Type time with keyboard</string>
+    <string name="schedule_time_dial_mode_cd">Pick time with clock dial</string>
+    <string name="rule_icon_sheet_title">Rule icon</string>
+    <string name="rule_icon_emoji_section">Emoji</string>
+    <string name="rule_icon_preset_section">Preset icons</string>
+    <string name="rule_icon_custom_slot_cd">Custom emoji</string>
+    <string name="rule_icon_apply_emoji_cd">Apply custom emoji</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
     <string name="delete">Delete</string>
+    <string name="delete_rule">Delete rule</string>
+    <string name="duplicate_rule">Duplicate rule</string>
+    <string name="view_history">View history</string>
 
     <!-- Run screen -->
     <string name="run_title">Run Rules</string>
@@ -74,6 +93,7 @@
 
     <!-- History screen -->
     <string name="history_title">History</string>
+    <string name="history_detail_title">Run details</string>
     <string name="history_empty_title">No history yet</string>
     <string name="history_empty_subtitle">Run some rules to see your file move history here</string>
     <string name="history_triggered_manual">Manual</string>
@@ -100,27 +120,112 @@
     <string name="notification_channel_name">File Pipe</string>
     <string name="notification_channel_desc">Shows progress when organizing files</string>
     <string name="notification_running">Running: %s</string>
+    <string name="notification_running_batch">Running %d rules…</string>
+
+    <!-- Rule search -->
+    <!-- History search / filter -->
+    <string name="history_sort_menu">Sort</string>
+    <string name="history_sort_last_ran_newest">Last run (newest first)</string>
+    <string name="history_sort_last_ran_oldest">Last run (oldest first)</string>
+    <string name="history_sort_rule_name_az">Rule name (A to Z)</string>
+    <string name="history_sort_rule_name_za">Rule name (Z to A)</string>
+    <string name="history_filter_all">All</string>
+    <string name="history_filter_success">Success</string>
+    <string name="history_filter_failed">Failed</string>
+    <string name="history_filter_partial">Partial</string>
+    <string name="history_filter_no_changes">No changes</string>
+    <string name="history_view_by_date">By date</string>
+    <string name="history_view_by_rule">By rule</string>
+    <string name="history_group_menu">Group runs</string>
+    <string name="history_group_by_date">Group by date</string>
+    <string name="history_group_by_rule">Group by rule</string>
+    <string name="history_group_by_status">Group by status</string>
+    <string name="history_status_header_success">Success</string>
+    <string name="history_status_header_failed">Failed</string>
+    <string name="history_status_header_partial">Partial</string>
+    <string name="history_status_header_no_changes">No changes</string>
+    <string name="history_status_header_in_progress">In progress</string>
+
+    <!-- Onboarding wizard -->
+    <string name="onboarding_wizard_title">Create your first rule</string>
+    <string name="onboarding_wizard_subtitle">Pick a template, start blank, or skip and set things up yourself</string>
+    <string name="onboarding_wizard_skip">Skip for now</string>
+    <string name="onboarding_wizard_use_template">Use template</string>
+    <string name="onboarding_wizard_start_blank">Start blank</string>
+    <string name="onboarding_wizard_start_blank_desc">You choose extensions</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
-    <string name="settings_theme_section">Appearance</string>
-    <string name="settings_backup_section">Rules backup</string>
-    <string name="settings_export_folder_hint">The JSON file is written here when you export or when auto-export runs.</string>
-    <string name="settings_no_folder_chosen">No folder chosen</string>
+    <string name="settings_appearance_section">Appearance</string>
+    <string name="settings_gradient_background">Gradient background</string>
+    <string name="settings_gradient_background_desc">Tinted background using your theme color</string>
+    <string name="settings_backup_section">Import/Export</string>
     <string name="settings_choose_export_folder">Choose export folder</string>
-    <string name="settings_export_now">Export now</string>
-    <string name="settings_import_rules">Import rules</string>
-    <string name="settings_auto_export_on_change">Auto-export on rule changes</string>
-    <string name="settings_auto_export_on_change_hint">Writes rules whenever you save, delete, or toggle a rule.</string>
+    <string name="settings_export_folder_hint">Folder for exporting backups (rules, history, settings).</string>
+    <string name="settings_export_select_folder_first">Select an export folder first</string>
+    <string name="settings_export_success">%1$s exported</string>
+    <string name="settings_export_now">Export backup</string>
+    <string name="settings_import_rules">Import backup</string>
+    <string name="settings_import_success">Backup imported (%1$s)</string>
+    <string name="settings_import_replace_hint">Import replaces all rules and run history with the backup. Settings in the file overwrite your current settings when the backup includes them.</string>
+    <string name="settings_auto_export_on_change">Auto-export on app exit</string>
+    <string name="settings_auto_export_on_change_hint">Full backup on exit after rule changes.</string>
     <string name="settings_scheduled_export">Daily scheduled export</string>
-    <string name="settings_scheduled_export_hint">Exports rules about once per day (requires export folder).</string>
+    <string name="settings_scheduled_export_hint">Exports backup about once per day (requires export folder).</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_system">System</string>
     <string name="theme_material_you">Material You</string>
     <string name="settings_material_you_hint">Uses wallpaper colors on Android 12+.</string>
+    <string name="theme_color_default">Default</string>
+    <string name="settings_theme_colors_hint">Accent and dynamic color source</string>
+    <string name="settings_palette_style">Palette style</string>
+    <string name="settings_palette_style_hint">How secondary and tertiary colors relate to the seed (preset accents only)</string>
+    <string name="theme_palette_tonal_spot">Tonal spot</string>
+    <string name="theme_palette_neutral">Neutral</string>
+    <string name="theme_palette_vibrant">Vibrant</string>
+    <string name="theme_palette_expressive">Expressive</string>
+    <string name="theme_palette_rainbow">Rainbow</string>
+    <string name="theme_palette_fruit_salad">Fruit salad</string>
+    <string name="theme_palette_monochrome">Monochrome</string>
+    <string name="theme_palette_fidelity">Fidelity</string>
+    <string name="theme_palette_content">Content</string>
     <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
+    <string name="settings_about_section">About</string>
+    <string name="settings_about_tagline">Organize your files automatically</string>
+    <string name="settings_view_on_github">View on GitHub</string>
+    <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title_subtitle">Organize your files automatically</string>
+    <string name="onboarding_lets_begin">Let\'s Begin</string>
+    <string name="onboarding_byline">by Bikram Agarwal</string>
+    <!-- Feedback / new settings -->
+    <string name="settings_touch_sound_section">Touch &amp; Sound</string>
+    <string name="settings_haptic_feedback">Haptic Feedback</string>
+    <string name="settings_haptic_feedback_desc">Tap sounds and swipe vibrations</string>
+    <string name="settings_progressive_blur">Progressive Blur</string>
+    <string name="settings_progressive_blur_desc">Frosted blur behind the tab bar on Android 12+</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_desc">Run summaries and reminders</string>
     <string name="theme_black">Black (OLED)</string>
+
+    <!-- Settings – Updates (GitHub builds) -->
+    <string name="settings_updates_section">Updates</string>
+    <string name="settings_auto_check_updates">Auto check for updates</string>
+    <string name="settings_auto_check_updates_desc">Check for updates at app launch</string>
+    <string name="settings_see_whats_new">See What\'s New?</string>
+    <string name="settings_check_for_updates">Check for updates</string>
+    <string name="settings_download_install">Download Update (v%1$s)</string>
+    <string name="settings_downloading">Downloading…</string>
+    <string name="settings_downloading_percent">Downloading %1$d%%</string>
+    <string name="settings_installing">Installing…</string>
+    <string name="settings_update_available">Version %1$s available</string>
+    <string name="settings_up_to_date">You\'re up to date</string>
+    <string name="settings_update_sheet_up_to_date">You are up to date</string>
+    <string name="settings_changelog_title">What\'s New</string>
+    <string name="settings_changelog_load_failed">Could not load changelog</string>
+    <string name="settings_play_in_app_update_failed">Could not start the update. Try Check for updates again.</string>
 
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>
@@ -148,6 +253,9 @@
     <string name="settings_log_retention">Log retention</string>
     <string name="settings_log_retention_hint">How long to keep run history records.</string>
 
+    <!-- Notification actions -->
+    <string name="notification_action_undo">Undo</string>
+
     <!-- Notification — run summary -->
     <string name="notification_summary_channel_name">Run Summary</string>
     <string name="notification_summary_channel_desc">Shows a summary after each rule run completes</string>
@@ -155,6 +263,26 @@
     <string name="notification_summary_body_moved">%d files moved</string>
     <string name="notification_summary_body_copied">%d files copied</string>
     <string name="notification_summary_body_partial">%1$d moved, %2$d failed</string>
+
+    <!-- Advanced filters section -->
+    <string name="advanced_section_title">Advanced filters</string>
+    <string name="advanced_section_subtitle">Optional filters to narrow matching files</string>
+    <string name="advanced_section_filters_active">Filters active</string>
+    <string name="advanced_filename_pattern_label">Filename pattern</string>
+    <string name="advanced_filename_pattern_placeholder">e.g. Screenshot_*</string>
+    <string name="advanced_min_size_label">Min size (MB)</string>
+    <string name="advanced_max_size_label">Max size (MB)</string>
+    <string name="advanced_min_age_label">Min age (days)</string>
+    <string name="advanced_max_age_label">Max age (days)</string>
+    <string name="advanced_exclude_patterns_label">Exclude patterns</string>
+    <string name="advanced_add_exclude">Add exclude pattern</string>
+    <string name="advanced_exclude_placeholder">e.g. .nomedia</string>
+    <string name="advanced_csv_hint">Separate multiple patterns with commas</string>
+
+    <!-- Folder bookmarks -->
+    <string name="bookmark_toggle_cd">Toggle bookmark</string>
+    <string name="bookmarks_quick_pick">Bookmarks</string>
+    <string name="bookmarks_choose">Bookmarks</string>
 
     <!-- Days of week -->
     <string-array name="days_of_week">

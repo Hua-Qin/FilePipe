@@ -1,0 +1,45 @@
+## v2.0.0 - Onboarding, more themes, advance filters
+
+### ✨ New Features
+
+- **Onboarding** — a short first-launch flow: welcome screen with the title card, then a template picker to get your first rule started effortlessly.
+- **Advanced rule filters** — narrow down which files a rule touches with filename patterns, file size/age limits, and exclude patterns. All tucked under an
+  expandable "Advanced" section when editing a rule.
+- **Hourly schedules** — in addition to daily and weekly, rules can now run every N hours.
+- **Simulate** — see exactly which files a rule would move, without actually moving anything.
+- **App shortcuts** — long-press the app icon to run any of your top 4 enabled rules directly.
+- **Undo from notification** — tap Undo on a scheduled-run notification to reverse the last batch of moves.
+- **Custom theme palettes** — go beyond Material You: pick from Tonal Spot, Vibrant, Expressive, Rainbow, Monochrome, and more, or choose one of 5 preset accent colors.
+- **Progressive blur** — optional frosted-glass blur effect (Android 12+).
+- **Gradient background** — instead of solid color, get subtle gradient behind the app content, toggleable in Settings.
+- **In-app updates** — check for updates right from Settings. GitHub installs get APK updates from GitHub Releases; Play Store installs use Google Play's in-app update flow.
+
+### 🔧 Improvements
+- **Smarter storage access** — the app no longer requires the broad "manage all files" permission. Folder access is granted individually via the system folder picker and remembered per folder. Cards now show an amber hint if a previously picked folder is no longer accessible.
+- **History depth** — history now loads progressively as you scroll (no more loading everything at once). Filter by outcome (including "no changes" runs), group by date or rule.
+- **Richer notifications** — scheduled-run notifications show the first few filenames that were  moved, so you know at a glance what happened.
+- **Rule icons** — set any emoji as the rule icon alongside the built-in presets.
+- **Settings redesign** — cleaner grouped cards, a reworked theme section with live palette preview, and an About section.
+- **Swipe action preview** — Settings shows a preview of what each swipe direction will do before you commit.
+- **Polished cards** — rule and history cards have smoother animations, tooltips on action buttons, and hover/press elevation feedback.
+- **Empty states** — friendly illustrated empty states on the Rules and History screens.
+
+### 🐛 Other Changes
+
+- Various performance improvements to rule execution and history loading.
+- Improved handling of edge cases when undoing a run involving nested folders.
+
+---
+
+## v1.0.0 - Launch of **File Pipe**
+
+### ✨ Features
+
+- **Rules** - Create rules with multiple source folders, file extensions, and a destination. Folders scanned recursively.
+- **Templates** - Start fast with presets (screenshots, images, video, music, downloads, documents etc.).
+- **Move or copy** - Per-rule operation mode, plus conflict handling (skip, overwrite, or rename with a suffix).
+- **Run your way** - Run rules on demand, or let **daily / weekly schedules** take care of it.
+- **History** - Every run is logged with per-file detail; **undo** a run to put files back when possible.
+- **Swipe shortcuts** - Configurable swipe gestures on rule cards (edit, duplicate, delete, history etc.).
+- **Backup** - Export rules to JSON, import again, optional auto-export and scheduled export (Settings).
+- **Look and feel** - Light, dark, black (OLED), system default, optional **Material You** colors.

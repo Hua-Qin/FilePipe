@@ -1,11 +1,19 @@
 package dev.bikram.filepipe.data.repository
 
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.map
 import dev.bikram.filepipe.data.local.dao.FileMovedDao
 import dev.bikram.filepipe.data.local.dao.RunHistoryDao
 import dev.bikram.filepipe.data.local.entity.FileMovedEntity
 import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
 import dev.bikram.filepipe.data.local.entity.toDomain
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.export.FileMovedBackupDto
+import dev.bikram.filepipe.domain.export.RunHistoryBackupDto
+import dev.bikram.filepipe.domain.model.HistorySortDirection
+import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunResult
 import dev.bikram.filepipe.domain.model.RunStatus
@@ -23,8 +31,46 @@ class RunHistoryRepository @Inject constructor(
     fun getAllHistory(): Flow<List<RunHistory>> =
         runHistoryDao.getAllHistory().map { it.map { entity -> entity.toDomain() } }
 
+    suspend fun getAllHistoryOnce(): List<RunHistory> =
+        runHistoryDao.getAllHistoryOnce().map { it.toDomain() }
+
     fun getHistoryForRule(ruleId: Long): Flow<List<RunHistory>> =
         runHistoryDao.getHistoryForRule(ruleId).map { it.map { entity -> entity.toDomain() } }
+
+    fun getAllHistoryPaged(
+        sortKey: HistorySortKey,
+        sortDirection: HistorySortDirection,
+    ): Flow<PagingData<RunHistory>> =
+        Pager(PagingConfig(pageSize = 30, enablePlaceholders = false)) {
+            when (sortKey) {
+                HistorySortKey.LAST_RAN -> when (sortDirection) {
+                    HistorySortDirection.DESCENDING -> runHistoryDao.getAllHistoryPagedLastRanDesc()
+                    HistorySortDirection.ASCENDING -> runHistoryDao.getAllHistoryPagedLastRanAsc()
+                }
+                HistorySortKey.RULE_NAME -> when (sortDirection) {
+                    HistorySortDirection.ASCENDING -> runHistoryDao.getAllHistoryPagedRuleNameAsc()
+                    HistorySortDirection.DESCENDING -> runHistoryDao.getAllHistoryPagedRuleNameDesc()
+                }
+            }
+        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+
+    fun getHistoryForRulePaged(
+        ruleId: Long,
+        sortKey: HistorySortKey,
+        sortDirection: HistorySortDirection,
+    ): Flow<PagingData<RunHistory>> =
+        Pager(PagingConfig(pageSize = 30, enablePlaceholders = false)) {
+            when (sortKey) {
+                HistorySortKey.LAST_RAN -> when (sortDirection) {
+                    HistorySortDirection.DESCENDING -> runHistoryDao.getHistoryForRulePagedLastRanDesc(ruleId)
+                    HistorySortDirection.ASCENDING -> runHistoryDao.getHistoryForRulePagedLastRanAsc(ruleId)
+                }
+                HistorySortKey.RULE_NAME -> when (sortDirection) {
+                    HistorySortDirection.ASCENDING -> runHistoryDao.getHistoryForRulePagedRuleNameAsc(ruleId)
+                    HistorySortDirection.DESCENDING -> runHistoryDao.getHistoryForRulePagedRuleNameDesc(ruleId)
+                }
+            }
+        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
 
     suspend fun getHistoryById(id: Long): RunHistory? =
         runHistoryDao.getHistoryById(id)?.toDomain()
@@ -103,4 +149,52 @@ class RunHistoryRepository @Inject constructor(
     suspend fun clearAllHistory() {
         runHistoryDao.deleteAllHistory()
     }
+
+    /**
+     * Replaces all history with backup rows. [ruleNameToId] maps rule name to the current DB rule id
+     * (first match if duplicate names). Clears existing history first.
+     */
+    suspend fun replaceHistoryFromBackup(
+        backupRuns: List<RunHistoryBackupDto>,
+        ruleNameToId: Map<String, Long>
+    ) {
+        clearAllHistory()
+        for (dto in backupRuns) {
+            val triggeredBy = runCatching { TriggerType.valueOf(dto.triggeredBy) }.getOrDefault(TriggerType.MANUAL)
+            val status = runCatching { RunStatus.valueOf(dto.status) }.getOrDefault(RunStatus.SUCCESS)
+            val filesFound = dto.files.size.coerceAtLeast(dto.totalFilesMoved + dto.totalFilesFailed)
+            val entity = RunHistoryEntity(
+                id = 0L,
+                ruleId = ruleNameToId[dto.ruleName],
+                ruleName = dto.ruleName,
+                triggeredBy = triggeredBy,
+                startedAt = dto.startedAt,
+                completedAt = dto.completedAt,
+                status = status,
+                totalFilesFound = filesFound,
+                totalFilesMoved = dto.totalFilesMoved,
+                totalFilesFailed = dto.totalFilesFailed,
+                errorMessage = dto.errorMessage,
+                isReversed = dto.isReversed
+            )
+            val newHistoryId = runHistoryDao.insertHistory(entity)
+            if (dto.files.isNotEmpty()) {
+                fileMovedDao.insertFilesMoved(dto.files.map { it.toEntity(newHistoryId) })
+            }
+        }
+    }
+
+    private fun FileMovedBackupDto.toEntity(runHistoryId: Long): FileMovedEntity =
+        FileMovedEntity(
+            id = 0L,
+            runHistoryId = runHistoryId,
+            fileName = fileName,
+            sourceUri = sourceUri,
+            destinationUri = destinationUri,
+            fileSizeBytes = fileSizeBytes,
+            movedAt = movedAt,
+            success = success,
+            skipped = skipped,
+            errorMessage = errorMessage
+        )
 }

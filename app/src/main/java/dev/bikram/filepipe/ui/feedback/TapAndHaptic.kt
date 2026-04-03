@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 
 val LocalTapSound = staticCompositionLocalOf<() -> Unit> { { } }
+val LocalHapticEnabled = staticCompositionLocalOf { true }
 
 @Composable
 fun rememberPlayTapSound(): () -> Unit = LocalTapSound.current
@@ -18,6 +19,22 @@ fun rememberPlayTapSound(): () -> Unit = LocalTapSound.current
 fun View.playTapSound() {
     if (isShown) {
         playSoundEffect(SoundEffectConstants.CLICK)
+    }
+}
+
+/**
+ * Heavier double-click haptic used for long-press multi-select.
+ * Distinct from the swipe-threshold haptic so the user can feel the difference.
+ */
+fun View.performLongPressHaptic() {
+    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+    } else {
+        context.getSystemService(Vibrator::class.java)
+    } ?: return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
     }
 }
 

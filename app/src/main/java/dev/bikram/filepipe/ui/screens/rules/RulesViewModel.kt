@@ -4,76 +4,128 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.domain.model.HistorySortDirection
+import dev.bikram.filepipe.domain.model.HistorySortKey
+import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.TriggerType
+import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
 import dev.bikram.filepipe.domain.usecase.ExecuteRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
-import dev.bikram.filepipe.domain.usecase.UndoRunUseCase
+import dev.bikram.filepipe.shortcuts.AppShortcutsManager
+import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-data class UndoSnackbarEvent(
-    val historyId: Long,
-    val ruleName: String,
-    val filesMoved: Int
-)
-
 data class DeleteUndoEvent(val rules: List<Rule>)
+
+data class PreviewState(
+    val ruleName: String,
+    val isLoading: Boolean = true,
+    val results: List<PreviewFileResult> = emptyList()
+)
 
 sealed interface RulesRunNavigation {
     data class HistoryDetail(val historyId: Long) : RulesRunNavigation
     data object HistoryList : RulesRunNavigation
 }
 
+data class RulesUiState(
+    val rules: List<Rule> = emptyList(),
+    val staleRuleIds: Set<Long> = emptySet(),
+    val swipeStartToEnd: SwipeAction = SwipeAction.EDIT,
+    val swipeEndToStart: SwipeAction = SwipeAction.DELETE,
+    val selectedRuleIds: Set<Long> = emptySet(),
+    val progressMap: Map<Long, RunProgress> = emptyMap(),
+    val isRunning: Boolean = false,
+    val previewState: PreviewState? = null,
+    val isCompactMode: Boolean = false,
+    val cardModeOverrides: Set<Long> = emptySet(),
+    val sortKey: HistorySortKey = HistorySortKey.LAST_RAN,
+    val sortDirection: HistorySortDirection = HistorySortDirection.DESCENDING
+)
+
 @HiltViewModel
 class RulesViewModel @Inject constructor(
     private val ruleRepository: RuleRepository,
     private val scheduleRulesUseCase: ScheduleRulesUseCase,
     private val executeRulesUseCase: ExecuteRulesUseCase,
+    private val simulateRuleUseCase: SimulateRuleUseCase,
     private val rulesAutoExportTrigger: RulesAutoExportTrigger,
-    private val undoRunUseCase: UndoRunUseCase,
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val appShortcutsManager: AppShortcutsManager,
+    private val pendingShortcutRepository: PendingShortcutRepository,
+    private val fileOperationRepository: FileOperationRepository
 ) : ViewModel() {
 
-    val rules: StateFlow<List<Rule>> = ruleRepository.getAllRules()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    // Eagerly so Room query starts before the UI renders, preventing an empty-state flash on cold start.
+    private val _rules: StateFlow<List<Rule>> = ruleRepository.getAllRules()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    val swipeStartToEnd: StateFlow<SwipeAction> = userPreferencesRepository.preferencesFlow
-        .map { it.swipeStartToEnd }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SwipeAction.DUPLICATE)
-
-    val swipeEndToStart: StateFlow<SwipeAction> = userPreferencesRepository.preferencesFlow
-        .map { it.swipeEndToStart }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SwipeAction.DELETE)
-
+    private val _staleRuleIds = MutableStateFlow<Set<Long>>(emptySet())
     private val _selectedRuleIds = MutableStateFlow<Set<Long>>(emptySet())
-    val selectedRuleIds: StateFlow<Set<Long>> = _selectedRuleIds.asStateFlow()
-
     private val _progressMap = MutableStateFlow<Map<Long, RunProgress>>(emptyMap())
-    val progressMap: StateFlow<Map<Long, RunProgress>> = _progressMap.asStateFlow()
+    private val _previewState = MutableStateFlow<PreviewState?>(null)
+    private val _isCompactMode = MutableStateFlow(false)
+    private val _cardModeOverrides = MutableStateFlow<Set<Long>>(emptySet())
+    private val _sortKey = MutableStateFlow(HistorySortKey.LAST_RAN)
+    private val _sortDirection = MutableStateFlow(HistorySortDirection.DESCENDING)
 
-    val isRunning: StateFlow<Boolean> = _progressMap
-        .map { progressMap -> progressMap.values.any { !it.isComplete } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+    private val sortedRulesFlow = combine(_rules, _sortKey, _sortDirection) { rules, sortKey, sortDirection ->
+        sortRulesList(rules, sortKey, sortDirection)
+    }
+
+    private val sortParamsFlow = combine(_sortKey, _sortDirection) { sortKey, sortDirection ->
+        sortKey to sortDirection
+    }
+
+    val uiState: StateFlow<RulesUiState> = combine(
+        sortedRulesFlow,
+        _staleRuleIds,
+        userPreferencesRepository.preferencesFlow,
+        _selectedRuleIds,
+        sortParamsFlow
+    ) { sortedRules, stale, prefs, selected, sortParams ->
+        val (sortKey, sortDirection) = sortParams
+        RulesUiState(
+            rules = sortedRules,
+            staleRuleIds = stale,
+            swipeStartToEnd = prefs.swipeStartToEnd,
+            swipeEndToStart = prefs.swipeEndToStart,
+            selectedRuleIds = selected,
+            sortKey = sortKey,
+            sortDirection = sortDirection
+        )
+    }
+        .combine(_progressMap) { state, progress ->
+            state.copy(progressMap = progress, isRunning = progress.values.any { !it.isComplete })
+        }
+        .combine(_previewState) { state, preview -> state.copy(previewState = preview) }
+        .combine(_isCompactMode) { state, compact -> state.copy(isCompactMode = compact) }
+        .combine(_cardModeOverrides) { state, overrides -> state.copy(cardModeOverrides = overrides) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RulesUiState())
 
     private val _navigateAfterRun = MutableSharedFlow<RulesRunNavigation>(extraBufferCapacity = 1)
     val navigateAfterRun = _navigateAfterRun.asSharedFlow()
-
-    private val _undoEvent = MutableSharedFlow<UndoSnackbarEvent>(extraBufferCapacity = 1)
-    val undoEvent = _undoEvent.asSharedFlow()
 
     private val _deleteUndoEvent = MutableSharedFlow<DeleteUndoEvent>(extraBufferCapacity = 1)
     val deleteUndoEvent = _deleteUndoEvent.asSharedFlow()
@@ -83,13 +135,33 @@ class RulesViewModel @Inject constructor(
 
     fun clearUserMessage() { _userMessage.value = null }
 
-    // Compact / expanded view mode
-    // isCompactMode = global default; cardModeOverrides = cards that flip the global default
-    private val _isCompactMode = MutableStateFlow(false)
-    val isCompactMode: StateFlow<Boolean> = _isCompactMode.asStateFlow()
+    init {
+        viewModelScope.launch {
+            var lastFolderSignature: String? = null
+            _rules.collect { ruleList ->
+                val signature = folderPathsSignature(ruleList)
+                if (signature != lastFolderSignature) {
+                    lastFolderSignature = signature
+                    _staleRuleIds.value = withContext(Dispatchers.IO) {
+                        computeStaleRuleIds(ruleList)
+                    }
+                }
+            }
+        }
+        _rules.onEach { appShortcutsManager.updateShortcuts(it) }.launchIn(viewModelScope)
+        pendingShortcutRepository.pendingRuleId.onEach { ruleId ->
+            val rule = _rules.value.find { it.id == ruleId }
+            if (rule != null) runRule(rule)
+        }.launchIn(viewModelScope)
+    }
 
-    private val _cardModeOverrides = MutableStateFlow<Set<Long>>(emptySet())
-    val cardModeOverrides: StateFlow<Set<Long>> = _cardModeOverrides.asStateFlow()
+    fun startPreview(rule: Rule) = viewModelScope.launch {
+        _previewState.value = PreviewState(ruleName = rule.name, isLoading = true)
+        val results = simulateRuleUseCase(rule)
+        _previewState.value = PreviewState(ruleName = rule.name, isLoading = false, results = results)
+    }
+
+    fun dismissPreview() { _previewState.value = null }
 
     fun isCardExpanded(ruleId: Long, compact: Boolean, overrides: Set<Long>): Boolean =
         if (compact) ruleId in overrides else ruleId !in overrides
@@ -114,11 +186,16 @@ class RulesViewModel @Inject constructor(
     }
 
     fun selectAll() {
-        _selectedRuleIds.value = rules.value.map { it.id }.toSet()
+        _selectedRuleIds.value = _rules.value.map { it.id }.toSet()
+    }
+
+    fun setSort(sortKey: HistorySortKey, sortDirection: HistorySortDirection) {
+        _sortKey.value = sortKey
+        _sortDirection.value = sortDirection
     }
 
     fun deleteSelected() = viewModelScope.launch {
-        val toDelete = rules.value.filter { it.id in _selectedRuleIds.value }
+        val toDelete = _rules.value.filter { it.id in _selectedRuleIds.value }
         toDelete.forEach { rule ->
             scheduleRulesUseCase.cancelRule(rule)
             ruleRepository.deleteRule(rule.id)
@@ -162,7 +239,7 @@ class RulesViewModel @Inject constructor(
     }
 
     fun runSelected() = viewModelScope.launch {
-        val selected = rules.value.filter { it.id in _selectedRuleIds.value && it.isEnabled }
+        val selected = _rules.value.filter { it.id in _selectedRuleIds.value && it.isEnabled }
         if (selected.isEmpty()) return@launch
 
         _progressMap.update {
@@ -213,11 +290,8 @@ class RulesViewModel @Inject constructor(
 
         clearProgress()
 
-        // If files were moved, emit undo snackbar event; otherwise navigate to detail
         val result = results.firstOrNull()
-        if (result != null && result.totalMoved > 0) {
-            _undoEvent.emit(UndoSnackbarEvent(result.historyId, rule.name, result.totalMoved))
-        } else if (result != null) {
+        if (result != null) {
             _navigateAfterRun.emit(RulesRunNavigation.HistoryDetail(result.historyId))
         }
     }
@@ -234,12 +308,38 @@ class RulesViewModel @Inject constructor(
         _userMessage.value = "\"${copy.name}\" created"
     }
 
-    fun undoRun(historyId: Long) = viewModelScope.launch {
-        val result = undoRunUseCase(historyId)
-        _userMessage.value = when {
-            result.totalFailed == 0 -> "Undone: ${result.totalReversed} file(s) restored"
-            result.totalReversed == 0 -> "Undo failed: ${result.errors.firstOrNull() ?: "unknown error"}"
-            else -> "Partial undo: ${result.totalReversed} restored, ${result.totalFailed} failed"
+    private fun folderPathsSignature(ruleList: List<Rule>): String =
+        ruleList.sortedBy { it.id }.joinToString("\u0000") { rule ->
+            buildString {
+                append(rule.id)
+                append('\u0001')
+                rule.sourceFolderPaths.sorted().forEach { path ->
+                    append(path)
+                    append('\u0002')
+                }
+                append('\u0001')
+                append(rule.destinationFolderPath)
+            }
         }
+
+    private fun computeStaleRuleIds(ruleList: List<Rule>): Set<Long> =
+        ruleList.filter { rule ->
+            val allPaths = rule.sourceFolderPaths + listOfNotNull(rule.destinationFolderPath.takeIf { it.isNotBlank() })
+            allPaths.any { path ->
+                !path.startsWith("content://") || !fileOperationRepository.isAccessible(path)
+            }
+        }.map { it.id }.toSet()
+
+    private fun sortRulesList(
+        rules: List<Rule>,
+        sortKey: HistorySortKey,
+        sortDirection: HistorySortDirection
+    ): List<Rule> {
+        val comparator = when (sortKey) {
+            HistorySortKey.LAST_RAN -> compareBy<Rule> { it.updatedAt }
+            HistorySortKey.RULE_NAME -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+        }
+        val sorted = rules.sortedWith(comparator)
+        return if (sortDirection == HistorySortDirection.DESCENDING) sorted.reversed() else sorted
     }
 }

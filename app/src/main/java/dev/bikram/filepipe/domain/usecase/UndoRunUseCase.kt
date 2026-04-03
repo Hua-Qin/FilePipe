@@ -1,5 +1,10 @@
 package dev.bikram.filepipe.domain.usecase
 
+import android.content.Context
+import android.net.Uri
+import android.provider.DocumentsContract
+import androidx.documentfile.provider.DocumentFile
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
@@ -7,7 +12,6 @@ import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 import javax.inject.Inject
 
 data class UndoResult(
@@ -17,9 +21,12 @@ data class UndoResult(
 )
 
 class UndoRunUseCase @Inject constructor(
+    @param:ApplicationContext private val context: Context,
     private val runHistoryRepository: RunHistoryRepository,
     private val fileOperationRepository: FileOperationRepository
 ) {
+    private val authority = "com.android.externalstorage.documents"
+
     suspend operator fun invoke(historyId: Long): UndoResult = withContext(Dispatchers.IO) {
         val history = runHistoryRepository.getHistoryById(historyId)
             ?: return@withContext UndoResult(0, 0, listOf("Run not found"))
@@ -36,23 +43,31 @@ class UndoRunUseCase @Inject constructor(
         val errors = mutableListOf<String>()
 
         movedFiles.forEach { fileMoved ->
-            val destFile = File(fileMoved.destinationUri)
-            val sourceFolder = File(fileMoved.sourceUri).parentFile
+            val destUri = Uri.parse(fileMoved.destinationUri)
+            val sourceFolderUriString = parentTreeUriString(fileMoved.sourceUri)
 
-            if (!destFile.exists()) {
-                errors.add("${fileMoved.fileName}: destination file no longer exists")
+            if (sourceFolderUriString == null) {
+                errors.add("${fileMoved.fileName}: cannot determine original source folder")
                 failed++
                 return@forEach
             }
-            if (sourceFolder == null || !sourceFolder.exists() || !sourceFolder.canWrite()) {
-                errors.add("${fileMoved.fileName}: source folder not accessible")
+
+            val destDoc = DocumentFile.fromSingleUri(context, destUri)
+            if (destDoc == null || !destDoc.exists()) {
+                errors.add("${fileMoved.fileName}: file no longer exists at destination")
                 failed++
                 return@forEach
             }
+
+            val sourceEntry = FileEntry(
+                uri = destUri,
+                name = fileMoved.fileName,
+                size = destDoc.length()
+            )
 
             val reverseResult = fileOperationRepository.moveFile(
-                sourceEntry = FileEntry(destFile),
-                destFolderPath = sourceFolder.absolutePath,
+                sourceEntry = sourceEntry,
+                destFolderUriString = sourceFolderUriString,
                 conflictPolicy = ConflictPolicy.RENAME_SUFFIX,
                 operationMode = OperationMode.MOVE
             )
@@ -65,10 +80,30 @@ class UndoRunUseCase @Inject constructor(
             }
         }
 
-        if (reversed > 0 || movedFiles.isEmpty()) {
+        if (reversed > 0) {
             runHistoryRepository.markRunReversed(historyId)
         }
 
         UndoResult(reversed, failed, errors)
+    }
+
+    /**
+     * Derives the parent folder as a SAF tree URI string from a document URI.
+     * e.g. content://...document/primary%3ADCIM%2FCamera%2Fphoto.jpg
+     *   → content://...tree/primary%3ADCIM%2FCamera
+     */
+    private fun parentTreeUriString(documentUriString: String): String? {
+        if (!documentUriString.startsWith("content://")) return null
+        return try {
+            val docId = DocumentsContract.getDocumentId(Uri.parse(documentUriString))
+            val relativePath = docId.substringAfter(":", "")
+            val parentDocId = if ('/' in relativePath) {
+                docId.substringBeforeLast('/')
+            } else {
+                // File is directly at the volume root — parent is the root itself
+                docId.substringBefore(':') + ":"
+            }
+            DocumentsContract.buildTreeDocumentUri(authority, parentDocId).toString()
+        } catch (_: Exception) { null }
     }
 }

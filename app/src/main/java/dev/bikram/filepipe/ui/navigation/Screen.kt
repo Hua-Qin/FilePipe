@@ -5,9 +5,26 @@ sealed class Screen(val route: String) {
     data object History : Screen("history")
     data object Settings : Screen("settings")
 
-    data object RuleDetail : Screen("rule_detail/{ruleId}") {
-        fun createRoute(ruleId: Long = NEW_RULE_ID) = "rule_detail/$ruleId"
+    data object RuleDetail : Screen(
+        "rule_detail/{ruleId}?templateIndex={templateIndex}&skipTemplatePicker={skipTemplatePicker}"
+    ) {
+        fun createRoute(
+            ruleId: Long = NEW_RULE_ID,
+            templateIndex: Int = -1,
+            skipTemplatePicker: Boolean = false
+        ): String {
+            val queryParts = mutableListOf<String>()
+            if (templateIndex >= 0) queryParts += "templateIndex=$templateIndex"
+            if (skipTemplatePicker) queryParts += "skipTemplatePicker=true"
+            return if (queryParts.isEmpty()) {
+                "rule_detail/$ruleId"
+            } else {
+                "rule_detail/$ruleId?${queryParts.joinToString("&")}"
+            }
+        }
         const val ARG_RULE_ID = "ruleId"
+        const val ARG_TEMPLATE_INDEX = "templateIndex"
+        const val ARG_SKIP_TEMPLATE_PICKER = "skipTemplatePicker"
         const val NEW_RULE_ID = -1L
     }
 
@@ -20,4 +37,11 @@ sealed class Screen(val route: String) {
         fun createRoute(ruleId: Long) = "history_for_rule/$ruleId"
         const val ARG_RULE_ID = "ruleId"
     }
+
+    data object OnboardingTitle : Screen("onboarding_title?fromSettings={fromSettings}") {
+        fun createRoute(fromSettings: Boolean = false) = "onboarding_title?fromSettings=$fromSettings"
+        const val ARG = "fromSettings"
+    }
+
+    data object OnboardingRuleWizard : Screen("onboarding_rule_wizard")
 }

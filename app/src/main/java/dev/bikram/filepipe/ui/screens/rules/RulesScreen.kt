@@ -1,7 +1,10 @@
 package dev.bikram.filepipe.ui.screens.rules
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,31 +15,44 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
@@ -45,16 +61,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -62,29 +74,42 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.SwipeAction
+import dev.bikram.filepipe.domain.model.HistorySortDirection
+import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.ui.components.RuleCard
-import dev.bikram.filepipe.ui.feedback.performSwipeThresholdHaptic
+import dev.bikram.filepipe.ui.components.ThemeColoredEmptyRulesIllustration
+import dev.bikram.filepipe.ui.components.RuleCardAction
+import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
+import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
+import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.navigation.Screen
+import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
+import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RulesScreen(
     contentPadding: PaddingValues,
-    onCreateRule: () -> Unit,
     onEditRule: (Long) -> Unit,
     onNavigateToHistoryDetail: (Long) -> Unit,
     onNavigateToHistoryList: () -> Unit,
@@ -92,20 +117,25 @@ fun RulesScreen(
     viewModel: RulesViewModel = hiltViewModel()
 ) {
     val playTap = rememberPlayTapSound()
-    val rules by viewModel.rules.collectAsStateWithLifecycle()
-    val selectedRuleIds by viewModel.selectedRuleIds.collectAsStateWithLifecycle()
-    val progressMap by viewModel.progressMap.collectAsStateWithLifecycle()
-    val isRunning by viewModel.isRunning.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val rules = uiState.rules
+    val selectedRuleIds = uiState.selectedRuleIds
+    val progressMap = uiState.progressMap
+    val isRunning = uiState.isRunning
+    val isCompactMode = uiState.isCompactMode
+    val cardModeOverrides = uiState.cardModeOverrides
+    val swipeStartToEnd = uiState.swipeStartToEnd
+    val swipeEndToStart = uiState.swipeEndToStart
+    val staleRuleIds = uiState.staleRuleIds
+    val previewState = uiState.previewState
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
-    val isCompactMode by viewModel.isCompactMode.collectAsStateWithLifecycle()
-    val cardModeOverrides by viewModel.cardModeOverrides.collectAsStateWithLifecycle()
-    val swipeStartToEnd by viewModel.swipeStartToEnd.collectAsStateWithLifecycle()
-    val swipeEndToStart by viewModel.swipeEndToStart.collectAsStateWithLifecycle()
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     var pendingDeleteRule by remember { mutableStateOf<Rule?>(null) }
     var pendingDeleteSelected by remember { mutableStateOf(false) }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
 
     val hasSelection = selectedRuleIds.isNotEmpty()
 
@@ -118,19 +148,6 @@ fun RulesScreen(
             when (target) {
                 is RulesRunNavigation.HistoryDetail -> onNavigateToHistoryDetail(target.historyId)
                 is RulesRunNavigation.HistoryList -> onNavigateToHistoryList()
-            }
-        }
-    }
-
-    LaunchedEffect(viewModel) {
-        viewModel.undoEvent.collect { event ->
-            val result = snackbarHostState.showSnackbar(
-                message = "${event.ruleName}: ${event.filesMoved} file(s) moved",
-                actionLabel = "Undo",
-                duration = SnackbarDuration.Long
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.undoRun(event.historyId)
             }
         }
     }
@@ -158,10 +175,16 @@ fun RulesScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
+            val appBarColors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent
+            )
             LargeTopAppBar(
                 title = { Text("Rules") },
                 scrollBehavior = scrollBehavior,
+                colors = appBarColors,
                 actions = {
                     if (hasSelection && !isRunning) {
                         IconButton(onClick = {
@@ -177,40 +200,80 @@ fun RulesScreen(
                             Icon(Icons.Default.Deselect, contentDescription = stringResource(R.string.run_deselect_all))
                         }
                     } else {
-                        FilledTonalIconButton(onClick = {
-                            playTap()
-                            viewModel.toggleGlobalViewMode()
-                        }) {
-                            Icon(
-                                imageVector = if (isCompactMode) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
-                                contentDescription = if (isCompactMode) "Expand all" else "Collapse all"
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Box {
+                                FilledTonalIconButton(onClick = {
+                                    playTap()
+                                    sortMenuExpanded = true
+                                }) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Sort,
+                                        contentDescription = stringResource(R.string.history_sort_menu)
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = sortMenuExpanded,
+                                    onDismissRequest = { sortMenuExpanded = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
+                                        onClick = {
+                                            playTap()
+                                            viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
+                                            sortMenuExpanded = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
+                                        onClick = {
+                                            playTap()
+                                            viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
+                                            sortMenuExpanded = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
+                                        onClick = {
+                                            playTap()
+                                            viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
+                                            sortMenuExpanded = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
+                                        onClick = {
+                                            playTap()
+                                            viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)
+                                            sortMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                            FilledTonalIconButton(onClick = {
+                                playTap()
+                                viewModel.toggleGlobalViewMode()
+                            }) {
+                                Icon(
+                                    imageVector = if (isCompactMode) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
+                                    contentDescription = if (isCompactMode) "Expand all" else "Collapse all"
+                                )
+                            }
                         }
                     }
                 }
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        floatingActionButton = {
-            if (!hasSelection) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        playTap()
-                        onCreateRule()
-                    },
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null)
-                    Text(
-                        text = stringResource(R.string.rules_add_rule),
-                        modifier = Modifier.padding(start = 8.dp)
-                    )
-                }
-            }
+        snackbarHost = {
+            SnackbarHost(
+                snackbarHostState,
+                modifier = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
+            )
         },
         bottomBar = {
-            if (hasSelection || isRunning) {
+            if (isRunning) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -218,54 +281,63 @@ fun RulesScreen(
                             start = 16.dp,
                             end = 16.dp,
                             top = 8.dp,
-                            bottom = contentPadding.calculateBottomPadding() + 8.dp
+                            bottom = contentPadding.calculateBottomPadding() + 4.dp
                         )
                 ) {
-                    if (isRunning) {
-                        Text(
-                            text = stringResource(R.string.run_in_progress),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    } else {
-                        val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Text(
+                        text = stringResource(R.string.run_in_progress),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            } else {
+                AnimatedVisibility(
+                    visible = hasSelection,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = contentPadding.calculateBottomPadding() + 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            tonalElevation = 3.dp,
+                            shadowElevation = 3.dp
                         ) {
-                            FilledTonalIconButton(
-                                onClick = {
-                                    playTap()
-                                    pendingDeleteSelected = true
-                                },
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete selected")
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    playTap()
-                                    viewModel.clearSelection()
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(stringResource(R.string.cancel))
-                            }
-                            Button(
-                                onClick = {
-                                    playTap()
-                                    viewModel.runSelected()
-                                },
-                                enabled = enabledSelectedCount > 0
-                            ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                Text(text = "  ${stringResource(R.string.run_button, enabledSelectedCount)}")
+                                FilledTonalIconButton(onClick = { playTap(); viewModel.clearSelection() }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Cancel selection")
+                                }
+                                FilledTonalIconButton(
+                                    onClick = { playTap(); pendingDeleteSelected = true },
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
+                                }
+                                FilledTonalButton(
+                                    onClick = { playTap(); viewModel.runSelected() },
+                                    enabled = enabledSelectedCount > 0,
+                                    shape = RoundedCornerShape(50),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text("Run Selected (${selectedRuleIds.size})")
+                                    Spacer(Modifier.width(6.dp))
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
                             }
                         }
                     }
@@ -274,15 +346,27 @@ fun RulesScreen(
         }
     ) { innerPadding ->
         if (rules.isEmpty()) {
-            EmptyState(modifier = Modifier.padding(innerPadding))
+            EmptyState(
+                onAddRule = {
+                    playTap()
+                    onEditRule(Screen.RuleDetail.NEW_RULE_ID)
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(scrollBlurModifier)
+                    .padding(innerPadding)
+                    .padding(bottom = contentPadding.calculateBottomPadding())
+            )
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(scrollBlurModifier),
                 contentPadding = PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
                     top = innerPadding.calculateTopPadding() + 8.dp,
-                    bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 96.dp
+                    bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 56.dp
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
@@ -294,6 +378,8 @@ fun RulesScreen(
                         isExpanded = isExpanded,
                         progress = progressMap[rule.id],
                         isAnyRuleRunning = isRunning,
+                        hasStaleFolder = rule.id in staleRuleIds,
+                        onStaleWarningClick = { onEditRule(rule.id) },
                         swipeStartToEnd = swipeStartToEnd,
                         swipeEndToStart = swipeEndToStart,
                         onToggleEnabled = { enabled -> viewModel.toggleEnabled(rule, enabled) },
@@ -308,6 +394,7 @@ fun RulesScreen(
                         onDelete = { pendingDeleteRule = rule },
                         onDuplicate = { viewModel.duplicateRule(rule) },
                         onRunRule = { viewModel.runRule(rule) },
+                        onPreviewRule = { viewModel.startPreview(rule) },
                         onViewHistory = { onNavigateToRuleHistory(rule.id) },
                         modifier = Modifier.animateItem()
                     )
@@ -358,9 +445,84 @@ fun RulesScreen(
             }
         )
     }
+
+    previewState?.let { preview ->
+        ModalBottomSheet(
+            onDismissRequest = { viewModel.dismissPreview() },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = "Preview — ${preview.ruleName}",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                if (preview.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .padding(32.dp)
+                    )
+                } else if (preview.results.isEmpty()) {
+                    Text(
+                        text = "No files would be affected.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 16.dp)
+                    )
+                } else {
+                    Text(
+                        text = "${preview.results.size} file(s) would be affected",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp)
+                    ) {
+                        items(
+                            items = preview.results,
+                            key = { previewItem -> previewItem.sourcePath }
+                        ) { result ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(result.fileName, style = MaterialTheme.typography.bodySmall)
+                                    val status = when {
+                                        result.wouldSkip -> "Would skip"
+                                        result.renamedTo != null -> "→ ${result.renamedTo}"
+                                        else -> "→ ${result.simulatedDestPath.substringAfterLast('/')}"
+                                    }
+                                    Text(
+                                        status,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                val sizeKb = result.sizeBytes / 1024
+                                Text(
+                                    if (sizeKb > 1024) "${sizeKb / 1024} MB" else "$sizeKb KB",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDismissRuleCard(
     rule: Rule,
@@ -368,6 +530,8 @@ private fun SwipeToDismissRuleCard(
     isExpanded: Boolean,
     progress: dev.bikram.filepipe.domain.model.RunProgress?,
     isAnyRuleRunning: Boolean,
+    hasStaleFolder: Boolean,
+    onStaleWarningClick: () -> Unit,
     swipeStartToEnd: SwipeAction,
     swipeEndToStart: SwipeAction,
     onToggleEnabled: (Boolean) -> Unit,
@@ -377,89 +541,71 @@ private fun SwipeToDismissRuleCard(
     onDelete: () -> Unit,
     onDuplicate: () -> Unit,
     onRunRule: () -> Unit,
+    onPreviewRule: () -> Unit,
     onViewHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val view = LocalView.current
     val cardShape = RoundedCornerShape(16.dp)
     val swipeAssigned = setOf(swipeStartToEnd, swipeEndToStart)
-    val cardIconPairs: List<Pair<ImageVector, () -> Unit>> = SwipeAction.entries
+    val cardIconPairs: List<RuleCardAction> = SwipeAction.entries
         .filter { it !in swipeAssigned }
         .map { action ->
-            action.icon() to { action.dispatch(onDelete, onEdit, onDuplicate, onViewHistory) }
-        }
-
-    BoxWithConstraints(modifier = modifier.clip(cardShape)) {
-        val dismissState = rememberSwipeToDismissBoxState(
-            confirmValueChange = { value ->
-                when (value) {
-                    SwipeToDismissBoxValue.EndToStart -> {
-                        swipeEndToStart.dispatch(onDelete, onEdit, onDuplicate, onViewHistory)
-                        false
-                    }
-                    SwipeToDismissBoxValue.StartToEnd -> {
-                        swipeStartToEnd.dispatch(onDelete, onEdit, onDuplicate, onViewHistory)
-                        false
-                    }
-                    else -> false
-                }
-            },
-            positionalThreshold = { totalDistance -> totalDistance * 0.33f }
-        )
-
-        LaunchedEffect(dismissState, rule.id) {
-            var previousTarget = SwipeToDismissBoxValue.Settled
-            snapshotFlow { dismissState.targetValue }.collect { target ->
-                val crossedIntoDismiss =
-                    target != SwipeToDismissBoxValue.Settled &&
-                        previousTarget == SwipeToDismissBoxValue.Settled
-                if (crossedIntoDismiss) {
-                    view.performSwipeThresholdHaptic()
-                }
-                previousTarget = target
-            }
-        }
-
-        SwipeToDismissBox(
-            state = dismissState,
-            modifier = Modifier.fillMaxWidth(),
-            backgroundContent = {
-                val isStartToEnd = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
-                val action = if (isStartToEnd) swipeStartToEnd else swipeEndToStart
-                Box(
-                    Modifier
-                        .fillMaxHeight()
-                        .weight(1f)
-                        .background(action.backgroundColor(), cardShape)
-                        .padding(
-                            start = if (isStartToEnd) 24.dp else 0.dp,
-                            end = if (isStartToEnd) 0.dp else 24.dp
-                        ),
-                    contentAlignment = if (isStartToEnd) Alignment.CenterStart else Alignment.CenterEnd
-                ) {
-                    Icon(
-                        imageVector = action.icon(),
-                        contentDescription = null,
-                        tint = action.iconTint(),
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            },
-            enableDismissFromStartToEnd = true
-        ) {
-            RuleCard(
-                rule = rule,
-                isSelected = isSelected,
-                isExpanded = isExpanded,
-                progress = progress,
-                onClick = onToggleSelectOrExpand,
-                onLongClick = onLongClick,
-                cardActions = cardIconPairs,
-                onToggleEnabled = onToggleEnabled,
-                onRunClick = onRunRule,
-                isAnyRuleRunning = isAnyRuleRunning
+            RuleCardAction(
+                icon = action.icon(),
+                label = action.label(),
+                onClick = { action.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule) }
             )
         }
+
+    val hapticEnabled = LocalHapticEnabled.current
+    DeliberateSwipeRevealCard(
+        commitThresholdFraction = SwipeDismissCardDefaults.CommitThresholdFraction,
+        cardShape = cardShape,
+        onSwipeStartToEnd = {
+            swipeStartToEnd.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
+        },
+        onSwipeEndToStart = {
+            swipeEndToStart.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
+        },
+        hapticEnabled = hapticEnabled,
+        backgroundContent = { fromStart ->
+            val action = if (fromStart) swipeStartToEnd else swipeEndToStart
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(action.semanticSwipeBackground(), cardShape)
+                    .padding(
+                        start = if (fromStart) 24.dp else 0.dp,
+                        end = if (fromStart) 0.dp else 24.dp
+                    ),
+                contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = action.icon(),
+                    contentDescription = null,
+                    tint = action.semanticSwipeIconTint(),
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        },
+        modifier = modifier
+    ) {
+        RuleCard(
+            rule = rule,
+            isSelected = isSelected,
+            isExpanded = isExpanded,
+            progress = progress,
+            onClick = onToggleSelectOrExpand,
+            onLongClick = onLongClick,
+            cardActions = cardIconPairs,
+            onToggleEnabled = onToggleEnabled,
+            onRunClick = onRunRule,
+            isAnyRuleRunning = isAnyRuleRunning,
+            onPreviewRule = onPreviewRule,
+            onViewHistory = onViewHistory,
+            hasStaleFolder = hasStaleFolder,
+            onStaleWarningClick = onStaleWarningClick
+        )
     }
 }
 
@@ -467,62 +613,75 @@ private fun SwipeAction.dispatch(
     onDelete: () -> Unit,
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
-    onViewHistory: () -> Unit
+    onViewHistory: () -> Unit,
+    onPreview: () -> Unit
 ) = when (this) {
-    SwipeAction.DELETE -> onDelete()
     SwipeAction.EDIT -> onEdit()
+    SwipeAction.DELETE -> onDelete()
     SwipeAction.DUPLICATE -> onDuplicate()
+    SwipeAction.PREVIEW -> onPreview()
     SwipeAction.VIEW_HISTORY -> onViewHistory()
 }
 
 private fun SwipeAction.icon(): ImageVector = when (this) {
-    SwipeAction.DELETE -> Icons.Default.Delete
     SwipeAction.EDIT -> Icons.Default.Edit
+    SwipeAction.DELETE -> Icons.Default.Delete
     SwipeAction.DUPLICATE -> Icons.Default.ContentCopy
+    SwipeAction.PREVIEW -> Icons.Default.Visibility
     SwipeAction.VIEW_HISTORY -> Icons.Default.History
 }
 
 @Composable
-private fun SwipeAction.backgroundColor() = when (this) {
-    SwipeAction.DELETE -> MaterialTheme.colorScheme.error.copy(alpha = 0.32f)
-    SwipeAction.EDIT -> MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.72f)
-    SwipeAction.DUPLICATE -> MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f)
-    SwipeAction.VIEW_HISTORY -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+private fun SwipeAction.label(): String = when (this) {
+    SwipeAction.EDIT -> stringResource(R.string.edit_rule)
+    SwipeAction.DELETE -> stringResource(R.string.delete_rule)
+    SwipeAction.DUPLICATE -> stringResource(R.string.duplicate_rule)
+    SwipeAction.PREVIEW -> stringResource(R.string.preview_rule)
+    SwipeAction.VIEW_HISTORY -> stringResource(R.string.view_history)
 }
 
 @Composable
-private fun SwipeAction.iconTint() = when (this) {
-    SwipeAction.DELETE -> MaterialTheme.colorScheme.error
-    SwipeAction.EDIT -> MaterialTheme.colorScheme.onTertiaryContainer
-    SwipeAction.DUPLICATE -> MaterialTheme.colorScheme.onSecondaryContainer
-    SwipeAction.VIEW_HISTORY -> MaterialTheme.colorScheme.onPrimaryContainer
-}
-
-@Composable
-private fun EmptyState(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+private fun EmptyState(
+    onAddRule: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }
     ) {
-        Icon(
-            Icons.Default.Info,
-            contentDescription = null,
-            modifier = Modifier.size(72.dp),
-            tint = MaterialTheme.colorScheme.outlineVariant
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            stringResource(R.string.rules_empty_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.rules_empty_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.outlineVariant,
-            textAlign = TextAlign.Center
-        )
+        Column(
+            modifier = modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            ThemeColoredEmptyRulesIllustration(Modifier.size(120.dp))
+            Spacer(Modifier.height(24.dp))
+            Text(
+                stringResource(R.string.rules_empty_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.rules_empty_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = onAddRule,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(0.72f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.rules_add_rule))
+            }
+        }
     }
 }

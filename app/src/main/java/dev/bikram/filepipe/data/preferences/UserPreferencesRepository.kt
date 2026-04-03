@@ -1,6 +1,8 @@
 package dev.bikram.filepipe.data.preferences
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -10,6 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import dev.bikram.filepipe.domain.export.SettingsBackupDto
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -22,12 +25,20 @@ private val Context.userPreferencesDataStore: DataStore<Preferences> by preferen
 private object PrefKeys {
     val THEME_MODE = stringPreferencesKey("theme_mode")
     val USE_MATERIAL_YOU = booleanPreferencesKey("use_material_you")
+    val COLOR_SOURCE = stringPreferencesKey("color_source")
+    val THEME_PALETTE_STYLE = stringPreferencesKey("theme_palette_style")
     val EXPORT_FOLDER_URI = stringPreferencesKey("export_folder_uri")
     val AUTO_EXPORT_ON_CHANGE = booleanPreferencesKey("auto_export_on_change")
     val SCHEDULED_EXPORT = booleanPreferencesKey("scheduled_export_enabled")
     val LOG_RETENTION_DAYS = intPreferencesKey("log_retention_days")
     val SWIPE_START_TO_END = stringPreferencesKey("swipe_start_to_end")
     val SWIPE_END_TO_START = stringPreferencesKey("swipe_end_to_start")
+    val BOOKMARKED_FOLDERS = stringPreferencesKey("bookmarked_folders")
+    val HAS_SEEN_INTRO = booleanPreferencesKey("has_seen_intro")
+    val HAPTIC_FEEDBACK = booleanPreferencesKey("haptic_feedback_enabled")
+    val PROGRESSIVE_BLUR = booleanPreferencesKey("progressive_blur_enabled")
+    val AUTO_CHECK_UPDATES = booleanPreferencesKey("auto_check_for_updates")
+    val USE_GRADIENT_BACKGROUND = booleanPreferencesKey("use_gradient_background")
 }
 
 @Singleton
@@ -45,23 +56,42 @@ class UserPreferencesRepository @Inject constructor(
             parsedMode != null -> parsedMode
             else -> AppThemeMode.SYSTEM
         }
-        val useMaterialYou = when {
-            legacyMaterialYou -> true
-            else -> prefs[PrefKeys.USE_MATERIAL_YOU] ?: false
+        val storedColorSource = prefs[PrefKeys.COLOR_SOURCE]?.let { raw ->
+            runCatching { AppColorSource.valueOf(raw) }.getOrNull()
         }
+        val colorSource = storedColorSource ?: when {
+            legacyMaterialYou -> AppColorSource.MATERIAL_YOU
+            else -> {
+                val legacyToggle = prefs[PrefKeys.USE_MATERIAL_YOU] ?: true
+                if (legacyToggle) AppColorSource.MATERIAL_YOU else AppColorSource.DEFAULT
+            }
+        }
+        val themePaletteStyle = prefs[PrefKeys.THEME_PALETTE_STYLE]?.let { raw ->
+            runCatching { ThemePaletteStyle.valueOf(raw) }.getOrNull()
+        } ?: ThemePaletteStyle.TONAL_SPOT
         AppPreferences(
             themeMode = themeMode,
-            useMaterialYou = useMaterialYou,
+            colorSource = colorSource,
+            themePaletteStyle = themePaletteStyle,
             exportFolderUri = prefs[PrefKeys.EXPORT_FOLDER_URI].orEmpty(),
             autoExportOnRuleChange = prefs[PrefKeys.AUTO_EXPORT_ON_CHANGE] ?: false,
             scheduledExportEnabled = prefs[PrefKeys.SCHEDULED_EXPORT] ?: false,
             logRetentionDays = prefs[PrefKeys.LOG_RETENTION_DAYS] ?: 30,
             swipeStartToEnd = prefs[PrefKeys.SWIPE_START_TO_END]
                 ?.let { runCatching { SwipeAction.valueOf(it) }.getOrNull() }
-                ?: SwipeAction.DUPLICATE,
+                ?: SwipeAction.EDIT,
             swipeEndToStart = prefs[PrefKeys.SWIPE_END_TO_START]
                 ?.let { runCatching { SwipeAction.valueOf(it) }.getOrNull() }
-                ?: SwipeAction.DELETE
+                ?: SwipeAction.DELETE,
+            bookmarkedFolders = prefs[PrefKeys.BOOKMARKED_FOLDERS]
+                ?.split("|")
+                ?.filter { it.isNotBlank() }
+                ?: emptyList(),
+            hasSeenIntro = prefs[PrefKeys.HAS_SEEN_INTRO] ?: false,
+            hapticFeedbackEnabled = prefs[PrefKeys.HAPTIC_FEEDBACK] ?: true,
+            progressiveBlurEnabled = prefs[PrefKeys.PROGRESSIVE_BLUR] ?: true,
+            autoCheckForUpdates = prefs[PrefKeys.AUTO_CHECK_UPDATES] ?: true,
+            useGradientBackground = prefs[PrefKeys.USE_GRADIENT_BACKGROUND] ?: true
         )
     }
 
@@ -71,8 +101,15 @@ class UserPreferencesRepository @Inject constructor(
         dataStore.edit { it[PrefKeys.THEME_MODE] = mode.name }
     }
 
-    suspend fun setUseMaterialYou(enabled: Boolean) {
-        dataStore.edit { it[PrefKeys.USE_MATERIAL_YOU] = enabled }
+    suspend fun setColorSource(source: AppColorSource) {
+        dataStore.edit { prefs ->
+            prefs[PrefKeys.COLOR_SOURCE] = source.name
+            prefs.remove(PrefKeys.USE_MATERIAL_YOU)
+        }
+    }
+
+    suspend fun setThemePaletteStyle(style: ThemePaletteStyle) {
+        dataStore.edit { it[PrefKeys.THEME_PALETTE_STYLE] = style.name }
     }
 
     suspend fun setExportFolderUri(uriString: String) {
@@ -97,5 +134,102 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun setSwipeEndToStart(action: SwipeAction) {
         dataStore.edit { it[PrefKeys.SWIPE_END_TO_START] = action.name }
+    }
+
+    suspend fun addBookmark(path: String) {
+        dataStore.edit { prefs ->
+            val current = prefs[PrefKeys.BOOKMARKED_FOLDERS]?.split("|")?.filter { it.isNotBlank() } ?: emptyList()
+            if (path !in current) {
+                prefs[PrefKeys.BOOKMARKED_FOLDERS] = (current + path).joinToString("|")
+            }
+        }
+    }
+
+    suspend fun removeBookmark(path: String) {
+        dataStore.edit { prefs ->
+            val current = prefs[PrefKeys.BOOKMARKED_FOLDERS]?.split("|")?.filter { it.isNotBlank() } ?: emptyList()
+            prefs[PrefKeys.BOOKMARKED_FOLDERS] = current.filter { it != path }.joinToString("|")
+        }
+    }
+
+    suspend fun markIntroSeen() {
+        dataStore.edit { it[PrefKeys.HAS_SEEN_INTRO] = true }
+    }
+
+    suspend fun setHapticFeedbackEnabled(enabled: Boolean) {
+        dataStore.edit { it[PrefKeys.HAPTIC_FEEDBACK] = enabled }
+    }
+
+    suspend fun setProgressiveBlurEnabled(enabled: Boolean) {
+        dataStore.edit { it[PrefKeys.PROGRESSIVE_BLUR] = enabled }
+    }
+
+    suspend fun setAutoCheckForUpdates(enabled: Boolean) {
+        dataStore.edit { it[PrefKeys.AUTO_CHECK_UPDATES] = enabled }
+    }
+
+    suspend fun setUseGradientBackground(enabled: Boolean) {
+        dataStore.edit { it[PrefKeys.USE_GRADIENT_BACKGROUND] = enabled }
+    }
+
+    suspend fun applySettingsFromBackup(dto: SettingsBackupDto) {
+        val exportUriString = dto.exportFolderUri
+        if (exportUriString.startsWith("content://")) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    Uri.parse(exportUriString),
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                )
+            }
+        }
+        dataStore.edit { prefs ->
+            val themeMode = runCatching { AppThemeMode.valueOf(dto.themeMode) }.getOrDefault(AppThemeMode.SYSTEM)
+            prefs[PrefKeys.THEME_MODE] = themeMode.name
+
+            val parsedColorSource = dto.colorSource?.let { raw ->
+                runCatching { AppColorSource.valueOf(raw) }.getOrNull()
+            }
+            when {
+                parsedColorSource != null -> {
+                    prefs[PrefKeys.COLOR_SOURCE] = parsedColorSource.name
+                    prefs.remove(PrefKeys.USE_MATERIAL_YOU)
+                }
+                dto.useMaterialYou == true -> {
+                    prefs.remove(PrefKeys.COLOR_SOURCE)
+                    prefs[PrefKeys.USE_MATERIAL_YOU] = true
+                }
+                dto.useMaterialYou == false -> {
+                    prefs.remove(PrefKeys.COLOR_SOURCE)
+                    prefs[PrefKeys.USE_MATERIAL_YOU] = false
+                }
+            }
+
+            dto.themePaletteStyle?.let { raw ->
+                runCatching { ThemePaletteStyle.valueOf(raw) }.getOrNull()?.let { style ->
+                    prefs[PrefKeys.THEME_PALETTE_STYLE] = style.name
+                }
+            }
+
+            prefs[PrefKeys.EXPORT_FOLDER_URI] = exportUriString
+            prefs[PrefKeys.AUTO_EXPORT_ON_CHANGE] = dto.autoExportOnRuleChange
+            prefs[PrefKeys.SCHEDULED_EXPORT] = dto.scheduledExportEnabled
+            prefs[PrefKeys.LOG_RETENTION_DAYS] = dto.logRetentionDays
+
+            runCatching { SwipeAction.valueOf(dto.swipeStartToEnd) }.getOrNull()?.let { action ->
+                prefs[PrefKeys.SWIPE_START_TO_END] = action.name
+            }
+            runCatching { SwipeAction.valueOf(dto.swipeEndToStart) }.getOrNull()?.let { action ->
+                prefs[PrefKeys.SWIPE_END_TO_START] = action.name
+            }
+
+            prefs[PrefKeys.BOOKMARKED_FOLDERS] =
+                dto.bookmarkedFolders.filter { it.isNotBlank() }.joinToString("|")
+
+            prefs[PrefKeys.HAS_SEEN_INTRO] = dto.hasSeenIntro
+            prefs[PrefKeys.HAPTIC_FEEDBACK] = dto.hapticFeedbackEnabled
+            prefs[PrefKeys.PROGRESSIVE_BLUR] = dto.progressiveBlurEnabled
+            prefs[PrefKeys.AUTO_CHECK_UPDATES] = dto.autoCheckForUpdates
+            prefs[PrefKeys.USE_GRADIENT_BACKGROUND] = dto.useGradientBackground
+        }
     }
 }

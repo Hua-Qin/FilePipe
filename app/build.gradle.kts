@@ -43,8 +43,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "dev.bikram.filepipe"
         minSdk = 30
         targetSdk = 36
-        versionCode = 100
-        versionName = "1.0.0"
+        versionCode = 200
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -83,6 +83,27 @@ extensions.configure<ApplicationExtension>("android") {
 
     buildFeatures {
         compose = true
+        buildConfig = true
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("github") {
+            dimension = "distribution"
+            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
+        }
+        create("playstore") {
+            dimension = "distribution"
+            buildConfigField("String", "GITHUB_REPO", "\"\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "true")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
+        }
     }
 
     lint {
@@ -100,7 +121,7 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
-    implementation(libs.compose.material3)
+    implementation("androidx.compose.material3:material3:1.5.0-alpha16")
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.material.icons.extended)
     debugImplementation(libs.compose.ui.tooling)
@@ -121,7 +142,12 @@ dependencies {
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.room.paging)
     ksp(libs.room.compiler)
+
+    // Paging 3
+    implementation(libs.paging.runtime)
+    implementation(libs.paging.compose)
 
     // WorkManager + Hilt integration
     implementation(libs.work.runtime.ktx)
@@ -143,4 +169,9 @@ dependencies {
     implementation(libs.documentfile)
 
     implementation(libs.datastore.preferences)
+
+    implementation(libs.material.kolor)
+
+    add("playstoreImplementation", "com.google.android.play:app-update:2.1.0")
+    add("playstoreImplementation", "com.google.android.play:app-update-ktx:2.1.0")
 }

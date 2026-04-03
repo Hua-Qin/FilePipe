@@ -1,21 +1,31 @@
 package dev.bikram.filepipe.domain.export
 
+import dev.bikram.filepipe.data.preferences.AppColorSource
+import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.domain.model.ConflictPolicy
+import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleSchedule
+import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.ScheduleType
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Serializable
-data class RulesBackup(
-    val version: Int = 3,
+data class AppBackup(
+    val version: Int = 6,
     val exportedAtMillis: Long = System.currentTimeMillis(),
-    val rules: List<RuleBackupDto>
+    val rules: List<RuleBackupDto>,
+    val history: List<RunHistoryBackupDto> = emptyList(),
+    val settings: SettingsBackupDto? = null
 )
+
+/** Kept for backward compatibility - parsed the same as AppBackup */
+typealias RulesBackup = AppBackup
 
 @Serializable
 data class RuleBackupDto(
@@ -28,7 +38,14 @@ data class RuleBackupDto(
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
     val scanSubdirectories: Boolean = false,
-    val iconKey: String = RuleIcon.DEFAULT.name
+    val iconKey: String = RuleIcon.DEFAULT.name,
+    val iconEmoji: String? = null,
+    val filenamePattern: String? = null,
+    val minFileSizeBytes: Long? = null,
+    val maxFileSizeBytes: Long? = null,
+    val minAgeDays: Int? = null,
+    val maxAgeDays: Int? = null,
+    val excludePatterns: List<String> = emptyList()
 )
 
 @Serializable
@@ -36,7 +53,54 @@ data class ScheduleBackupDto(
     val type: String,
     val dayOfWeek: Int? = null,
     val hour: Int,
-    val minute: Int
+    val minute: Int,
+    val intervalHours: Int? = null
+)
+
+@Serializable
+data class RunHistoryBackupDto(
+    val ruleName: String,
+    val triggeredBy: String,
+    val startedAt: Long,
+    val completedAt: Long? = null,
+    val status: String,
+    val totalFilesMoved: Int,
+    val totalFilesFailed: Int,
+    val errorMessage: String? = null,
+    val isReversed: Boolean = false,
+    val files: List<FileMovedBackupDto> = emptyList()
+)
+
+@Serializable
+data class FileMovedBackupDto(
+    val fileName: String,
+    val sourceUri: String,
+    val destinationUri: String,
+    val fileSizeBytes: Long,
+    val movedAt: Long,
+    val success: Boolean,
+    val skipped: Boolean = false,
+    val errorMessage: String? = null
+)
+
+@Serializable
+data class SettingsBackupDto(
+    val themeMode: String,
+    val colorSource: String? = null,
+    val themePaletteStyle: String? = null,
+    val useMaterialYou: Boolean? = null,
+    val exportFolderUri: String = "",
+    val autoExportOnRuleChange: Boolean = false,
+    val scheduledExportEnabled: Boolean = false,
+    val logRetentionDays: Int = 30,
+    val swipeStartToEnd: String = SwipeAction.EDIT.name,
+    val swipeEndToStart: String = SwipeAction.DELETE.name,
+    val bookmarkedFolders: List<String> = emptyList(),
+    val hasSeenIntro: Boolean = false,
+    val hapticFeedbackEnabled: Boolean = true,
+    val progressiveBlurEnabled: Boolean = true,
+    val autoCheckForUpdates: Boolean = true,
+    val useGradientBackground: Boolean = true
 )
 
 private val jsonFormatter = Json {
@@ -54,14 +118,65 @@ fun Rule.toBackupDto(): RuleBackupDto = RuleBackupDto(
     conflictPolicy = conflictPolicy.name,
     operationMode = operationMode.name,
     scanSubdirectories = scanSubdirectories,
-    iconKey = icon.name
+    iconKey = icon.name,
+    iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
+    filenamePattern = filenamePattern,
+    minFileSizeBytes = minFileSizeBytes,
+    maxFileSizeBytes = maxFileSizeBytes,
+    minAgeDays = minAgeDays,
+    maxAgeDays = maxAgeDays,
+    excludePatterns = excludePatterns
 )
 
 fun RuleSchedule.toBackupDto(): ScheduleBackupDto = ScheduleBackupDto(
     type = type.name,
     dayOfWeek = dayOfWeek,
     hour = hour,
-    minute = minute
+    minute = minute,
+    intervalHours = intervalHours
+)
+
+fun RunHistory.toBackupDto(files: List<FileMoved> = emptyList()): RunHistoryBackupDto = RunHistoryBackupDto(
+    ruleName = ruleName,
+    triggeredBy = triggeredBy.name,
+    startedAt = startedAt,
+    completedAt = completedAt,
+    status = status.name,
+    totalFilesMoved = totalFilesMoved,
+    totalFilesFailed = totalFilesFailed,
+    errorMessage = errorMessage,
+    isReversed = isReversed,
+    files = files.map { it.toBackupDto() }
+)
+
+fun FileMoved.toBackupDto(): FileMovedBackupDto = FileMovedBackupDto(
+    fileName = fileName,
+    sourceUri = sourceUri,
+    destinationUri = destinationUri,
+    fileSizeBytes = fileSizeBytes,
+    movedAt = movedAt,
+    success = success,
+    skipped = skipped,
+    errorMessage = errorMessage
+)
+
+fun AppPreferences.toBackupDto(): SettingsBackupDto = SettingsBackupDto(
+    themeMode = themeMode.name,
+    colorSource = colorSource.name,
+    themePaletteStyle = themePaletteStyle.name,
+    useMaterialYou = if (colorSource == AppColorSource.MATERIAL_YOU) true else false,
+    exportFolderUri = exportFolderUri,
+    autoExportOnRuleChange = autoExportOnRuleChange,
+    scheduledExportEnabled = scheduledExportEnabled,
+    logRetentionDays = logRetentionDays,
+    swipeStartToEnd = swipeStartToEnd.name,
+    swipeEndToStart = swipeEndToStart.name,
+    bookmarkedFolders = bookmarkedFolders,
+    hasSeenIntro = hasSeenIntro,
+    hapticFeedbackEnabled = hapticFeedbackEnabled,
+    progressiveBlurEnabled = progressiveBlurEnabled,
+    autoCheckForUpdates = autoCheckForUpdates,
+    useGradientBackground = useGradientBackground
 )
 
 fun RuleBackupDto.toDomain(): Rule = Rule(
@@ -75,7 +190,14 @@ fun RuleBackupDto.toDomain(): Rule = Rule(
     conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
     operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),
     scanSubdirectories = scanSubdirectories,
-    icon = RuleIcon.fromStored(iconKey)
+    icon = RuleIcon.fromStored(iconKey),
+    iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
+    filenamePattern = filenamePattern,
+    minFileSizeBytes = minFileSizeBytes,
+    maxFileSizeBytes = maxFileSizeBytes,
+    minAgeDays = minAgeDays,
+    maxAgeDays = maxAgeDays,
+    excludePatterns = excludePatterns
 )
 
 fun ScheduleBackupDto.toDomain(): RuleSchedule? {
@@ -84,18 +206,28 @@ fun ScheduleBackupDto.toDomain(): RuleSchedule? {
         type = scheduleType,
         dayOfWeek = dayOfWeek,
         hour = hour,
-        minute = minute
+        minute = minute,
+        intervalHours = intervalHours
     )
 }
 
-fun buildRulesBackupJson(rules: List<Rule>): String {
-    val backup = RulesBackup(
+fun buildAppBackupJson(
+    rules: List<Rule>,
+    history: List<Pair<RunHistory, List<FileMoved>>> = emptyList(),
+    settings: AppPreferences? = null
+): String {
+    val backup = AppBackup(
         exportedAtMillis = System.currentTimeMillis(),
-        rules = rules.map { it.toBackupDto() }
+        rules = rules.map { it.toBackupDto() },
+        history = history.map { (run, files) -> run.toBackupDto(files) },
+        settings = settings?.toBackupDto()
     )
     return jsonFormatter.encodeToString(backup)
 }
 
-fun parseRulesBackupJson(text: String): Result<RulesBackup> = runCatching {
-    jsonFormatter.decodeFromString<RulesBackup>(text)
+/** Kept for backward compatibility */
+fun buildRulesBackupJson(rules: List<Rule>): String = buildAppBackupJson(rules)
+
+fun parseRulesBackupJson(text: String): Result<AppBackup> = runCatching {
+    jsonFormatter.decodeFromString<AppBackup>(text)
 }

@@ -6,8 +6,10 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dev.bikram.filepipe.domain.model.Rule
+import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.worker.FileOrganizerWorker
+import dev.bikram.filepipe.worker.RunAllScheduledRulesWorker
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -31,18 +33,23 @@ class ScheduleRulesUseCase @Inject constructor(
             .setRequiresBatteryNotLow(true)
             .build()
 
-        val periodDays = when (schedule.type) {
-            ScheduleType.DAILY -> 1L
-            ScheduleType.WEEKLY -> 7L
+        val delayMs = when (schedule.type) {
+            ScheduleType.EVERY_N_HOURS -> 0L
+            else -> calculateDelayUntilNextRun(
+                schedule.hour,
+                schedule.minute,
+                if (schedule.type == ScheduleType.WEEKLY) schedule.dayOfWeek else null
+            )
         }
 
-        val delayMs = calculateDelayUntilNextRun(
-            schedule.hour,
-            schedule.minute,
-            if (schedule.type == ScheduleType.WEEKLY) schedule.dayOfWeek else null
-        )
-
-        val request = PeriodicWorkRequestBuilder<FileOrganizerWorker>(periodDays, TimeUnit.DAYS)
+        val request = when (schedule.type) {
+            ScheduleType.EVERY_N_HOURS -> {
+                val hours = schedule.intervalHours?.toLong()?.coerceIn(1L, 24L) ?: 1L
+                PeriodicWorkRequestBuilder<FileOrganizerWorker>(hours, TimeUnit.HOURS)
+            }
+            ScheduleType.DAILY -> PeriodicWorkRequestBuilder<FileOrganizerWorker>(1L, TimeUnit.DAYS)
+            ScheduleType.WEEKLY -> PeriodicWorkRequestBuilder<FileOrganizerWorker>(7L, TimeUnit.DAYS)
+        }
             .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
             .setInputData(inputData)
             .addTag(tag)
@@ -64,7 +71,66 @@ class ScheduleRulesUseCase @Inject constructor(
         workManager.cancelAllWorkByTag(workTagFor(ruleId))
     }
 
+    /**
+     * Batch-schedules a list of enabled rules by grouping rules that share an identical schedule
+     * configuration into a single [RunAllScheduledRulesWorker] periodic request.
+     *
+     * Rules with unique schedules still get their own worker, but rules that would otherwise
+     * fire at the same time are coalesced into one foreground service pass — reducing wake-lock
+     * overhead and notification noise when many rules share the same schedule.
+     *
+     * Existing per-rule workers for all provided rules are cancelled before the batch workers
+     * are enqueued.
+     */
+    fun scheduleCoalesced(rules: List<Rule>) {
+        val enabled = rules.filter { it.isEnabled && it.schedule != null }
+        // Cancel existing per-rule workers first
+        enabled.forEach { cancelRule(it) }
+
+        val constraints = Constraints.Builder().setRequiresBatteryNotLow(true).build()
+
+        enabled
+            .groupBy { scheduleKey(it.schedule!!) }
+            .forEach { (_, group) ->
+                val schedule = group.first().schedule!!
+                val delayMs = when (schedule.type) {
+                    ScheduleType.EVERY_N_HOURS -> 0L
+                    else -> calculateDelayUntilNextRun(
+                        schedule.hour,
+                        schedule.minute,
+                        if (schedule.type == ScheduleType.WEEKLY) schedule.dayOfWeek else null
+                    )
+                }
+                val ruleIds = group.map { it.id }.toLongArray()
+                val inputData = workDataOf(RunAllScheduledRulesWorker.KEY_RULE_IDS to ruleIds)
+                val batchTag = batchTagFor(ruleIds)
+
+                val request = when (schedule.type) {
+                    ScheduleType.EVERY_N_HOURS -> {
+                        val hours = schedule.intervalHours?.toLong()?.coerceIn(1L, 24L) ?: 1L
+                        PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(hours, java.util.concurrent.TimeUnit.HOURS)
+                    }
+                    ScheduleType.DAILY -> PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(1L, java.util.concurrent.TimeUnit.DAYS)
+                    ScheduleType.WEEKLY -> PeriodicWorkRequestBuilder<RunAllScheduledRulesWorker>(7L, java.util.concurrent.TimeUnit.DAYS)
+                }
+                    .setInitialDelay(delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .setInputData(inputData)
+                    .addTag(batchTag)
+                    .setConstraints(constraints)
+                    .build()
+
+                workManager.enqueueUniquePeriodicWork(
+                    batchTag,
+                    ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
+                    request
+                )
+            }
+    }
+
     private fun workTagFor(ruleId: Long) = "rule_$ruleId"
+    private fun batchTagFor(ruleIds: LongArray) = "batch_${ruleIds.sorted().joinToString("_")}"
+    private fun scheduleKey(schedule: RuleSchedule): String =
+        "${schedule.type}_${schedule.hour}_${schedule.minute}_${schedule.dayOfWeek}_${schedule.intervalHours}"
 
     private fun calculateDelayUntilNextRun(hour: Int, minute: Int, dayOfWeek: Int?): Long {
         val now = Calendar.getInstance()

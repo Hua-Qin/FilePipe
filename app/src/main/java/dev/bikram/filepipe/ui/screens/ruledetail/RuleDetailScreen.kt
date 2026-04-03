@@ -4,8 +4,10 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -15,17 +17,25 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
@@ -47,24 +57,26 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toShape
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.MultiChoiceSegmentedButtonRow
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -74,12 +86,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RuleIcon
@@ -87,11 +108,30 @@ import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.components.FileExtensionChips
 import dev.bikram.filepipe.ui.components.FolderPickerButton
+import dev.bikram.filepipe.ui.components.RuleIconEmojiPresets
+import dev.bikram.filepipe.ui.components.RuleIconOrEmoji
 import dev.bikram.filepipe.ui.components.ScheduleDialog
-import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
-import dev.bikram.filepipe.ui.components.safTreeUriToPath
 import dev.bikram.filepipe.ui.components.toImageVector
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
+import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
+import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ToggleButton
+import androidx.compose.ui.text.input.KeyboardType
 
 private val SectionButtonShape = RoundedCornerShape(12.dp)
 
@@ -162,7 +202,11 @@ private fun RuleSectionCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalLayoutApi::class,
+    ExperimentalMaterial3ExpressiveApi::class
+)
 @Composable
 fun RuleDetailScreen(
     onNavigateBack: () -> Unit,
@@ -172,33 +216,44 @@ fun RuleDetailScreen(
     val isDirty by viewModel.isDirty.collectAsStateWithLifecycle()
     var showScheduleDialog by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
-    var showTemplateSheet by remember { mutableStateOf(viewModel.isNewRule) }
-    var ruleIconMenuExpanded by remember { mutableStateOf(false) }
+    var showTemplateSheet by remember { mutableStateOf(viewModel.showInitialTemplatePicker) }
+    var showRuleIconSheet by remember { mutableStateOf(false) }
+    var customEmojiDraft by remember { mutableStateOf("") }
     val previewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val playTap = rememberPlayTapSound()
+    val bookmarkedFolders by viewModel.bookmarkedFolders.collectAsStateWithLifecycle()
+    var advancedExpanded by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
 
     var pendingFolderPick by remember { mutableStateOf<FolderPickIntent?>(null) }
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
-        val pickedPath = uri?.let { safTreeUriToPath(it) }
-        if (pickedPath == null) {
+        val pending = pendingFolderPick
+        if (uri == null) {
             pendingFolderPick = null
             return@rememberLauncherForActivityResult
         }
-        when (val pending = pendingFolderPick) {
-            FolderPickIntent.AddSource -> viewModel.addSourceFolder(pickedPath)
+        // Persist the grant so it survives reboots
+        context.contentResolver.takePersistableUriPermission(
+            uri,
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        )
+        val uriString = uri.toString()
+        when (pending) {
+            FolderPickIntent.AddSource -> viewModel.addSourceFolder(uriString)
             is FolderPickIntent.ReplaceSource ->
-                viewModel.replaceSourceFolder(pending.previousPath, pickedPath)
-            FolderPickIntent.SetDestination -> viewModel.setDestination(pickedPath)
+                viewModel.replaceSourceFolder(pending.previousPath, uriString)
+            FolderPickIntent.SetDestination -> viewModel.setDestination(uriString)
             null -> {}
         }
         pendingFolderPick = null
     }
 
-    fun launchFolderPicker(intent: FolderPickIntent, initialAbsolutePath: String?) {
+    fun launchFolderPicker(intent: FolderPickIntent, initialPath: String?) {
         pendingFolderPick = intent
-        folderPickerLauncher.launch(initialAbsolutePath?.let { absoluteStoragePathToOpenTreeInitialUri(it) })
+        folderPickerLauncher.launch(initialPath?.let { absoluteStoragePathToOpenTreeInitialUri(it) })
     }
 
     fun withTapSound(action: () -> Unit) {
@@ -208,6 +263,14 @@ fun RuleDetailScreen(
 
     LaunchedEffect(state.isSaved) {
         if (state.isSaved) onNavigateBack()
+    }
+
+    LaunchedEffect(state.removedRedundantFolders) {
+        if (state.removedRedundantFolders.isNotEmpty()) {
+            val names = state.removedRedundantFolders.joinToString(", ") { it.substringAfterLast('/') }
+            snackbarHostState.showSnackbar("Removed redundant subfolder(s): $names")
+            viewModel.dismissRedundantFolderNotice()
+        }
     }
 
     fun tryNavigateBack() {
@@ -220,70 +283,55 @@ fun RuleDetailScreen(
 
     BackHandler(onBack = ::tryNavigateBack)
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(if (viewModel.isNewRule) stringResource(R.string.new_rule) else stringResource(R.string.edit_rule)) },
-                navigationIcon = {
-                    IconButton(onClick = { withTapSound(::tryNavigateBack) }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { withTapSound { viewModel.loadPreview() } },
-                        enabled = state.sourceFolderPaths.isNotEmpty() && state.fileExtensions.isNotEmpty()
-                    ) {
-                        Icon(Icons.Default.Visibility, contentDescription = stringResource(R.string.preview_rule))
-                    }
-                }
-            )
-        },
-        bottomBar = {
-            if (!state.isLoading) {
-                Surface(tonalElevation = 3.dp) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { withTapSound(::tryNavigateBack) },
-                            modifier = Modifier.weight(1f),
-                            shape = PillShape
-                        ) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                        Button(
-                            onClick = { withTapSound { viewModel.save() } },
-                            modifier = Modifier.weight(1f),
-                            shape = PillShape
-                        ) {
-                            Text(stringResource(R.string.save))
-                        }
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
-        if (state.isLoading) {
-            Column(
-                Modifier.fillMaxSize().padding(innerPadding),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) { CircularProgressIndicator() }
-            return@Scaffold
-        }
+    val scrollState = rememberScrollState()
+    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val topContentPadding = statusTop + 64.dp
+    val bottomContentPadding = navBottom + 88.dp
+    val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer() ?: Modifier
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(
+                if (LocalUseGradientBackground.current) Modifier
+                else Modifier.background(MaterialTheme.colorScheme.background)
+            )
+    ) {
+        if (state.isLoading) {
+            CircularProgressIndicator(Modifier.align(Alignment.Center))
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(fullBleedBlurModifier)
+            ) {
+                val scheme = MaterialTheme.colorScheme
+                if (LocalUseGradientBackground.current) {
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(scheme.surface)
+                            .background(
+                                Brush.verticalGradient(
+                                    colorStops = arrayOf(
+                                        0f to scheme.primaryContainer.copy(alpha = 0.45f),
+                                        0.55f to scheme.surface.copy(alpha = 0f)
+                                    )
+                                )
+                            )
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize().background(scheme.background))
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+            Spacer(Modifier.height(topContentPadding))
             if (state.errors.isNotEmpty()) {
                 state.errors.forEach { error ->
                     Text(
@@ -299,44 +347,22 @@ fun RuleDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box {
-                    FilledTonalIconButton(
-                        onClick = { withTapSound { ruleIconMenuExpanded = true } },
-                        modifier = Modifier.size(52.dp),
-                        shape = SectionButtonShape,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-                        )
-                    ) {
-                        Icon(
-                            imageVector = state.icon.toImageVector(),
-                            contentDescription = stringResource(R.string.rule_icon_picker_cd),
-                            modifier = Modifier.size(26.dp)
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = ruleIconMenuExpanded,
-                        onDismissRequest = { ruleIconMenuExpanded = false },
-                        modifier = Modifier.heightIn(max = 360.dp)
-                    ) {
-                        RuleIcon.entries.forEach { iconOption ->
-                            DropdownMenuItem(
-                                text = { Text(ruleIconOptionLabel(iconOption)) },
-                                onClick = {
-                                    withTapSound {
-                                        viewModel.setIcon(iconOption)
-                                        ruleIconMenuExpanded = false
-                                    }
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = iconOption.toImageVector(),
-                                        contentDescription = null
-                                    )
-                                }
-                            )
-                        }
-                    }
+                FilledTonalIconButton(
+                    onClick = { withTapSound { showRuleIconSheet = true } },
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .size(56.dp),
+                    shape = SectionButtonShape
+                ) {
+                    RuleIconOrEmoji(
+                        iconEmoji = state.iconEmoji,
+                        icon = state.icon,
+                        vectorSize = 34.dp,
+                        emojiFontSize = 32.sp,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        contentDescription = stringResource(R.string.rule_icon_picker_cd),
+                        modifier = Modifier
+                    )
                 }
                 OutlinedTextField(
                     value = state.name,
@@ -367,13 +393,14 @@ fun RuleDetailScreen(
                 icon = Icons.Filled.Search
             ) {
                 state.sourceFolderPaths.forEach { path ->
+                    val isSourceBookmarked = path in bookmarkedFolders
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = path,
+                            text = displayPath(path),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
@@ -384,21 +411,69 @@ fun RuleDetailScreen(
                                     }
                                 }
                         )
+                        IconButton(onClick = { withTapSound { viewModel.toggleBookmark(path) } }) {
+                            Icon(
+                                imageVector = if (isSourceBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                contentDescription = stringResource(R.string.bookmark_toggle_cd),
+                                modifier = Modifier.size(22.dp),
+                                tint = if (isSourceBookmarked) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         IconButton(onClick = { withTapSound { viewModel.removeSourceFolder(path) } }) {
                             Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(18.dp))
                         }
                     }
                 }
+                val unusedBookmarks = bookmarkedFolders.filter {
+                    it.startsWith("content://") && it !in state.sourceFolderPaths
+                }
+                var bookmarkDropdownExpanded by remember { mutableStateOf(false) }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FolderPickerButton(
                         label = stringResource(R.string.add_source_folder),
                         onClick = { launchFolderPicker(FolderPickIntent.AddSource, null) },
                         modifier = Modifier.weight(1f)
                     )
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { if (unusedBookmarks.isNotEmpty()) bookmarkDropdownExpanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = SectionButtonShape,
+                            enabled = unusedBookmarks.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Bookmark,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text("  ${stringResource(R.string.bookmarks_choose)}")
+                        }
+                        DropdownMenu(
+                            expanded = bookmarkDropdownExpanded,
+                            onDismissRequest = { bookmarkDropdownExpanded = false }
+                        ) {
+                            unusedBookmarks.forEach { bookmarkPath ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = displayPath(bookmarkPath),
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    },
+                                    onClick = {
+                                        withTapSound {
+                                            viewModel.addSourceFolder(bookmarkPath)
+                                            bookmarkDropdownExpanded = false
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -424,33 +499,96 @@ fun RuleDetailScreen(
                 icon = Icons.Filled.FolderSpecial
             ) {
                 if (state.destinationFolderPath.isNotBlank()) {
-                    Text(
-                        text = state.destinationFolderPath,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.clickable {
-                            withTapSound {
-                                launchFolderPicker(
-                                    FolderPickIntent.SetDestination,
-                                    state.destinationFolderPath
+                    val isDestBookmarked = state.destinationFolderPath in bookmarkedFolders
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = displayPath(state.destinationFolderPath),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    withTapSound {
+                                        launchFolderPicker(
+                                            FolderPickIntent.SetDestination,
+                                            state.destinationFolderPath
+                                        )
+                                    }
+                                }
+                        )
+                        IconButton(onClick = { withTapSound { viewModel.toggleBookmark(state.destinationFolderPath) } }) {
+                            Icon(
+                                imageVector = if (isDestBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                contentDescription = stringResource(R.string.bookmark_toggle_cd),
+                                modifier = Modifier.size(22.dp),
+                                tint = if (isDestBookmarked) MaterialTheme.colorScheme.primary
+                                       else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+                val unusedDestBookmarks = bookmarkedFolders.filter {
+                    it.startsWith("content://") && it != state.destinationFolderPath
+                }
+                var destBookmarkDropdownExpanded by remember { mutableStateOf(false) }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    FolderPickerButton(
+                        label = if (state.destinationFolderPath.isBlank()) {
+                            stringResource(R.string.pick_folder)
+                        } else {
+                            stringResource(R.string.change_destination)
+                        },
+                        onClick = {
+                            launchFolderPicker(
+                                FolderPickIntent.SetDestination,
+                                state.destinationFolderPath.takeIf { it.isNotBlank() }
+                            )
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { if (unusedDestBookmarks.isNotEmpty()) destBookmarkDropdownExpanded = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = SectionButtonShape,
+                            enabled = unusedDestBookmarks.isNotEmpty()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Bookmark,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text("  ${stringResource(R.string.bookmarks_choose)}")
+                        }
+                        DropdownMenu(
+                            expanded = destBookmarkDropdownExpanded,
+                            onDismissRequest = { destBookmarkDropdownExpanded = false }
+                        ) {
+                            unusedDestBookmarks.forEach { bookmarkPath ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = displayPath(bookmarkPath),
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                    },
+                                    onClick = {
+                                        withTapSound {
+                                            viewModel.setDestination(bookmarkPath)
+                                            destBookmarkDropdownExpanded = false
+                                        }
+                                    }
                                 )
                             }
                         }
-                    )
-                }
-                FolderPickerButton(
-                    label = if (state.destinationFolderPath.isBlank()) {
-                        stringResource(R.string.pick_folder)
-                    } else {
-                        stringResource(R.string.change_destination)
-                    },
-                    onClick = {
-                        launchFolderPicker(
-                            FolderPickIntent.SetDestination,
-                            state.destinationFolderPath.takeIf { it.isNotBlank() }
-                        )
                     }
-                )
+                }
             }
 
             RuleSectionCard(
@@ -462,21 +600,27 @@ fun RuleDetailScreen(
                     text = stringResource(R.string.rule_operation_mode_label),
                     style = MaterialTheme.typography.bodyMedium
                 )
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                @Suppress("DEPRECATION")
+                ButtonGroup(modifier = Modifier.fillMaxWidth()) {
                     OperationMode.entries.forEachIndexed { index, mode ->
-                        SegmentedButton(
-                            selected = state.operationMode == mode,
-                            onClick = { withTapSound { viewModel.setOperationMode(mode) } },
-                            shape = SegmentedButtonDefaults.itemShape(index, OperationMode.entries.size),
-                            label = {
-                                Text(
-                                    when (mode) {
-                                        OperationMode.MOVE -> stringResource(R.string.operation_move)
-                                        OperationMode.COPY -> stringResource(R.string.operation_copy)
-                                    }
-                                )
-                            }
-                        )
+                        val shapes = when (index) {
+                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            OperationMode.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        }
+                        ToggleButton(
+                            checked = state.operationMode == mode,
+                            onCheckedChange = { withTapSound { viewModel.setOperationMode(mode) } },
+                            shapes = shapes,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                when (mode) {
+                                    OperationMode.MOVE -> stringResource(R.string.operation_move)
+                                    OperationMode.COPY -> stringResource(R.string.operation_copy)
+                                }
+                            )
+                        }
                     }
                 }
 
@@ -486,23 +630,29 @@ fun RuleDetailScreen(
                     text = stringResource(R.string.rule_conflict_policy_label),
                     style = MaterialTheme.typography.bodyMedium
                 )
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                @Suppress("DEPRECATION")
+                ButtonGroup(modifier = Modifier.fillMaxWidth()) {
                     ConflictPolicy.entries.forEachIndexed { index, policy ->
-                        SegmentedButton(
-                            selected = state.conflictPolicy == policy,
-                            onClick = { withTapSound { viewModel.setConflictPolicy(policy) } },
-                            shape = SegmentedButtonDefaults.itemShape(index, ConflictPolicy.entries.size),
-                            label = {
-                                Text(
-                                    when (policy) {
-                                        ConflictPolicy.SKIP -> stringResource(R.string.conflict_skip)
-                                        ConflictPolicy.OVERWRITE -> stringResource(R.string.conflict_overwrite)
-                                        ConflictPolicy.RENAME_SUFFIX -> stringResource(R.string.conflict_rename)
-                                    },
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
-                        )
+                        val shapes = when (index) {
+                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            ConflictPolicy.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        }
+                        ToggleButton(
+                            checked = state.conflictPolicy == policy,
+                            onCheckedChange = { withTapSound { viewModel.setConflictPolicy(policy) } },
+                            shapes = shapes,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                when (policy) {
+                                    ConflictPolicy.SKIP -> stringResource(R.string.conflict_skip)
+                                    ConflictPolicy.OVERWRITE -> stringResource(R.string.conflict_overwrite)
+                                    ConflictPolicy.RENAME_SUFFIX -> stringResource(R.string.conflict_rename)
+                                },
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
                     }
                 }
             }
@@ -521,6 +671,8 @@ fun RuleDetailScreen(
                             val dayName = schedule.dayOfWeek?.let { days.getOrNull(it - 2) } ?: "?"
                             "Weekly ($dayName) at %02d:%02d".format(schedule.hour, schedule.minute)
                         }
+                        ScheduleType.EVERY_N_HOURS ->
+                            "Every ${schedule.intervalHours ?: 1}h"
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -555,8 +707,203 @@ fun RuleDetailScreen(
                 }
             }
 
-            Spacer(Modifier.height(32.dp))
+            // Advanced filters section
+            val hasAdvancedFilters = state.filenamePattern.isNotBlank() ||
+                state.minFileSizeMb.isNotBlank() || state.maxFileSizeMb.isNotBlank() ||
+                state.minAgeDays.isNotBlank() || state.maxAgeDays.isNotBlank() ||
+                state.excludePatternsText.isNotBlank()
+
+            ElevatedCard(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.elevatedCardColors()
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { advancedExpanded = !advancedExpanded },
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Tune,
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            tint = if (hasAdvancedFilters) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.advanced_section_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = if (hasAdvancedFilters) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (hasAdvancedFilters && !advancedExpanded)
+                                    stringResource(R.string.advanced_section_filters_active)
+                                else
+                                    stringResource(R.string.advanced_section_subtitle),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = if (advancedExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    val advancedExpandSpec = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>()
+                    AnimatedVisibility(
+                        visible = advancedExpanded,
+                        enter = expandVertically(animationSpec = advancedExpandSpec) + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.padding(top = 16.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = state.filenamePattern,
+                                onValueChange = viewModel::setFilenamePattern,
+                                label = { Text(stringResource(R.string.advanced_filename_pattern_label)) },
+                                placeholder = { Text(stringResource(R.string.advanced_filename_pattern_placeholder)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = state.minFileSizeMb,
+                                    onValueChange = viewModel::setMinFileSizeMb,
+                                    label = { Text(stringResource(R.string.advanced_min_size_label)) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = state.maxFileSizeMb,
+                                    onValueChange = viewModel::setMaxFileSizeMb,
+                                    label = { Text(stringResource(R.string.advanced_max_size_label)) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = state.minAgeDays,
+                                    onValueChange = viewModel::setMinAgeDays,
+                                    label = { Text(stringResource(R.string.advanced_min_age_label)) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                                OutlinedTextField(
+                                    value = state.maxAgeDays,
+                                    onValueChange = viewModel::setMaxAgeDays,
+                                    label = { Text(stringResource(R.string.advanced_max_age_label)) },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+
+                            OutlinedTextField(
+                                value = state.excludePatternsText,
+                                onValueChange = viewModel::setExcludePatternsText,
+                                label = { Text(stringResource(R.string.advanced_exclude_patterns_label)) },
+                                placeholder = { Text(stringResource(R.string.advanced_exclude_placeholder)) },
+                                supportingText = { Text(stringResource(R.string.advanced_csv_hint)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(32.dp + bottomContentPadding))
+                }
+            }
         }
+
+        TopAppBar(
+            modifier = Modifier.align(Alignment.TopCenter),
+            title = { Text(if (viewModel.isNewRule) stringResource(R.string.new_rule) else stringResource(R.string.edit_rule)) },
+            navigationIcon = {
+                IconButton(onClick = { withTapSound(::tryNavigateBack) }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+            },
+            actions = {
+                IconButton(
+                    onClick = { withTapSound { viewModel.loadPreview() } },
+                    enabled = state.sourceFolderPaths.isNotEmpty() && state.fileExtensions.isNotEmpty()
+                ) {
+                    Icon(Icons.Default.Visibility, contentDescription = stringResource(R.string.preview_rule))
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent
+            )
+        )
+
+        if (!state.isLoading) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
+                color = Color.Transparent,
+                tonalElevation = 0.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { withTapSound(::tryNavigateBack) },
+                        modifier = Modifier.weight(1f),
+                        shape = PillShape
+                    ) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Button(
+                        onClick = { withTapSound { viewModel.save() } },
+                        modifier = Modifier.weight(1f),
+                        shape = PillShape
+                    ) {
+                        Text(stringResource(R.string.save))
+                    }
+                }
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(
+                    bottom = if (state.isLoading) {
+                        navBottom + 16.dp
+                    } else {
+                        navBottom + 88.dp
+                    }
+                )
+        )
     }
 
     if (showDiscardDialog) {
@@ -607,6 +954,173 @@ fun RuleDetailScreen(
         )
     }
 
+    if (showRuleIconSheet) {
+        val ruleIconSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        LaunchedEffect(showRuleIconSheet) {
+            if (showRuleIconSheet) {
+                customEmojiDraft = state.iconEmoji.orEmpty()
+            }
+        }
+        ModalBottomSheet(
+            onDismissRequest = { showRuleIconSheet = false },
+            sheetState = ruleIconSheetState
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .navigationBarsPadding()
+            ) {
+                Text(
+                    text = stringResource(R.string.rule_icon_sheet_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    text = stringResource(R.string.rule_icon_preset_section),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                val ruleIconGridCell = (maxWidth - 48.dp) / 7f
+                FlowRow(
+                    maxItemsInEachRow = 7,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    RuleIcon.entries.forEach { iconOption ->
+                        FilledTonalIconButton(
+                            onClick = {
+                                withTapSound {
+                                    viewModel.setIcon(iconOption)
+                                    showRuleIconSheet = false
+                                }
+                            },
+                            modifier = Modifier.size(ruleIconGridCell),
+                            shape = SectionButtonShape
+                        ) {
+                            Icon(
+                                imageVector = iconOption.toImageVector(),
+                                contentDescription = ruleIconOptionLabel(iconOption),
+                                modifier = Modifier.size(34.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+                } // close BoxWithConstraints for icon section
+                Text(
+                    text = stringResource(R.string.rule_icon_emoji_section),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                val customEmojiSlotDescription = stringResource(R.string.rule_icon_custom_slot_cd)
+                val emojiTextStyle = TextStyle(
+                    fontSize = 28.sp,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                val emojiCellSize = (maxWidth - 48.dp) / 7f
+                FlowRow(
+                    maxItemsInEachRow = 7,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    RuleIconEmojiPresets.forEach { emojiPreset ->
+                        Surface(
+                            onClick = {
+                                withTapSound {
+                                    viewModel.setIconEmoji(emojiPreset)
+                                    showRuleIconSheet = false
+                                }
+                            },
+                            modifier = Modifier.size(emojiCellSize),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = emojiPreset, style = emojiTextStyle)
+                            }
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier
+                            .size(emojiCellSize)
+                            .semantics { contentDescription = customEmojiSlotDescription },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    ) {
+                        BasicTextField(
+                            value = customEmojiDraft,
+                            onValueChange = { newValue ->
+                                if (newValue.isEmpty()) {
+                                    customEmojiDraft = ""
+                                } else {
+                                    val boundary = java.text.BreakIterator.getCharacterInstance()
+                                    boundary.setText(newValue)
+                                    val start = boundary.first()
+                                    val end = boundary.next()
+                                    customEmojiDraft = newValue.substring(start, end)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 6.dp, vertical = 10.dp),
+                            textStyle = emojiTextStyle.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurfaceVariant),
+                            singleLine = true,
+                            decorationBox = { innerTextField ->
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    innerTextField()
+                                }
+                            }
+                        )
+                    }
+                    val applyEmojiEnabled = customEmojiDraft.isNotBlank()
+                    Surface(
+                        onClick = {
+                            if (applyEmojiEnabled) {
+                                withTapSound {
+                                    viewModel.setIconEmoji(customEmojiDraft)
+                                    showRuleIconSheet = false
+                                }
+                            }
+                        },
+                        enabled = applyEmojiEnabled,
+                        modifier = Modifier.size(emojiCellSize),
+                        shape = MaterialShapes.Cookie12Sided.toShape(),
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = stringResource(R.string.rule_icon_apply_emoji_cd),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+                } // close BoxWithConstraints for emoji section
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+
     // Template picker — shown only for new rules, once
     if (showTemplateSheet && viewModel.isNewRule) {
         ModalBottomSheet(
@@ -620,7 +1134,7 @@ fun RuleDetailScreen(
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
                 Text(
-                    text = "Pick a starting point — you can customize everything after.",
+                    text = "Pick a starting point - you can customize everything after.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 12.dp)
@@ -646,12 +1160,17 @@ fun RuleDetailScreen(
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 modifier = Modifier.size(48.dp)
                             ) {
-                                Icon(
-                                    imageVector = template.suggestedIcon.toImageVector(),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(12.dp)
-                                )
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = template.suggestedIcon.toImageVector(),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(template.name, style = MaterialTheme.typography.titleSmall)

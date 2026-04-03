@@ -5,64 +5,40 @@ data class RuleTemplate(
     val extensions: List<String>,
     val operationMode: OperationMode = OperationMode.MOVE,
     val scanSubdirectories: Boolean = false,
-    val suggestedSourcePaths: List<String> = emptyList(),
     val suggestedIcon: RuleIcon = RuleIcon.DEFAULT
 ) {
     companion object {
-        private const val PRIMARY = "/storage/emulated/0"
-
         val ALL = listOf(
             RuleTemplate(
                 name = "Screenshots",
                 extensions = listOf(".png", ".jpg", ".jpeg"),
-                suggestedIcon = RuleIcon.SCREENSHOT,
-                suggestedSourcePaths = listOf(
-                    "$PRIMARY/Pictures/Screenshots",
-                    "$PRIMARY/DCIM/Screenshots"
-                )
+                suggestedIcon = RuleIcon.SCREENSHOT
             ),
             RuleTemplate(
                 name = "Documents",
                 extensions = listOf(".pdf", ".docx", ".doc", ".txt", ".odt"),
-                suggestedIcon = RuleIcon.DOCUMENT,
-                suggestedSourcePaths = listOf(
-                    "$PRIMARY/Documents",
-                    "$PRIMARY/Download"
-                )
+                suggestedIcon = RuleIcon.DOCUMENT
             ),
             RuleTemplate(
                 name = "Videos",
                 extensions = listOf(".mp4", ".mov", ".mkv", ".avi"),
-                suggestedIcon = RuleIcon.VIDEO,
-                suggestedSourcePaths = listOf(
-                    "$PRIMARY/DCIM",
-                    "$PRIMARY/Movies"
-                )
+                suggestedIcon = RuleIcon.VIDEO
             ),
             RuleTemplate(
                 name = "Music",
                 extensions = listOf(".mp3", ".flac", ".wav", ".aac", ".m4a", ".ogg", ".opus"),
-                suggestedIcon = RuleIcon.MUSIC,
-                suggestedSourcePaths = listOf(
-                    "$PRIMARY/Music",
-                    "$PRIMARY/Download"
-                )
+                suggestedIcon = RuleIcon.MUSIC
             ),
             RuleTemplate(
                 name = "Downloads",
                 extensions = listOf(".jpg", ".jpeg", ".png", ".mp4", ".pdf", ".zip"),
-                suggestedIcon = RuleIcon.DOWNLOAD,
-                suggestedSourcePaths = listOf("$PRIMARY/Download")
+                suggestedIcon = RuleIcon.DOWNLOAD
             ),
             RuleTemplate(
                 name = "All Images",
                 extensions = listOf(".jpg", ".jpeg", ".png", ".gif", ".heic", ".webp", ".bmp"),
                 scanSubdirectories = true,
-                suggestedIcon = RuleIcon.IMAGE,
-                suggestedSourcePaths = listOf(
-                    "$PRIMARY/DCIM",
-                    "$PRIMARY/Pictures"
-                )
+                suggestedIcon = RuleIcon.IMAGE
             )
         )
     }
