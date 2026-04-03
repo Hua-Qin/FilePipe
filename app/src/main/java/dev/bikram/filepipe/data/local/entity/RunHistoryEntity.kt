@@ -1,12 +1,16 @@
 package dev.bikram.filepipe.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.TriggerType
 
-@Entity(tableName = "run_history")
+@Entity(
+    tableName = "run_history",
+    indices = [Index(value = ["ruleId"])]
+)
 data class RunHistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val ruleId: Long?,

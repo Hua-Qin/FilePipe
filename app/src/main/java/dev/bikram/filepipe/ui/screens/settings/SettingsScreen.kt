@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -29,17 +31,26 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.BlurOn
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.SwipeLeft
 import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.filled.Vibration
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -56,6 +67,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Switch
@@ -82,6 +94,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -98,6 +111,8 @@ import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
+import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
+import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 import dev.bikram.filepipe.ui.components.AboutAuthorPhoto
 import dev.bikram.filepipe.ui.components.AppIconImage
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
@@ -110,6 +125,7 @@ import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.update.UpdateInfo
+import dev.bikram.filepipe.ui.components.text.SimpleMarkdown
 
 private val themePickerOrder = listOf(
     AppThemeMode.SYSTEM,
@@ -131,7 +147,6 @@ fun SettingsScreen(
     val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
     val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
     val context = LocalContext.current
 
@@ -159,10 +174,19 @@ fun SettingsScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    val changelogUi by viewModel.changelogUi.collectAsStateWithLifecycle()
-    val changelogSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val updateSheetChangelog by viewModel.updateSheetChangelog.collectAsStateWithLifecycle()
+    val manualUpdateNoResult by viewModel.manualUpdateNoResult.collectAsStateWithLifecycle()
+    var showUpdateSheet by remember { mutableStateOf(false) }
+    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(userMessage) {
+        val message = userMessage ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message)
+        viewModel.clearUserMessage()
+    }
 
     val folderLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
@@ -181,61 +205,34 @@ fun SettingsScreen(
         }
     }
 
-    LaunchedEffect(userMessage) {
-        val message = userMessage ?: return@LaunchedEffect
-        viewModel.clearUserMessage()
-        snackbarHostState.showSnackbar(message)
-    }
+    val playInAppUpdateLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { }
 
-    if (changelogUi !is ChangelogUiState.Hidden) {
+    if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
         ModalBottomSheet(
-            onDismissRequest = { viewModel.dismissChangelogSheet() },
-            sheetState = changelogSheetState
+            onDismissRequest = {
+                showUpdateSheet = false
+                viewModel.dismissUpdateSheet()
+            },
+            sheetState = updateSheetState
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.settings_changelog_title),
-                    style = MaterialTheme.typography.titleLarge
-                )
-                Spacer(Modifier.height(12.dp))
-                when (val state = changelogUi) {
-                    ChangelogUiState.Loading -> {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            LoadingIndicator(modifier = Modifier.size(40.dp))
-                        }
+            UpdateCheckBottomSheetContent(
+                isCheckingUpdate = isCheckingUpdate,
+                updateInfo = updateInfo,
+                manualUpdateNoResult = manualUpdateNoResult,
+                downloadProgress = downloadProgress,
+                changelogState = updateSheetChangelog,
+                onDownloadClick = { info ->
+                    playTap()
+                    if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.downloadUrl.isBlank()) {
+                        val hostActivity = context as? ComponentActivity
+                        viewModel.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
+                    } else {
+                        viewModel.downloadAndInstall(info.downloadUrl)
                     }
-                    is ChangelogUiState.Ready -> {
-                        val changelogScroll = rememberScrollState()
-                        Text(
-                            text = state.text,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .heightIn(max = 480.dp)
-                                .verticalScroll(changelogScroll)
-                        )
-                    }
-                    is ChangelogUiState.Failed -> {
-                        Text(
-                            text = state.message,
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                    else -> {}
                 }
-                Spacer(Modifier.height(16.dp))
-            }
+            )
         }
     }
 
@@ -470,6 +467,11 @@ fun SettingsScreen(
                         )
                     }
                 }
+                Spacer(Modifier.height(8.dp))
+                SwipeActionPreviewCard(
+                    swipeStartToEnd = preferences.swipeStartToEnd,
+                    swipeEndToStart = preferences.swipeEndToStart
+                )
             }
 
             // ── History ───────────────────────────────────────────────────────
@@ -528,7 +530,7 @@ fun SettingsScreen(
                             displayPath(uriOrPath)
                         }
                     }
-                    ?: stringResource(R.string.settings_no_folder_chosen)
+                    ?: stringResource(R.string.settings_choose_export_folder)
 
                 GroupedListColumn {
                     GroupedListItem(position = GroupPosition.FIRST) {
@@ -577,26 +579,36 @@ fun SettingsScreen(
                         )
                     }
                     GroupedListItem(position = GroupPosition.LAST) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            OutlinedButton(
-                                onClick = { playTap(); importLauncher.launch("application/json") },
-                                modifier = Modifier.weight(1f)
-                            ) { Text(stringResource(R.string.settings_import_rules)) }
-                            OutlinedButton(
-                                onClick = { playTap(); viewModel.exportNow() },
-                                modifier = Modifier.weight(1f)
-                            ) { Text(stringResource(R.string.settings_export_now)) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { playTap(); importLauncher.launch("application/json") },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text(stringResource(R.string.settings_import_rules)) }
+                                OutlinedButton(
+                                    onClick = { playTap(); viewModel.exportNow() },
+                                    modifier = Modifier.weight(1f)
+                                ) { Text(stringResource(R.string.settings_export_now)) }
+                            }
+                            Text(
+                                text = stringResource(R.string.settings_import_replace_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
             }
 
-            // ── Updates (github flavor only) ──────────────────────────────────
+            // ── Updates (GitHub APK or Play in-app updates by flavor) ─────────
             if (BuildConfig.SHOW_UPDATES) {
                 item {
                     Column {
@@ -606,7 +618,7 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         GroupedListColumn {
-                            GroupedListItem(position = GroupPosition.FIRST) {
+                            GroupedListItem(position = GroupPosition.ONLY) {
                                 SettingsToggleItem(
                                     title = stringResource(R.string.settings_auto_check_updates),
                                     subtitle = stringResource(R.string.settings_auto_check_updates_desc),
@@ -617,62 +629,28 @@ fun SettingsScreen(
                                     }
                                 )
                             }
-                            GroupedListItem(position = GroupPosition.MIDDLE) {
-                                ListItem(
-                                    headlineContent = {
-                                        Text(
-                                            stringResource(R.string.settings_see_whats_new),
-                                            style = MaterialTheme.typography.bodyLarge
-                                        )
-                                    },
-                                    leadingContent = {
-                                        Icon(
-                                            Icons.Default.NewReleases,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary
-                                        )
-                                    },
-                                    trailingContent = {
-                                        Icon(Icons.Default.ChevronRight, contentDescription = null)
-                                    },
-                                    modifier = Modifier.clickable {
-                                        playTap()
-                                        viewModel.openChangelogSheet()
-                                    },
-                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                                )
-                            }
-                            if (updateInfo != null) {
-                                GroupedListItem(position = GroupPosition.MIDDLE) {
-                                    ListItem(
-                                        headlineContent = {
-                                            Text(
-                                                stringResource(
-                                                    R.string.settings_update_available,
-                                                    updateInfo!!.versionName
-                                                ),
-                                                style = MaterialTheme.typography.bodyLarge
-                                            )
-                                        },
-                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                                    )
-                                }
-                            }
-                            GroupedListItem(position = GroupPosition.LAST) {
-                                UpdateMorphingButtonRow(
-                                    updateInfo = updateInfo,
-                                    isCheckingUpdate = isCheckingUpdate,
-                                    downloadProgress = downloadProgress,
-                                    onCheckClick = {
-                                        playTap()
-                                        viewModel.checkForUpdate()
-                                    },
-                                    onDownloadClick = { info ->
-                                        playTap()
-                                        viewModel.downloadAndInstall(info.downloadUrl)
-                                    }
-                                )
-                            }
+                        }
+                        Button(
+                            onClick = {
+                                playTap()
+                                viewModel.beginManualUpdateCheckFromSheet()
+                                viewModel.loadChangelogForUpdateSheet()
+                                showUpdateSheet = true
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.NewReleases,
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.settings_check_for_updates),
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -681,7 +659,8 @@ fun SettingsScreen(
             // ── About ─────────────────────────────────────────────────────────
             item {
                 val context = LocalContext.current
-                val githubRepo = BuildConfig.GITHUB_REPO.trim()
+                val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
+                    .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
                 Column(modifier = Modifier.padding(top = 24.dp)) {
                     SettingsSectionHeader(
                         icon = Icons.Default.Info,
@@ -731,6 +710,16 @@ fun SettingsScreen(
                                         modifier = Modifier
                                             .size(84.dp)
                                             .clip(RoundedCornerShape(16.dp))
+                                            .clickable {
+                                                playTap()
+                                                val profileUrl =
+                                                    context.getString(R.string.about_author_github_profile_url)
+                                                runCatching {
+                                                    context.startActivity(
+                                                        Intent(Intent.ACTION_VIEW, Uri.parse(profileUrl))
+                                                    )
+                                                }
+                                            }
                                     )
                                 }
                                 Spacer(Modifier.height(20.dp))
@@ -740,12 +729,12 @@ fun SettingsScreen(
                                     color = MaterialTheme.colorScheme.onSurface,
                                     textAlign = TextAlign.Center
                                 )
-                                if (githubRepo.isNotEmpty()) {
+                                if (githubRepoForSourceLink.isNotEmpty()) {
                                     Spacer(Modifier.height(16.dp))
                                     OutlinedButton(
                                         onClick = {
                                             playTap()
-                                            val url = "https://github.com/$githubRepo"
+                                            val url = "https://github.com/$githubRepoForSourceLink"
                                             runCatching {
                                                 context.startActivity(
                                                     Intent(Intent.ACTION_VIEW, Uri.parse(url))
@@ -775,121 +764,237 @@ fun SettingsScreen(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun UpdateMorphingButtonRow(
-    updateInfo: UpdateInfo?,
+private fun UpdateCheckBottomSheetContent(
     isCheckingUpdate: Boolean,
+    updateInfo: UpdateInfo?,
+    manualUpdateNoResult: Boolean,
     downloadProgress: Float?,
-    onCheckClick: () -> Unit,
+    changelogState: ChangelogUiState,
     onDownloadClick: (UpdateInfo) -> Unit
 ) {
-    val scheme = MaterialTheme.colorScheme
-    val buttonHeight = 48.dp
-    val shape = RoundedCornerShape(24.dp)
-    Row(
-        modifier = Modifier
+    val changelogScroll = rememberScrollState()
+    Column(
+        Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .verticalScroll(changelogScroll)
     ) {
-        when {
-            downloadProgress != null -> {
-                val progressValue = downloadProgress
-                val label = when {
-                    progressValue == -1f -> stringResource(R.string.settings_installing)
-                    progressValue == -2f -> stringResource(R.string.settings_downloading)
-                    else -> stringResource(
-                        R.string.settings_downloading_percent,
-                        progressValue.toInt().coerceIn(0, 100)
-                    )
+        if (isCheckingUpdate) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(240.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                LoadingIndicator(modifier = Modifier.size(48.dp))
+            }
+        } else {
+            when {
+                downloadProgress != null -> {
+                    UpdateSheetDownloadProgressBar(downloadProgress = downloadProgress)
                 }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(buttonHeight)
-                        .clip(shape)
-                ) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(scheme.onSurface.copy(alpha = 0.12f))
-                    )
-                    when {
-                        progressValue >= 0f && progressValue <= 100f -> {
-                            Box(
-                                Modifier
-                                    .fillMaxHeight()
-                                    .fillMaxWidth((progressValue / 100f).coerceIn(0f, 1f))
-                                    .align(Alignment.CenterStart)
-                                    .background(scheme.primary.copy(alpha = 0.85f))
-                            )
-                        }
-                        progressValue == -1f || progressValue == -2f -> {
-                            Box(
-                                Modifier
-                                    .fillMaxSize()
-                                    .background(scheme.primary.copy(alpha = 0.22f))
-                            )
-                        }
-                    }
-                    if (progressValue == -1f || progressValue == -2f) {
-                        LinearProgressIndicator(
+                updateInfo != null -> {
+                    val availableUpdate = updateInfo
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SystemUpdate,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(
+                                R.string.settings_update_available,
+                                availableUpdate.versionName
+                            ),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = { onDownloadClick(availableUpdate) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .align(Alignment.BottomCenter)
-                                .height(4.dp),
-                            color = scheme.primary.copy(alpha = 0.48f),
-                            trackColor = Color.Transparent
+                                .height(48.dp),
+                            shape = RoundedCornerShape(24.dp)
+                        ) {
+                            Text(
+                                text = stringResource(
+                                    R.string.settings_download_install,
+                                    availableUpdate.versionName
+                                ),
+                                maxLines = 1
+                            )
+                        }
+                    }
+                }
+                manualUpdateNoResult -> {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        UpToDatePhoneIcon()
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            text = stringResource(R.string.settings_update_sheet_up_to_date),
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = scheme.onSurface.copy(alpha = 0.78f),
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-            }
-            isCheckingUpdate -> {
-                OutlinedButton(
-                    onClick = {},
-                    enabled = false,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(buttonHeight),
-                    shape = shape
-                ) {
-                    LoadingIndicator(modifier = Modifier.size(24.dp))
-                }
-            }
-            updateInfo != null -> {
-                val availableUpdate = updateInfo
-                Button(
-                    onClick = { onDownloadClick(availableUpdate) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(buttonHeight),
-                    shape = shape
-                ) {
-                    Text(
-                        text = stringResource(
-                            R.string.settings_download_install,
-                            availableUpdate.versionName
-                        ),
-                        maxLines = 1
-                    )
-                }
-            }
-            else -> {
-                OutlinedButton(
-                    onClick = onCheckClick,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(buttonHeight),
-                    shape = shape
-                ) {
-                    Text(stringResource(R.string.settings_check_for_updates))
                 }
             }
         }
+
+        Spacer(Modifier.height(20.dp))
+        Text(
+            text = stringResource(R.string.settings_changelog_title),
+            style = MaterialTheme.typography.titleLarge
+        )
+        Spacer(Modifier.height(12.dp))
+        when (changelogState) {
+            ChangelogUiState.Hidden -> {}
+            ChangelogUiState.Loading -> {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        LoadingIndicator(modifier = Modifier.size(40.dp))
+                    }
+                }
+            }
+            is ChangelogUiState.Ready -> {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer
+                ) {
+                    SimpleMarkdown(
+                        content = changelogState.text,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    )
+                }
+            }
+            is ChangelogUiState.Failed -> {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer
+                ) {
+                    Text(
+                        text = changelogState.message,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun UpToDatePhoneIcon() {
+    val primary = MaterialTheme.colorScheme.primary
+    Box(
+        modifier = Modifier.size(56.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Smartphone,
+            contentDescription = null,
+            modifier = Modifier.size(40.dp),
+            tint = primary
+        )
+        Icon(
+            imageVector = Icons.Filled.CheckCircle,
+            contentDescription = null,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .size(22.dp)
+                .offset(x = 2.dp, y = 2.dp),
+            tint = primary
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
+    val scheme = MaterialTheme.colorScheme
+    val buttonHeight = 48.dp
+    val shape = RoundedCornerShape(24.dp)
+    val label = when {
+        downloadProgress == -1f -> stringResource(R.string.settings_installing)
+        downloadProgress == -2f -> stringResource(R.string.settings_downloading)
+        else -> stringResource(
+            R.string.settings_downloading_percent,
+            downloadProgress.toInt().coerceIn(0, 100)
+        )
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(buttonHeight)
+            .clip(shape)
+    ) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(scheme.onSurface.copy(alpha = 0.12f))
+        )
+        when {
+            downloadProgress >= 0f && downloadProgress <= 100f -> {
+                Box(
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth((downloadProgress / 100f).coerceIn(0f, 1f))
+                        .align(Alignment.CenterStart)
+                        .background(scheme.primary.copy(alpha = 0.85f))
+                )
+            }
+            downloadProgress == -1f || downloadProgress == -2f -> {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(scheme.primary.copy(alpha = 0.22f))
+                )
+            }
+        }
+        if (downloadProgress == -1f || downloadProgress == -2f) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .height(4.dp),
+                color = scheme.primary.copy(alpha = 0.48f),
+                trackColor = Color.Transparent
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = scheme.onSurface.copy(alpha = 0.78f),
+            modifier = Modifier.align(Alignment.Center)
+        )
     }
 }
 
@@ -1010,6 +1115,120 @@ private fun SwipeActionDropdown(
             }
         }
     }
+}
+
+@Composable
+private fun SwipeActionPreviewCard(
+    swipeStartToEnd: SwipeAction,
+    swipeEndToStart: SwipeAction
+) {
+    val leftBg by animateColorAsState(
+        targetValue = swipeStartToEnd.semanticSwipeBackground(),
+        animationSpec = tween(300),
+        label = "leftBg"
+    )
+    val rightBg by animateColorAsState(
+        targetValue = swipeEndToStart.semanticSwipeBackground(),
+        animationSpec = tween(300),
+        label = "rightBg"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+    ) {
+        // Left action background (swipe right reveals this)
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(0.5f)
+                .background(leftBg)
+                .align(Alignment.CenterStart)
+                .padding(start = 16.dp),
+            contentAlignment = Alignment.CenterStart
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = swipeStartToEnd.semanticSwipeIconTint(),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector = swipeStartToEnd.previewIcon(),
+                    contentDescription = null,
+                    tint = swipeStartToEnd.semanticSwipeIconTint(),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    swipeActionLabel(swipeStartToEnd),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = swipeStartToEnd.semanticSwipeIconTint()
+                )
+            }
+        }
+        // Right action background (swipe left reveals this)
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(0.5f)
+                .background(rightBg)
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    swipeActionLabel(swipeEndToStart),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = swipeEndToStart.semanticSwipeIconTint()
+                )
+                Spacer(Modifier.width(6.dp))
+                Icon(
+                    imageVector = swipeEndToStart.previewIcon(),
+                    contentDescription = null,
+                    tint = swipeEndToStart.semanticSwipeIconTint(),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = null,
+                    tint = swipeEndToStart.semanticSwipeIconTint(),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+        // Center rule card placeholder
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .fillMaxHeight()
+                .fillMaxWidth(0.42f)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "Rule",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+private fun SwipeAction.previewIcon(): androidx.compose.ui.graphics.vector.ImageVector = when (this) {
+    SwipeAction.EDIT -> Icons.Default.Edit
+    SwipeAction.DELETE -> Icons.Default.Delete
+    SwipeAction.DUPLICATE -> Icons.Default.ContentCopy
+    SwipeAction.PREVIEW -> Icons.Default.Visibility
+    SwipeAction.VIEW_HISTORY -> Icons.Default.History
 }
 
 @Composable

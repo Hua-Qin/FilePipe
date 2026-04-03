@@ -1,6 +1,5 @@
 package dev.bikram.filepipe.worker
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -10,17 +9,22 @@ import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.TriggerType
 import dev.bikram.filepipe.domain.usecase.ExecuteRulesUseCase
 import dev.bikram.filepipe.receiver.NotificationActionReceiver
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
 
+/**
+ * Coalesced worker that processes multiple rules in a single foreground service pass.
+ * Use [ScheduleRulesUseCase.scheduleCoalesced] to schedule rules with the same schedule
+ * configuration under one worker instead of spinning up separate workers per rule.
+ */
 @HiltWorker
-class FileOrganizerWorker @AssistedInject constructor(
+class RunAllScheduledRulesWorker @AssistedInject constructor(
     @Assisted private val appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val executeRulesUseCase: ExecuteRulesUseCase,
@@ -28,21 +32,31 @@ class FileOrganizerWorker @AssistedInject constructor(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
-        val ruleId = inputData.getLong(KEY_RULE_ID, -1L)
-        if (ruleId == -1L) return Result.failure()
+        val ruleIds = inputData.getLongArray(KEY_RULE_IDS) ?: return Result.failure()
+        val rules = buildList {
+            for (id in ruleIds) {
+                ruleRepository.getRuleById(id)?.let { if (it.isEnabled) add(it) }
+            }
+        }
+        if (rules.isEmpty()) return Result.success()
 
-        val rule = ruleRepository.getRuleById(ruleId) ?: return Result.failure()
-
-        setForeground(createForegroundInfo(rule.name))
+        setForeground(createForegroundInfo(rules.size))
 
         return try {
-            val results = executeRulesUseCase(listOf(rule), TriggerType.SCHEDULED)
-            val result = results.firstOrNull()
-            if (result != null) {
+            val results = executeRulesUseCase(rules, TriggerType.SCHEDULED)
+            results.forEach { result ->
+                val rule = rules.find { it.id == result.ruleId } ?: return@forEach
                 val movedFileNames = result.filesMoved
                     .filter { it.success && !it.skipped }
                     .map { it.fileName }
-                postSummaryNotification(rule.name, result.totalMoved, result.totalFailed, rule.operationMode, result.historyId, movedFileNames)
+                postSummaryNotification(
+                    ruleName = rule.name,
+                    moved = result.totalMoved,
+                    failed = result.totalFailed,
+                    operationMode = rule.operationMode,
+                    historyId = result.historyId,
+                    movedFileNames = movedFileNames
+                )
             }
             Result.success()
         } catch (e: Exception) {
@@ -65,7 +79,7 @@ class FileOrganizerWorker @AssistedInject constructor(
                 appContext.getString(R.string.notification_summary_body_copied, moved)
             else -> appContext.getString(R.string.notification_summary_body_moved, moved)
         }
-        val builder = NotificationCompat.Builder(appContext, SUMMARY_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(appContext, FileOrganizerWorker.SUMMARY_CHANNEL_ID)
             .setContentTitle(appContext.getString(R.string.notification_summary_title, ruleName))
             .setContentText(body)
             .setSmallIcon(R.drawable.ic_notification)
@@ -83,7 +97,6 @@ class FileOrganizerWorker @AssistedInject constructor(
             builder.setStyle(style)
         }
 
-        // Add Undo action if files were moved
         if (moved > 0) {
             val undoIntent = Intent(appContext, NotificationActionReceiver::class.java).apply {
                 action = NotificationActionReceiver.ACTION_UNDO_RUN
@@ -99,13 +112,13 @@ class FileOrganizerWorker @AssistedInject constructor(
         }
 
         val manager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        manager.notify(SUMMARY_NOTIFICATION_ID, builder.build())
+        manager.notify((SUMMARY_NOTIFICATION_BASE_ID + historyId).toInt(), builder.build())
     }
 
-    private fun createForegroundInfo(ruleName: String): ForegroundInfo {
-        createNotificationChannel()
-        val notification = NotificationCompat.Builder(appContext, CHANNEL_ID)
-            .setContentTitle(appContext.getString(R.string.notification_running, ruleName))
+    private fun createForegroundInfo(ruleCount: Int): ForegroundInfo {
+        ensureProgressChannel()
+        val notification = NotificationCompat.Builder(appContext, FileOrganizerWorker.CHANNEL_ID)
+            .setContentTitle(appContext.getString(R.string.notification_running_batch, ruleCount))
             .setSmallIcon(R.drawable.ic_notification)
             .setOngoing(true)
             .setSilent(true)
@@ -113,12 +126,12 @@ class FileOrganizerWorker @AssistedInject constructor(
         return ForegroundInfo(NOTIFICATION_ID, notification)
     }
 
-    private fun createNotificationChannel() {
+    private fun ensureProgressChannel() {
         val manager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.getNotificationChannel(CHANNEL_ID) == null) {
+        if (manager.getNotificationChannel(FileOrganizerWorker.CHANNEL_ID) == null) {
             manager.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID,
+                android.app.NotificationChannel(
+                    FileOrganizerWorker.CHANNEL_ID,
                     appContext.getString(R.string.notification_channel_name),
                     NotificationManager.IMPORTANCE_LOW
                 ).apply {
@@ -130,10 +143,10 @@ class FileOrganizerWorker @AssistedInject constructor(
 
     private fun ensureSummaryChannel() {
         val manager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (manager.getNotificationChannel(SUMMARY_CHANNEL_ID) == null) {
+        if (manager.getNotificationChannel(FileOrganizerWorker.SUMMARY_CHANNEL_ID) == null) {
             manager.createNotificationChannel(
-                NotificationChannel(
-                    SUMMARY_CHANNEL_ID,
+                android.app.NotificationChannel(
+                    FileOrganizerWorker.SUMMARY_CHANNEL_ID,
                     appContext.getString(R.string.notification_summary_channel_name),
                     NotificationManager.IMPORTANCE_DEFAULT
                 ).apply {
@@ -144,10 +157,8 @@ class FileOrganizerWorker @AssistedInject constructor(
     }
 
     companion object {
-        const val KEY_RULE_ID = "rule_id"
-        const val CHANNEL_ID = "file_organizer_channel"
-        const val NOTIFICATION_ID = 1001
-        const val SUMMARY_CHANNEL_ID = "run_summary_channel"
-        const val SUMMARY_NOTIFICATION_ID = 1002
+        const val KEY_RULE_IDS = "rule_ids"
+        const val NOTIFICATION_ID = 1003
+        const val SUMMARY_NOTIFICATION_BASE_ID = 2000
     }
 }

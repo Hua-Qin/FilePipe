@@ -70,6 +70,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
+import dev.bikram.filepipe.domain.model.isNoChangesRun
 import dev.bikram.filepipe.domain.model.TriggerType
 import dev.bikram.filepipe.ui.components.StatusChip
 import dev.bikram.filepipe.ui.components.displayPath
@@ -98,8 +99,8 @@ fun HistoryDetailScreen(
 
     LaunchedEffect(userMessage) {
         val msg = userMessage ?: return@LaunchedEffect
-        viewModel.clearUserMessage()
         snackbarHostState.showSnackbar(msg)
+        viewModel.clearUserMessage()
     }
 
     Box(
@@ -220,8 +221,7 @@ private fun RunSummaryCard(history: RunHistory, onUndo: () -> Unit) {
                 Text("Run Summary", style = MaterialTheme.typography.titleMedium)
                 StatusChip(
                     status = history.status,
-                    noChanges = history.status == RunStatus.SUCCESS &&
-                        history.totalFilesMoved == 0 && history.totalFilesFailed == 0
+                    noChanges = history.isNoChangesRun()
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))

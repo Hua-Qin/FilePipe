@@ -1,5 +1,9 @@
 package dev.bikram.filepipe.data.repository
 
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import androidx.paging.map
 import dev.bikram.filepipe.data.local.dao.FileMovedDao
 import dev.bikram.filepipe.data.local.dao.RunHistoryDao
 import dev.bikram.filepipe.data.local.entity.FileMovedEntity
@@ -8,6 +12,8 @@ import dev.bikram.filepipe.data.local.entity.toDomain
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.export.FileMovedBackupDto
 import dev.bikram.filepipe.domain.export.RunHistoryBackupDto
+import dev.bikram.filepipe.domain.model.HistorySortDirection
+import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunResult
 import dev.bikram.filepipe.domain.model.RunStatus
@@ -30,6 +36,41 @@ class RunHistoryRepository @Inject constructor(
 
     fun getHistoryForRule(ruleId: Long): Flow<List<RunHistory>> =
         runHistoryDao.getHistoryForRule(ruleId).map { it.map { entity -> entity.toDomain() } }
+
+    fun getAllHistoryPaged(
+        sortKey: HistorySortKey,
+        sortDirection: HistorySortDirection,
+    ): Flow<PagingData<RunHistory>> =
+        Pager(PagingConfig(pageSize = 30, enablePlaceholders = false)) {
+            when (sortKey) {
+                HistorySortKey.LAST_RAN -> when (sortDirection) {
+                    HistorySortDirection.DESCENDING -> runHistoryDao.getAllHistoryPagedLastRanDesc()
+                    HistorySortDirection.ASCENDING -> runHistoryDao.getAllHistoryPagedLastRanAsc()
+                }
+                HistorySortKey.RULE_NAME -> when (sortDirection) {
+                    HistorySortDirection.ASCENDING -> runHistoryDao.getAllHistoryPagedRuleNameAsc()
+                    HistorySortDirection.DESCENDING -> runHistoryDao.getAllHistoryPagedRuleNameDesc()
+                }
+            }
+        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
+
+    fun getHistoryForRulePaged(
+        ruleId: Long,
+        sortKey: HistorySortKey,
+        sortDirection: HistorySortDirection,
+    ): Flow<PagingData<RunHistory>> =
+        Pager(PagingConfig(pageSize = 30, enablePlaceholders = false)) {
+            when (sortKey) {
+                HistorySortKey.LAST_RAN -> when (sortDirection) {
+                    HistorySortDirection.DESCENDING -> runHistoryDao.getHistoryForRulePagedLastRanDesc(ruleId)
+                    HistorySortDirection.ASCENDING -> runHistoryDao.getHistoryForRulePagedLastRanAsc(ruleId)
+                }
+                HistorySortKey.RULE_NAME -> when (sortDirection) {
+                    HistorySortDirection.ASCENDING -> runHistoryDao.getHistoryForRulePagedRuleNameAsc(ruleId)
+                    HistorySortDirection.DESCENDING -> runHistoryDao.getHistoryForRulePagedRuleNameDesc(ruleId)
+                }
+            }
+        }.flow.map { pagingData -> pagingData.map { it.toDomain() } }
 
     suspend fun getHistoryById(id: Long): RunHistory? =
         runHistoryDao.getHistoryById(id)?.toDomain()

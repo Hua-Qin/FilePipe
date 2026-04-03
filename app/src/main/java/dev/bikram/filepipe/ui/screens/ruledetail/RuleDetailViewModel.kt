@@ -109,7 +109,11 @@ class RuleDetailViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val ruleId: Long = savedStateHandle[Screen.RuleDetail.ARG_RULE_ID] ?: Screen.RuleDetail.NEW_RULE_ID
+    private val templateIndex: Int = savedStateHandle[Screen.RuleDetail.ARG_TEMPLATE_INDEX] ?: -1
+    private val skipTemplatePicker: Boolean =
+        savedStateHandle[Screen.RuleDetail.ARG_SKIP_TEMPLATE_PICKER] ?: false
     val isNewRule = ruleId == Screen.RuleDetail.NEW_RULE_ID
+    val showInitialTemplatePicker: Boolean = isNewRule && !skipTemplatePicker
 
     private val _uiState = MutableStateFlow(RuleDetailUiState())
     val uiState: StateFlow<RuleDetailUiState> = _uiState.asStateFlow()
@@ -128,6 +132,8 @@ class RuleDetailViewModel @Inject constructor(
         if (!isNewRule) {
             loadRule()
         } else {
+            val template = RuleTemplate.ALL.getOrNull(templateIndex)
+            if (template != null) applyTemplate(template)
             _uiState.update { it.copy(isLoading = false) }
             _baseline.value = _uiState.value.toSnapshot()
         }

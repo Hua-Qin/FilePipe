@@ -3,15 +3,28 @@ package dev.bikram.filepipe.ui.screens.history
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import androidx.paging.insertSeparators
+import androidx.paging.map
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
+import dev.bikram.filepipe.domain.model.HistorySortDirection
+import dev.bikram.filepipe.domain.model.HistorySortKey
+import dev.bikram.filepipe.domain.model.HistoryStatusFilter
 import dev.bikram.filepipe.domain.model.RunHistory
+import dev.bikram.filepipe.domain.model.RunStatus
+import dev.bikram.filepipe.domain.model.isNoChangesRun
 import dev.bikram.filepipe.domain.usecase.UndoRunUseCase
 import dev.bikram.filepipe.ui.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -20,11 +33,34 @@ import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
 
-data class HistoryGroup(
-    val dateLabel: String,
-    val entries: List<RunHistory>
-)
+enum class HistoryStatusSection {
+    SUCCESS,
+    FAILED,
+    PARTIAL,
+    NO_CHANGES,
+    IN_PROGRESS,
+}
 
+sealed interface HistoryItem {
+    data class Entry(val history: RunHistory) : HistoryItem
+    data class DateHeader(val label: String) : HistoryItem
+    data class RuleHeader(val ruleName: String, val count: Int) : HistoryItem
+    data class StatusHeader(val section: HistoryStatusSection, val count: Int) : HistoryItem
+}
+
+enum class HistoryViewMode { BY_DATE, BY_RULE, BY_STATUS }
+
+data class HistoryUiState(
+    val statusFilter: HistoryStatusFilter = HistoryStatusFilter.ALL,
+    val viewMode: HistoryViewMode = HistoryViewMode.BY_DATE,
+    val sortKey: HistorySortKey = HistorySortKey.LAST_RAN,
+    val sortDirection: HistorySortDirection = HistorySortDirection.DESCENDING,
+) {
+    val isFilterActive: Boolean
+        get() = statusFilter != HistoryStatusFilter.ALL || viewMode != HistoryViewMode.BY_DATE
+}
+
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HistoryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
@@ -35,37 +71,80 @@ class HistoryViewModel @Inject constructor(
     val filterRuleId: Long? = savedStateHandle.get<Long>(Screen.HistoryForRule.ARG_RULE_ID)
         ?.takeIf { it > 0 }
 
-    val historyGroups: StateFlow<List<HistoryGroup>> = (
+    private val _statusFilter = MutableStateFlow(HistoryStatusFilter.ALL)
+    private val _viewMode = MutableStateFlow(HistoryViewMode.BY_DATE)
+    private val _sortKey = MutableStateFlow(HistorySortKey.LAST_RAN)
+    private val _sortDirection = MutableStateFlow(HistorySortDirection.DESCENDING)
+
+    val uiState: StateFlow<HistoryUiState> = combine(
+        _statusFilter, _viewMode, _sortKey, _sortDirection
+    ) { status, mode, sortKey, sortDir ->
+        HistoryUiState(
+            statusFilter = status,
+            viewMode = mode,
+            sortKey = sortKey,
+            sortDirection = sortDir,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HistoryUiState())
+
+    val historyPagingFlow: Flow<PagingData<HistoryItem>> = combine(
+        _sortKey,
+        _sortDirection,
+    ) { sortKey, sortDir -> sortKey to sortDir }
+        .flatMapLatest { (sortKey, sortDir) ->
+            val baseFlow = if (filterRuleId != null) {
+                runHistoryRepository.getHistoryForRulePaged(filterRuleId, sortKey, sortDir)
+            } else {
+                runHistoryRepository.getAllHistoryPaged(sortKey, sortDir)
+            }
+            baseFlow.map { pagingData ->
+                pagingData
+                    .map { history -> HistoryItem.Entry(history) as HistoryItem }
+                    .insertSeparators { before, after ->
+                        val afterEntry = after as? HistoryItem.Entry ?: return@insertSeparators null
+                        val beforeEntry = before as? HistoryItem.Entry
+                        if (beforeEntry == null || !isSameDay(beforeEntry.history.startedAt, afterEntry.history.startedAt)) {
+                            HistoryItem.DateHeader(formatDateLabel(afterEntry.history.startedAt))
+                        } else null
+                    }
+            }
+        }
+        .cachedIn(viewModelScope)
+
+    val filteredHistoryItems: StateFlow<List<HistoryItem>> = combine(
         if (filterRuleId != null) runHistoryRepository.getHistoryForRule(filterRuleId)
-        else runHistoryRepository.getAllHistory()
-    )
-        .map { list -> groupByDate(list) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        else runHistoryRepository.getAllHistory(),
+        _statusFilter,
+        _viewMode,
+        _sortKey,
+        _sortDirection,
+    ) { all, status, mode, sortKey, sortDir ->
+        val filtered = all.filter { history -> history.matchesHistoryStatusFilter(status) }
+        val sorted = sortHistories(filtered, sortKey, sortDir)
+        when (mode) {
+            HistoryViewMode.BY_DATE -> buildDateGroupedItems(sorted)
+            HistoryViewMode.BY_RULE -> buildRuleGroupedItems(sorted)
+            HistoryViewMode.BY_STATUS -> buildStatusGroupedItems(sorted)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 
     fun clearUserMessage() { _userMessage.value = null }
 
-    private fun groupByDate(history: List<RunHistory>): List<HistoryGroup> {
-        val dayFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-        val now = System.currentTimeMillis()
-        val todayKey = dayFormat.format(Date(now))
-        val yesterdayKey = dayFormat.format(Date(now - 86_400_000L))
-        val labelFormat = SimpleDateFormat("MMM d, yyyy", Locale.getDefault())
+    fun setStatusFilter(status: HistoryStatusFilter) { _statusFilter.value = status }
 
-        return history
-            .groupBy { dayFormat.format(Date(it.startedAt)) }
-            .entries
-            .sortedByDescending { it.key }
-            .map { (key, entries) ->
-                val label = when (key) {
-                    todayKey -> "Today"
-                    yesterdayKey -> "Yesterday"
-                    else -> labelFormat.format(SimpleDateFormat("yyyyMMdd", Locale.getDefault()).parse(key)!!)
-                }
-                HistoryGroup(label, entries.sortedByDescending { it.startedAt })
-            }
+    fun setViewMode(mode: HistoryViewMode) { _viewMode.value = mode }
+
+    fun setSort(key: HistorySortKey, direction: HistorySortDirection) {
+        _sortKey.value = key
+        _sortDirection.value = direction
+    }
+
+    fun clearFilters() {
+        _statusFilter.value = HistoryStatusFilter.ALL
+        _viewMode.value = HistoryViewMode.BY_DATE
     }
 
     fun clearAllHistory() = viewModelScope.launch {
@@ -83,5 +162,111 @@ class HistoryViewModel @Inject constructor(
             result.totalReversed == 0 -> "Undo failed: ${result.errors.firstOrNull() ?: "unknown error"}"
             else -> "Partial undo: ${result.totalReversed} restored, ${result.totalFailed} failed"
         }
+    }
+
+    private fun sortHistories(
+        list: List<RunHistory>,
+        sortKey: HistorySortKey,
+        sortDirection: HistorySortDirection,
+    ): List<RunHistory> {
+        return when (sortKey) {
+            HistorySortKey.LAST_RAN -> when (sortDirection) {
+                HistorySortDirection.DESCENDING -> list.sortedByDescending { it.startedAt }
+                HistorySortDirection.ASCENDING -> list.sortedBy { it.startedAt }
+            }
+            HistorySortKey.RULE_NAME -> when (sortDirection) {
+                HistorySortDirection.ASCENDING -> list.sortedWith(
+                    compareBy<RunHistory> { it.ruleName.lowercase(Locale.getDefault()) }
+                        .thenByDescending { it.startedAt }
+                )
+                HistorySortDirection.DESCENDING -> list.sortedWith(
+                    compareByDescending<RunHistory> { it.ruleName.lowercase(Locale.getDefault()) }
+                        .thenByDescending { it.startedAt }
+                )
+            }
+        }
+    }
+
+    private fun buildDateGroupedItems(list: List<RunHistory>): List<HistoryItem> {
+        if (list.isEmpty()) return emptyList()
+        val result = mutableListOf<HistoryItem>()
+        var lastDayKey = ""
+        for (history in list) {
+            val dayKey = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date(history.startedAt))
+            if (dayKey != lastDayKey) {
+                result.add(HistoryItem.DateHeader(formatDateLabel(history.startedAt)))
+                lastDayKey = dayKey
+            }
+            result.add(HistoryItem.Entry(history))
+        }
+        return result
+    }
+
+    private fun buildRuleGroupedItems(list: List<RunHistory>): List<HistoryItem> {
+        if (list.isEmpty()) return emptyList()
+        val result = mutableListOf<HistoryItem>()
+        val groups = list.groupBy { it.ruleName }
+        for ((ruleName, entries) in groups) {
+            result.add(HistoryItem.RuleHeader(ruleName = ruleName, count = entries.size))
+            entries.forEach { result.add(HistoryItem.Entry(it)) }
+        }
+        return result
+    }
+
+    private fun buildStatusGroupedItems(list: List<RunHistory>): List<HistoryItem> {
+        if (list.isEmpty()) return emptyList()
+        val successWork = mutableListOf<RunHistory>()
+        val failed = mutableListOf<RunHistory>()
+        val partial = mutableListOf<RunHistory>()
+        val noChanges = mutableListOf<RunHistory>()
+        val inProgress = mutableListOf<RunHistory>()
+        for (history in list) {
+            when {
+                history.isNoChangesRun() -> noChanges.add(history)
+                history.status == RunStatus.IN_PROGRESS -> inProgress.add(history)
+                history.status == RunStatus.FAILED -> failed.add(history)
+                history.status == RunStatus.PARTIAL_FAILURE -> partial.add(history)
+                history.status == RunStatus.SUCCESS -> successWork.add(history)
+            }
+        }
+        val result = mutableListOf<HistoryItem>()
+        fun appendSection(section: HistoryStatusSection, entries: List<RunHistory>) {
+            if (entries.isEmpty()) return
+            result.add(HistoryItem.StatusHeader(section = section, count = entries.size))
+            entries.forEach { result.add(HistoryItem.Entry(it)) }
+        }
+        appendSection(HistoryStatusSection.SUCCESS, successWork)
+        appendSection(HistoryStatusSection.FAILED, failed)
+        appendSection(HistoryStatusSection.PARTIAL, partial)
+        appendSection(HistoryStatusSection.NO_CHANGES, noChanges)
+        appendSection(HistoryStatusSection.IN_PROGRESS, inProgress)
+        return result
+    }
+
+    private fun formatDateLabel(timestampMs: Long): String {
+        val dayFmt = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+        val now = System.currentTimeMillis()
+        val key = dayFmt.format(Date(timestampMs))
+        return when (key) {
+            dayFmt.format(Date(now)) -> "Today"
+            dayFmt.format(Date(now - 86_400_000L)) -> "Yesterday"
+            else -> SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(timestampMs))
+        }
+    }
+
+    private fun isSameDay(t1: Long, t2: Long): Boolean {
+        val fmt = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+        return fmt.format(Date(t1)) == fmt.format(Date(t2))
+    }
+}
+
+private fun RunHistory.matchesHistoryStatusFilter(filter: HistoryStatusFilter): Boolean {
+    return when (filter) {
+        HistoryStatusFilter.ALL -> true
+        HistoryStatusFilter.SUCCESS ->
+            status == RunStatus.SUCCESS && !isNoChangesRun()
+        HistoryStatusFilter.FAILED -> status == RunStatus.FAILED
+        HistoryStatusFilter.PARTIAL -> status == RunStatus.PARTIAL_FAILURE
+        HistoryStatusFilter.NO_CHANGES -> isNoChangesRun()
     }
 }

@@ -53,6 +53,7 @@
     <string name="keep_editing">Keep editing</string>
     <string name="save_and_exit">Save &amp; exit</string>
     <string name="schedule_label">Schedule (optional)</string>
+    <string name="schedule_card_label">Run</string>
     <string name="enable_schedule">Enable automatic schedule</string>
     <string name="schedule_frequency">Frequency</string>
     <string name="schedule_daily">Daily</string>
@@ -76,6 +77,9 @@
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
     <string name="delete">Delete</string>
+    <string name="delete_rule">Delete rule</string>
+    <string name="duplicate_rule">Duplicate rule</string>
+    <string name="view_history">View history</string>
 
     <!-- Run screen -->
     <string name="run_title">Run Rules</string>
@@ -116,6 +120,39 @@
     <string name="notification_channel_name">File Pipe</string>
     <string name="notification_channel_desc">Shows progress when organizing files</string>
     <string name="notification_running">Running: %s</string>
+    <string name="notification_running_batch">Running %d rules…</string>
+
+    <!-- Rule search -->
+    <!-- History search / filter -->
+    <string name="history_sort_menu">Sort</string>
+    <string name="history_sort_last_ran_newest">Last run (newest first)</string>
+    <string name="history_sort_last_ran_oldest">Last run (oldest first)</string>
+    <string name="history_sort_rule_name_az">Rule name (A to Z)</string>
+    <string name="history_sort_rule_name_za">Rule name (Z to A)</string>
+    <string name="history_filter_all">All</string>
+    <string name="history_filter_success">Success</string>
+    <string name="history_filter_failed">Failed</string>
+    <string name="history_filter_partial">Partial</string>
+    <string name="history_filter_no_changes">No changes</string>
+    <string name="history_view_by_date">By date</string>
+    <string name="history_view_by_rule">By rule</string>
+    <string name="history_group_menu">Group runs</string>
+    <string name="history_group_by_date">Group by date</string>
+    <string name="history_group_by_rule">Group by rule</string>
+    <string name="history_group_by_status">Group by status</string>
+    <string name="history_status_header_success">Success</string>
+    <string name="history_status_header_failed">Failed</string>
+    <string name="history_status_header_partial">Partial</string>
+    <string name="history_status_header_no_changes">No changes</string>
+    <string name="history_status_header_in_progress">In progress</string>
+
+    <!-- Onboarding wizard -->
+    <string name="onboarding_wizard_title">Create your first rule</string>
+    <string name="onboarding_wizard_subtitle">Pick a template, start blank, or skip and set things up yourself</string>
+    <string name="onboarding_wizard_skip">Skip for now</string>
+    <string name="onboarding_wizard_use_template">Use template</string>
+    <string name="onboarding_wizard_start_blank">Start blank</string>
+    <string name="onboarding_wizard_start_blank_desc">You choose extensions</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -123,10 +160,14 @@
     <string name="settings_gradient_background">Gradient background</string>
     <string name="settings_gradient_background_desc">Tinted background using your theme color</string>
     <string name="settings_backup_section">Import/Export</string>
-    <string name="settings_no_folder_chosen">No folder chosen</string>
-    <string name="settings_export_folder_hint">Folder for manual export and auto-export (rules, history, settings).</string>
+    <string name="settings_choose_export_folder">Choose export folder</string>
+    <string name="settings_export_folder_hint">Folder for exporting backups (rules, history, settings).</string>
+    <string name="settings_export_select_folder_first">Select an export folder first</string>
+    <string name="settings_export_success">%1$s exported</string>
     <string name="settings_export_now">Export backup</string>
     <string name="settings_import_rules">Import backup</string>
+    <string name="settings_import_success">Backup imported (%1$s)</string>
+    <string name="settings_import_replace_hint">Import replaces all rules and run history with the backup. Settings in the file overwrite your current settings when the backup includes them.</string>
     <string name="settings_auto_export_on_change">Auto-export on app exit</string>
     <string name="settings_auto_export_on_change_hint">Full backup on exit after rule changes.</string>
     <string name="settings_scheduled_export">Daily scheduled export</string>
@@ -153,6 +194,7 @@
     <string name="settings_about_section">About</string>
     <string name="settings_about_tagline">Organize your files automatically</string>
     <string name="settings_view_on_github">View on GitHub</string>
+    <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
 
     <!-- Onboarding -->
     <string name="onboarding_title_subtitle">Organize your files automatically</string>
@@ -180,8 +222,10 @@
     <string name="settings_installing">Installing…</string>
     <string name="settings_update_available">Version %1$s available</string>
     <string name="settings_up_to_date">You\'re up to date</string>
+    <string name="settings_update_sheet_up_to_date">You are up to date</string>
     <string name="settings_changelog_title">What\'s New</string>
     <string name="settings_changelog_load_failed">Could not load changelog</string>
+    <string name="settings_play_in_app_update_failed">Could not start the update. Try Check for updates again.</string>
 
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>

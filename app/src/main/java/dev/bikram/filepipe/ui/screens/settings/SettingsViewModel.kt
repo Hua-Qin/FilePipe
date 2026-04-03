@@ -20,6 +20,11 @@ import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.ImportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
+import androidx.activity.ComponentActivity
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.IntentSenderRequest
+import dev.bikram.filepipe.update.PlayInAppUpdateStarter
+import dev.bikram.filepipe.update.PlayUpdateSessionHandle
 import dev.bikram.filepipe.update.UpdateChecker
 import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
@@ -32,6 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.yield
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -46,7 +52,9 @@ class SettingsViewModel @Inject constructor(
     private val importRulesUseCase: ImportRulesUseCase,
     private val workManager: WorkManager,
     private val rulesAutoExportTrigger: RulesAutoExportTrigger,
-    private val updateChecker: UpdateChecker
+    private val updateChecker: UpdateChecker,
+    private val playUpdateSessionHandle: PlayUpdateSessionHandle,
+    private val playInAppUpdateStarter: PlayInAppUpdateStarter
 ) : ViewModel() {
 
     val preferencesFlow = userPreferencesRepository.preferencesFlow
@@ -67,8 +75,11 @@ class SettingsViewModel @Inject constructor(
     private val _downloadProgress = MutableStateFlow<Float?>(null)
     val downloadProgress: StateFlow<Float?> = _downloadProgress.asStateFlow()
 
-    private val _changelogUi = MutableStateFlow<ChangelogUiState>(ChangelogUiState.Hidden)
-    val changelogUi: StateFlow<ChangelogUiState> = _changelogUi.asStateFlow()
+    private val _updateSheetChangelog = MutableStateFlow<ChangelogUiState>(ChangelogUiState.Hidden)
+    val updateSheetChangelog: StateFlow<ChangelogUiState> = _updateSheetChangelog.asStateFlow()
+
+    private val _manualUpdateNoResult = MutableStateFlow(false)
+    val manualUpdateNoResult: StateFlow<Boolean> = _manualUpdateNoResult.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -169,11 +180,13 @@ class SettingsViewModel @Inject constructor(
     fun exportNow() = viewModelScope.launch {
         val folder = userPreferencesRepository.getPreferencesSnapshot().exportFolderUri
         if (folder.isBlank()) {
-            _userMessage.value = "Choose an export folder first"
+            _userMessage.value = context.getString(R.string.settings_export_select_folder_first)
             return@launch
         }
         exportRulesUseCase.exportRulesToTreeUri(folder).fold(
-            onSuccess = { _userMessage.value = "Backup exported successfully" },
+            onSuccess = { fileName ->
+                _userMessage.value = context.getString(R.string.settings_export_success, fileName)
+            },
             onFailure = { _userMessage.value = "Export failed: ${it.message}" }
         )
     }
@@ -196,13 +209,17 @@ class SettingsViewModel @Inject constructor(
                     }
                     if (result.settingsRestored) add("settings")
                 }
-                _userMessage.value = "Imported ${parts.joinToString(", ")}"
+                _userMessage.value = context.getString(
+                    R.string.settings_import_success,
+                    parts.joinToString(", ")
+                )
             },
             onFailure = { _userMessage.value = "Import failed: ${it.message}" }
         )
     }
 
     fun checkForUpdate(silent: Boolean = false) = viewModelScope.launch {
+        playUpdateSessionHandle.clearPendingPlayUpdate()
         _isCheckingUpdate.value = true
         _downloadProgress.value = null
         _updateInfo.value = null
@@ -211,8 +228,74 @@ class SettingsViewModel @Inject constructor(
         if (info != null) {
             _updateInfo.value = info
         } else if (!silent) {
+            _userMessage.value = null
+            yield()
             _userMessage.value = context.getString(R.string.settings_up_to_date)
         }
+    }
+
+    /**
+     * Manual flow from the update sheet: sets checking immediately on the main thread, then runs the check.
+     * No snackbar; the sheet shows up-to-date vs available.
+     */
+    fun beginManualUpdateCheckFromSheet() {
+        playUpdateSessionHandle.clearPendingPlayUpdate()
+        _isCheckingUpdate.value = true
+        _downloadProgress.value = null
+        _updateInfo.value = null
+        _manualUpdateNoResult.value = false
+        viewModelScope.launch {
+            val info = updateChecker.checkForUpdate()
+            _isCheckingUpdate.value = false
+            if (info != null) {
+                _updateInfo.value = info
+            } else {
+                _manualUpdateNoResult.value = true
+            }
+        }
+    }
+
+    fun loadChangelogForUpdateSheet() = viewModelScope.launch {
+        if (BuildConfig.CHANGELOG_GITHUB_REPO.isBlank()) {
+            _updateSheetChangelog.value = ChangelogUiState.Failed(
+                context.getString(R.string.settings_changelog_load_failed)
+            )
+            return@launch
+        }
+        _updateSheetChangelog.value = ChangelogUiState.Loading
+        val loaded = withContext(Dispatchers.IO) {
+            runCatching { fetchRawChangelog() }
+        }
+        _updateSheetChangelog.value = loaded.fold(
+            onSuccess = { ChangelogUiState.Ready(it) },
+            onFailure = {
+                ChangelogUiState.Failed(
+                    it.message ?: context.getString(R.string.settings_changelog_load_failed)
+                )
+            }
+        )
+    }
+
+    fun dismissUpdateSheet() {
+        playUpdateSessionHandle.clearPendingPlayUpdate()
+        _updateSheetChangelog.value = ChangelogUiState.Hidden
+        _manualUpdateNoResult.value = false
+    }
+
+    fun tryStartPlayInAppUpdate(
+        activity: ComponentActivity?,
+        launcher: ActivityResultLauncher<IntentSenderRequest>
+    ): Boolean {
+        if (!BuildConfig.USE_PLAY_IN_APP_UPDATES) return false
+        if (activity == null) {
+            _userMessage.value = context.getString(R.string.settings_play_in_app_update_failed)
+            return false
+        }
+        val started = playInAppUpdateStarter.startUpdateIfPending(activity, launcher)
+        if (!started) {
+            _userMessage.value = context.getString(R.string.settings_play_in_app_update_failed)
+        }
+        return started
     }
 
     fun downloadAndInstall(downloadUrl: String) = viewModelScope.launch {
@@ -269,28 +352,6 @@ class SettingsViewModel @Inject constructor(
         _downloadProgress.value = null
     }
 
-    fun openChangelogSheet() {
-        if (BuildConfig.GITHUB_REPO.isBlank()) return
-        viewModelScope.launch {
-            _changelogUi.value = ChangelogUiState.Loading
-            val loaded = withContext(Dispatchers.IO) {
-                runCatching { fetchRawChangelog() }
-            }
-            _changelogUi.value = loaded.fold(
-                onSuccess = { ChangelogUiState.Ready(it) },
-                onFailure = {
-                    ChangelogUiState.Failed(
-                        it.message ?: context.getString(R.string.settings_changelog_load_failed)
-                    )
-                }
-            )
-        }
-    }
-
-    fun dismissChangelogSheet() {
-        _changelogUi.value = ChangelogUiState.Hidden
-    }
-
     fun openAppNotificationSettings() {
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
@@ -306,9 +367,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun fetchRawChangelog(): String {
-        val repo = BuildConfig.GITHUB_REPO
+        val repo = BuildConfig.CHANGELOG_GITHUB_REPO
+        val branch = BuildConfig.CHANGELOG_GITHUB_BRANCH
         val connection =
-            URL("https://raw.githubusercontent.com/$repo/main/CHANGELOG.md").openConnection() as HttpURLConnection
+            URL("https://raw.githubusercontent.com/$repo/$branch/CHANGELOG.md").openConnection() as HttpURLConnection
         connection.instanceFollowRedirects = true
         connection.connectTimeout = 15_000
         connection.readTimeout = 20_000

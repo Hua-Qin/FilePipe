@@ -1,7 +1,10 @@
 package dev.bikram.filepipe.ui.screens.rules
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +27,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Deselect
@@ -39,10 +44,14 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
@@ -70,14 +79,22 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.graphics.vector.ImageVector
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.SwipeAction
+import dev.bikram.filepipe.domain.model.HistorySortDirection
+import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.ui.components.RuleCard
+import dev.bikram.filepipe.ui.components.ThemeColoredEmptyRulesIllustration
+import dev.bikram.filepipe.ui.components.RuleCardAction
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
@@ -100,21 +117,23 @@ fun RulesScreen(
     viewModel: RulesViewModel = hiltViewModel()
 ) {
     val playTap = rememberPlayTapSound()
-    val previewState by viewModel.previewState.collectAsStateWithLifecycle()
-    val rules by viewModel.rules.collectAsStateWithLifecycle()
-    val selectedRuleIds by viewModel.selectedRuleIds.collectAsStateWithLifecycle()
-    val progressMap by viewModel.progressMap.collectAsStateWithLifecycle()
-    val isRunning by viewModel.isRunning.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val rules = uiState.rules
+    val selectedRuleIds = uiState.selectedRuleIds
+    val progressMap = uiState.progressMap
+    val isRunning = uiState.isRunning
+    val isCompactMode = uiState.isCompactMode
+    val cardModeOverrides = uiState.cardModeOverrides
+    val swipeStartToEnd = uiState.swipeStartToEnd
+    val swipeEndToStart = uiState.swipeEndToStart
+    val staleRuleIds = uiState.staleRuleIds
+    val previewState = uiState.previewState
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
-    val isCompactMode by viewModel.isCompactMode.collectAsStateWithLifecycle()
-    val cardModeOverrides by viewModel.cardModeOverrides.collectAsStateWithLifecycle()
-    val swipeStartToEnd by viewModel.swipeStartToEnd.collectAsStateWithLifecycle()
-    val swipeEndToStart by viewModel.swipeEndToStart.collectAsStateWithLifecycle()
-    val staleRuleIds by viewModel.staleRuleIds.collectAsStateWithLifecycle()
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     var pendingDeleteRule by remember { mutableStateOf<Rule?>(null) }
     var pendingDeleteSelected by remember { mutableStateOf(false) }
+    var sortMenuExpanded by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
 
@@ -150,21 +169,22 @@ fun RulesScreen(
 
     LaunchedEffect(userMessage) {
         val msg = userMessage ?: return@LaunchedEffect
-        viewModel.clearUserMessage()
         snackbarHostState.showSnackbar(msg)
+        viewModel.clearUserMessage()
     }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
+            val appBarColors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent
+            )
             LargeTopAppBar(
                 title = { Text("Rules") },
                 scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent
-                ),
+                colors = appBarColors,
                 actions = {
                     if (hasSelection && !isRunning) {
                         IconButton(onClick = {
@@ -180,14 +200,67 @@ fun RulesScreen(
                             Icon(Icons.Default.Deselect, contentDescription = stringResource(R.string.run_deselect_all))
                         }
                     } else {
-                        FilledTonalIconButton(onClick = {
-                            playTap()
-                            viewModel.toggleGlobalViewMode()
-                        }) {
-                            Icon(
-                                imageVector = if (isCompactMode) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
-                                contentDescription = if (isCompactMode) "Expand all" else "Collapse all"
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Box {
+                                FilledTonalIconButton(onClick = {
+                                    playTap()
+                                    sortMenuExpanded = true
+                                }) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Sort,
+                                        contentDescription = stringResource(R.string.history_sort_menu)
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = sortMenuExpanded,
+                                    onDismissRequest = { sortMenuExpanded = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
+                                        onClick = {
+                                            playTap()
+                                            viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
+                                            sortMenuExpanded = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
+                                        onClick = {
+                                            playTap()
+                                            viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
+                                            sortMenuExpanded = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
+                                        onClick = {
+                                            playTap()
+                                            viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
+                                            sortMenuExpanded = false
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
+                                        onClick = {
+                                            playTap()
+                                            viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)
+                                            sortMenuExpanded = false
+                                        }
+                                    )
+                                }
+                            }
+                            FilledTonalIconButton(onClick = {
+                                playTap()
+                                viewModel.toggleGlobalViewMode()
+                            }) {
+                                Icon(
+                                    imageVector = if (isCompactMode) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
+                                    contentDescription = if (isCompactMode) "Expand all" else "Collapse all"
+                                )
+                            }
                         }
                     }
                 }
@@ -200,7 +273,7 @@ fun RulesScreen(
             )
         },
         bottomBar = {
-            if (hasSelection || isRunning) {
+            if (isRunning) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -211,51 +284,60 @@ fun RulesScreen(
                             bottom = contentPadding.calculateBottomPadding() + 4.dp
                         )
                 ) {
-                    if (isRunning) {
-                        Text(
-                            text = stringResource(R.string.run_in_progress),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    } else {
-                        val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Text(
+                        text = stringResource(R.string.run_in_progress),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            } else {
+                AnimatedVisibility(
+                    visible = hasSelection,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
+                    val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = contentPadding.calculateBottomPadding() + 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            tonalElevation = 3.dp,
+                            shadowElevation = 3.dp
                         ) {
-                            FilledTonalIconButton(
-                                onClick = {
-                                    playTap()
-                                    pendingDeleteSelected = true
-                                },
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                    contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Delete selected")
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    playTap()
-                                    viewModel.clearSelection()
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(stringResource(R.string.cancel))
-                            }
-                            Button(
-                                onClick = {
-                                    playTap()
-                                    viewModel.runSelected()
-                                },
-                                enabled = enabledSelectedCount > 0
-                            ) {
-                                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                                Text(text = "  ${stringResource(R.string.run_button, enabledSelectedCount)}")
+                                FilledTonalIconButton(onClick = { playTap(); viewModel.clearSelection() }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Cancel selection")
+                                }
+                                FilledTonalIconButton(
+                                    onClick = { playTap(); pendingDeleteSelected = true },
+                                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
+                                }
+                                FilledTonalButton(
+                                    onClick = { playTap(); viewModel.runSelected() },
+                                    enabled = enabledSelectedCount > 0,
+                                    shape = RoundedCornerShape(50),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text("Run Selected (${selectedRuleIds.size})")
+                                    Spacer(Modifier.width(6.dp))
+                                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
                             }
                         }
                     }
@@ -297,6 +379,7 @@ fun RulesScreen(
                         progress = progressMap[rule.id],
                         isAnyRuleRunning = isRunning,
                         hasStaleFolder = rule.id in staleRuleIds,
+                        onStaleWarningClick = { onEditRule(rule.id) },
                         swipeStartToEnd = swipeStartToEnd,
                         swipeEndToStart = swipeEndToStart,
                         onToggleEnabled = { enabled -> viewModel.toggleEnabled(rule, enabled) },
@@ -448,6 +531,7 @@ private fun SwipeToDismissRuleCard(
     progress: dev.bikram.filepipe.domain.model.RunProgress?,
     isAnyRuleRunning: Boolean,
     hasStaleFolder: Boolean,
+    onStaleWarningClick: () -> Unit,
     swipeStartToEnd: SwipeAction,
     swipeEndToStart: SwipeAction,
     onToggleEnabled: (Boolean) -> Unit,
@@ -463,10 +547,14 @@ private fun SwipeToDismissRuleCard(
 ) {
     val cardShape = RoundedCornerShape(16.dp)
     val swipeAssigned = setOf(swipeStartToEnd, swipeEndToStart)
-    val cardIconPairs: List<Pair<ImageVector, () -> Unit>> = SwipeAction.entries
+    val cardIconPairs: List<RuleCardAction> = SwipeAction.entries
         .filter { it !in swipeAssigned }
         .map { action ->
-            action.icon() to { action.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule) }
+            RuleCardAction(
+                icon = action.icon(),
+                label = action.label(),
+                onClick = { action.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule) }
+            )
         }
 
     val hapticEnabled = LocalHapticEnabled.current
@@ -513,7 +601,10 @@ private fun SwipeToDismissRuleCard(
             onToggleEnabled = onToggleEnabled,
             onRunClick = onRunRule,
             isAnyRuleRunning = isAnyRuleRunning,
-            hasStaleFolder = hasStaleFolder
+            onPreviewRule = onPreviewRule,
+            onViewHistory = onViewHistory,
+            hasStaleFolder = hasStaleFolder,
+            onStaleWarningClick = onStaleWarningClick
         )
     }
 }
@@ -541,40 +632,56 @@ private fun SwipeAction.icon(): ImageVector = when (this) {
 }
 
 @Composable
+private fun SwipeAction.label(): String = when (this) {
+    SwipeAction.EDIT -> stringResource(R.string.edit_rule)
+    SwipeAction.DELETE -> stringResource(R.string.delete_rule)
+    SwipeAction.DUPLICATE -> stringResource(R.string.duplicate_rule)
+    SwipeAction.PREVIEW -> stringResource(R.string.preview_rule)
+    SwipeAction.VIEW_HISTORY -> stringResource(R.string.view_history)
+}
+
+@Composable
 private fun EmptyState(
     onAddRule: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }
     ) {
-        Text(
-            stringResource(R.string.rules_empty_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            stringResource(R.string.rules_empty_subtitle),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = onAddRule,
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth(0.72f)
+        Column(
+            modifier = modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp)
+            ThemeColoredEmptyRulesIllustration(Modifier.size(120.dp))
+            Spacer(Modifier.height(24.dp))
+            Text(
+                stringResource(R.string.rules_empty_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.width(8.dp))
-            Text(stringResource(R.string.rules_add_rule))
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(R.string.rules_empty_subtitle),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = onAddRule,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier.fillMaxWidth(0.72f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.rules_add_rule))
+            }
         }
     }
 }

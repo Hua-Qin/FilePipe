@@ -45,8 +45,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -64,7 +62,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -81,6 +78,7 @@ import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.screens.history.HistoryScreen
 import dev.bikram.filepipe.ui.screens.history.HistoryViewModel
 import dev.bikram.filepipe.ui.screens.historydetail.HistoryDetailScreen
+import dev.bikram.filepipe.ui.screens.onboarding.OnboardingRuleWizardScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingTitleScreen
 import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
@@ -122,6 +120,7 @@ private val bottomNavItems = listOf(
 @Composable
 fun AppNavigation(
     hasSeenIntro: Boolean = true,
+    introSeenAtLaunch: Boolean = hasSeenIntro,
     preferences: AppPreferences = AppPreferences()
 ) {
     val playTap = rememberPlayTapSound()
@@ -186,13 +185,12 @@ fun AppNavigation(
     val settingsVm: SettingsViewModel = hiltViewModel()
 
     var showClearHistoryDialog by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
-    val fabMessage by settingsVm.userMessage.collectAsStateWithLifecycle()
 
-    LaunchedEffect(fabMessage) {
-        val msg = fabMessage ?: return@LaunchedEffect
-        settingsVm.clearUserMessage()
-        snackbarHostState.showSnackbar(msg)
+    // Lock from disk-backed snapshot (MainActivity) so the first frame does not use
+    // AppPreferences.DEFAULT.hasSeenIntro (false) and force onboarding on every cold start.
+    // Still stable for the activity so live hasSeenIntro updates do not change startDestination.
+    val lockedNavStartDestination = remember(introSeenAtLaunch) {
+        if (introSeenAtLaunch) Screen.Rules.route else Screen.OnboardingTitle.createRoute()
     }
 
     LaunchedEffect(hasSeenIntro, preferences.autoCheckForUpdates) {
@@ -255,7 +253,7 @@ fun AppNavigation(
             ) { _ ->
                 NavHost(
                 navController = navController,
-                startDestination = if (hasSeenIntro) Screen.Rules.route else Screen.OnboardingTitle.createRoute(),
+                startDestination = lockedNavStartDestination,
                 enterTransition = { slideInHorizontally { it } + fadeIn() },
                 exitTransition = { slideOutHorizontally { -it / 3 } + fadeOut() },
                 popEnterTransition = { slideInHorizontally { -it } + fadeIn() },
@@ -275,12 +273,43 @@ fun AppNavigation(
                             if (fromSettings) {
                                 navController.popBackStack()
                             } else {
-                                settingsVm.markIntroSeen {
-                                    navController.navigate(Screen.Rules.route) {
-                                        popUpTo(0) { inclusive = true }
-                                    }
+                                navController.navigate(Screen.OnboardingRuleWizard.route) {
+                                    popUpTo(Screen.OnboardingTitle.route) { inclusive = true }
                                 }
                             }
+                        }
+                    )
+                }
+
+                composable(Screen.OnboardingRuleWizard.route) {
+                    OnboardingRuleWizardScreen(
+                        bottomContentPadding = scrimHeight,
+                        onUseTemplate = { templateIndex ->
+                            navController.navigate(Screen.Rules.route) {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                            navController.navigate(
+                                Screen.RuleDetail.createRoute(
+                                    templateIndex = templateIndex,
+                                    skipTemplatePicker = true
+                                )
+                            )
+                            settingsVm.markIntroSeen()
+                        },
+                        onStartBlank = {
+                            navController.navigate(Screen.Rules.route) {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                            navController.navigate(
+                                Screen.RuleDetail.createRoute(skipTemplatePicker = true)
+                            )
+                            settingsVm.markIntroSeen()
+                        },
+                        onSkip = {
+                            navController.navigate(Screen.Rules.route) {
+                                popUpTo(navController.graph.id) { inclusive = true }
+                            }
+                            settingsVm.markIntroSeen()
                         }
                     )
                 }
@@ -310,9 +339,19 @@ fun AppNavigation(
                 }
                 composable(
                     route = Screen.RuleDetail.route,
-                    arguments = listOf(navArgument(Screen.RuleDetail.ARG_RULE_ID) {
-                        type = NavType.LongType
-                    })
+                    arguments = listOf(
+                        navArgument(Screen.RuleDetail.ARG_RULE_ID) {
+                            type = NavType.LongType
+                        },
+                        navArgument(Screen.RuleDetail.ARG_TEMPLATE_INDEX) {
+                            type = NavType.IntType
+                            defaultValue = -1
+                        },
+                        navArgument(Screen.RuleDetail.ARG_SKIP_TEMPLATE_PICKER) {
+                            type = NavType.BoolType
+                            defaultValue = false
+                        }
+                    )
                 ) {
                     RuleDetailScreen(
                         onNavigateBack = { navController.popBackStack() }
@@ -331,7 +370,8 @@ fun AppNavigation(
                         contentPadding = PaddingValues(bottom = contentPaddingBottom),
                         onOpenIntro = {
                             navController.navigate(Screen.OnboardingTitle.createRoute(fromSettings = true))
-                        }
+                        },
+                        viewModel = settingsVm
                     )
                 }
                 composable(
@@ -357,13 +397,6 @@ fun AppNavigation(
                 }
             }
         }
-
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = contentPaddingBottom + 8.dp)
-        )
 
         if (showBottomBar) {
             FloatingNavBar(

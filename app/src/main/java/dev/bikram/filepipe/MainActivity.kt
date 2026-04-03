@@ -6,8 +6,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
@@ -43,6 +52,11 @@ class MainActivity : ComponentActivity() {
             val preferences by userPreferencesRepository.preferencesFlow
                 .collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
 
+            var introSeenAtLaunch by remember { mutableStateOf<Boolean?>(null) }
+            LaunchedEffect(Unit) {
+                introSeenAtLaunch = userPreferencesRepository.getPreferencesSnapshot().hasSeenIntro
+            }
+
             SideEffect {
                 val nightMode = when (preferences.themeMode) {
                     AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
@@ -58,10 +72,20 @@ class MainActivity : ComponentActivity() {
                 themePaletteStyle = preferences.themePaletteStyle,
                 hapticFeedbackEnabled = preferences.hapticFeedbackEnabled
             ) {
-                AppNavigation(
-                    hasSeenIntro = preferences.hasSeenIntro,
-                    preferences = preferences
-                )
+                if (introSeenAtLaunch == null) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        Box(Modifier.fillMaxSize())
+                    }
+                } else {
+                    AppNavigation(
+                        hasSeenIntro = preferences.hasSeenIntro,
+                        introSeenAtLaunch = introSeenAtLaunch!!,
+                        preferences = preferences
+                    )
+                }
             }
         }
     }

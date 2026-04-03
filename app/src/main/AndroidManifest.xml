@@ -4,6 +4,8 @@
 
     <!-- No broad storage permissions — SAF grants access only to user-selected folders -->
 
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- WorkManager / scheduling -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />

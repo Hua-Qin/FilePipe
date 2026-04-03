@@ -23,6 +23,22 @@ fun View.playTapSound() {
 }
 
 /**
+ * Heavier double-click haptic used for long-press multi-select.
+ * Distinct from the swipe-threshold haptic so the user can feel the difference.
+ */
+fun View.performLongPressHaptic() {
+    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+    } else {
+        context.getSystemService(Vibrator::class.java)
+    } ?: return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
+    }
+}
+
+/**
  * Haptic when swipe passes the dismiss threshold. Uses a stronger [View.performHapticFeedback]
  * than a bare tick, plus a heavier vibrator pulse when hardware supports it.
  */

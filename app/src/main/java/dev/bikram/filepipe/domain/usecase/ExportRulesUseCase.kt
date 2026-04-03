@@ -24,7 +24,7 @@ class ExportRulesUseCase @Inject constructor(
     private val runHistoryRepository: RunHistoryRepository,
     private val userPreferencesRepository: UserPreferencesRepository
 ) {
-    suspend fun exportRulesToTreeUri(folderPath: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun exportRulesToTreeUri(folderPath: String): Result<String> = withContext(Dispatchers.IO) {
         if (folderPath.isBlank()) return@withContext Result.failure(IllegalStateException("No export folder"))
 
         val rules = ruleRepository.getAllRules().first()
@@ -39,9 +39,9 @@ class ExportRulesUseCase @Inject constructor(
         val fileName = "filepipe_backup_$dateSuffix.json"
 
         if (folderPath.startsWith("content://")) {
-            writeToContentUri(folderPath, fileName, json)
+            writeToContentUri(folderPath, fileName, json).map { fileName }
         } else {
-            writeToFilePath(folderPath, fileName, json)
+            writeToFilePath(folderPath, fileName, json).map { fileName }
         }
     }
 

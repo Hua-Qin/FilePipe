@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -66,12 +67,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.MultiChoiceSegmentedButtonRow
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -121,12 +118,19 @@ import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ToggleButton
 import androidx.compose.ui.text.input.KeyboardType
 
 private val SectionButtonShape = RoundedCornerShape(12.dp)
@@ -212,7 +216,7 @@ fun RuleDetailScreen(
     val isDirty by viewModel.isDirty.collectAsStateWithLifecycle()
     var showScheduleDialog by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
-    var showTemplateSheet by remember { mutableStateOf(viewModel.isNewRule) }
+    var showTemplateSheet by remember { mutableStateOf(viewModel.showInitialTemplatePicker) }
     var showRuleIconSheet by remember { mutableStateOf(false) }
     var customEmojiDraft by remember { mutableStateOf("") }
     val previewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -353,8 +357,8 @@ fun RuleDetailScreen(
                     RuleIconOrEmoji(
                         iconEmoji = state.iconEmoji,
                         icon = state.icon,
-                        vectorSize = 28.dp,
-                        emojiFontSize = 26.sp,
+                        vectorSize = 34.dp,
+                        emojiFontSize = 32.sp,
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         contentDescription = stringResource(R.string.rule_icon_picker_cd),
                         modifier = Modifier
@@ -596,21 +600,27 @@ fun RuleDetailScreen(
                     text = stringResource(R.string.rule_operation_mode_label),
                     style = MaterialTheme.typography.bodyMedium
                 )
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                @Suppress("DEPRECATION")
+                ButtonGroup(modifier = Modifier.fillMaxWidth()) {
                     OperationMode.entries.forEachIndexed { index, mode ->
-                        SegmentedButton(
-                            selected = state.operationMode == mode,
-                            onClick = { withTapSound { viewModel.setOperationMode(mode) } },
-                            shape = SegmentedButtonDefaults.itemShape(index, OperationMode.entries.size),
-                            label = {
-                                Text(
-                                    when (mode) {
-                                        OperationMode.MOVE -> stringResource(R.string.operation_move)
-                                        OperationMode.COPY -> stringResource(R.string.operation_copy)
-                                    }
-                                )
-                            }
-                        )
+                        val shapes = when (index) {
+                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            OperationMode.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        }
+                        ToggleButton(
+                            checked = state.operationMode == mode,
+                            onCheckedChange = { withTapSound { viewModel.setOperationMode(mode) } },
+                            shapes = shapes,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                when (mode) {
+                                    OperationMode.MOVE -> stringResource(R.string.operation_move)
+                                    OperationMode.COPY -> stringResource(R.string.operation_copy)
+                                }
+                            )
+                        }
                     }
                 }
 
@@ -620,23 +630,29 @@ fun RuleDetailScreen(
                     text = stringResource(R.string.rule_conflict_policy_label),
                     style = MaterialTheme.typography.bodyMedium
                 )
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                @Suppress("DEPRECATION")
+                ButtonGroup(modifier = Modifier.fillMaxWidth()) {
                     ConflictPolicy.entries.forEachIndexed { index, policy ->
-                        SegmentedButton(
-                            selected = state.conflictPolicy == policy,
-                            onClick = { withTapSound { viewModel.setConflictPolicy(policy) } },
-                            shape = SegmentedButtonDefaults.itemShape(index, ConflictPolicy.entries.size),
-                            label = {
-                                Text(
-                                    when (policy) {
-                                        ConflictPolicy.SKIP -> stringResource(R.string.conflict_skip)
-                                        ConflictPolicy.OVERWRITE -> stringResource(R.string.conflict_overwrite)
-                                        ConflictPolicy.RENAME_SUFFIX -> stringResource(R.string.conflict_rename)
-                                    },
-                                    style = MaterialTheme.typography.labelSmall
-                                )
-                            }
-                        )
+                        val shapes = when (index) {
+                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            ConflictPolicy.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        }
+                        ToggleButton(
+                            checked = state.conflictPolicy == policy,
+                            onCheckedChange = { withTapSound { viewModel.setConflictPolicy(policy) } },
+                            shapes = shapes,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                when (policy) {
+                                    ConflictPolicy.SKIP -> stringResource(R.string.conflict_skip)
+                                    ConflictPolicy.OVERWRITE -> stringResource(R.string.conflict_overwrite)
+                                    ConflictPolicy.RENAME_SUFFIX -> stringResource(R.string.conflict_rename)
+                                },
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
                     }
                 }
             }
@@ -739,7 +755,12 @@ fun RuleDetailScreen(
                         )
                     }
 
-                    AnimatedVisibility(visible = advancedExpanded) {
+                    val advancedExpandSpec = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>()
+                    AnimatedVisibility(
+                        visible = advancedExpanded,
+                        enter = expandVertically(animationSpec = advancedExpandSpec) + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
                         Column(
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                             modifier = Modifier.padding(top = 16.dp)
@@ -962,12 +983,12 @@ fun RuleDetailScreen(
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
-                val ruleIconGridCell = 48.dp
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                val ruleIconGridCell = (maxWidth - 48.dp) / 7f
                 FlowRow(
                     maxItemsInEachRow = 7,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     RuleIcon.entries.forEach { iconOption ->
                         FilledTonalIconButton(
@@ -983,30 +1004,31 @@ fun RuleDetailScreen(
                             Icon(
                                 imageVector = iconOption.toImageVector(),
                                 contentDescription = ruleIconOptionLabel(iconOption),
-                                modifier = Modifier.size(26.dp),
+                                modifier = Modifier.size(34.dp),
                                 tint = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
                     }
                 }
+                } // close BoxWithConstraints for icon section
                 Text(
                     text = stringResource(R.string.rule_icon_emoji_section),
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
-                val emojiCellSize = ruleIconGridCell
                 val customEmojiSlotDescription = stringResource(R.string.rule_icon_custom_slot_cd)
                 val emojiTextStyle = TextStyle(
-                    fontSize = 22.sp,
+                    fontSize = 28.sp,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSecondaryContainer
                 )
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
+                val emojiCellSize = (maxWidth - 48.dp) / 7f
                 FlowRow(
                     maxItemsInEachRow = 7,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     RuleIconEmojiPresets.forEach { emojiPreset ->
                         Surface(
@@ -1093,6 +1115,7 @@ fun RuleDetailScreen(
                         }
                     }
                 }
+                } // close BoxWithConstraints for emoji section
                 Spacer(Modifier.height(8.dp))
             }
         }
@@ -1137,12 +1160,17 @@ fun RuleDetailScreen(
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 modifier = Modifier.size(48.dp)
                             ) {
-                                Icon(
-                                    imageVector = template.suggestedIcon.toImageVector(),
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.padding(12.dp)
-                                )
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = template.suggestedIcon.toImageVector(),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(32.dp)
+                                    )
+                                }
                             }
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(template.name, style = MaterialTheme.typography.titleSmall)

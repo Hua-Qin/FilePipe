@@ -61,6 +61,18 @@ enum class TriggerType { MANUAL, SCHEDULED }
 
 enum class RunStatus { IN_PROGRESS, SUCCESS, PARTIAL_FAILURE, FAILED }
 
+/** Successful run with zero files moved and zero failures (shown as "No changes", not "Success"). */
+fun RunHistory.isNoChangesRun(): Boolean =
+    status == RunStatus.SUCCESS && totalFilesMoved == 0 && totalFilesFailed == 0
+
+enum class HistoryStatusFilter {
+    ALL,
+    SUCCESS,
+    FAILED,
+    PARTIAL,
+    NO_CHANGES,
+}
+
 // ---
 
 data class FileMoved(

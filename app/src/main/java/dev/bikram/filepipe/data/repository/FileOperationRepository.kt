@@ -284,13 +284,26 @@ class FileOperationRepository @Inject constructor(
         }
     }
 
+    private val accessCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Boolean, Long>>()
+    private val ACCESS_CACHE_TTL_MS = 5_000L
+
     fun isAccessible(folderUriString: String): Boolean {
         if (!folderUriString.startsWith("content://")) return false
-        return try {
+        val cached = accessCache[folderUriString]
+        if (cached != null && System.currentTimeMillis() - cached.second < ACCESS_CACHE_TTL_MS) {
+            return cached.first
+        }
+        val result = try {
             DocumentFile.fromTreeUri(context, Uri.parse(folderUriString))?.canRead() == true
         } catch (_: SecurityException) {
             false
         }
+        accessCache[folderUriString] = result to System.currentTimeMillis()
+        return result
+    }
+
+    fun invalidateAccessCache() {
+        accessCache.clear()
     }
 
     private fun resolveDestName(name: String, destTree: DocumentFile): String {

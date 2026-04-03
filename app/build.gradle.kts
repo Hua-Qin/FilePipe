@@ -92,11 +92,17 @@ extensions.configure<ApplicationExtension>("android") {
             dimension = "distribution"
             buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
             buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
         create("playstore") {
             dimension = "distribution"
             buildConfigField("String", "GITHUB_REPO", "\"\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "false")
+            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "true")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
     }
 
@@ -136,7 +142,12 @@ dependencies {
     // Room
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.room.paging)
     ksp(libs.room.compiler)
+
+    // Paging 3
+    implementation(libs.paging.runtime)
+    implementation(libs.paging.compose)
 
     // WorkManager + Hilt integration
     implementation(libs.work.runtime.ktx)
@@ -160,4 +171,7 @@ dependencies {
     implementation(libs.datastore.preferences)
 
     implementation(libs.material.kolor)
+
+    add("playstoreImplementation", "com.google.android.play:app-update:2.1.0")
+    add("playstoreImplementation", "com.google.android.play:app-update-ktx:2.1.0")
 }
