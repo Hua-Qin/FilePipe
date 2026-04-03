@@ -1,7 +1,9 @@
 # Manual-only release build (workflow_dispatch). No push/tag triggers.
 #
 # - Git tag: creates v{versionName} from app/build.gradle.kts at the workflow commit (github.sha).
-# - APK: single universal release APK, renamed to filepipe-v{versionName}.apk for artifact + release.
+# - Artifacts (signed release, same versionCode):
+#     - filepipe-v{version}-github.apk   (GitHub Releases / sideload; REQUEST_INSTALL_PACKAGES)
+#     - filepipe-v{version}-playstore.aab (Play Store upload; same playstore flavor as former APK)
 # - GitHub Release: always draft; publish from the Releases UI when ready.
 # - Run from any branch (e.g. main); the tagged commit is the commit that was built.
 
@@ -16,25 +18,30 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Node 20 actions are deprecated; official actions below use Node 24. Third-party actions
+    # still on node20 (e.g. softprops/action-gh-release) run on Node 24 when this is set.
+    # https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: platforms;android-36 build-tools;36.0.0
           log-accepted-android-sdk-licenses: false
 
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -66,36 +73,58 @@ jobs:
           KEY_PASS: ${{ secrets.KEY_PASSWORD }}
           K_ALIAS: ${{ secrets.KEY_ALIAS }}
 
-      - name: Assemble signed release
-        run: ./gradlew :app:assembleRelease --no-configuration-cache
+      - name: Build GitHub APK and Play bundle
+        run: ./gradlew :app:assembleGithubRelease :app:bundlePlaystoreRelease --no-configuration-cache
 
-      - name: Rename release APK
+      - name: Collect and rename release assets
         run: |
+          set -euo pipefail
           version="${{ steps.version.outputs.version }}"
-          release_dir="app/build/outputs/apk/release"
-          src="${release_dir}/app-release.apk"
-          dest="${release_dir}/filepipe-v${version}.apk"
-          if [ ! -f "$src" ]; then
-            echo "Expected APK not found: $src"
-            ls -la "$release_dir" || true
+          out="release-assets"
+          mkdir -p "$out"
+
+          github_apk="app/build/outputs/apk/github/release/app-github-release.apk"
+          play_aab="app/build/outputs/bundle/playstoreRelease/app-playstore-release.aab"
+
+          if [ ! -f "$github_apk" ]; then
+            echo "Expected GitHub flavor APK not found: $github_apk"
+            find app/build/outputs/apk -name '*.apk' -print || true
             exit 1
           fi
-          mv "$src" "$dest"
+          if [ ! -f "$play_aab" ]; then
+            echo "Expected Play Store bundle not found: $play_aab"
+            find app/build/outputs/bundle -name '*.aab' -print || true
+            exit 1
+          fi
 
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+          cp "$github_apk" "$out/filepipe-v${version}-github.apk"
+          cp "$play_aab" "$out/filepipe-v${version}-playstore.aab"
+          ls -la "$out"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v6
         with:
-          name: filepipe-v${{ steps.version.outputs.version }}
-          path: app/build/outputs/apk/release/*.apk
+          name: filepipe-v${{ steps.version.outputs.version }}-release
+          path: release-assets/*
 
+      # Pass token via `with.token`, not env GITHUB_TOKEN — env-only breaks
+      # `on: release: types: [published]` for downstream workflows (softprops/action-gh-release #770).
       - name: Create draft GitHub Release (tag v${{ steps.version.outputs.version }})
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2.6.1
         with:
+          token: ${{ github.token }}
           draft: true
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
           target_commitish: ${{ github.sha }}
-          files: app/build/outputs/apk/release/*.apk
+          body: |
+            **Release assets (same versionCode; distribution flavors)**
+
+            | File | Use |
+            |------|-----|
+            | `filepipe-v${{ steps.version.outputs.version }}-github.apk` | Sideload / GitHub Releases (`REQUEST_INSTALL_PACKAGES` for APK updates) |
+            | `filepipe-v${{ steps.version.outputs.version }}-playstore.aab` | Upload to Play Console (Android App Bundle; not for direct sideload) |
+          files: |
+            release-assets/filepipe-v${{ steps.version.outputs.version }}-github.apk
+            release-assets/filepipe-v${{ steps.version.outputs.version }}-playstore.aab
           generate_release_notes: true

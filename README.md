@@ -18,12 +18,6 @@
   colors, **5 preset accents** and **9 palettes**, optional **progressive blur** and **gradient** background.
 - **Updates** - **Check for updates** in Settings: GitHub builds use releases from this repo; Play builds use **Google Play** in-app updates. 
 
-
-### Builds
-
-- **GitHub / sideload** (`github` flavor) - APK updates from GitHub Releases.
-- **Play Store** (`playstore` flavor) - Updates via the Play Store's in-app update.
-
 ## 🚀 How to use
 
 1. **Start a new rule** - On **Rules** tab, tap **Add rule**. Pick a template or Start blank, then set the name and icon.
@@ -46,6 +40,5 @@
    actions, notifications, backup / restore, history retention, and update checks.
 
 ---
-
 
 Made with ❤️ by Bikram Agarwal
