@@ -53,6 +53,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
@@ -177,11 +178,13 @@ private fun CompactContent(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = rule.icon.toImageVector(),
-                        contentDescription = null,
-                        modifier = Modifier.size(22.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    RuleIconOrEmoji(
+                        iconEmoji = rule.iconEmoji,
+                        icon = rule.icon,
+                        vectorSize = 22.dp,
+                        emojiFontSize = 18.sp,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier
                     )
                 }
             },
@@ -251,11 +254,13 @@ private fun ExpandedContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(
-                    imageVector = rule.icon.toImageVector(),
-                    contentDescription = null,
-                    modifier = Modifier.size(28.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                RuleIconOrEmoji(
+                    iconEmoji = rule.iconEmoji,
+                    icon = rule.icon,
+                    vectorSize = 28.dp,
+                    emojiFontSize = 22.sp,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
                 )
                 Text(
                     text = rule.name,
@@ -282,12 +287,6 @@ private fun ExpandedContent(
         ) {
             Spacer(Modifier.height(8.dp))
 
-            Text(
-                text = stringResource(R.string.rule_card_types),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(Modifier.height(4.dp))
             if (rule.fileExtensions.isEmpty()) {
                 Text(
                     text = stringResource(R.string.rule_card_types_none),
@@ -369,6 +368,10 @@ private fun ExpandedContent(
                         val days = arrayOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
                         val dayName = schedule.dayOfWeek?.let { days.getOrNull(it - 2) } ?: "?"
                         "Weekly $dayName at %02d:%02d".format(schedule.hour, schedule.minute)
+                    }
+                    ScheduleType.EVERY_N_HOURS -> {
+                        val hours = schedule.intervalHours ?: 1
+                        "Every ${hours}h"
                     }
                 }
                 LabeledInfo(label = stringResource(R.string.schedule_label), value = scheduleText)

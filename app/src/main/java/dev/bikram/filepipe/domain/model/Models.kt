@@ -18,6 +18,8 @@ data class Rule(
     val operationMode: OperationMode = OperationMode.MOVE,
     val scanSubdirectories: Boolean = false,
     val icon: RuleIcon = RuleIcon.DEFAULT,
+    /** When non-blank, shown instead of [icon] in UI (system emoji font). */
+    val iconEmoji: String? = null,
     // Advanced filters
     val filenamePattern: String? = null,
     val minFileSizeBytes: Long? = null,
@@ -27,13 +29,15 @@ data class Rule(
     val excludePatterns: List<String> = emptyList()
 )
 
-enum class ScheduleType { DAILY, WEEKLY }
+enum class ScheduleType { DAILY, WEEKLY, EVERY_N_HOURS }
 
 data class RuleSchedule(
     val type: ScheduleType,
-    val dayOfWeek: Int? = null,  // Calendar.MONDAY (2) … Calendar.SUNDAY (1) — null for DAILY
+    val dayOfWeek: Int? = null,  // Calendar.MONDAY (2) … Calendar.SUNDAY (1) — null for DAILY / EVERY_N_HOURS
     val hour: Int,
-    val minute: Int
+    val minute: Int,
+    /** Required when [type] is [ScheduleType.EVERY_N_HOURS]; UI allows 1–24 hours (use daily for longer gaps). */
+    val intervalHours: Int? = null
 )
 
 // ---

@@ -43,6 +43,7 @@ data class RuleDetailUiState(
     val operationMode: OperationMode = OperationMode.MOVE,
     val scanSubdirectories: Boolean = false,
     val icon: RuleIcon = RuleIcon.DEFAULT,
+    val iconEmoji: String? = null,
     // Advanced filters (shown as display strings in UI)
     val filenamePattern: String = "",
     val minFileSizeMb: String = "",
@@ -68,6 +69,7 @@ private data class RuleSnapshot(
     val operationMode: OperationMode,
     val scanSubdirectories: Boolean,
     val icon: RuleIcon,
+    val iconEmoji: String?,
     val filenamePattern: String,
     val minFileSizeMb: String,
     val maxFileSizeMb: String,
@@ -86,6 +88,7 @@ private fun RuleDetailUiState.toSnapshot(): RuleSnapshot = RuleSnapshot(
     operationMode = operationMode,
     scanSubdirectories = scanSubdirectories,
     icon = icon,
+    iconEmoji = iconEmoji,
     filenamePattern = filenamePattern,
     minFileSizeMb = minFileSizeMb,
     maxFileSizeMb = maxFileSizeMb,
@@ -146,6 +149,7 @@ class RuleDetailViewModel @Inject constructor(
                     operationMode = rule.operationMode,
                     scanSubdirectories = rule.scanSubdirectories,
                     icon = rule.icon,
+                    iconEmoji = rule.iconEmoji,
                     filenamePattern = rule.filenamePattern ?: "",
                     minFileSizeMb = rule.minFileSizeBytes?.let { bytes -> "${bytes / 1024 / 1024}" } ?: "",
                     maxFileSizeMb = rule.maxFileSizeBytes?.let { bytes -> "${bytes / 1024 / 1024}" } ?: "",
@@ -246,7 +250,25 @@ class RuleDetailViewModel @Inject constructor(
 
     fun dismissRedundantFolderNotice() = _uiState.update { it.copy(removedRedundantFolders = emptyList()) }
 
-    fun setIcon(icon: RuleIcon) = _uiState.update { it.copy(icon = icon) }
+    fun setIcon(icon: RuleIcon) = _uiState.update { it.copy(icon = icon, iconEmoji = null) }
+
+    fun setIconEmoji(emoji: String?) {
+        if (emoji == null) {
+            _uiState.update { it.copy(iconEmoji = null) }
+            return
+        }
+        val trimmed = emoji.trim()
+        if (trimmed.isEmpty()) {
+            _uiState.update { it.copy(iconEmoji = null) }
+            return
+        }
+        val boundary = java.text.BreakIterator.getCharacterInstance()
+        boundary.setText(trimmed)
+        val start = boundary.first()
+        val end = boundary.next()
+        val singleGrapheme = trimmed.substring(start, end)
+        _uiState.update { it.copy(iconEmoji = singleGrapheme) }
+    }
 
     // Advanced filter setters
     fun setFilenamePattern(pattern: String) = _uiState.update { it.copy(filenamePattern = pattern) }
@@ -266,15 +288,19 @@ class RuleDetailViewModel @Inject constructor(
 
     fun applyTemplate(template: RuleTemplate) {
         _uiState.update { state ->
-            val mergedSources = (state.sourceFolderPaths + template.suggestedSourcePaths).distinct()
-            state.copy(
+            val nextState = state.copy(
                 name = if (state.name.isBlank()) template.name else state.name,
                 fileExtensions = template.extensions,
                 operationMode = template.operationMode,
                 scanSubdirectories = template.scanSubdirectories,
-                sourceFolderPaths = mergedSources,
                 icon = template.suggestedIcon
             )
+            if (nextState.scanSubdirectories) {
+                val (kept, removed) = removeRedundantPaths(nextState.sourceFolderPaths)
+                nextState.copy(sourceFolderPaths = kept, removedRedundantFolders = removed)
+            } else {
+                nextState
+            }
         }
     }
 
@@ -330,6 +356,7 @@ class RuleDetailViewModel @Inject constructor(
         operationMode = state.operationMode,
         scanSubdirectories = state.scanSubdirectories,
         icon = state.icon,
+        iconEmoji = state.iconEmoji?.takeIf { it.isNotBlank() },
         filenamePattern = state.filenamePattern.takeIf { it.isNotBlank() },
         minFileSizeBytes = state.minFileSizeMb.toLongOrNull()?.takeIf { it > 0 }?.let { it * 1024 * 1024 },
         maxFileSizeBytes = state.maxFileSizeMb.toLongOrNull()?.takeIf { it > 0 }?.let { it * 1024 * 1024 },

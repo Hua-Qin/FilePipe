@@ -80,7 +80,7 @@ class UndoRunUseCase @Inject constructor(
             }
         }
 
-        if (reversed > 0 || movedFiles.isEmpty()) {
+        if (reversed > 0) {
             runHistoryRepository.markRunReversed(historyId)
         }
 

@@ -39,6 +39,7 @@ data class RuleBackupDto(
     val operationMode: String = OperationMode.MOVE.name,
     val scanSubdirectories: Boolean = false,
     val iconKey: String = RuleIcon.DEFAULT.name,
+    val iconEmoji: String? = null,
     val filenamePattern: String? = null,
     val minFileSizeBytes: Long? = null,
     val maxFileSizeBytes: Long? = null,
@@ -52,7 +53,8 @@ data class ScheduleBackupDto(
     val type: String,
     val dayOfWeek: Int? = null,
     val hour: Int,
-    val minute: Int
+    val minute: Int,
+    val intervalHours: Int? = null
 )
 
 @Serializable
@@ -91,7 +93,7 @@ data class SettingsBackupDto(
     val autoExportOnRuleChange: Boolean = false,
     val scheduledExportEnabled: Boolean = false,
     val logRetentionDays: Int = 30,
-    val swipeStartToEnd: String = SwipeAction.DUPLICATE.name,
+    val swipeStartToEnd: String = SwipeAction.EDIT.name,
     val swipeEndToStart: String = SwipeAction.DELETE.name,
     val bookmarkedFolders: List<String> = emptyList(),
     val hasSeenIntro: Boolean = false,
@@ -117,6 +119,7 @@ fun Rule.toBackupDto(): RuleBackupDto = RuleBackupDto(
     operationMode = operationMode.name,
     scanSubdirectories = scanSubdirectories,
     iconKey = icon.name,
+    iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
     filenamePattern = filenamePattern,
     minFileSizeBytes = minFileSizeBytes,
     maxFileSizeBytes = maxFileSizeBytes,
@@ -129,7 +132,8 @@ fun RuleSchedule.toBackupDto(): ScheduleBackupDto = ScheduleBackupDto(
     type = type.name,
     dayOfWeek = dayOfWeek,
     hour = hour,
-    minute = minute
+    minute = minute,
+    intervalHours = intervalHours
 )
 
 fun RunHistory.toBackupDto(files: List<FileMoved> = emptyList()): RunHistoryBackupDto = RunHistoryBackupDto(
@@ -187,6 +191,7 @@ fun RuleBackupDto.toDomain(): Rule = Rule(
     operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),
     scanSubdirectories = scanSubdirectories,
     icon = RuleIcon.fromStored(iconKey),
+    iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
     filenamePattern = filenamePattern,
     minFileSizeBytes = minFileSizeBytes,
     maxFileSizeBytes = maxFileSizeBytes,
@@ -201,7 +206,8 @@ fun ScheduleBackupDto.toDomain(): RuleSchedule? {
         type = scheduleType,
         dayOfWeek = dayOfWeek,
         hour = hour,
-        minute = minute
+        minute = minute,
+        intervalHours = intervalHours
     )
 }
 

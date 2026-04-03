@@ -5,11 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -31,12 +30,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,11 +40,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -59,8 +52,11 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.ui.components.HistoryCard
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
-import dev.bikram.filepipe.ui.feedback.performSwipeThresholdHaptic
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
+import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
+import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,12 +74,13 @@ fun HistoryScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     var showClearConfirm by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
     val isFiltered = viewModel.filterRuleId != null
 
     LaunchedEffect(userMessage) {
         val msg = userMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(msg)
         viewModel.clearUserMessage()
+        snackbarHostState.showSnackbar(msg)
     }
 
     if (showClearConfirm) {
@@ -142,6 +139,7 @@ fun HistoryScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .then(scrollBlurModifier)
                     .padding(innerPadding)
                     .padding(bottom = contentPadding.calculateBottomPadding())
                     .padding(32.dp),
@@ -172,7 +170,9 @@ fun HistoryScreen(
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(scrollBlurModifier),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
@@ -216,7 +216,6 @@ fun HistoryScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDismissHistoryCard(
     history: RunHistory,
@@ -224,42 +223,21 @@ private fun SwipeToDismissHistoryCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val view = LocalView.current
     val hapticEnabled = LocalHapticEnabled.current
     val cardShape = RoundedCornerShape(12.dp)
-    BoxWithConstraints(modifier = modifier.clip(cardShape)) {
-        val dismissState = rememberSwipeToDismissBoxState(
-            positionalThreshold = { totalDistance -> totalDistance * 0.33f }
-        )
-
-        LaunchedEffect(dismissState.currentValue) {
-            if (dismissState.currentValue == SwipeToDismissBoxValue.EndToStart) {
-                onDelete()
-                dismissState.snapTo(SwipeToDismissBoxValue.Settled)
-            }
-        }
-
-        LaunchedEffect(dismissState, history.id) {
-            var previousTarget = SwipeToDismissBoxValue.Settled
-            snapshotFlow { dismissState.targetValue }.collect { target ->
-                val crossedIntoDismiss =
-                    target != SwipeToDismissBoxValue.Settled &&
-                        previousTarget == SwipeToDismissBoxValue.Settled
-                if (crossedIntoDismiss && hapticEnabled) {
-                    view.performSwipeThresholdHaptic()
-                }
-                previousTarget = target
-            }
-        }
-
-        SwipeToDismissBox(
-            state = dismissState,
-            modifier = Modifier.fillMaxWidth(),
-            backgroundContent = {
+    DeliberateSwipeRevealCard(
+        commitThresholdFraction = SwipeDismissCardDefaults.CommitThresholdFraction,
+        cardShape = cardShape,
+        onSwipeStartToEnd = { },
+        onSwipeEndToStart = onDelete,
+        hapticEnabled = hapticEnabled,
+        allowSwipeStartToEnd = false,
+        allowSwipeEndToStart = true,
+        backgroundContent = { fromStart ->
+            if (!fromStart) {
                 Box(
                     Modifier
-                        .fillMaxHeight()
-                        .weight(1f)
+                        .fillMaxSize()
                         .background(
                             MaterialTheme.colorScheme.error.copy(alpha = 0.32f),
                             cardShape
@@ -274,10 +252,10 @@ private fun SwipeToDismissHistoryCard(
                         modifier = Modifier.size(28.dp)
                     )
                 }
-            },
-            enableDismissFromStartToEnd = false
-        ) {
-            HistoryCard(history = history, onClick = onClick)
-        }
+            }
+        },
+        modifier = modifier
+    ) {
+        HistoryCard(history = history, onClick = onClick)
     }
 }

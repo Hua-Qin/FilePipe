@@ -1,20 +1,21 @@
 package dev.bikram.filepipe.ui.screens.ruledetail
 
 import android.net.Uri
-import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,10 +29,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
@@ -53,11 +56,15 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.toShape
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.MultiChoiceSegmentedButtonRow
 import androidx.compose.material3.OutlinedButton
@@ -82,16 +89,20 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
-import dev.bikram.filepipe.ui.modifiers.progressiveBlur
-import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
+import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -100,12 +111,14 @@ import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.components.FileExtensionChips
 import dev.bikram.filepipe.ui.components.FolderPickerButton
+import dev.bikram.filepipe.ui.components.RuleIconEmojiPresets
+import dev.bikram.filepipe.ui.components.RuleIconOrEmoji
 import dev.bikram.filepipe.ui.components.ScheduleDialog
+import dev.bikram.filepipe.ui.components.toImageVector
 import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
 import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
 import dev.bikram.filepipe.ui.components.displayPath
-import dev.bikram.filepipe.ui.components.toImageVector
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.text.KeyboardOptions
@@ -113,6 +126,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.outlined.Bookmark
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.ui.text.input.KeyboardType
 
 private val SectionButtonShape = RoundedCornerShape(12.dp)
@@ -184,7 +198,11 @@ private fun RuleSectionCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalLayoutApi::class,
+    ExperimentalMaterial3ExpressiveApi::class
+)
 @Composable
 fun RuleDetailScreen(
     onNavigateBack: () -> Unit,
@@ -195,7 +213,8 @@ fun RuleDetailScreen(
     var showScheduleDialog by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
     var showTemplateSheet by remember { mutableStateOf(viewModel.isNewRule) }
-    var ruleIconMenuExpanded by remember { mutableStateOf(false) }
+    var showRuleIconSheet by remember { mutableStateOf(false) }
+    var customEmojiDraft by remember { mutableStateOf("") }
     val previewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val playTap = rememberPlayTapSound()
     val bookmarkedFolders by viewModel.bookmarkedFolders.collectAsStateWithLifecycle()
@@ -207,6 +226,7 @@ fun RuleDetailScreen(
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
+        val pending = pendingFolderPick
         if (uri == null) {
             pendingFolderPick = null
             return@rememberLauncherForActivityResult
@@ -217,7 +237,7 @@ fun RuleDetailScreen(
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
         )
         val uriString = uri.toString()
-        when (val pending = pendingFolderPick) {
+        when (pending) {
             FolderPickIntent.AddSource -> viewModel.addSourceFolder(uriString)
             is FolderPickIntent.ReplaceSource ->
                 viewModel.replaceSourceFolder(pending.previousPath, uriString)
@@ -260,28 +280,11 @@ fun RuleDetailScreen(
     BackHandler(onBack = ::tryNavigateBack)
 
     val scrollState = rememberScrollState()
-    val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topContentPadding = statusTop + 64.dp
     val bottomContentPadding = navBottom + 88.dp
-    val topBlurHeightPx = with(density) { topContentPadding.toPx() }
-    val bottomBlurHeightPx = with(density) { bottomContentPadding.toPx() }
-    val progressiveBlurEnabled = LocalProgressiveBlurEnabled.current
-    val blurRadiusPx =
-        if (progressiveBlurEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) 56f else 0f
-    val formBlurModifier =
-        if (progressiveBlurEnabled) {
-            Modifier.progressiveBlur(
-                blurRadius = blurRadiusPx,
-                topHeight = topBlurHeightPx,
-                bottomHeight = bottomBlurHeightPx,
-                showGradientOverlay = true,
-                overlayAlpha = 0.38f
-            )
-        } else {
-            Modifier
-        }
+    val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer() ?: Modifier
 
     Box(
         modifier = Modifier
@@ -294,11 +297,10 @@ fun RuleDetailScreen(
         if (state.isLoading) {
             CircularProgressIndicator(Modifier.align(Alignment.Center))
         } else {
-            // Background inside this layer so the blur shader samples real pixels (see AppNavigation blur).
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(formBlurModifier)
+                    .then(fullBleedBlurModifier)
             ) {
                 val scheme = MaterialTheme.colorScheme
                 if (LocalUseGradientBackground.current) {
@@ -341,43 +343,22 @@ fun RuleDetailScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box {
-                    FilledTonalIconButton(
-                        onClick = { withTapSound { ruleIconMenuExpanded = true } },
-                        modifier = Modifier.size(52.dp),
-                        shape = SectionButtonShape
-                    ) {
-                        Icon(
-                            imageVector = state.icon.toImageVector(),
-                            contentDescription = stringResource(R.string.rule_icon_picker_cd),
-                            modifier = Modifier.size(26.dp),
-                            tint = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = ruleIconMenuExpanded,
-                        onDismissRequest = { ruleIconMenuExpanded = false },
-                        modifier = Modifier.heightIn(max = 360.dp)
-                    ) {
-                        RuleIcon.entries.forEach { iconOption ->
-                            DropdownMenuItem(
-                                text = { Text(ruleIconOptionLabel(iconOption)) },
-                                onClick = {
-                                    withTapSound {
-                                        viewModel.setIcon(iconOption)
-                                        ruleIconMenuExpanded = false
-                                    }
-                                },
-                                leadingIcon = {
-                                    Icon(
-                                        imageVector = iconOption.toImageVector(),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            )
-                        }
-                    }
+                FilledTonalIconButton(
+                    onClick = { withTapSound { showRuleIconSheet = true } },
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .size(56.dp),
+                    shape = SectionButtonShape
+                ) {
+                    RuleIconOrEmoji(
+                        iconEmoji = state.iconEmoji,
+                        icon = state.icon,
+                        vectorSize = 28.dp,
+                        emojiFontSize = 26.sp,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        contentDescription = stringResource(R.string.rule_icon_picker_cd),
+                        modifier = Modifier
+                    )
                 }
                 OutlinedTextField(
                     value = state.name,
@@ -428,9 +409,9 @@ fun RuleDetailScreen(
                         )
                         IconButton(onClick = { withTapSound { viewModel.toggleBookmark(path) } }) {
                             Icon(
-                                imageVector = if (isSourceBookmarked) Icons.Filled.Bookmark else Icons.Outlined.Bookmark,
+                                imageVector = if (isSourceBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                                 contentDescription = stringResource(R.string.bookmark_toggle_cd),
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(22.dp),
                                 tint = if (isSourceBookmarked) MaterialTheme.colorScheme.primary
                                        else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -536,9 +517,9 @@ fun RuleDetailScreen(
                         )
                         IconButton(onClick = { withTapSound { viewModel.toggleBookmark(state.destinationFolderPath) } }) {
                             Icon(
-                                imageVector = if (isDestBookmarked) Icons.Filled.Bookmark else Icons.Outlined.Bookmark,
+                                imageVector = if (isDestBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                                 contentDescription = stringResource(R.string.bookmark_toggle_cd),
-                                modifier = Modifier.size(18.dp),
+                                modifier = Modifier.size(22.dp),
                                 tint = if (isDestBookmarked) MaterialTheme.colorScheme.primary
                                        else MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -674,6 +655,8 @@ fun RuleDetailScreen(
                             val dayName = schedule.dayOfWeek?.let { days.getOrNull(it - 2) } ?: "?"
                             "Weekly ($dayName) at %02d:%02d".format(schedule.hour, schedule.minute)
                         }
+                        ScheduleType.EVERY_N_HOURS ->
+                            "Every ${schedule.intervalHours ?: 1}h"
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -948,6 +931,171 @@ fun RuleDetailScreen(
                 showScheduleDialog = false
             }
         )
+    }
+
+    if (showRuleIconSheet) {
+        val ruleIconSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        LaunchedEffect(showRuleIconSheet) {
+            if (showRuleIconSheet) {
+                customEmojiDraft = state.iconEmoji.orEmpty()
+            }
+        }
+        ModalBottomSheet(
+            onDismissRequest = { showRuleIconSheet = false },
+            sheetState = ruleIconSheetState
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
+                    .navigationBarsPadding()
+            ) {
+                Text(
+                    text = stringResource(R.string.rule_icon_sheet_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    text = stringResource(R.string.rule_icon_preset_section),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                val ruleIconGridCell = 48.dp
+                FlowRow(
+                    maxItemsInEachRow = 7,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    RuleIcon.entries.forEach { iconOption ->
+                        FilledTonalIconButton(
+                            onClick = {
+                                withTapSound {
+                                    viewModel.setIcon(iconOption)
+                                    showRuleIconSheet = false
+                                }
+                            },
+                            modifier = Modifier.size(ruleIconGridCell),
+                            shape = SectionButtonShape
+                        ) {
+                            Icon(
+                                imageVector = iconOption.toImageVector(),
+                                contentDescription = ruleIconOptionLabel(iconOption),
+                                modifier = Modifier.size(26.dp),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+                Text(
+                    text = stringResource(R.string.rule_icon_emoji_section),
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                val emojiCellSize = ruleIconGridCell
+                val customEmojiSlotDescription = stringResource(R.string.rule_icon_custom_slot_cd)
+                val emojiTextStyle = TextStyle(
+                    fontSize = 22.sp,
+                    textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                FlowRow(
+                    maxItemsInEachRow = 7,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    RuleIconEmojiPresets.forEach { emojiPreset ->
+                        Surface(
+                            onClick = {
+                                withTapSound {
+                                    viewModel.setIconEmoji(emojiPreset)
+                                    showRuleIconSheet = false
+                                }
+                            },
+                            modifier = Modifier.size(emojiCellSize),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.secondaryContainer
+                        ) {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(text = emojiPreset, style = emojiTextStyle)
+                            }
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier
+                            .size(emojiCellSize)
+                            .semantics { contentDescription = customEmojiSlotDescription },
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                    ) {
+                        BasicTextField(
+                            value = customEmojiDraft,
+                            onValueChange = { newValue ->
+                                if (newValue.isEmpty()) {
+                                    customEmojiDraft = ""
+                                } else {
+                                    val boundary = java.text.BreakIterator.getCharacterInstance()
+                                    boundary.setText(newValue)
+                                    val start = boundary.first()
+                                    val end = boundary.next()
+                                    customEmojiDraft = newValue.substring(start, end)
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(horizontal = 6.dp, vertical = 10.dp),
+                            textStyle = emojiTextStyle.copy(color = MaterialTheme.colorScheme.onSurfaceVariant),
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurfaceVariant),
+                            singleLine = true,
+                            decorationBox = { innerTextField ->
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    innerTextField()
+                                }
+                            }
+                        )
+                    }
+                    val applyEmojiEnabled = customEmojiDraft.isNotBlank()
+                    Surface(
+                        onClick = {
+                            if (applyEmojiEnabled) {
+                                withTapSound {
+                                    viewModel.setIconEmoji(customEmojiDraft)
+                                    showRuleIconSheet = false
+                                }
+                            }
+                        },
+                        enabled = applyEmojiEnabled,
+                        modifier = Modifier.size(emojiCellSize),
+                        shape = MaterialShapes.Cookie12Sided.toShape(),
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = stringResource(R.string.rule_icon_apply_emoji_cd),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+        }
     }
 
     // Template picker — shown only for new rules, once

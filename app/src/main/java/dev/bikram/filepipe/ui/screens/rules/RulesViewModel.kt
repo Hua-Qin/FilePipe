@@ -62,20 +62,26 @@ class RulesViewModel @Inject constructor(
     val rules: StateFlow<List<Rule>> = ruleRepository.getAllRules()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val staleRuleIds: StateFlow<Set<Long>> = rules
-        .map { ruleList ->
-            withContext(Dispatchers.IO) {
-                ruleList.filter { rule ->
-                    val allPaths = rule.sourceFolderPaths + listOfNotNull(rule.destinationFolderPath.takeIf { it.isNotBlank() })
-                    allPaths.any { path ->
-                        !path.startsWith("content://") || !fileOperationRepository.isAccessible(path)
-                    }
-                }.map { it.id }.toSet()
-            }
-        }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+    private val _staleRuleIds = MutableStateFlow<Set<Long>>(emptySet())
+    /**
+     * Stale folder access is recomputed on IO only when folder URIs (per rule) change, not on every
+     * rules DB emission (e.g. name/toggle-only updates reuse the last result).
+     */
+    val staleRuleIds: StateFlow<Set<Long>> = _staleRuleIds.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            var lastFolderSignature: String? = null
+            rules.collect { ruleList ->
+                val signature = folderPathsSignature(ruleList)
+                if (signature != lastFolderSignature) {
+                    lastFolderSignature = signature
+                    _staleRuleIds.value = withContext(Dispatchers.IO) {
+                        computeStaleRuleIds(ruleList)
+                    }
+                }
+            }
+        }
         // Keep dynamic shortcuts up to date whenever rules change
         rules.onEach { appShortcutsManager.updateShortcuts(it) }.launchIn(viewModelScope)
 
@@ -88,7 +94,7 @@ class RulesViewModel @Inject constructor(
 
     val swipeStartToEnd: StateFlow<SwipeAction> = userPreferencesRepository.preferencesFlow
         .map { it.swipeStartToEnd }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SwipeAction.DUPLICATE)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SwipeAction.EDIT)
 
     val swipeEndToStart: StateFlow<SwipeAction> = userPreferencesRepository.preferencesFlow
         .map { it.swipeEndToStart }
@@ -274,4 +280,25 @@ class RulesViewModel @Inject constructor(
         _userMessage.value = "\"${copy.name}\" created"
     }
 
+    private fun folderPathsSignature(ruleList: List<Rule>): String =
+        ruleList.sortedBy { it.id }.joinToString("\u0000") { rule ->
+            buildString {
+                append(rule.id)
+                append('\u0001')
+                rule.sourceFolderPaths.sorted().forEach { path ->
+                    append(path)
+                    append('\u0002')
+                }
+                append('\u0001')
+                append(rule.destinationFolderPath)
+            }
+        }
+
+    private fun computeStaleRuleIds(ruleList: List<Rule>): Set<Long> =
+        ruleList.filter { rule ->
+            val allPaths = rule.sourceFolderPaths + listOfNotNull(rule.destinationFolderPath.takeIf { it.isNotBlank() })
+            allPaths.any { path ->
+                !path.startsWith("content://") || !fileOperationRepository.isAccessible(path)
+            }
+        }.map { it.id }.toSet()
 }

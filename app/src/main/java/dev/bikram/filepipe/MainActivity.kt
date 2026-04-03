@@ -9,7 +9,6 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.flow.map
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
@@ -44,10 +43,6 @@ class MainActivity : ComponentActivity() {
             val preferences by userPreferencesRepository.preferencesFlow
                 .collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
 
-            val hasSeenIntro by userPreferencesRepository.preferencesFlow
-                .map { it.hasSeenIntro }
-                .collectAsStateWithLifecycle(initialValue = null)
-
             SideEffect {
                 val nightMode = when (preferences.themeMode) {
                     AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
@@ -63,12 +58,10 @@ class MainActivity : ComponentActivity() {
                 themePaletteStyle = preferences.themePaletteStyle,
                 hapticFeedbackEnabled = preferences.hapticFeedbackEnabled
             ) {
-                if (hasSeenIntro != null) {
-                    AppNavigation(
-                        hasSeenIntro = hasSeenIntro!!,
-                        preferences = preferences
-                    )
-                }
+                AppNavigation(
+                    hasSeenIntro = preferences.hasSeenIntro,
+                    preferences = preferences
+                )
             }
         }
     }

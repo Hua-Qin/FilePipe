@@ -150,10 +150,61 @@ class FileOperationRepository @Inject constructor(
                     errorMessage = "Could not create destination file"
                 )
 
-            context.contentResolver.openInputStream(sourceEntry.uri)?.use { input ->
-                context.contentResolver.openOutputStream(destFile.uri)?.use { output ->
-                    input.copyTo(output)
+            val inputStream = context.contentResolver.openInputStream(sourceEntry.uri)
+            if (inputStream == null) {
+                destFile.delete()
+                return@withContext FileMoved(
+                    fileName = sourceEntry.name,
+                    sourceUri = sourceEntry.uri.toString(),
+                    destinationUri = "",
+                    fileSizeBytes = sourceEntry.size,
+                    success = false,
+                    errorMessage = "Could not read source file"
+                )
+            }
+
+            val outputStream = context.contentResolver.openOutputStream(destFile.uri)
+            if (outputStream == null) {
+                inputStream.close()
+                destFile.delete()
+                return@withContext FileMoved(
+                    fileName = sourceEntry.name,
+                    sourceUri = sourceEntry.uri.toString(),
+                    destinationUri = "",
+                    fileSizeBytes = sourceEntry.size,
+                    success = false,
+                    errorMessage = "Could not write destination file"
+                )
+            }
+
+            val bytesCopied = try {
+                inputStream.use { input ->
+                    outputStream.use { output ->
+                        input.copyTo(output)
+                    }
                 }
+            } catch (e: IOException) {
+                destFile.delete()
+                return@withContext FileMoved(
+                    fileName = sourceEntry.name,
+                    sourceUri = sourceEntry.uri.toString(),
+                    destinationUri = "",
+                    fileSizeBytes = sourceEntry.size,
+                    success = false,
+                    errorMessage = e.message ?: "IO error"
+                )
+            }
+
+            if (sourceEntry.size > 0L && bytesCopied == 0L) {
+                destFile.delete()
+                return@withContext FileMoved(
+                    fileName = sourceEntry.name,
+                    sourceUri = sourceEntry.uri.toString(),
+                    destinationUri = "",
+                    fileSizeBytes = sourceEntry.size,
+                    success = false,
+                    errorMessage = "No data was copied"
+                )
             }
 
             if (operationMode == OperationMode.MOVE) {

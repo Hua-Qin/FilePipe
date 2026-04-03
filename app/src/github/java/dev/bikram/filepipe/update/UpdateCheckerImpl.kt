@@ -35,7 +35,7 @@ class UpdateCheckerImpl @Inject constructor() : UpdateChecker {
             val release = json.decodeFromString<GithubRelease>(responseText)
 
             val remoteVersion = release.tag_name.removePrefix("v")
-            if (remoteVersion == BuildConfig.VERSION_NAME) return@runCatching null
+            if (!isRemoteVersionNewer(remoteVersion, BuildConfig.VERSION_NAME)) return@runCatching null
 
             val apkAsset = release.assets.firstOrNull { it.name.endsWith(".apk") }
                 ?: return@runCatching null

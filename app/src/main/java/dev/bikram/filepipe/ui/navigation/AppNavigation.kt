@@ -86,9 +86,10 @@ import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
-import dev.bikram.filepipe.ui.modifiers.progressiveBlur
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.ProgressiveBlurStyle
 
 private data class BottomNavItem(
     val screen: Screen,
@@ -132,25 +133,53 @@ fun AppNavigation(
         currentDestination?.hierarchy?.any { destination -> destination.route == it.screen.route } == true
     }
 
+    val isRuleDetailRoute = currentDestination?.hierarchy?.any { destination ->
+        destination.route == Screen.RuleDetail.route
+    } == true
+    val isHistoryDetailRoute = currentDestination?.hierarchy?.any { destination ->
+        destination.route == Screen.HistoryDetail.route
+    } == true
+
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val floatingBarHeight = 64.dp
     val scrimHeight = navBarInset + floatingBarHeight + 24.dp
-    val topBlurHeight = statusBarInset + 64.dp
+    val topBlurSmallChrome = statusBarInset + 64.dp
+    // Blur only under collapsed app-bar band so expanded LargeTopAppBar does not tint/blur list content below.
+    val topBlurHeightDp = topBlurSmallChrome
+    val fullScreenBottomBlurShort = navBarInset + 48.dp
+    val fullScreenBottomBlurRuleEdit = navBarInset + 88.dp
+    val bottomBlurHeightDp = when {
+        showBottomBar -> scrimHeight
+        isRuleDetailRoute -> fullScreenBottomBlurRuleEdit
+        else -> fullScreenBottomBlurShort
+    }
     val contentPaddingBottom = if (showBottomBar) scrimHeight else navBarInset
     val density = LocalDensity.current
-    val bottomBlurHeightPx = with(density) { scrimHeight.toPx() }
-    val topBlurHeightPx = with(density) { topBlurHeight.toPx() }
-    val progressiveBlurModifier = if (showBottomBar && preferences.progressiveBlurEnabled) {
-        Modifier.progressiveBlur(
-            blurRadius = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) 40f else 0f,
-            topHeight = topBlurHeightPx,
-            bottomHeight = bottomBlurHeightPx,
-            showGradientOverlay = true
-        )
-    } else {
-        Modifier
-    }
+    val bottomBlurHeightPx = with(density) { bottomBlurHeightDp.toPx() }
+    val topBlurHeightPx = with(density) { topBlurHeightDp.toPx() }
+    val progressiveBlurStyle: ProgressiveBlurStyle? =
+        if (!preferences.progressiveBlurEnabled) {
+            null
+        } else {
+            val blurRadius =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    if (isRuleDetailRoute) 56f else 44f
+                } else {
+                    0f
+                }
+            val overlayAlpha = when {
+                isRuleDetailRoute -> 0.38f
+                isHistoryDetailRoute -> 0.30f
+                else -> 0.34f
+            }
+            ProgressiveBlurStyle(
+                topHeightPx = topBlurHeightPx,
+                bottomHeightPx = bottomBlurHeightPx,
+                blurRadius = blurRadius,
+                overlayAlpha = overlayAlpha
+            )
+        }
 
     // Activity-scoped VMs for nav bar FAB actions
     val historyVm: HistoryViewModel = hiltViewModel()
@@ -162,8 +191,8 @@ fun AppNavigation(
 
     LaunchedEffect(fabMessage) {
         val msg = fabMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(msg)
         settingsVm.clearUserMessage()
+        snackbarHostState.showSnackbar(msg)
     }
 
     LaunchedEffect(hasSeenIntro, preferences.autoCheckForUpdates) {
@@ -199,7 +228,8 @@ fun AppNavigation(
 
     CompositionLocalProvider(
         LocalUseGradientBackground provides preferences.useGradientBackground,
-        LocalProgressiveBlurEnabled provides preferences.progressiveBlurEnabled
+        LocalProgressiveBlurEnabled provides preferences.progressiveBlurEnabled,
+        LocalProgressiveBlurStyle provides progressiveBlurStyle
     ) {
         Box(Modifier.fillMaxSize()) {
             if (preferences.useGradientBackground) {
@@ -219,9 +249,7 @@ fun AppNavigation(
                 )
             }
             Scaffold(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(progressiveBlurModifier),
+                modifier = Modifier.fillMaxSize(),
                 containerColor = if (preferences.useGradientBackground) Color.Transparent else MaterialTheme.colorScheme.background,
                 bottomBar = {}
             ) { _ ->

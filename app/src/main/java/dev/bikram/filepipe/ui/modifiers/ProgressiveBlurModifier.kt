@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
+import dev.bikram.filepipe.ui.theme.ProgressiveBlurStyle
 
 enum class BlurDirection {
     TOP,
@@ -134,4 +135,22 @@ fun Modifier.progressiveBlur(
     topHeight = if (direction == BlurDirection.TOP) height else 0f,
     bottomHeight = if (direction == BlurDirection.BOTTOM) height else 0f,
     showGradientOverlay = showGradientOverlay
+)
+
+/** Blur for [LazyColumn] under a transparent [LargeTopAppBar] (app bar is a sibling, not blurred). */
+fun ProgressiveBlurStyle.applyToScrollableList(): Modifier = Modifier.progressiveBlur(
+    blurRadius = blurRadius,
+    topHeight = topHeightPx,
+    bottomHeight = bottomHeightPx,
+    showGradientOverlay = true,
+    overlayAlpha = overlayAlpha
+)
+
+/** Blur for a full-screen layer (y=0 at window top), e.g. rule edit scroll under transparent chrome. */
+fun ProgressiveBlurStyle.applyToFullBleedLayer(): Modifier = Modifier.progressiveBlur(
+    blurRadius = blurRadius,
+    topHeight = topHeightPx,
+    bottomHeight = bottomHeightPx,
+    showGradientOverlay = true,
+    overlayAlpha = overlayAlpha
 )

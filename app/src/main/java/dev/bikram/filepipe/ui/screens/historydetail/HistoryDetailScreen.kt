@@ -7,16 +7,22 @@ import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -39,22 +45,24 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import android.net.Uri
-import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -67,6 +75,9 @@ import dev.bikram.filepipe.ui.components.StatusChip
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.formatTime
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.R
+import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,72 +91,120 @@ fun HistoryDetailScreen(
     val files by viewModel.files.collectAsStateWithLifecycle()
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer() ?: Modifier
+    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val topListPadding = statusTop + 64.dp
 
     LaunchedEffect(userMessage) {
         val msg = userMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(msg)
         viewModel.clearUserMessage()
+        snackbarHostState.showSnackbar(msg)
     }
 
-    Scaffold(
-        containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text(history?.ruleName ?: "History Detail") },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        playTap()
-                        onNavigateBack()
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(
+                if (LocalUseGradientBackground.current) Modifier
+                else Modifier.background(MaterialTheme.colorScheme.background)
             )
-        },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 16.dp, end = 16.dp,
-                top = innerPadding.calculateTopPadding() + 8.dp,
-                bottom = 32.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(fullBleedBlurModifier)
         ) {
-            history?.let { h ->
-                item {
-                    RunSummaryCard(
-                        history = h,
-                        onUndo = {
-                            playTap()
-                            viewModel.undoRun()
+            val scheme = MaterialTheme.colorScheme
+            if (LocalUseGradientBackground.current) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(scheme.surface)
+                        .background(
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0f to scheme.primaryContainer.copy(alpha = 0.45f),
+                                    0.55f to scheme.surface.copy(alpha = 0f)
+                                )
+                            )
+                        )
+                )
+            } else {
+                Box(Modifier.fillMaxSize().background(scheme.background))
+            }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = topListPadding + 8.dp,
+                    bottom = 32.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                history?.let { h ->
+                    item {
+                        RunSummaryCard(
+                            history = h,
+                            onUndo = {
+                                playTap()
+                                viewModel.undoRun()
+                            }
+                        )
+                    }
+                    if (files.isNotEmpty()) {
+                        item {
+                            Text(
+                                "Files (${files.size})",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            )
                         }
-                    )
-                }
-                if (files.isNotEmpty()) {
-                    item {
-                        Text(
-                            "Files (${files.size})",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                        )
-                    }
-                    items(files, key = { it.id }) { file ->
-                        FileMovedCard(file, modifier = Modifier.animateItem())
-                    }
-                } else {
-                    item {
-                        Text(
-                            "No file records for this run.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        items(files, key = { it.id }) { file ->
+                            FileMovedCard(file, modifier = Modifier.animateItem())
+                        }
+                    } else {
+                        item {
+                            Text(
+                                "No file records for this run.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }
         }
+
+        TopAppBar(
+            modifier = Modifier.align(Alignment.TopCenter),
+            title = {
+                Text(
+                    history?.ruleName ?: stringResource(R.string.history_detail_title)
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = {
+                    playTap()
+                    onNavigateBack()
+                }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = Color.Transparent,
+                scrolledContainerColor = Color.Transparent
+            )
+        )
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = navBottom + 16.dp)
+        )
     }
 }
 

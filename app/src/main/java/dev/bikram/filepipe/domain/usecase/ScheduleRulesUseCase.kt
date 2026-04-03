@@ -31,18 +31,23 @@ class ScheduleRulesUseCase @Inject constructor(
             .setRequiresBatteryNotLow(true)
             .build()
 
-        val periodDays = when (schedule.type) {
-            ScheduleType.DAILY -> 1L
-            ScheduleType.WEEKLY -> 7L
+        val delayMs = when (schedule.type) {
+            ScheduleType.EVERY_N_HOURS -> 0L
+            else -> calculateDelayUntilNextRun(
+                schedule.hour,
+                schedule.minute,
+                if (schedule.type == ScheduleType.WEEKLY) schedule.dayOfWeek else null
+            )
         }
 
-        val delayMs = calculateDelayUntilNextRun(
-            schedule.hour,
-            schedule.minute,
-            if (schedule.type == ScheduleType.WEEKLY) schedule.dayOfWeek else null
-        )
-
-        val request = PeriodicWorkRequestBuilder<FileOrganizerWorker>(periodDays, TimeUnit.DAYS)
+        val request = when (schedule.type) {
+            ScheduleType.EVERY_N_HOURS -> {
+                val hours = schedule.intervalHours?.toLong()?.coerceIn(1L, 24L) ?: 1L
+                PeriodicWorkRequestBuilder<FileOrganizerWorker>(hours, TimeUnit.HOURS)
+            }
+            ScheduleType.DAILY -> PeriodicWorkRequestBuilder<FileOrganizerWorker>(1L, TimeUnit.DAYS)
+            ScheduleType.WEEKLY -> PeriodicWorkRequestBuilder<FileOrganizerWorker>(7L, TimeUnit.DAYS)
+        }
             .setInitialDelay(delayMs, TimeUnit.MILLISECONDS)
             .setInputData(inputData)
             .addTag(tag)

@@ -47,8 +47,16 @@ fun OnboardingTitleScreen(
 ) {
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
-    val profileBitmap = remember {
-        BitmapFactory.decodeStream(context.assets.open("Me-600.jpg"))?.asImageBitmap()
+    val profileBitmap = remember(context) {
+        for (assetName in listOf("Me-600.webp", "Me-600.jpg")) {
+            val decoded = runCatching {
+                context.assets.open(assetName).use { stream ->
+                    BitmapFactory.decodeStream(stream)?.asImageBitmap()
+                }
+            }.getOrNull()
+            if (decoded != null) return@remember decoded
+        }
+        null
     }
 
     Box(

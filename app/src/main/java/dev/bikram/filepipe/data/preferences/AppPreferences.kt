@@ -12,7 +12,7 @@ data class AppPreferences(
     val autoExportOnRuleChange: Boolean = false,
     val scheduledExportEnabled: Boolean = false,
     val logRetentionDays: Int = 30,
-    val swipeStartToEnd: SwipeAction = SwipeAction.DUPLICATE,
+    val swipeStartToEnd: SwipeAction = SwipeAction.EDIT,
     val swipeEndToStart: SwipeAction = SwipeAction.DELETE,
     val bookmarkedFolders: List<String> = emptyList(),
     val hasSeenIntro: Boolean = false,

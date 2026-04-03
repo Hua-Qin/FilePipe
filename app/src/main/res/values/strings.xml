@@ -11,7 +11,6 @@
     <string name="rules_empty_title">No rules yet</string>
     <string name="rules_empty_subtitle">Tap Add Rule to create your first organizing rule</string>
     <string name="rules_add_rule">Add Rule</string>
-    <string name="rule_card_types">Types</string>
     <string name="rule_card_types_none">None</string>
     <string name="rule_card_from">From</string>
     <string name="rule_card_from_none">No sources</string>
@@ -60,6 +59,20 @@
     <string name="schedule_weekly">Weekly</string>
     <string name="schedule_day">Day of week</string>
     <string name="schedule_time">Time</string>
+    <string name="schedule_dialog_title">Set schedule</string>
+    <string name="schedule_hourly">Hourly</string>
+    <string name="schedule_interval_hours">Every (hours)</string>
+    <string name="schedule_interval_hours_helper">1 to 24 — use Daily for longer gaps</string>
+    <string name="schedule_remove_short">Remove</string>
+    <string name="schedule_pick_time">Choose time</string>
+    <string name="schedule_time_picker_title">Pick time</string>
+    <string name="schedule_time_input_mode_cd">Type time with keyboard</string>
+    <string name="schedule_time_dial_mode_cd">Pick time with clock dial</string>
+    <string name="rule_icon_sheet_title">Rule icon</string>
+    <string name="rule_icon_emoji_section">Emoji</string>
+    <string name="rule_icon_preset_section">Preset icons</string>
+    <string name="rule_icon_custom_slot_cd">Custom emoji</string>
+    <string name="rule_icon_apply_emoji_cd">Apply custom emoji</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
     <string name="delete">Delete</string>
@@ -76,6 +89,7 @@
 
     <!-- History screen -->
     <string name="history_title">History</string>
+    <string name="history_detail_title">Run details</string>
     <string name="history_empty_title">No history yet</string>
     <string name="history_empty_subtitle">Run some rules to see your file move history here</string>
     <string name="history_triggered_manual">Manual</string>
@@ -160,7 +174,7 @@
     <string name="settings_auto_check_updates_desc">Check for updates at app launch</string>
     <string name="settings_see_whats_new">See What\'s New?</string>
     <string name="settings_check_for_updates">Check for updates</string>
-    <string name="settings_download_install">Download &amp; Install (v%1$s)</string>
+    <string name="settings_download_install">Download Update (v%1$s)</string>
     <string name="settings_downloading">Downloading…</string>
     <string name="settings_downloading_percent">Downloading %1$d%%</string>
     <string name="settings_installing">Installing…</string>

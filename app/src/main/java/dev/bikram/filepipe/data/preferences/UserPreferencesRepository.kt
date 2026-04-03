@@ -79,7 +79,7 @@ class UserPreferencesRepository @Inject constructor(
             logRetentionDays = prefs[PrefKeys.LOG_RETENTION_DAYS] ?: 30,
             swipeStartToEnd = prefs[PrefKeys.SWIPE_START_TO_END]
                 ?.let { runCatching { SwipeAction.valueOf(it) }.getOrNull() }
-                ?: SwipeAction.DUPLICATE,
+                ?: SwipeAction.EDIT,
             swipeEndToStart = prefs[PrefKeys.SWIPE_END_TO_START]
                 ?.let { runCatching { SwipeAction.valueOf(it) }.getOrNull() }
                 ?: SwipeAction.DELETE,

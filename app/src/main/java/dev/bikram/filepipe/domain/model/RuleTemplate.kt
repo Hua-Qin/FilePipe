@@ -5,7 +5,6 @@ data class RuleTemplate(
     val extensions: List<String>,
     val operationMode: OperationMode = OperationMode.MOVE,
     val scanSubdirectories: Boolean = false,
-    val suggestedSourcePaths: List<String> = emptyList(),
     val suggestedIcon: RuleIcon = RuleIcon.DEFAULT
 ) {
     companion object {

@@ -12,10 +12,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,7 +30,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.SelectAll
@@ -51,15 +52,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -67,10 +65,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -83,9 +79,13 @@ import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.ui.components.RuleCard
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
-import dev.bikram.filepipe.ui.feedback.performSwipeThresholdHaptic
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
+import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
+import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 
@@ -116,6 +116,7 @@ fun RulesScreen(
     var pendingDeleteRule by remember { mutableStateOf<Rule?>(null) }
     var pendingDeleteSelected by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
 
     val hasSelection = selectedRuleIds.isNotEmpty()
 
@@ -149,8 +150,8 @@ fun RulesScreen(
 
     LaunchedEffect(userMessage) {
         val msg = userMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(msg)
         viewModel.clearUserMessage()
+        snackbarHostState.showSnackbar(msg)
     }
 
     Scaffold(
@@ -264,14 +265,21 @@ fun RulesScreen(
     ) { innerPadding ->
         if (rules.isEmpty()) {
             EmptyState(
+                onAddRule = {
+                    playTap()
+                    onEditRule(Screen.RuleDetail.NEW_RULE_ID)
+                },
                 modifier = Modifier
                     .fillMaxSize()
+                    .then(scrollBlurModifier)
                     .padding(innerPadding)
                     .padding(bottom = contentPadding.calculateBottomPadding())
             )
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(scrollBlurModifier),
                 contentPadding = PaddingValues(
                     start = 16.dp,
                     end = 16.dp,
@@ -392,7 +400,10 @@ fun RulesScreen(
                             .fillMaxWidth()
                             .heightIn(max = 400.dp)
                     ) {
-                        items(preview.results) { result ->
+                        items(
+                            items = preview.results,
+                            key = { previewItem -> previewItem.sourcePath }
+                        ) { result ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -429,7 +440,6 @@ fun RulesScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SwipeToDismissRuleCard(
     rule: Rule,
@@ -451,7 +461,6 @@ private fun SwipeToDismissRuleCard(
     onViewHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val view = LocalView.current
     val cardShape = RoundedCornerShape(16.dp)
     val swipeAssigned = setOf(swipeStartToEnd, swipeEndToStart)
     val cardIconPairs: List<Pair<ImageVector, () -> Unit>> = SwipeAction.entries
@@ -461,79 +470,51 @@ private fun SwipeToDismissRuleCard(
         }
 
     val hapticEnabled = LocalHapticEnabled.current
-    BoxWithConstraints(modifier = modifier.clip(cardShape)) {
-        val dismissState = rememberSwipeToDismissBoxState(
-            positionalThreshold = { totalDistance -> totalDistance * 0.33f }
+    DeliberateSwipeRevealCard(
+        commitThresholdFraction = SwipeDismissCardDefaults.CommitThresholdFraction,
+        cardShape = cardShape,
+        onSwipeStartToEnd = {
+            swipeStartToEnd.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
+        },
+        onSwipeEndToStart = {
+            swipeEndToStart.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
+        },
+        hapticEnabled = hapticEnabled,
+        backgroundContent = { fromStart ->
+            val action = if (fromStart) swipeStartToEnd else swipeEndToStart
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(action.semanticSwipeBackground(), cardShape)
+                    .padding(
+                        start = if (fromStart) 24.dp else 0.dp,
+                        end = if (fromStart) 0.dp else 24.dp
+                    ),
+                contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = action.icon(),
+                    contentDescription = null,
+                    tint = action.semanticSwipeIconTint(),
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        },
+        modifier = modifier
+    ) {
+        RuleCard(
+            rule = rule,
+            isSelected = isSelected,
+            isExpanded = isExpanded,
+            progress = progress,
+            onClick = onToggleSelectOrExpand,
+            onLongClick = onLongClick,
+            cardActions = cardIconPairs,
+            onToggleEnabled = onToggleEnabled,
+            onRunClick = onRunRule,
+            isAnyRuleRunning = isAnyRuleRunning,
+            hasStaleFolder = hasStaleFolder
         )
-
-        LaunchedEffect(dismissState.currentValue) {
-            when (dismissState.currentValue) {
-                SwipeToDismissBoxValue.EndToStart -> {
-                    swipeEndToStart.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
-                    dismissState.snapTo(SwipeToDismissBoxValue.Settled)
-                }
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    swipeStartToEnd.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
-                    dismissState.snapTo(SwipeToDismissBoxValue.Settled)
-                }
-                else -> {}
-            }
-        }
-
-        LaunchedEffect(dismissState, rule.id) {
-            var previousTarget = SwipeToDismissBoxValue.Settled
-            snapshotFlow { dismissState.targetValue }.collect { target ->
-                val crossedIntoDismiss =
-                    target != SwipeToDismissBoxValue.Settled &&
-                        previousTarget == SwipeToDismissBoxValue.Settled
-                if (crossedIntoDismiss && hapticEnabled) {
-                    view.performSwipeThresholdHaptic()
-                }
-                previousTarget = target
-            }
-        }
-
-        SwipeToDismissBox(
-            state = dismissState,
-            modifier = Modifier.fillMaxWidth(),
-            backgroundContent = {
-                val isStartToEnd = dismissState.dismissDirection == SwipeToDismissBoxValue.StartToEnd
-                val action = if (isStartToEnd) swipeStartToEnd else swipeEndToStart
-                Box(
-                    Modifier
-                        .fillMaxHeight()
-                        .weight(1f)
-                        .background(action.semanticSwipeBackground(), cardShape)
-                        .padding(
-                            start = if (isStartToEnd) 24.dp else 0.dp,
-                            end = if (isStartToEnd) 0.dp else 24.dp
-                        ),
-                    contentAlignment = if (isStartToEnd) Alignment.CenterStart else Alignment.CenterEnd
-                ) {
-                    Icon(
-                        imageVector = action.icon(),
-                        contentDescription = null,
-                        tint = action.semanticSwipeIconTint(),
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-            },
-            enableDismissFromStartToEnd = true
-        ) {
-            RuleCard(
-                rule = rule,
-                isSelected = isSelected,
-                isExpanded = isExpanded,
-                progress = progress,
-                onClick = onToggleSelectOrExpand,
-                onLongClick = onLongClick,
-                cardActions = cardIconPairs,
-                onToggleEnabled = onToggleEnabled,
-                onRunClick = onRunRule,
-                isAnyRuleRunning = isAnyRuleRunning,
-                hasStaleFolder = hasStaleFolder
-            )
-        }
     }
 }
 
@@ -560,19 +541,15 @@ private fun SwipeAction.icon(): ImageVector = when (this) {
 }
 
 @Composable
-private fun EmptyState(modifier: Modifier = Modifier) {
+private fun EmptyState(
+    onAddRule: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Column(
         modifier = modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            Icons.Default.Info,
-            contentDescription = null,
-            modifier = Modifier.size(72.dp),
-            tint = MaterialTheme.colorScheme.outlineVariant
-        )
-        Spacer(Modifier.height(16.dp))
         Text(
             stringResource(R.string.rules_empty_title),
             style = MaterialTheme.typography.titleMedium,
@@ -585,5 +562,19 @@ private fun EmptyState(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
             textAlign = TextAlign.Center
         )
+        Spacer(Modifier.height(24.dp))
+        Button(
+            onClick = onAddRule,
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth(0.72f)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Add,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.rules_add_rule))
+        }
     }
 }

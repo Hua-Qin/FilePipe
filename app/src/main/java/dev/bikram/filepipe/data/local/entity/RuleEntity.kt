@@ -24,11 +24,13 @@ data class RuleEntity(
     val scheduleDayOfWeek: Int? = null,
     val scheduleHour: Int? = null,
     val scheduleMinute: Int? = null,
+    val scheduleIntervalHours: Int? = null,
     val workManagerTag: String? = null,
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
     val scanSubdirectories: Boolean = false,
     val iconKey: String = RuleIcon.DEFAULT.name,
+    val iconEmoji: String? = null,
     // Advanced filters (added in DB version 2)
     val filenamePattern: String? = null,
     val minFileSizeBytes: Long? = null,
@@ -48,18 +50,30 @@ fun RuleEntity.toDomain(): Rule = Rule(
     isEnabled = isEnabled,
     createdAt = createdAt,
     updatedAt = updatedAt,
-    schedule = if (scheduleType != null && scheduleHour != null && scheduleMinute != null) {
-        RuleSchedule(
-            type = scheduleType,
-            dayOfWeek = scheduleDayOfWeek,
-            hour = scheduleHour,
-            minute = scheduleMinute
-        )
-    } else null,
+    schedule = when {
+        scheduleType == ScheduleType.EVERY_N_HOURS && scheduleIntervalHours != null ->
+            RuleSchedule(
+                type = scheduleType,
+                dayOfWeek = null,
+                hour = scheduleHour ?: 0,
+                minute = scheduleMinute ?: 0,
+                intervalHours = scheduleIntervalHours
+            )
+        scheduleType != null && scheduleHour != null && scheduleMinute != null ->
+            RuleSchedule(
+                type = scheduleType,
+                dayOfWeek = scheduleDayOfWeek,
+                hour = scheduleHour,
+                minute = scheduleMinute,
+                intervalHours = null
+            )
+        else -> null
+    },
     conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
     operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),
     scanSubdirectories = scanSubdirectories,
     icon = RuleIcon.fromStored(iconKey),
+    iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
     filenamePattern = filenamePattern,
     minFileSizeBytes = minFileSizeBytes,
     maxFileSizeBytes = maxFileSizeBytes,
@@ -81,11 +95,13 @@ fun Rule.toEntity(): RuleEntity = RuleEntity(
     scheduleDayOfWeek = schedule?.dayOfWeek,
     scheduleHour = schedule?.hour,
     scheduleMinute = schedule?.minute,
+    scheduleIntervalHours = schedule?.intervalHours,
     workManagerTag = if (id != 0L) "rule_$id" else null,
     conflictPolicy = conflictPolicy.name,
     operationMode = operationMode.name,
     scanSubdirectories = scanSubdirectories,
     iconKey = icon.name,
+    iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
     filenamePattern = filenamePattern,
     minFileSizeBytes = minFileSizeBytes,
     maxFileSizeBytes = maxFileSizeBytes,

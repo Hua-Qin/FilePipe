@@ -104,8 +104,10 @@ import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.components.displayPath
-import dev.bikram.filepipe.ui.components.safTreeUriToPath
+import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.update.UpdateInfo
 
@@ -130,6 +132,7 @@ fun SettingsScreen(
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
     val context = LocalContext.current
 
     fun computeNotificationsEnabled(): Boolean {
@@ -180,8 +183,8 @@ fun SettingsScreen(
 
     LaunchedEffect(userMessage) {
         val message = userMessage ?: return@LaunchedEffect
-        snackbarHostState.showSnackbar(message)
         viewModel.clearUserMessage()
+        snackbarHostState.showSnackbar(message)
     }
 
     if (changelogUi !is ChangelogUiState.Hidden) {
@@ -257,7 +260,9 @@ fun SettingsScreen(
         }
     ) { innerPadding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(scrollBlurModifier),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
@@ -649,17 +654,6 @@ fun SettingsScreen(
                                                 style = MaterialTheme.typography.bodyLarge
                                             )
                                         },
-                                        supportingContent = if (updateInfo!!.releaseNotes.isNotBlank()) {
-                                            {
-                                                Text(
-                                                    updateInfo!!.releaseNotes,
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    maxLines = 4,
-                                                    overflow = TextOverflow.Ellipsis
-                                                )
-                                            }
-                                        } else null,
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                                     )
                                 }
