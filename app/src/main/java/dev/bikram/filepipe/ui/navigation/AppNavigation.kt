@@ -444,7 +444,7 @@ fun AppNavigation(
                         Screen.Settings -> FloatingActionButton(
                             onClick = {
                                 playTap()
-                                settingsVm.exportNow()
+                                settingsVm.requestManualExportPicker()
                             },
                             modifier = fabModifier,
                             containerColor = containerColor,

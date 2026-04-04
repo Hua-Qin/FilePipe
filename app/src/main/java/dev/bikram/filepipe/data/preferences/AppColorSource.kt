@@ -9,11 +9,16 @@ enum class AppColorSource {
     PRESET_EMERALD,
     PRESET_AMBER,
     PRESET_VIOLET,
-    PRESET_CORAL;
+    PRESET_CORAL,
+    PRESET_TEAL,
+    PRESET_LIME,
+    PRESET_ROSE,
+    PRESET_SLATE;
 
     val isSeedBased: Boolean
         get() = when (this) {
-            PRESET_SAPPHIRE, PRESET_EMERALD, PRESET_AMBER, PRESET_VIOLET, PRESET_CORAL -> true
+            PRESET_SAPPHIRE, PRESET_EMERALD, PRESET_AMBER, PRESET_VIOLET, PRESET_CORAL,
+            PRESET_TEAL, PRESET_LIME, PRESET_ROSE, PRESET_SLATE -> true
             else -> false
         }
 
@@ -23,6 +28,10 @@ enum class AppColorSource {
         PRESET_AMBER -> Color(0xFFFF8F00)
         PRESET_VIOLET -> Color(0xFF7B1FA2)
         PRESET_CORAL -> Color(0xFFE53935)
+        PRESET_TEAL -> Color(0xFF00796B)
+        PRESET_LIME -> Color(0xFFAFB42B)
+        PRESET_ROSE -> Color(0xFFE91E63)
+        PRESET_SLATE -> Color(0xFF546E7A)
         else -> null
     }
 
@@ -34,7 +43,11 @@ enum class AppColorSource {
             PRESET_EMERALD,
             PRESET_AMBER,
             PRESET_VIOLET,
-            PRESET_CORAL
+            PRESET_CORAL,
+            PRESET_TEAL,
+            PRESET_LIME,
+            PRESET_ROSE,
+            PRESET_SLATE
         )
     }
 }

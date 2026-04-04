@@ -82,6 +82,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -105,6 +106,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.launch
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
@@ -177,10 +179,11 @@ fun SettingsScreen(
     val updateSheetChangelog by viewModel.updateSheetChangelog.collectAsStateWithLifecycle()
     val manualUpdateNoResult by viewModel.manualUpdateNoResult.collectAsStateWithLifecycle()
     var showUpdateSheet by remember { mutableStateOf(false) }
-    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(userMessage) {
         val message = userMessage ?: return@LaunchedEffect
@@ -194,6 +197,20 @@ fun SettingsScreen(
         if (uri != null) {
             val path = safTreeUriToPath(uri) ?: uri.toString()
             viewModel.setExportFolderUri(path)
+        }
+    }
+
+    val createDocumentLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.completeManualExportToUri(uri)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        viewModel.manualExportPickerRequested.collect { suggestedFileName ->
+            createDocumentLauncher.launch(suggestedFileName)
         }
     }
 
@@ -519,18 +536,12 @@ fun SettingsScreen(
 
                 val folderLabel = preferences.exportFolderUri
                     .takeIf { it.isNotBlank() }
-                    ?.let { uriOrPath ->
-                        if (uriOrPath.startsWith("content://")) {
-                            android.net.Uri.parse(uriOrPath).authority
-                                ?.substringBefore(".")
-                                ?.replaceFirstChar { it.uppercase() }
-                                ?.let { "Cloud: $it" }
-                                ?: uriOrPath
-                        } else {
-                            displayPath(uriOrPath)
-                        }
-                    }
+                    ?.let { displayPath(it) }
                     ?: stringResource(R.string.settings_choose_export_folder)
+
+                val exportFolderReady = preferences.exportFolderUri.isNotBlank()
+                val autoExportSwitchEnabled = exportFolderReady || preferences.autoExportOnRuleChange
+                val scheduledExportSwitchEnabled = exportFolderReady || preferences.scheduledExportEnabled
 
                 GroupedListColumn {
                     GroupedListItem(position = GroupPosition.FIRST) {
@@ -561,6 +572,15 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_auto_export_on_change),
                             subtitle = stringResource(R.string.settings_auto_export_on_change_hint),
                             checked = preferences.autoExportOnRuleChange,
+                            switchEnabled = autoExportSwitchEnabled,
+                            onDisabledInteraction = {
+                                playTap()
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        context.getString(R.string.settings_export_select_folder_first)
+                                    )
+                                }
+                            },
                             onCheckedChange = { enabled ->
                                 playTap()
                                 viewModel.setAutoExportOnChange(enabled)
@@ -572,6 +592,15 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_scheduled_export),
                             subtitle = stringResource(R.string.settings_scheduled_export_hint),
                             checked = preferences.scheduledExportEnabled,
+                            switchEnabled = scheduledExportSwitchEnabled,
+                            onDisabledInteraction = {
+                                playTap()
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        context.getString(R.string.settings_export_select_folder_first)
+                                    )
+                                }
+                            },
                             onCheckedChange = { enabled ->
                                 playTap()
                                 viewModel.setScheduledExportEnabled(enabled)
@@ -594,7 +623,7 @@ fun SettingsScreen(
                                     modifier = Modifier.weight(1f)
                                 ) { Text(stringResource(R.string.settings_import_rules)) }
                                 OutlinedButton(
-                                    onClick = { playTap(); viewModel.exportNow() },
+                                    onClick = { playTap(); viewModel.requestManualExportPicker() },
                                     modifier = Modifier.weight(1f)
                                 ) { Text(stringResource(R.string.settings_export_now)) }
                             }
@@ -1028,7 +1057,9 @@ private fun SettingsToggleItem(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-    isLast: Boolean = false
+    isLast: Boolean = false,
+    switchEnabled: Boolean = true,
+    onDisabledInteraction: (() -> Unit)? = null
 ) {
     ListItem(
         headlineContent = { Text(title, style = MaterialTheme.typography.bodyLarge) },
@@ -1047,12 +1078,26 @@ private fun SettingsToggleItem(
             { Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else null,
         trailingContent = {
+            val switchInteractive = switchEnabled || onDisabledInteraction != null
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange
+                onCheckedChange = { enabled ->
+                    when {
+                        switchEnabled -> onCheckedChange(enabled)
+                        onDisabledInteraction != null && enabled -> onDisabledInteraction.invoke()
+                        else -> { }
+                    }
+                },
+                enabled = switchInteractive
             )
         },
-        modifier = Modifier.clickable { onCheckedChange(!checked) },
+        modifier = Modifier.clickable {
+            if (!switchEnabled) {
+                onDisabledInteraction?.invoke()
+            } else {
+                onCheckedChange(!checked)
+            }
+        },
         colors = ListItemDefaults.colors(
             containerColor = Color.Transparent
         )

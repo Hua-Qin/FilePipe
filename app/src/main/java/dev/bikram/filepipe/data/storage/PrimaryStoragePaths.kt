@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.data.storage
 
+import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 
@@ -7,6 +8,34 @@ import android.provider.DocumentsContract
  * Converts a SAF tree URI (content://.../tree/primary%3ADCIM%2FCamera)
  * to an absolute file system path (/storage/emulated/0/DCIM/Camera).
  */
+/**
+ * Derives a persistable tree URI (same format as [androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree])
+ * from a document URI returned by [androidx.activity.result.contract.ActivityResultContracts.CreateDocument].
+ */
+fun treeUriFromDocumentUri(context: Context, documentUri: Uri): Uri? {
+    return try {
+        if (!DocumentsContract.isDocumentUri(context, documentUri)) return null
+        val authority = documentUri.authority ?: return null
+        val documentId = DocumentsContract.getDocumentId(documentUri)
+        val treeDocumentId = treeDocumentIdFromDocumentId(documentId) ?: return null
+        DocumentsContract.buildTreeDocumentUri(authority, treeDocumentId)
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun treeDocumentIdFromDocumentId(documentId: String): String? {
+    val colonIndex = documentId.indexOf(':')
+    if (colonIndex < 0) return null
+    val afterColon = documentId.substring(colonIndex + 1)
+    val slashIndex = afterColon.indexOf('/')
+    return if (slashIndex < 0) {
+        documentId
+    } else {
+        documentId.substring(0, colonIndex + 1 + slashIndex)
+    }
+}
+
 fun safTreeUriToPath(uri: Uri): String? {
     return try {
         val docId = DocumentsContract.getTreeDocumentId(uri)
