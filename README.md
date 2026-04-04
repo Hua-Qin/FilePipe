@@ -15,7 +15,7 @@
 - **App shortcuts** — Long-press the launcher icon to run any of your top 4 enabled rules straight from the home screen.
 - **Backup** - Export rules, history and settings to JSON, optional auto-export and scheduled export. Import restores everything. 
 - **Look and feel** - Light, dark, black (OLED), system default, **Material You** wallpaper
-  colors, **5 preset accents** and **9 palettes**, optional **progressive blur** and **gradient** background.
+  colors, **9 preset accents** and **9 palettes**, optional **progressive blur** and **gradient** background.
 - **Updates** - **Check for updates** in Settings: GitHub builds use releases from this repo; Play builds use **Google Play** in-app updates. 
 
 ## 🚀 How to use

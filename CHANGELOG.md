@@ -9,7 +9,7 @@
 - **Simulate** — see exactly which files a rule would move, without actually moving anything.
 - **App shortcuts** — long-press the app icon to run any of your top 4 enabled rules directly.
 - **Undo from notification** — tap Undo on a scheduled-run notification to reverse the last batch of moves.
-- **Custom theme palettes** — go beyond Material You: pick from Tonal Spot, Vibrant, Expressive, Rainbow, Monochrome, and more, or choose one of 5 preset accent colors.
+- **Custom theme palettes** — go beyond Material You: pick from Tonal Spot, Vibrant, Expressive, Rainbow, Monochrome, and more, or choose one of 9 preset accent colors.
 - **Progressive blur** — optional frosted-glass blur effect (Android 12+).
 - **Gradient background** — instead of solid color, get subtle gradient behind the app content, toggleable in Settings.
 - **In-app updates** — check for updates right from Settings. GitHub installs get APK updates from GitHub Releases; Play Store installs use Google Play's in-app update flow.

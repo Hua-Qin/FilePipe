@@ -43,8 +43,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "dev.bikram.filepipe"
         minSdk = 30
         targetSdk = 36
-        versionCode = 200
-        versionName = "2.0.0"
+        versionCode = 201
+        versionName = "2.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -73,6 +73,10 @@ extensions.configure<ApplicationExtension>("android") {
                 "proguard-rules.pro"
             )
             signingConfigs.findByName("release")?.let { signingConfig = it }
+            // Embed native debug symbols in the AAB for Play Console crash/ANR symbolication (transitive .so from deps).
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
 
@@ -90,6 +94,7 @@ extensions.configure<ApplicationExtension>("android") {
     productFlavors {
         create("github") {
             dimension = "distribution"
+            applicationIdSuffix = ".gh"
             buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
             buildConfigField("Boolean", "SHOW_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
@@ -104,6 +109,10 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
             buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
+    }
+
+    androidResources {
+        ignoreAssetsPattern = "IconKitchen.zip"
     }
 
     lint {

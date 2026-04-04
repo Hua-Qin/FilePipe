@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.app.NotificationManager
 import dagger.hilt.android.AndroidEntryPoint
+import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.domain.usecase.UndoRunUseCase
 import dev.bikram.filepipe.worker.FileOrganizerWorker
 import kotlinx.coroutines.CoroutineScope
@@ -38,7 +39,7 @@ class NotificationActionReceiver : BroadcastReceiver() {
     }
 
     companion object {
-        const val ACTION_UNDO_RUN = "dev.bikram.filepipe.ACTION_UNDO_RUN"
+        val ACTION_UNDO_RUN: String = "${BuildConfig.APPLICATION_ID}.ACTION_UNDO_RUN"
         const val EXTRA_HISTORY_ID = "extra_history_id"
     }
 }

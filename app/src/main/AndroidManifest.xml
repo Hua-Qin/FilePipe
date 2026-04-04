@@ -57,7 +57,7 @@
             android:name=".receiver.NotificationActionReceiver"
             android:exported="false">
             <intent-filter>
-                <action android:name="dev.bikram.filepipe.ACTION_UNDO_RUN" />
+                <action android:name="${applicationId}.ACTION_UNDO_RUN" />
             </intent-filter>
         </receiver>
 
