@@ -30,7 +30,9 @@ private fun treeDocumentIdFromDocumentId(documentId: String): String? {
     val afterColon = documentId.substring(colonIndex + 1)
     val slashIndex = afterColon.indexOf('/')
     return if (slashIndex < 0) {
-        documentId
+        // No folder in the path (e.g. primary:file.json in storage root). The tree is the volume
+        // root (primary:), not the file document id — same as [absoluteStoragePathToTreeUri] for "".
+        documentId.substring(0, colonIndex + 1)
     } else {
         documentId.substring(0, colonIndex + 1 + slashIndex)
     }
