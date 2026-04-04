@@ -1,0 +1,96 @@
+# Publish an existing GitHub Release playstore .aab to Play internal testing via Fastlane.
+# Does not rebuild the app. Listing and screenshots come from fastlane/metadata/android at the release tag.
+#
+# Prerequisites:
+# - Repository secret PLAY_SERVICE_ACCOUNT_JSON_B64 (base64-encoded Google Play service account JSON).
+# - The GitHub release must include an asset matching *playstore.aab (same naming as Build and release).
+#
+# workflow_dispatch:
+# - release_tag: Git tag of the release (e.g. v2.0.0). Leave empty to use the latest non-draft release.
+
+name: Publish to Play Store
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Git tag of the GitHub release (e.g. v2.0.0). Empty = latest published non-draft release."
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Resolve release tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=$(echo "${{ inputs.release_tag }}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          if [ -z "$tag" ]; then
+            tag=$(gh release list --repo "${{ github.repository }}" --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')
+            if [ -z "$tag" ] || [ "$tag" = "null" ]; then
+              echo "No published non-draft release found. Publish a release first or set release_tag."
+              exit 1
+            fi
+          fi
+          echo "Using release tag: $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - name: Download playstore AAB from GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.tag }}"
+          mkdir -p downloaded-aab
+          gh release download "$tag" --repo "${{ github.repository }}" --pattern "*playstore.aab" --dir downloaded-aab
+          count=$(find downloaded-aab -maxdepth 1 -name '*.aab' -type f | wc -l)
+          if [ "$count" -ne 1 ]; then
+            echo "Expected exactly one *playstore.aab on release $tag; found:"
+            find downloaded-aab -type f -print || true
+            exit 1
+          fi
+          aab=$(find downloaded-aab -maxdepth 1 -name '*.aab' -type f -print -quit)
+          echo "PLAY_AAB_PATH=$GITHUB_WORKSPACE/$aab" >> "$GITHUB_ENV"
+          echo "AAB: $aab"
+
+      - name: Write Play service account JSON
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PLAY_SERVICE_ACCOUNT_JSON_B64}" ]; then
+            echo "Missing repository secret PLAY_SERVICE_ACCOUNT_JSON_B64 (base64-encoded service account JSON)."
+            exit 1
+          fi
+          key_path="${RUNNER_TEMP}/play-service-account.json"
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON_B64" | tr -d '\n\r ' | base64 -d > "$key_path"
+          python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$key_path"
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Install Fastlane
+        run: bundle install --jobs 4 --retry 3
+
+      - name: Upload to Play internal track (Fastlane)
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ runner.temp }}/play-service-account.json
+        run: bundle exec fastlane deploy_internal

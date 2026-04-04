@@ -6,11 +6,23 @@
 #     - filepipe-v{version}-playstore.aab (Play Store upload; same playstore flavor as former APK)
 # - GitHub Release: always draft; publish from the Releases UI when ready.
 # - Run from any branch (e.g. main); the tagged commit is the commit that was built.
+#
+# Optional Play Console upload (workflow input publish_to_internal):
+# - Requires repository secret PLAY_SERVICE_ACCOUNT_JSON_B64 = base64-encoded Google Play service account JSON
+#   (Google Cloud: enable Play Android Developer API, create key; Play Console: add service account and grant access to releases and store listing as needed).
+# - Runs fastlane deploy_internal: uploads playstore AAB to the internal testing track and syncs listing from
+#   fastlane/metadata/android (screenshots and image assets upload only if PNGs/JPEGs are present there).
 
 name: Build and release
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_to_internal:
+        description: "Upload AAB + Play listing to internal track (needs base64 PLAY_SERVICE_ACCOUNT_JSON_B64 secret)"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -100,6 +112,37 @@ jobs:
           cp "$github_apk" "$out/filepipe-v${version}-github.apk"
           cp "$play_aab" "$out/filepipe-v${version}-playstore.aab"
           ls -la "$out"
+
+      - name: Write Play service account JSON
+        if: ${{ inputs.publish_to_internal }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PLAY_SERVICE_ACCOUNT_JSON_B64}" ]; then
+            echo "Missing repository secret PLAY_SERVICE_ACCOUNT_JSON_B64 (base64-encoded service account JSON)."
+            exit 1
+          fi
+          key_path="${RUNNER_TEMP}/play-service-account.json"
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON_B64" | tr -d '\n\r ' | base64 -d > "$key_path"
+          python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$key_path"
+
+      - name: Set up Ruby
+        if: ${{ inputs.publish_to_internal }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Install Fastlane
+        if: ${{ inputs.publish_to_internal }}
+        run: bundle install --jobs 4 --retry 3
+
+      - name: Upload to Play internal track (Fastlane)
+        if: ${{ inputs.publish_to_internal }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ runner.temp }}/play-service-account.json
+        run: bundle exec fastlane deploy_internal
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v6

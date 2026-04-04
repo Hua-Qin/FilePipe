@@ -28,12 +28,16 @@ import dev.bikram.filepipe.update.PlayUpdateSessionHandle
 import dev.bikram.filepipe.update.UpdateChecker
 import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
+import dev.bikram.filepipe.data.storage.treeUriFromDocumentUri
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -41,6 +45,9 @@ import kotlinx.coroutines.yield
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -81,6 +88,12 @@ class SettingsViewModel @Inject constructor(
     private val _manualUpdateNoResult = MutableStateFlow(false)
     val manualUpdateNoResult: StateFlow<Boolean> = _manualUpdateNoResult.asStateFlow()
 
+    private val _manualExportPickerRequested = MutableSharedFlow<String>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
+    )
+    val manualExportPickerRequested = _manualExportPickerRequested.asSharedFlow()
+
     init {
         viewModelScope.launch {
             val prefs = userPreferencesRepository.getPreferencesSnapshot()
@@ -112,6 +125,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setExportFolderUri(uriString: String) = viewModelScope.launch {
+        persistExportFolderUri(uriString)
+    }
+
+    private suspend fun persistExportFolderUri(uriString: String) {
         if (uriString.startsWith("content://")) {
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
@@ -121,9 +138,18 @@ class SettingsViewModel @Inject constructor(
             }
         }
         userPreferencesRepository.setExportFolderUri(uriString)
+        if (uriString.isBlank()) {
+            userPreferencesRepository.setAutoExportOnRuleChange(false)
+            userPreferencesRepository.setScheduledExportEnabled(false)
+            workManager.cancelUniqueWork(SCHEDULED_EXPORT_WORK_NAME)
+        }
     }
 
     fun setAutoExportOnChange(enabled: Boolean) = viewModelScope.launch {
+        if (enabled && userPreferencesRepository.getPreferencesSnapshot().exportFolderUri.isBlank()) {
+            _userMessage.value = context.getString(R.string.settings_export_select_folder_first)
+            return@launch
+        }
         userPreferencesRepository.setAutoExportOnRuleChange(enabled)
         if (enabled) {
             rulesAutoExportTrigger.maybeExportAfterRuleChange()
@@ -131,6 +157,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setScheduledExportEnabled(enabled: Boolean) = viewModelScope.launch {
+        if (enabled && userPreferencesRepository.getPreferencesSnapshot().exportFolderUri.isBlank()) {
+            _userMessage.value = context.getString(R.string.settings_export_select_folder_first)
+            return@launch
+        }
         userPreferencesRepository.setScheduledExportEnabled(enabled)
         if (enabled) {
             enqueueScheduledExportWork()
@@ -177,18 +207,31 @@ class SettingsViewModel @Inject constructor(
         userPreferencesRepository.setAutoCheckForUpdates(enabled)
     }
 
-    fun exportNow() = viewModelScope.launch {
-        val folder = userPreferencesRepository.getPreferencesSnapshot().exportFolderUri
-        if (folder.isBlank()) {
-            _userMessage.value = context.getString(R.string.settings_export_select_folder_first)
-            return@launch
-        }
-        exportRulesUseCase.exportRulesToTreeUri(folder).fold(
-            onSuccess = { fileName ->
-                _userMessage.value = context.getString(R.string.settings_export_success, fileName)
+    fun requestManualExportPicker() {
+        _manualExportPickerRequested.tryEmit(defaultManualExportFileName())
+    }
+
+    fun completeManualExportToUri(targetUri: Uri) = viewModelScope.launch {
+        exportRulesUseCase.exportBackupJsonToDocumentUri(targetUri).fold(
+            onSuccess = { displayName ->
+                val prefs = userPreferencesRepository.getPreferencesSnapshot()
+                if (prefs.exportFolderUri.isBlank()) {
+                    val treeUri = treeUriFromDocumentUri(context, targetUri)
+                    if (treeUri != null) {
+                        persistExportFolderUri(treeUri.toString())
+                    }
+                }
+                _userMessage.value = context.getString(R.string.settings_export_success, displayName)
             },
-            onFailure = { _userMessage.value = "Export failed: ${it.message}" }
+            onFailure = { err ->
+                _userMessage.value = "Export failed: ${err.message}"
+            }
         )
+    }
+
+    private fun defaultManualExportFileName(): String {
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+        return "filepipe_backup_$stamp.json"
     }
 
     fun importFromUri(uri: Uri) = viewModelScope.launch {

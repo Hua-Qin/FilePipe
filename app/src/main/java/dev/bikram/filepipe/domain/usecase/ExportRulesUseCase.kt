@@ -35,13 +35,48 @@ class ExportRulesUseCase @Inject constructor(
         val settings = userPreferencesRepository.getPreferencesSnapshot()
 
         val json = buildAppBackupJson(rules, historyWithFiles, settings)
-        val dateSuffix = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
-        val fileName = "filepipe_backup_$dateSuffix.json"
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+        val fileName = "filepipe_backup_$stamp.json"
 
         if (folderPath.startsWith("content://")) {
             writeToContentUri(folderPath, fileName, json).map { fileName }
         } else {
             writeToFilePath(folderPath, fileName, json).map { fileName }
+        }
+    }
+
+    /**
+     * Writes the same backup JSON as [exportRulesToTreeUri] to a URI from [androidx.activity.result.contract.ActivityResultContracts.CreateDocument].
+     */
+    suspend fun exportBackupJsonToDocumentUri(targetUri: Uri): Result<String> = withContext(Dispatchers.IO) {
+        val rules = ruleRepository.getAllRules().first()
+        val allHistory = runHistoryRepository.getAllHistoryOnce()
+        val historyWithFiles = allHistory.map { run ->
+            run to runHistoryRepository.getFilesForRunOnce(run.id)
+        }
+        val settings = userPreferencesRepository.getPreferencesSnapshot()
+        val json = buildAppBackupJson(rules, historyWithFiles, settings)
+        runCatching {
+            context.contentResolver.openOutputStream(targetUri)?.use { stream ->
+                stream.write(json.toByteArray(Charsets.UTF_8))
+            } ?: throw IOException("Failed to open output stream for export")
+            friendlyFileNameFromDocumentUri(targetUri)
+        }.fold(onSuccess = { Result.success(it) }, onFailure = { Result.failure(it) })
+    }
+
+    /**
+     * [Uri.getLastPathSegment] for SAF document URIs is the full document id (e.g. `primary:Download/foo.json`).
+     * For snackbars we only want the leaf file name (e.g. `foo.json`).
+     */
+    private fun friendlyFileNameFromDocumentUri(documentUri: Uri): String {
+        val segment = documentUri.lastPathSegment ?: return "filepipe_backup.json"
+        val decoded = Uri.decode(segment)
+        val lastSlash = decoded.lastIndexOf('/')
+        return if (lastSlash >= 0) {
+            decoded.substring(lastSlash + 1)
+        } else {
+            val lastColon = decoded.lastIndexOf(':')
+            if (lastColon >= 0) decoded.substring(lastColon + 1) else decoded
         }
     }
 

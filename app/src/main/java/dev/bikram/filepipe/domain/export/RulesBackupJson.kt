@@ -17,7 +17,7 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 data class AppBackup(
-    val version: Int = 6,
+    val version: Int = 7,
     val exportedAtMillis: Long = System.currentTimeMillis(),
     val rules: List<RuleBackupDto>,
     val history: List<RunHistoryBackupDto> = emptyList(),
@@ -106,6 +106,8 @@ data class SettingsBackupDto(
 private val jsonFormatter = Json {
     prettyPrint = true
     ignoreUnknownKeys = true
+    // Otherwise booleans and other fields that match DTO defaults (e.g. haptic on) are omitted from the file.
+    encodeDefaults = true
 }
 
 fun Rule.toBackupDto(): RuleBackupDto = RuleBackupDto(

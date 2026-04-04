@@ -1,0 +1,50 @@
+<b>Pipe your scattered files into order.</b> File Pipe lets you define rules that automatically move or copy files from one folder to another — no manual sorting needed. Set it up once and let it run on a schedule, or trigger rules whenever you need them.
+
+<b>━━ RULES ━━</b>
+Use templates to start fast, or build your own. Create a rule by choosing source folders, file extensions, and a destination. Each rule can move or copy files, and you control what happens when a filename collision occurs — skip, overwrite, or rename automatically. Rules can scan subfolders recursively and each one gets its own schedule.
+
+<b>━━ ADVANCED FILTERS ━━</b>
+Not every file in a folder should match. Narrow things down with:
+• Filename patterns (wildcards)
+• Minimum and maximum file size
+• Minimum and maximum file age
+• Exclude patterns
+
+All optional, all collapsed by default so simple rules stay simple.
+
+<b>━━ SIMULATE BEFORE YOU RUN ━━</b>
+Not sure a rule will pick up the right files? <b>Simulate</b> it first. File Pipe previews exactly which files would be moved — without touching anything on disk.
+
+<b>━━ FLEXIBLE SCHEDULES ━━</b>
+Run rules on demand, or schedule them to run:
+• Every few hours
+• Daily at a specific time
+• Weekly on a specific day and time
+
+<b>━━ HISTORY ━━</b>
+Every run is logged with a full per-file breakdown — moved, skipped, or failed. You can:
+• Filter by outcome (including runs that matched nothing)
+• Sort by date or rule name
+• Switch between date view, rule view, or status view
+• Tap a moved file to open it directly
+• <b>Undo</b> a run to restore files when possible
+
+<b>━━ APP SHORTCUTS ━━</b>
+Long-press the app icon to run any of your top four enabled rules immediately, without opening the app.
+
+<b>━━ NOTIFICATIONS ━━</b>
+Scheduled runs post a summary notification showing the files that were moved. Tap <b>Undo</b> directly from the notification to reverse the last batch.
+
+<b>━━ BACKUP AND RESTORE ━━</b>
+Export all your rules to a JSON file and import them back at any time. Auto-export on rule change and scheduled exports are available in Settings.
+
+<b>━━ LOOK AND FEEL ━━</b>
+• Light, dark, black (OLED), or system-default theme
+• Material You (wallpaper colors on Android 12+)
+• 5 fixed accent presets: Sapphire, Emerald, Amber, Violet, Coral
+• 9 palette algorithms: Tonal Spot, Vibrant, Expressive, Rainbow, Monochrome, and more
+• Optional gradient background
+• Optional progressive blur behind the nav bar (Android 12+)
+
+<b>━━ PRIVACY ━━</b>
+Works entirely on-device. No accounts, no cloud sync, no data collection. Folder access is granted one folder at a time via the standard system picker — no broad storage permission required.
