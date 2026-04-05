@@ -52,7 +52,6 @@ import androidx.compose.material.icons.automirrored.filled.TextSnippet
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -80,6 +79,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -97,11 +97,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RuleIcon
@@ -127,6 +131,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.ButtonGroup
@@ -142,6 +147,60 @@ private sealed class FolderPickIntent {
     data object SetDestination : FolderPickIntent()
 }
 private val PillShape = RoundedCornerShape(50)
+
+/** ObtainX-style large faded icon at bottom-right of error cards (~alpha 28/255). */
+private val RuleErrorCardWatermarkAlpha = 28f / 255f
+
+@Composable
+private fun RuleErrorAlertCard(
+    title: String,
+    modifier: Modifier = Modifier,
+    verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(8.dp),
+    content: @Composable ColumnScope.() -> Unit
+) {
+    val onErrorContainer = MaterialTheme.colorScheme.onErrorContainer
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = SectionButtonShape,
+        color = MaterialTheme.colorScheme.errorContainer,
+        contentColor = onErrorContainer
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                verticalArrangement = verticalArrangement
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Warning,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                content()
+            }
+            Icon(
+                imageVector = Icons.Filled.Warning,
+                contentDescription = null,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 4.dp, bottom = 4.dp)
+                    .size(52.dp),
+                tint = onErrorContainer.copy(alpha = RuleErrorCardWatermarkAlpha)
+            )
+        }
+    }
+}
 
 @Composable
 private fun ruleIconOptionLabel(icon: RuleIcon): String = stringResource(
@@ -166,7 +225,7 @@ private fun RuleSectionCard(
 ) {
     ElevatedCard(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.elevatedCardColors()
+        colors = elevatedCardColors()
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(
@@ -250,6 +309,9 @@ fun RuleDetailScreen(
             null -> {}
         }
         pendingFolderPick = null
+        if (pending != null) {
+            viewModel.refreshFolderAccessAfterPermissionChange()
+        }
     }
 
     fun launchFolderPicker(intent: FolderPickIntent, initialPath: String?) {
@@ -262,6 +324,17 @@ fun RuleDetailScreen(
         action()
     }
 
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshFolderAccessAfterPermissionChange()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     LaunchedEffect(state.isSaved) {
         if (state.isSaved) onNavigateBack()
     }
@@ -269,7 +342,7 @@ fun RuleDetailScreen(
     LaunchedEffect(state.removedRedundantFolders) {
         if (state.removedRedundantFolders.isNotEmpty()) {
             val names = state.removedRedundantFolders.joinToString(", ") { it.substringAfterLast('/') }
-            snackbarHostState.showSnackbar("Removed redundant subfolder(s): $names")
+            snackbarHostState.showSnackbar(context.getString(R.string.rule_detail_redundant_subfolder_removed, names))
             viewModel.dismissRedundantFolderNotice()
         }
     }
@@ -334,12 +407,52 @@ fun RuleDetailScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
             Spacer(Modifier.height(topContentPadding))
-            if (state.errors.isNotEmpty()) {
-                state.errors.forEach { error ->
+            AnimatedVisibility(
+                visible = state.errors.isNotEmpty(),
+                enter = fadeIn() + expandVertically(clip = false),
+                exit = fadeOut() + shrinkVertically(clip = false)
+            ) {
+                RuleErrorAlertCard(
+                    title = stringResource(R.string.rule_detail_validation_errors_title)
+                ) {
+                    state.errors.forEach { errorLine ->
+                        Text(
+                            text = "• $errorLine",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
+            val folderAccessIssues =
+                state.inaccessibleSourcePaths.isNotEmpty() || state.destinationFolderInaccessible
+            if (folderAccessIssues) {
+                RuleErrorAlertCard(
+                    title = stringResource(R.string.rule_detail_folder_access_title),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    state.inaccessibleSourcePaths.forEach { path ->
+                        Text(
+                            text = stringResource(
+                                R.string.rule_detail_folder_access_source_line,
+                                displayPath(path)
+                            ),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    if (state.destinationFolderInaccessible) {
+                        Text(
+                            text = stringResource(
+                                R.string.rule_detail_folder_access_destination_line,
+                                displayPath(state.destinationFolderPath)
+                            ),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     Text(
-                        text = "• $error",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall
+                        text = stringResource(R.string.rule_detail_folder_access_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.88f)
                     )
                 }
             }
@@ -396,6 +509,7 @@ fun RuleDetailScreen(
             ) {
                 state.sourceFolderPaths.forEach { path ->
                     val isSourceBookmarked = path in bookmarkedFolders
+                    val sourceNeedsAccess = path in state.inaccessibleSourcePaths
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
@@ -404,7 +518,11 @@ fun RuleDetailScreen(
                         Text(
                             text = displayPath(path),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = if (sourceNeedsAccess) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable {
@@ -423,7 +541,7 @@ fun RuleDetailScreen(
                             )
                         }
                         IconButton(onClick = { withTapSound { viewModel.removeSourceFolder(path) } }) {
-                            Icon(Icons.Default.Close, contentDescription = "Remove", modifier = Modifier.size(18.dp))
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.schedule_remove_short), modifier = Modifier.size(18.dp))
                         }
                     }
                 }
@@ -477,21 +595,33 @@ fun RuleDetailScreen(
                         }
                     }
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = stringResource(R.string.rule_scan_subdirs_label),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Switch(
-                        checked = state.scanSubdirectories,
-                        onCheckedChange = { enabled ->
-                            withTapSound { viewModel.setScanSubdirectories(enabled) }
-                        }
-                    )
+                Column(Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = stringResource(R.string.rule_scan_subdirs_label),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Switch(
+                            checked = state.scanSubdirectories,
+                            onCheckedChange = { enabled ->
+                                withTapSound { viewModel.setScanSubdirectories(enabled) }
+                            }
+                        )
+                    }
+                    if (state.scanSubdirectories) {
+                        Text(
+                            text = stringResource(R.string.rule_scan_subdirs_support),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 4.dp)
+                        )
+                    }
                 }
             }
 
@@ -509,7 +639,11 @@ fun RuleDetailScreen(
                         Text(
                             text = displayPath(state.destinationFolderPath),
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.primary,
+                            color = if (state.destinationFolderInaccessible) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable {
@@ -716,7 +850,7 @@ fun RuleDetailScreen(
 
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.elevatedCardColors()
+                colors = elevatedCardColors()
             ) {
                 Column(Modifier.padding(16.dp)) {
                     Row(
@@ -843,7 +977,7 @@ fun RuleDetailScreen(
             title = { Text(if (viewModel.isNewRule) stringResource(R.string.new_rule) else stringResource(R.string.edit_rule)) },
             navigationIcon = {
                 IconButton(onClick = { withTapSound(::tryNavigateBack) }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.nav_back))
                 }
             },
             actions = {
@@ -1135,7 +1269,7 @@ fun RuleDetailScreen(
                     modifier = Modifier.padding(bottom = 4.dp)
                 )
                 Text(
-                    text = "Pick a starting point - you can customize everything after.",
+                    text = stringResource(R.string.template_picker_subtitle),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 12.dp)
@@ -1191,7 +1325,7 @@ fun RuleDetailScreen(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     shape = PillShape
                 ) {
-                    Text(stringResource(R.string.template_skip))
+                    Text(stringResource(R.string.onboarding_wizard_start_blank))
                 }
                 Spacer(Modifier.height(24.dp))
             }

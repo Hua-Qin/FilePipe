@@ -7,7 +7,13 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.HiltAndroidApp
+import dev.bikram.filepipe.manualrun.ManualRunProcessLifecycleBinder
+import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.worker.LogPruneWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -17,6 +23,14 @@ class FilePipeApp : Application(), Configuration.Provider {
     @Inject
     lateinit var workerFactory: HiltWorkerFactory
 
+    @Inject
+    lateinit var manualRunProcessLifecycleBinder: ManualRunProcessLifecycleBinder
+
+    @Inject
+    lateinit var userPreferencesRepository: UserPreferencesRepository
+
+    private val preferencesMigrationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
@@ -24,6 +38,10 @@ class FilePipeApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        manualRunProcessLifecycleBinder.ensureRegistered()
+        preferencesMigrationScope.launch {
+            userPreferencesRepository.migrateLegacyCustomSeedIfNeeded()
+        }
         scheduleLogPruneWorker()
     }
 

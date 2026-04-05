@@ -88,6 +88,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -98,6 +99,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.core.app.NotificationManagerCompat
@@ -126,6 +128,7 @@ import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.ui.components.text.SimpleMarkdown
 
@@ -179,7 +182,9 @@ fun SettingsScreen(
     val updateSheetChangelog by viewModel.updateSheetChangelog.collectAsStateWithLifecycle()
     val manualUpdateNoResult by viewModel.manualUpdateNoResult.collectAsStateWithLifecycle()
     var showUpdateSheet by remember { mutableStateOf(false) }
-    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val configuration = LocalConfiguration.current
+    val maxUpdateSheetHeight = (configuration.screenHeightDp * 0.85f).dp
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     val snackbarHostState = remember { SnackbarHostState() }
@@ -226,15 +231,25 @@ fun SettingsScreen(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { }
 
+    LaunchedEffect(showUpdateSheet) {
+        if (showUpdateSheet) {
+            updateSheetState.expand()
+        }
+    }
+
     if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
+        val updateSheetContainerColors = elevatedCardColors()
         ModalBottomSheet(
             onDismissRequest = {
                 showUpdateSheet = false
                 viewModel.dismissUpdateSheet()
             },
-            sheetState = updateSheetState
+            sheetState = updateSheetState,
+            containerColor = updateSheetContainerColors.containerColor,
+            contentColor = updateSheetContainerColors.contentColor
         ) {
             UpdateCheckBottomSheetContent(
+                maxSheetHeight = maxUpdateSheetHeight,
                 isCheckingUpdate = isCheckingUpdate,
                 updateInfo = updateInfo,
                 manualUpdateNoResult = manualUpdateNoResult,
@@ -325,6 +340,8 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 ThemeColorSection(
                     colorSource = preferences.colorSource,
+                    savedCustomSeedHexes = preferences.savedCustomSeedHexes,
+                    activeCustomSeedHex = preferences.activeCustomSeedHex,
                     themePaletteStyle = preferences.themePaletteStyle,
                     onColorSource = { source ->
                         playTap()
@@ -333,6 +350,18 @@ fun SettingsScreen(
                     onPaletteStyle = { style ->
                         playTap()
                         viewModel.setThemePaletteStyle(style)
+                    },
+                    onAddCustomSeedHex = { hex ->
+                        playTap()
+                        viewModel.addCustomSeedHex(hex)
+                    },
+                    onSelectCustomSeedHex = { hex ->
+                        playTap()
+                        viewModel.selectCustomSeedHex(hex)
+                    },
+                    onRemoveCustomSeedHex = { hex ->
+                        playTap()
+                        viewModel.removeCustomSeedHex(hex)
                     }
                 )
                 if (preferences.colorSource == AppColorSource.MATERIAL_YOU && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
@@ -353,6 +382,17 @@ fun SettingsScreen(
                             onCheckedChange = { enabled ->
                                 playTap()
                                 viewModel.setUseGradientBackground(enabled)
+                            }
+                        )
+                    }
+                    GroupedListItem(position = GroupPosition.MIDDLE) {
+                        SettingsToggleItem(
+                            title = stringResource(R.string.settings_fixed_card_colors),
+                            subtitle = stringResource(R.string.settings_fixed_card_colors_desc),
+                            checked = preferences.useFixedCardColors,
+                            onCheckedChange = { enabled ->
+                                playTap()
+                                viewModel.setUseFixedCardColors(enabled)
                             }
                         )
                     }
@@ -687,7 +727,7 @@ fun SettingsScreen(
 
             // ── About ─────────────────────────────────────────────────────────
             item {
-                val context = LocalContext.current
+                val aboutContext = LocalContext.current
                 val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
                     .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
                 Column(modifier = Modifier.padding(top = 24.dp)) {
@@ -714,7 +754,7 @@ fun SettingsScreen(
                                 )
                                 Spacer(Modifier.height(10.dp))
                                 Text(
-                                    text = stringResource(R.string.settings_about_tagline),
+                                    text = stringResource(R.string.app_tagline),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center
@@ -742,9 +782,9 @@ fun SettingsScreen(
                                             .clickable {
                                                 playTap()
                                                 val profileUrl =
-                                                    context.getString(R.string.about_author_github_profile_url)
+                                                    aboutContext.getString(R.string.about_author_github_profile_url)
                                                 runCatching {
-                                                    context.startActivity(
+                                                    aboutContext.startActivity(
                                                         Intent(Intent.ACTION_VIEW, Uri.parse(profileUrl))
                                                     )
                                                 }
@@ -765,7 +805,7 @@ fun SettingsScreen(
                                             playTap()
                                             val url = "https://github.com/$githubRepoForSourceLink"
                                             runCatching {
-                                                context.startActivity(
+                                                aboutContext.startActivity(
                                                     Intent(Intent.ACTION_VIEW, Uri.parse(url))
                                                 )
                                             }
@@ -794,6 +834,7 @@ fun SettingsScreen(
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun UpdateCheckBottomSheetContent(
+    maxSheetHeight: Dp,
     isCheckingUpdate: Boolean,
     updateInfo: UpdateInfo?,
     manualUpdateNoResult: Boolean,
@@ -801,13 +842,15 @@ private fun UpdateCheckBottomSheetContent(
     changelogState: ChangelogUiState,
     onDownloadClick: (UpdateInfo) -> Unit
 ) {
-    val changelogScroll = rememberScrollState()
+    val sheetScroll = rememberScrollState()
+    val changelogSurfaceColors = elevatedCardColors()
     Column(
         Modifier
             .fillMaxWidth()
+            .heightIn(max = maxSheetHeight)
             .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 8.dp)
-            .verticalScroll(changelogScroll)
+            .verticalScroll(sheetScroll)
     ) {
         if (isCheckingUpdate) {
             Box(
@@ -872,7 +915,7 @@ private fun UpdateCheckBottomSheetContent(
                         UpToDatePhoneIcon()
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = stringResource(R.string.settings_update_sheet_up_to_date),
+                            text = stringResource(R.string.settings_up_to_date),
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center,
@@ -897,7 +940,10 @@ private fun UpdateCheckBottomSheetContent(
                         .fillMaxWidth()
                         .height(120.dp),
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer
+                    color = changelogSurfaceColors.containerColor,
+                    contentColor = changelogSurfaceColors.contentColor,
+                    tonalElevation = 1.dp,
+                    shadowElevation = 0.dp
                 ) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
@@ -911,7 +957,10 @@ private fun UpdateCheckBottomSheetContent(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer
+                    color = changelogSurfaceColors.containerColor,
+                    contentColor = changelogSurfaceColors.contentColor,
+                    tonalElevation = 1.dp,
+                    shadowElevation = 0.dp
                 ) {
                     SimpleMarkdown(
                         content = changelogState.text,
@@ -925,7 +974,10 @@ private fun UpdateCheckBottomSheetContent(
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainer
+                    color = changelogSurfaceColors.containerColor,
+                    contentColor = changelogSurfaceColors.contentColor,
+                    tonalElevation = 1.dp,
+                    shadowElevation = 0.dp
                 ) {
                     Text(
                         text = changelogState.message,
@@ -1108,11 +1160,11 @@ private val LOG_RETENTION_OPTIONS = listOf(7, 14, 30, 90, -1)
 
 @Composable
 private fun logRetentionLabel(days: Int): String = when (days) {
-    7 -> "7 days"
-    14 -> "14 days"
-    30 -> "30 days"
-    90 -> "90 days"
-    else -> "Never"
+    7 -> stringResource(R.string.log_retention_7_days)
+    14 -> stringResource(R.string.log_retention_14_days)
+    30 -> stringResource(R.string.log_retention_30_days)
+    90 -> stringResource(R.string.log_retention_90_days)
+    else -> stringResource(R.string.log_retention_never)
 }
 
 @Composable
@@ -1134,11 +1186,11 @@ private fun LogRetentionDropdown(currentDays: Int, onSelect: (Int) -> Unit) {
 
 @Composable
 private fun swipeActionLabel(action: SwipeAction): String = when (action) {
-    SwipeAction.EDIT -> "Edit"
-    SwipeAction.DELETE -> "Delete"
-    SwipeAction.DUPLICATE -> "Duplicate"
-    SwipeAction.PREVIEW -> "Preview"
-    SwipeAction.VIEW_HISTORY -> "View history"
+    SwipeAction.EDIT -> stringResource(R.string.action_edit)
+    SwipeAction.DELETE -> stringResource(R.string.delete)
+    SwipeAction.DUPLICATE -> stringResource(R.string.action_duplicate)
+    SwipeAction.PREVIEW -> stringResource(R.string.preview_title)
+    SwipeAction.VIEW_HISTORY -> stringResource(R.string.view_history)
 }
 
 @Composable

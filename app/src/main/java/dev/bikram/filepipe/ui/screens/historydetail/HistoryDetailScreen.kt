@@ -68,8 +68,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
+import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import dev.bikram.filepipe.domain.model.isNoChangesRun
 import dev.bikram.filepipe.domain.model.TriggerType
 import dev.bikram.filepipe.ui.components.StatusChip
@@ -80,6 +82,7 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.elevatedCardColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -211,7 +214,10 @@ fun HistoryDetailScreen(
 
 @Composable
 private fun RunSummaryCard(history: RunHistory, onUndo: () -> Unit) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        colors = elevatedCardColors()
+    ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -220,7 +226,7 @@ private fun RunSummaryCard(history: RunHistory, onUndo: () -> Unit) {
             ) {
                 Text("Run Summary", style = MaterialTheme.typography.titleMedium)
                 StatusChip(
-                    status = history.status,
+                    status = if (history.isEffectivelyUndone()) RunStatus.UNDONE else history.status,
                     noChanges = history.isNoChangesRun()
                 )
             }
@@ -235,21 +241,38 @@ private fun RunSummaryCard(history: RunHistory, onUndo: () -> Unit) {
                 val durationSec = (completed - history.startedAt) / 1000
                 SummaryRow("Duration", "${durationSec}s")
             }
-            SummaryRow("Files moved", history.totalFilesMoved.toString())
+            SummaryRow(
+                stringResource(
+                    when (history.operationMode) {
+                        OperationMode.COPY -> R.string.history_detail_files_copied_label
+                        OperationMode.MOVE -> R.string.history_detail_files_moved_label
+                    }
+                ),
+                history.totalFilesMoved.toString()
+            )
             if (history.totalFilesFailed > 0) {
                 SummaryRow("Failed", history.totalFilesFailed.toString())
+            }
+            if (history.cancelledUnprocessedCount > 0) {
+                SummaryRow(
+                    stringResource(R.string.history_detail_not_processed_cancelled_label),
+                    history.cancelledUnprocessedCount.toString()
+                )
             }
             history.errorMessage?.let { msg ->
                 SummaryRow("Error", msg)
             }
-            if (history.isReversed) {
+            if (history.isEffectivelyUndone()) {
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "This run has been undone.",
+                    stringResource(R.string.history_detail_run_undone),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary
                 )
-            } else if (history.totalFilesMoved > 0 && history.status == RunStatus.SUCCESS) {
+            } else if (
+                history.totalFilesMoved > 0 &&
+                    (history.status == RunStatus.SUCCESS || history.status == RunStatus.CANCELLED)
+            ) {
                 Spacer(Modifier.height(8.dp))
                 Button(
                     onClick = onUndo,
@@ -261,7 +284,7 @@ private fun RunSummaryCard(history: RunHistory, onUndo: () -> Unit) {
                     )
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null)
-                    Text("  Undo (restore ${history.totalFilesMoved} file(s))")
+                    Text("  ${stringResource(R.string.history_detail_undo_files, history.totalFilesMoved)}")
                 }
             }
         }
@@ -297,10 +320,16 @@ private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
         file.success -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.error
     }
+    val listCardSurface = elevatedCardColors()
     val containerColor = when {
-        file.skipped -> MaterialTheme.colorScheme.surfaceContainerLow
+        file.skipped -> listCardSurface.containerColor
         !file.success -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
-        else -> MaterialTheme.colorScheme.surfaceContainerLow
+        else -> listCardSurface.containerColor
+    }
+    val rowContentColor = if (file.success || file.skipped) {
+        listCardSurface.contentColor
+    } else {
+        MaterialTheme.colorScheme.onSurface
     }
 
     Surface(
@@ -313,6 +342,7 @@ private fun FileMovedCard(file: FileMoved, modifier: Modifier = Modifier) {
             ),
         shape = RoundedCornerShape(12.dp),
         color = containerColor,
+        contentColor = rowContentColor,
         tonalElevation = 1.dp
     ) {
         Row(

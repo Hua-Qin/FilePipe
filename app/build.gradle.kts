@@ -13,6 +13,9 @@ plugins {
 
 kotlin {
     jvmToolchain(libs.versions.java.get().toInt())
+    compilerOptions {
+        freeCompilerArgs.add("-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi")
+    }
 }
 
 // Release signing only when keystore.properties exists (GitHub Actions writes it from secrets).
@@ -43,8 +46,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "dev.bikram.filepipe"
         minSdk = 30
         targetSdk = 36
-        versionCode = 201
-        versionName = "2.0.1"
+        versionCode = 210
+        versionName = "2.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -130,9 +133,10 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
-    implementation("androidx.compose.material3:material3:1.5.0-alpha16")
+    implementation(libs.compose.material3.expressive)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.material.icons.extended)
+    implementation(libs.reorderable)
     debugImplementation(libs.compose.ui.tooling)
 
     // Activity + Navigation
@@ -143,6 +147,7 @@ dependencies {
     // Lifecycle / ViewModel
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
+    implementation(libs.lifecycle.process)
 
     // Hilt
     implementation(libs.hilt.android)

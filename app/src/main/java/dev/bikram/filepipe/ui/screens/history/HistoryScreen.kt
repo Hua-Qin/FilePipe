@@ -37,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -117,10 +118,12 @@ fun HistoryScreen(
 
     val filterChipsData = listOf(
         HistoryStatusFilter.ALL to stringResource(R.string.history_filter_all),
-        HistoryStatusFilter.SUCCESS to stringResource(R.string.history_filter_success),
-        HistoryStatusFilter.FAILED to stringResource(R.string.history_filter_failed),
-        HistoryStatusFilter.PARTIAL to stringResource(R.string.history_filter_partial),
-        HistoryStatusFilter.NO_CHANGES to stringResource(R.string.history_filter_no_changes)
+        HistoryStatusFilter.SUCCESS to stringResource(R.string.status_success),
+        HistoryStatusFilter.FAILED to stringResource(R.string.status_failed),
+        HistoryStatusFilter.PARTIAL to stringResource(R.string.status_partial),
+        HistoryStatusFilter.NO_CHANGES to stringResource(R.string.status_no_changes),
+        HistoryStatusFilter.CANCELLED to stringResource(R.string.status_cancelled),
+        HistoryStatusFilter.UNDONE to stringResource(R.string.status_undone)
     )
 
     if (showClearConfirm) {
@@ -196,6 +199,7 @@ fun HistoryScreen(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_date)) },
+                                    leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_DATE, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_DATE)
@@ -204,6 +208,7 @@ fun HistoryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_rule)) },
+                                    leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_RULE, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_RULE)
@@ -212,6 +217,7 @@ fun HistoryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_status)) },
+                                    leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_STATUS, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_STATUS)
@@ -236,6 +242,7 @@ fun HistoryScreen(
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
+                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
@@ -244,6 +251,7 @@ fun HistoryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
+                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
@@ -252,6 +260,7 @@ fun HistoryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
+                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
@@ -260,6 +269,7 @@ fun HistoryScreen(
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
+                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
                                     onClick = {
                                         playTap()
                                         viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)
@@ -482,11 +492,13 @@ fun HistoryScreen(
 
 @Composable
 private fun historyStatusSectionTitle(section: HistoryStatusSection): String = when (section) {
-    HistoryStatusSection.SUCCESS -> stringResource(R.string.history_status_header_success)
-    HistoryStatusSection.FAILED -> stringResource(R.string.history_status_header_failed)
-    HistoryStatusSection.PARTIAL -> stringResource(R.string.history_status_header_partial)
-    HistoryStatusSection.NO_CHANGES -> stringResource(R.string.history_status_header_no_changes)
+    HistoryStatusSection.SUCCESS -> stringResource(R.string.status_success)
+    HistoryStatusSection.FAILED -> stringResource(R.string.status_failed)
+    HistoryStatusSection.PARTIAL -> stringResource(R.string.status_partial)
+    HistoryStatusSection.NO_CHANGES -> stringResource(R.string.status_no_changes)
     HistoryStatusSection.IN_PROGRESS -> stringResource(R.string.history_status_header_in_progress)
+    HistoryStatusSection.CANCELLED -> stringResource(R.string.status_cancelled)
+    HistoryStatusSection.UNDONE -> stringResource(R.string.status_undone)
 }
 
 @Composable

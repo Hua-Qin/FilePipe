@@ -71,6 +71,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
@@ -86,8 +87,10 @@ import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalUseFixedCardColors
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.ProgressiveBlurStyle
+import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 
 private data class BottomNavItem(
     val screen: Screen,
@@ -121,10 +124,12 @@ private val bottomNavItems = listOf(
 fun AppNavigation(
     hasSeenIntro: Boolean = true,
     introSeenAtLaunch: Boolean = hasSeenIntro,
-    preferences: AppPreferences = AppPreferences()
+    preferences: AppPreferences = AppPreferences(),
+    pendingShortcutRepository: PendingShortcutRepository
 ) {
     val playTap = rememberPlayTapSound()
     val navController = rememberNavController()
+    val pendingHistoryId by pendingShortcutRepository.pendingHistoryDetailId.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
@@ -199,6 +204,15 @@ fun AppNavigation(
         }
     }
 
+    LaunchedEffect(hasSeenIntro, pendingHistoryId, navController) {
+        val historyId = pendingHistoryId ?: return@LaunchedEffect
+        if (!hasSeenIntro) return@LaunchedEffect
+        navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
+            launchSingleTop = true
+        }
+        pendingShortcutRepository.clearPendingHistoryDetail()
+    }
+
     val currentTab = bottomNavItems.find { item ->
         currentDestination?.hierarchy?.any { it.route == item.screen.route } == true
     }?.screen
@@ -226,6 +240,7 @@ fun AppNavigation(
 
     CompositionLocalProvider(
         LocalUseGradientBackground provides preferences.useGradientBackground,
+        LocalUseFixedCardColors provides preferences.useFixedCardColors,
         LocalProgressiveBlurEnabled provides preferences.progressiveBlurEnabled,
         LocalProgressiveBlurStyle provides progressiveBlurStyle
     ) {

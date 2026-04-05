@@ -11,6 +11,8 @@ data class Rule(
     val destinationFolderPath: String,
     val fileExtensions: List<String>,
     val isEnabled: Boolean = true,
+    /** Display order when sorting by [HistorySortKey.MY_ORDER]; lower first. */
+    val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val schedule: RuleSchedule? = null,
@@ -51,19 +53,28 @@ data class RunHistory(
     val completedAt: Long? = null,
     val status: RunStatus,
     val totalFilesFound: Int = 0,
+    /** Files matched but not processed because the user cancelled (partial run). */
+    val cancelledUnprocessedCount: Int = 0,
     val totalFilesMoved: Int = 0,
     val totalFilesFailed: Int = 0,
     val errorMessage: String? = null,
-    val isReversed: Boolean = false
+    val isReversed: Boolean = false,
+    val operationMode: OperationMode = OperationMode.MOVE,
+    /** Destination folder document URIs created during a copy run (for undo to remove empty dirs). */
+    val copyCreatedDestFolderUris: List<String> = emptyList()
 )
 
 enum class TriggerType { MANUAL, SCHEDULED }
 
-enum class RunStatus { IN_PROGRESS, SUCCESS, PARTIAL_FAILURE, FAILED }
+enum class RunStatus { IN_PROGRESS, SUCCESS, PARTIAL_FAILURE, FAILED, CANCELLED, UNDONE }
 
 /** Successful run with zero files moved and zero failures (shown as "No changes", not "Success"). */
 fun RunHistory.isNoChangesRun(): Boolean =
     status == RunStatus.SUCCESS && totalFilesMoved == 0 && totalFilesFailed == 0
+
+/** True after undo, including legacy rows that only set [RunHistory.isReversed]. */
+fun RunHistory.isEffectivelyUndone(): Boolean =
+    status == RunStatus.UNDONE || isReversed
 
 enum class HistoryStatusFilter {
     ALL,
@@ -71,6 +82,8 @@ enum class HistoryStatusFilter {
     FAILED,
     PARTIAL,
     NO_CHANGES,
+    CANCELLED,
+    UNDONE,
 }
 
 // ---
@@ -96,7 +109,8 @@ data class RunResult(
     val historyId: Long,
     val filesMoved: List<FileMoved>,
     val startedAt: Long,
-    val completedAt: Long
+    val completedAt: Long,
+    val copyCreatedDestFolderUris: List<String> = emptyList()
 ) {
     val totalMoved: Int get() = filesMoved.count { it.success && !it.skipped }
     val totalSkipped: Int get() = filesMoved.count { it.skipped }
@@ -132,4 +146,9 @@ data class RunProgress(
     val totalFiles: Int = 0,
     val isComplete: Boolean = false,
     val error: String? = null
-)
+) {
+    companion object {
+        /** Matches [ExecuteRulesUseCase] cancellation path; distinguishes success terminal from stopped mid-run. */
+        const val ERROR_CANCELLED: String = "Cancelled"
+    }
+}

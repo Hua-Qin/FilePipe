@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleShortcutIntent(intent)
+        handleOpenHistoryDetailIntent(intent)
 
         setContent {
             val preferences by userPreferencesRepository.preferencesFlow
@@ -70,7 +71,9 @@ class MainActivity : ComponentActivity() {
                 themeMode = preferences.themeMode,
                 colorSource = preferences.colorSource,
                 themePaletteStyle = preferences.themePaletteStyle,
-                hapticFeedbackEnabled = preferences.hapticFeedbackEnabled
+                hapticFeedbackEnabled = preferences.hapticFeedbackEnabled,
+                useGradientBackground = preferences.useGradientBackground,
+                activeCustomSeedHex = preferences.activeCustomSeedHex
             ) {
                 if (introSeenAtLaunch == null) {
                     Surface(
@@ -83,7 +86,8 @@ class MainActivity : ComponentActivity() {
                     AppNavigation(
                         hasSeenIntro = preferences.hasSeenIntro,
                         introSeenAtLaunch = introSeenAtLaunch!!,
-                        preferences = preferences
+                        preferences = preferences,
+                        pendingShortcutRepository = pendingShortcutRepository
                     )
                 }
             }
@@ -92,7 +96,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleShortcutIntent(intent)
+        handleOpenHistoryDetailIntent(intent)
     }
 
     override fun onStop() {
@@ -106,6 +112,17 @@ class MainActivity : ComponentActivity() {
         val ruleId = intent?.getLongExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID, -1L) ?: -1L
         if (ruleId != -1L) {
             pendingShortcutRepository.requestRunRule(ruleId)
+        }
+    }
+
+    private fun handleOpenHistoryDetailIntent(intent: Intent?) {
+        val historyId = intent?.getLongExtra(
+            PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID,
+            -1L
+        ) ?: -1L
+        if (historyId != -1L) {
+            pendingShortcutRepository.requestOpenHistoryDetail(historyId)
+            intent?.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID)
         }
     }
 }

@@ -6,20 +6,26 @@ import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.TriggerType
-import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
 import dev.bikram.filepipe.domain.usecase.ExecuteRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
+import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
+import dev.bikram.filepipe.manualrun.ManualRunForegroundCoordinator
 import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -34,6 +40,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 data class DeleteUndoEvent(val rules: List<Rule>)
@@ -49,6 +56,13 @@ sealed interface RulesRunNavigation {
     data object HistoryList : RulesRunNavigation
 }
 
+/** Where the sole in-run Cancel control is shown for manual runs. */
+sealed interface ManualRunCancelAnchor {
+    data object None : ManualRunCancelAnchor
+    data class SingleRule(val ruleId: Long) : ManualRunCancelAnchor
+    data object RunSelectedBar : ManualRunCancelAnchor
+}
+
 data class RulesUiState(
     val rules: List<Rule> = emptyList(),
     val staleRuleIds: Set<Long> = emptySet(),
@@ -57,6 +71,7 @@ data class RulesUiState(
     val selectedRuleIds: Set<Long> = emptySet(),
     val progressMap: Map<Long, RunProgress> = emptyMap(),
     val isRunning: Boolean = false,
+    val manualRunCancelAnchor: ManualRunCancelAnchor = ManualRunCancelAnchor.None,
     val previewState: PreviewState? = null,
     val isCompactMode: Boolean = false,
     val cardModeOverrides: Set<Long> = emptySet(),
@@ -67,6 +82,7 @@ data class RulesUiState(
 @HiltViewModel
 class RulesViewModel @Inject constructor(
     private val ruleRepository: RuleRepository,
+    private val runHistoryRepository: RunHistoryRepository,
     private val scheduleRulesUseCase: ScheduleRulesUseCase,
     private val executeRulesUseCase: ExecuteRulesUseCase,
     private val simulateRuleUseCase: SimulateRuleUseCase,
@@ -74,7 +90,8 @@ class RulesViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val appShortcutsManager: AppShortcutsManager,
     private val pendingShortcutRepository: PendingShortcutRepository,
-    private val fileOperationRepository: FileOperationRepository
+    private val fileOperationRepository: FileOperationRepository,
+    private val manualRunForegroundCoordinator: ManualRunForegroundCoordinator
 ) : ViewModel() {
 
     // Eagerly so Room query starts before the UI renders, preventing an empty-state flash on cold start.
@@ -89,9 +106,19 @@ class RulesViewModel @Inject constructor(
     private val _cardModeOverrides = MutableStateFlow<Set<Long>>(emptySet())
     private val _sortKey = MutableStateFlow(HistorySortKey.LAST_RAN)
     private val _sortDirection = MutableStateFlow(HistorySortDirection.DESCENDING)
+    private val _manualRunCancelAnchor = MutableStateFlow<ManualRunCancelAnchor>(ManualRunCancelAnchor.None)
 
-    private val sortedRulesFlow = combine(_rules, _sortKey, _sortDirection) { rules, sortKey, sortDirection ->
-        sortRulesList(rules, sortKey, sortDirection)
+    private val lastRunStartedAtByRuleId: StateFlow<Map<Long, Long>> = runHistoryRepository
+        .observeLastRunStartedAtByRuleId()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
+
+    private val sortedRulesFlow = combine(
+        _rules,
+        _sortKey,
+        _sortDirection,
+        lastRunStartedAtByRuleId
+    ) { rules, sortKey, sortDirection, lastRunMap ->
+        sortRulesList(rules, sortKey, sortDirection, lastRunMap)
     }
 
     private val sortParamsFlow = combine(_sortKey, _sortDirection) { sortKey, sortDirection ->
@@ -122,6 +149,7 @@ class RulesViewModel @Inject constructor(
         .combine(_previewState) { state, preview -> state.copy(previewState = preview) }
         .combine(_isCompactMode) { state, compact -> state.copy(isCompactMode = compact) }
         .combine(_cardModeOverrides) { state, overrides -> state.copy(cardModeOverrides = overrides) }
+        .combine(_manualRunCancelAnchor) { state, anchor -> state.copy(manualRunCancelAnchor = anchor) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), RulesUiState())
 
     private val _navigateAfterRun = MutableSharedFlow<RulesRunNavigation>(extraBufferCapacity = 1)
@@ -133,7 +161,39 @@ class RulesViewModel @Inject constructor(
     private val _userMessage = MutableStateFlow<String?>(null)
     val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 
+    private var manualRunJob: Job? = null
+    private val manualRunJobLock = Any()
+
     fun clearUserMessage() { _userMessage.value = null }
+
+    /**
+     * Clears the folder readability cache and recomputes which rules lack access.
+     * Call when returning to the rules list (e.g. after re-granting SAF permission) because
+     * [folderPathsSignature] does not change when only permissions change.
+     */
+    fun refreshStaleFolderAccess() {
+        viewModelScope.launch(Dispatchers.IO) {
+            fileOperationRepository.invalidateAccessCache()
+            _staleRuleIds.value = computeStaleRuleIds(_rules.value)
+        }
+    }
+
+    fun cancelManualRun() {
+        viewModelScope.launch {
+            val toCancel = synchronized(manualRunJobLock) {
+                val current = manualRunJob
+                manualRunJob = null
+                current
+            }
+            toCancel?.cancel(CancellationException("User cancelled"))
+            toCancel?.join()
+            _manualRunCancelAnchor.value = ManualRunCancelAnchor.None
+            manualRunForegroundCoordinator.setManualRunActive(false)
+            if (toCancel == null) {
+                clearRunProgressOnly()
+            }
+        }
+    }
 
     init {
         viewModelScope.launch {
@@ -205,8 +265,12 @@ class RulesViewModel @Inject constructor(
         if (toDelete.isNotEmpty()) _deleteUndoEvent.emit(DeleteUndoEvent(toDelete))
     }
 
-    fun clearProgress() {
+    fun clearRunProgressOnly() {
         _progressMap.value = emptyMap()
+    }
+
+    fun clearProgress() {
+        clearRunProgressOnly()
         _selectedRuleIds.value = emptySet()
     }
 
@@ -238,61 +302,70 @@ class RulesViewModel @Inject constructor(
         rulesAutoExportTrigger.maybeExportAfterRuleChange()
     }
 
-    fun runSelected() = viewModelScope.launch {
+    fun runSelected() {
         val selected = _rules.value.filter { it.id in _selectedRuleIds.value && it.isEnabled }
-        if (selected.isEmpty()) return@launch
-
-        _progressMap.update {
-            selected.associate { rule ->
-                rule.id to RunProgress(
-                    ruleId = rule.id,
-                    ruleName = rule.name,
-                    progress = 0f
-                )
-            }
-        }
-
-        val results = executeRulesUseCase(
-            rules = selected,
-            triggerType = TriggerType.MANUAL,
-            onProgress = { progress ->
-                _progressMap.update { current -> current + (progress.ruleId to progress) }
-            }
-        )
-
-        when {
-            results.size == 1 -> _navigateAfterRun.emit(
-                RulesRunNavigation.HistoryDetail(results.first().historyId)
-            )
-            results.isNotEmpty() -> _navigateAfterRun.emit(RulesRunNavigation.HistoryList)
-        }
-        clearProgress()
+        enqueueManualRun(selected, ManualRunCancelAnchor.RunSelectedBar)
     }
 
-    fun runRule(rule: Rule) = viewModelScope.launch {
-        if (!rule.isEnabled) return@launch
+    fun runRule(rule: Rule) {
+        if (!rule.isEnabled) return
+        enqueueManualRun(listOf(rule), ManualRunCancelAnchor.SingleRule(rule.id))
+    }
 
-        _progressMap.value = mapOf(
-            rule.id to RunProgress(
-                ruleId = rule.id,
-                ruleName = rule.name,
-                progress = 0f
-            )
-        )
-
-        val results = executeRulesUseCase(
-            rules = listOf(rule),
-            triggerType = TriggerType.MANUAL,
-            onProgress = { progress ->
-                _progressMap.update { current -> current + (progress.ruleId to progress) }
+    /**
+     * Runs [rules] in-process for immediate start. [ManualRunForegroundService] is started from
+     * [MainActivity] when the app goes to background while a manual run is active.
+     *
+     * Uses a [CoroutineStart.LAZY] job so the slot can be updated before the previous runner is
+     * cancelled and joined, avoiding overlapping executions and stale [manualRunJob] identity.
+     */
+    private fun enqueueManualRun(rules: List<Rule>, anchor: ManualRunCancelAnchor) {
+        if (rules.isEmpty()) return
+        viewModelScope.launch {
+            val newJob = viewModelScope.launch(start = CoroutineStart.LAZY) {
+                val selfJob = coroutineContext[Job]!!
+                manualRunForegroundCoordinator.setManualRunActive(true)
+                _manualRunCancelAnchor.value = anchor
+                _progressMap.value = rules.associate { rule ->
+                    rule.id to RunProgress(
+                        ruleId = rule.id,
+                        ruleName = rule.name,
+                        progress = 0f
+                    )
+                }
+                try {
+                    val results = executeRulesUseCase(rules, TriggerType.MANUAL) { progress ->
+                        _progressMap.update { current -> current + (progress.ruleId to progress) }
+                    }
+                    when {
+                        results.size == 1 ->
+                            _navigateAfterRun.emit(
+                                RulesRunNavigation.HistoryDetail(results.first().historyId)
+                            )
+                        results.isNotEmpty() ->
+                            _navigateAfterRun.emit(RulesRunNavigation.HistoryList)
+                    }
+                } catch (_: CancellationException) {
+                    // History finalized inside ExecuteRulesUseCase
+                } finally {
+                    manualRunForegroundCoordinator.setManualRunActive(false)
+                    synchronized(manualRunJobLock) {
+                        if (manualRunJob === selfJob) {
+                            manualRunJob = null
+                        }
+                    }
+                    _manualRunCancelAnchor.value = ManualRunCancelAnchor.None
+                    clearProgress()
+                }
             }
-        )
-
-        clearProgress()
-
-        val result = results.firstOrNull()
-        if (result != null) {
-            _navigateAfterRun.emit(RulesRunNavigation.HistoryDetail(result.historyId))
+            val previousJob = synchronized(manualRunJobLock) {
+                val old = manualRunJob
+                manualRunJob = newJob
+                old
+            }
+            previousJob?.cancel()
+            previousJob?.cancelAndJoin()
+            newJob.start()
         }
     }
 
@@ -333,13 +406,58 @@ class RulesViewModel @Inject constructor(
     private fun sortRulesList(
         rules: List<Rule>,
         sortKey: HistorySortKey,
-        sortDirection: HistorySortDirection
+        sortDirection: HistorySortDirection,
+        lastRunStartedAtByRuleId: Map<Long, Long>
     ): List<Rule> {
-        val comparator = when (sortKey) {
-            HistorySortKey.LAST_RAN -> compareBy<Rule> { it.updatedAt }
-            HistorySortKey.RULE_NAME -> compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+        when (sortKey) {
+            HistorySortKey.MY_ORDER ->
+                return rules.sortedWith(compareBy({ it.sortOrder }, { it.id }))
+            HistorySortKey.LAST_RAN -> {
+                val locale = Locale.getDefault()
+                return when (sortDirection) {
+                    HistorySortDirection.DESCENDING -> rules.sortedWith(
+                        compareByDescending<Rule> { lastRunStartedAtByRuleId[it.id] ?: Long.MIN_VALUE }
+                            .thenBy { it.name.lowercase(locale) }
+                            .thenBy { it.id }
+                    )
+                    HistorySortDirection.ASCENDING -> rules.sortedWith(
+                        compareBy<Rule> { lastRunStartedAtByRuleId[it.id] ?: Long.MAX_VALUE }
+                            .thenBy { it.name.lowercase(locale) }
+                            .thenBy { it.id }
+                    )
+                }
+            }
+            HistorySortKey.RULE_NAME -> {
+                val sorted = rules.sortedWith(
+                    compareBy(String.CASE_INSENSITIVE_ORDER) { it.name }
+                )
+                return if (sortDirection == HistorySortDirection.DESCENDING) sorted.reversed() else sorted
+            }
         }
-        val sorted = rules.sortedWith(comparator)
-        return if (sortDirection == HistorySortDirection.DESCENDING) sorted.reversed() else sorted
+    }
+
+    fun persistMyOrder(ordered: List<Rule>) = viewModelScope.launch(Dispatchers.IO) {
+        persistSortOrderIndices(ordered)
+        rulesAutoExportTrigger.maybeExportAfterRuleChange()
+    }
+
+    /**
+     * Persists [ordered] as [Rule.sortOrder] indices. Optionally switches the rules list sort to
+     * [HistorySortKey.MY_ORDER] after IO so Room emits updated rows before the UI treats order as canonical.
+     */
+    fun applyDraggedOrder(ordered: List<Rule>, alsoSwitchSortToMyOrder: Boolean) =
+        viewModelScope.launch(Dispatchers.IO) {
+            persistSortOrderIndices(ordered)
+            rulesAutoExportTrigger.maybeExportAfterRuleChange()
+            if (alsoSwitchSortToMyOrder) {
+                withContext(Dispatchers.Main.immediate) {
+                    _sortKey.value = HistorySortKey.MY_ORDER
+                    _sortDirection.value = HistorySortDirection.ASCENDING
+                }
+            }
+        }
+
+    private suspend fun persistSortOrderIndices(ordered: List<Rule>) {
+        ruleRepository.persistOrderedSortIndices(ordered)
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -32,19 +33,21 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -53,10 +56,6 @@ import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.setValue
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -69,11 +68,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.filepipe.ui.theme.elevatedCardColors
 
 data class RuleCardAction(
     val icon: ImageVector,
@@ -95,30 +96,33 @@ fun RuleCard(
     cardActions: List<RuleCardAction>, // non-swipe action icons shown in card
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
+    onCancelRunClick: () -> Unit,
+    showInlineProgressCancel: Boolean = false,
     isAnyRuleRunning: Boolean,
     onPreviewRule: () -> Unit = {},
     onViewHistory: () -> Unit = {},
     hasStaleFolder: Boolean = false,
     onStaleWarningClick: () -> Unit = {},
+    /** When non-null (My order + reorder gesture): long-press on rule icon toggles selection; card body long-press drags. */
+    onLeadingLongClick: (() -> Unit)? = null,
+    /** Long-press drag to reorder (My order); must be built inside [ReorderableItem]. */
+    reorderLongPressDragModifier: Modifier = Modifier,
+    suppressLongClickForReorder: Boolean = false,
     modifier: Modifier = Modifier
 ) {
-    val hoverInteraction = remember { MutableInteractionSource() }
-    val isHovered by hoverInteraction.collectIsHoveredAsState()
-    val elevation by animateDpAsState(
-        targetValue = if (isHovered) 8.dp else 2.dp,
-        label = "cardElevation"
-    )
-    ElevatedCard(
+    val cardColors = elevatedCardColors()
+    Surface(
         modifier = modifier
             .fillMaxWidth()
-            .hoverable(hoverInteraction)
             .then(
                 if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CardShape)
                 else Modifier
             ),
         shape = CardShape,
-        elevation = CardDefaults.elevatedCardElevation(defaultElevation = elevation),
-        colors = CardDefaults.elevatedCardColors()
+        color = cardColors.containerColor,
+        contentColor = cardColors.contentColor,
+        tonalElevation = 1.dp,
+        shadowElevation = 0.dp
     ) {
         AnimatedContent(
             targetState = isExpanded,
@@ -136,9 +140,14 @@ fun RuleCard(
                     cardActions = cardActions,
                     onToggleEnabled = onToggleEnabled,
                     onRunClick = onRunClick,
+                    onCancelRunClick = onCancelRunClick,
+                    showInlineProgressCancel = showInlineProgressCancel,
                     isAnyRuleRunning = isAnyRuleRunning,
                     hasStaleFolder = hasStaleFolder,
-                    onStaleWarningClick = onStaleWarningClick
+                    onStaleWarningClick = onStaleWarningClick,
+                    onLeadingLongClick = onLeadingLongClick,
+                    reorderLongPressDragModifier = reorderLongPressDragModifier,
+                    suppressLongClickForReorder = suppressLongClickForReorder
                 )
             } else {
                 CompactContent(
@@ -148,14 +157,23 @@ fun RuleCard(
                     onLongClick = onLongClick,
                     onToggleEnabled = onToggleEnabled,
                     onRunClick = onRunClick,
-                    isAnyRuleRunning = isAnyRuleRunning
+                    onCancelRunClick = onCancelRunClick,
+                    showInlineProgressCancel = showInlineProgressCancel,
+                    isAnyRuleRunning = isAnyRuleRunning,
+                    onLeadingLongClick = onLeadingLongClick,
+                    reorderLongPressDragModifier = reorderLongPressDragModifier,
+                    suppressLongClickForReorder = suppressLongClickForReorder
                 )
             }
         }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(
+    ExperimentalFoundationApi::class,
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3ExpressiveApi::class
+)
 @Composable
 private fun CompactContent(
     rule: Rule,
@@ -164,7 +182,12 @@ private fun CompactContent(
     onLongClick: () -> Unit,
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
-    isAnyRuleRunning: Boolean
+    onCancelRunClick: () -> Unit,
+    showInlineProgressCancel: Boolean,
+    isAnyRuleRunning: Boolean,
+    onLeadingLongClick: (() -> Unit)? = null,
+    reorderLongPressDragModifier: Modifier = Modifier,
+    suppressLongClickForReorder: Boolean = false
 ) {
     val playTap = rememberPlayTapSound()
     val runInProgress = progress != null && !progress.isComplete
@@ -175,10 +198,19 @@ private fun CompactContent(
     val destText = displayPath(rule.destinationFolderPath).takeIf { it.isNotBlank() } ?: ""
     val infoText = listOf(typesText, destText).filter { it.isNotBlank() }.joinToString("  |  ")
 
+    val columnLongClick: (() -> Unit)? = when {
+        suppressLongClickForReorder -> null
+        onLeadingLongClick != null -> null
+        else -> onLongClick
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .tapSoundCombinedClickable(
+                onClick = onClick,
+                onLongClick = columnLongClick
+            )
+            .then(reorderLongPressDragModifier)
     ) {
         ListItem(
             headlineContent = {
@@ -201,13 +233,24 @@ private fun CompactContent(
                 }
             } else null,
             leadingContent = {
+                val iconBoxModifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        shape = CircleShape
+                    )
+                    .then(
+                        if (onLeadingLongClick != null) {
+                            Modifier.tapSoundCombinedClickable(
+                                onClick = onClick,
+                                onLongClick = onLeadingLongClick
+                            )
+                        } else {
+                            Modifier
+                        }
+                    )
                 Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            shape = CircleShape
-                        ),
+                    modifier = iconBoxModifier,
                     contentAlignment = Alignment.Center
                 ) {
                     RuleIconOrEmoji(
@@ -233,25 +276,40 @@ private fun CompactContent(
                         }
                     )
                     if (runInProgress) {
-                        Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                            CircularWavyProgressIndicator(
-                                progress = { if (progress!!.totalFiles > 0) progress.progress else 0f },
-                                modifier = Modifier.size(26.dp)
-                            )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                                CircularWavyProgressIndicator(
+                                    progress = { if (progress!!.totalFiles > 0) progress.progress else 0f },
+                                    modifier = Modifier.size(26.dp)
+                                )
+                            }
+                            if (showInlineProgressCancel) {
+                                OutlinedButton(
+                                    onClick = { playTap(); onCancelRunClick() },
+                                    shape = RoundedCornerShape(50),
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                        horizontal = 10.dp, vertical = 6.dp
+                                    )
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.cancel),
+                                        style = MaterialTheme.typography.labelLarge
+                                    )
+                                }
+                            }
                         }
                     } else {
-                        FilledTonalButton(
+                        FilledTonalIconButton(
                             onClick = { playTap(); onRunClick() },
                             enabled = rule.isEnabled && !runBlocked,
-                            shape = RoundedCornerShape(50),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                horizontal = 12.dp, vertical = 8.dp
-                            )
                         ) {
                             Icon(
                                 Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
+                                contentDescription = stringResource(R.string.run_now),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
@@ -262,7 +320,12 @@ private fun CompactContent(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
+@OptIn(
+    ExperimentalFoundationApi::class,
+    ExperimentalLayoutApi::class,
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3ExpressiveApi::class
+)
 @Composable
 private fun ExpandedContent(
     rule: Rule,
@@ -272,15 +335,29 @@ private fun ExpandedContent(
     cardActions: List<RuleCardAction>,
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
+    onCancelRunClick: () -> Unit,
+    showInlineProgressCancel: Boolean,
     isAnyRuleRunning: Boolean,
     hasStaleFolder: Boolean = false,
-    onStaleWarningClick: () -> Unit = {}
+    onStaleWarningClick: () -> Unit = {},
+    onLeadingLongClick: (() -> Unit)? = null,
+    reorderLongPressDragModifier: Modifier = Modifier,
+    suppressLongClickForReorder: Boolean = false
 ) {
     val playTap = rememberPlayTapSound()
+    val expandedColumnLongClick: (() -> Unit)? = when {
+        suppressLongClickForReorder -> null
+        onLeadingLongClick != null -> null
+        else -> onLongClick
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .tapSoundCombinedClickable(
+                onClick = onClick,
+                onLongClick = expandedColumnLongClick
+            )
+            .then(reorderLongPressDragModifier)
             .padding(16.dp)
     ) {
         Row(
@@ -293,14 +370,27 @@ private fun ExpandedContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                RuleIconOrEmoji(
-                    iconEmoji = rule.iconEmoji,
-                    icon = rule.icon,
-                    vectorSize = 28.dp,
-                    emojiFontSize = 22.sp,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                )
+                Box(
+                    modifier = Modifier.then(
+                        if (onLeadingLongClick != null) {
+                            Modifier.tapSoundCombinedClickable(
+                                onClick = onClick,
+                                onLongClick = onLeadingLongClick
+                            )
+                        } else {
+                            Modifier
+                        }
+                    )
+                ) {
+                    RuleIconOrEmoji(
+                        iconEmoji = rule.iconEmoji,
+                        icon = rule.icon,
+                        vectorSize = 28.dp,
+                        emojiFontSize = 22.sp,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                    )
+                }
                 Text(
                     text = rule.name,
                     style = MaterialTheme.typography.titleLarge,
@@ -434,7 +524,18 @@ private fun ExpandedContent(
                             val summary = when {
                                 runProgress.error != null -> "Error: ${runProgress.error}"
                                 runProgress.totalFiles == 0 -> "No matching files found"
-                                else -> "${runProgress.filesMoved} / ${runProgress.totalFiles} files moved"
+                                else -> when (rule.operationMode) {
+                                    OperationMode.COPY -> stringResource(
+                                        R.string.rule_card_progress_files_copied_summary,
+                                        runProgress.filesMoved,
+                                        runProgress.totalFiles
+                                    )
+                                    OperationMode.MOVE -> stringResource(
+                                        R.string.rule_card_progress_files_moved_summary,
+                                        runProgress.filesMoved,
+                                        runProgress.totalFiles
+                                    )
+                                }
                             }
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
@@ -470,7 +571,20 @@ private fun ExpandedContent(
                                     modifier = Modifier.size(28.dp)
                                 )
                                 Text(
-                                    text = "Moving ${runProgress.currentFileName.ifBlank { "…" }} (${runProgress.filesMoved + 1} / ${runProgress.totalFiles})",
+                                    text = when (rule.operationMode) {
+                                        OperationMode.COPY -> stringResource(
+                                            R.string.rule_card_progress_copying_file,
+                                            runProgress.currentFileName.ifBlank { "…" },
+                                            runProgress.filesMoved + 1,
+                                            runProgress.totalFiles
+                                        )
+                                        OperationMode.MOVE -> stringResource(
+                                            R.string.rule_card_progress_moving_file,
+                                            runProgress.currentFileName.ifBlank { "…" },
+                                            runProgress.filesMoved + 1,
+                                            runProgress.totalFiles
+                                        )
+                                    },
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -501,7 +615,6 @@ private fun ExpandedContent(
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 cardActions.forEach { action ->
-                    @OptIn(ExperimentalMaterial3Api::class)
                     TooltipBox(
                         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                         tooltip = { PlainTooltip { Text(action.label) } },
@@ -522,23 +635,43 @@ private fun ExpandedContent(
             }
             val runInProgress = progress != null && !progress.isComplete
             val runBlocked = isAnyRuleRunning && progress == null
-            @OptIn(ExperimentalMaterial3Api::class)
-            TooltipBox(
-                positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                tooltip = { PlainTooltip { Text(stringResource(R.string.run_now)) } },
-                state = rememberTooltipState()
-            ) {
-                FilledTonalButton(
-                    onClick = {
-                        playTap()
-                        onRunClick()
-                    },
-                    enabled = rule.isEnabled && !runInProgress && !runBlocked,
-                    shape = RoundedCornerShape(50)
+            if (runInProgress && showInlineProgressCancel) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                    tooltip = { PlainTooltip { Text(stringResource(R.string.cancel)) } },
+                    state = rememberTooltipState()
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(text = stringResource(R.string.run_now))
+                    OutlinedButton(
+                        onClick = { playTap(); onCancelRunClick() },
+                        shape = RoundedCornerShape(50)
+                    ) {
+                        Text(text = stringResource(R.string.cancel))
+                    }
+                }
+            } else if (!runInProgress) {
+                TooltipBox(
+                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                    tooltip = { PlainTooltip { Text(stringResource(R.string.run_now)) } },
+                    state = rememberTooltipState()
+                ) {
+                    FilledTonalButton(
+                        onClick = {
+                            playTap()
+                            onRunClick()
+                        },
+                        enabled = rule.isEnabled && !runBlocked,
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.filledTonalButtonColors(),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(text = stringResource(R.string.run_now))
+                    }
                 }
             }
         }
