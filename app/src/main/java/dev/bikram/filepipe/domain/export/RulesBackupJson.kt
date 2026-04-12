@@ -2,6 +2,7 @@ package dev.bikram.filepipe.domain.export
 
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
@@ -19,7 +20,7 @@ import kotlinx.serialization.json.Json
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
  * (`@Database`); Room KSP does not allow that annotation to reference this constant.
  */
-const val APP_DATABASE_SCHEMA_VERSION = 4
+const val APP_DATABASE_SCHEMA_VERSION = 5
 
 /**
  * Root object for `filepipe_backup_*.json`.
@@ -75,6 +76,11 @@ data class ScheduleBackupDto(
 @Serializable
 data class RunHistoryBackupDto(
     val ruleName: String,
+    /**
+     * Index of the rule in the backup's [AppBackup.rules] list at export time. When set, restore maps
+     * history to the correct rule even if several rules share the same [ruleName]. Null in older backups.
+     */
+    val ruleIndexInBackup: Int? = null,
     val triggeredBy: String,
     val startedAt: Long,
     val completedAt: Long? = null,
@@ -95,6 +101,7 @@ data class FileMovedBackupDto(
     val sourceUri: String,
     val destinationUri: String,
     val fileSizeBytes: Long,
+    val relativeParentSegments: List<String> = emptyList(),
     val movedAt: Long,
     val success: Boolean,
     val skipped: Boolean = false,
@@ -126,7 +133,8 @@ data class SettingsBackupDto(
     val useFixedCardColors: Boolean = false,
     val customSeedHex: String? = null,
     val customSeedHexes: List<String>? = null,
-    val activeCustomSeedHex: String? = null
+    val activeCustomSeedHex: String? = null,
+    val folderAccessMode: String? = null
 )
 
 private val jsonFormatter = Json {
@@ -166,8 +174,12 @@ fun RuleSchedule.toBackupDto(): ScheduleBackupDto = ScheduleBackupDto(
     intervalHours = intervalHours
 )
 
-fun RunHistory.toBackupDto(files: List<FileMoved> = emptyList()): RunHistoryBackupDto = RunHistoryBackupDto(
+fun RunHistory.toBackupDto(
+    files: List<FileMoved> = emptyList(),
+    ruleIndexInBackup: Int? = null
+): RunHistoryBackupDto = RunHistoryBackupDto(
     ruleName = ruleName,
+    ruleIndexInBackup = ruleIndexInBackup,
     triggeredBy = triggeredBy.name,
     startedAt = startedAt,
     completedAt = completedAt,
@@ -187,6 +199,7 @@ fun FileMoved.toBackupDto(): FileMovedBackupDto = FileMovedBackupDto(
     sourceUri = sourceUri,
     destinationUri = destinationUri,
     fileSizeBytes = fileSizeBytes,
+    relativeParentSegments = relativeParentSegments,
     movedAt = movedAt,
     success = success,
     skipped = skipped,
@@ -216,7 +229,8 @@ fun AppPreferences.toBackupDto(): SettingsBackupDto = SettingsBackupDto(
     useFixedCardColors = useFixedCardColors,
     customSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },
     customSeedHexes = savedCustomSeedHexes.takeIf { it.isNotEmpty() },
-    activeCustomSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() }
+    activeCustomSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },
+    folderAccessMode = folderAccessMode.name
 )
 
 fun RuleBackupDto.toDomain(): Rule = Rule(
@@ -258,10 +272,16 @@ fun buildAppBackupJson(
     history: List<Pair<RunHistory, List<FileMoved>>> = emptyList(),
     settings: AppPreferences? = null
 ): String {
+    val ruleIdToIndexInBackup = rules.mapIndexed { index, rule -> rule.id to index }.toMap()
     val backup = AppBackup(
         exportedAtMillis = System.currentTimeMillis(),
         rules = rules.map { it.toBackupDto() },
-        history = history.map { (run, files) -> run.toBackupDto(files) },
+        history = history.map { (run, files) ->
+            run.toBackupDto(
+                files = files,
+                ruleIndexInBackup = run.ruleId?.let { ruleId -> ruleIdToIndexInBackup[ruleId] }
+            )
+        },
         settings = settings?.toBackupDto()
     )
     return jsonFormatter.encodeToString(backup)

@@ -1,7 +1,9 @@
 package dev.bikram.filepipe.domain.usecase
 
+import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
+import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
@@ -14,13 +16,14 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.yield
-import java.util.Collections
 import javax.inject.Inject
 
 class ExecuteRulesUseCase @Inject constructor(
     private val fileOperationRepository: FileOperationRepository,
-    private val runHistoryRepository: RunHistoryRepository
+    private val runHistoryRepository: RunHistoryRepository,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) {
     suspend operator fun invoke(
         rules: List<Rule>,
@@ -45,10 +48,11 @@ class ExecuteRulesUseCase @Inject constructor(
         val allFiles = mutableListOf<FileMoved>()
         var totalPlanned = 0
         var completedSuccessfulMoves = 0
-        val copyCreatedDestFolders: MutableSet<String> =
-            Collections.synchronizedSet(linkedSetOf())
+        val copyCreatedDestFolders: MutableSet<String> = linkedSetOf()
 
         try {
+            val filesystemAccessEnabled =
+                isFilesystemAccessEffective(userPreferencesRepository.preferencesFlow.first().folderAccessMode)
             // Collect all matching files across all source folders
             val fileEntries = rule.sourceFolderPaths.flatMap { sourcePath ->
                 fileOperationRepository.listMatchingFiles(
@@ -60,7 +64,8 @@ class ExecuteRulesUseCase @Inject constructor(
                     maxFileSizeBytes = rule.maxFileSizeBytes,
                     minAgeDays = rule.minAgeDays,
                     maxAgeDays = rule.maxAgeDays,
-                    excludePatterns = rule.excludePatterns
+                    excludePatterns = rule.excludePatterns,
+                    filesystemAccessEnabled = filesystemAccessEnabled
                 )
             }
 
@@ -88,7 +93,8 @@ class ExecuteRulesUseCase @Inject constructor(
                         copyCreatedDestFolders
                     } else {
                         null
-                    }
+                    },
+                    filesystemAccessEnabled = filesystemAccessEnabled
                 )
                 // Job may be cancelled as soon as moveFile returns; record the outcome so undo/history match disk.
                 withContext(NonCancellable) {

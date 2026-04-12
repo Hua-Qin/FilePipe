@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.data.local.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -25,6 +26,8 @@ data class FileMovedEntity(
     val sourceUri: String,
     val destinationUri: String,
     val fileSizeBytes: Long,
+    @ColumnInfo(defaultValue = "[]")
+    val relativeParentSegments: List<String> = emptyList(),
     val movedAt: Long,
     val success: Boolean,
     val skipped: Boolean = false,
@@ -38,6 +41,7 @@ fun FileMovedEntity.toDomain(): FileMoved = FileMoved(
     sourceUri = sourceUri,
     destinationUri = destinationUri,
     fileSizeBytes = fileSizeBytes,
+    relativeParentSegments = relativeParentSegments,
     movedAt = movedAt,
     success = success,
     skipped = skipped,
@@ -51,6 +55,7 @@ fun FileMoved.toEntity(runHistoryId: Long): FileMovedEntity = FileMovedEntity(
     sourceUri = sourceUri,
     destinationUri = destinationUri,
     fileSizeBytes = fileSizeBytes,
+    relativeParentSegments = relativeParentSegments,
     movedAt = movedAt,
     success = success,
     skipped = skipped,

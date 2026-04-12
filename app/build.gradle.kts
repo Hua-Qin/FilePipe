@@ -46,8 +46,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "dev.bikram.filepipe"
         minSdk = 30
         targetSdk = 36
-        versionCode = 220
-        versionName = "2.2.0"
+        versionCode = 300
+        versionName = "3.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -68,6 +68,22 @@ extensions.configure<ApplicationExtension>("android") {
     }
 
     buildTypes {
+        debug {
+        }
+        create("devRelease") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            signingConfig = signingConfigs.getByName("debug")
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            matchingFallbacks += listOf("release")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -186,6 +202,9 @@ dependencies {
 
     implementation(libs.material.kolor)
 
+    // Play in-app update AARs merge extra manifest entries. App info may list permissions under the
+    // "Nearby devices" group on Android 12+ even though FilePipe does not declare them in src manifests.
+    // Inspect merged output: ./gradlew :app:processPlaystoreReleaseMainManifest
     add("playstoreImplementation", "com.google.android.play:app-update:2.1.0")
     add("playstoreImplementation", "com.google.android.play:app-update-ktx:2.1.0")
 }

@@ -11,6 +11,7 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dev.bikram.filepipe.data.preferences.AppColorSource
+import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
@@ -35,7 +36,11 @@ import dev.bikram.filepipe.update.UpdateInfo
 import dev.bikram.filepipe.update.notificationDedupeKey
 import dev.bikram.filepipe.update.copyUpdateApkToMediaStoreDownloads
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
+import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.treeUriFromDocumentUri
+import dev.bikram.filepipe.domain.model.Rule
+import kotlinx.coroutines.flow.first
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import androidx.core.content.FileProvider
@@ -58,6 +63,13 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
+/** Used from Help to scroll the settings list to a section after navigation. */
+enum class SettingsBringIntoViewSection {
+    None,
+    FolderAccess,
+    Notifications
+}
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @param:ApplicationContext private val context: Context,
@@ -70,7 +82,8 @@ class SettingsViewModel @Inject constructor(
     private val playUpdateSessionHandle: PlayUpdateSessionHandle,
     private val playInAppUpdateStarter: PlayInAppUpdateStarter,
     private val updateAvailableNotifier: UpdateAvailableNotifier,
-    private val updateCheckWorkScheduler: UpdateCheckWorkScheduler
+    private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
+    private val ruleRepository: RuleRepository
 ) : ViewModel() {
 
     val preferencesFlow = userPreferencesRepository.preferencesFlow
@@ -106,6 +119,41 @@ class SettingsViewModel @Inject constructor(
     )
     val manualExportPickerRequested = _manualExportPickerRequested.asSharedFlow()
 
+    private val _bringIntoViewSection = MutableStateFlow(SettingsBringIntoViewSection.None)
+    val bringIntoViewSection: StateFlow<SettingsBringIntoViewSection> = _bringIntoViewSection.asStateFlow()
+
+    private val _folderAccessSectionHighlight = MutableStateFlow(false)
+    val folderAccessSectionHighlight: StateFlow<Boolean> = _folderAccessSectionHighlight.asStateFlow()
+
+    private val _notificationsSectionHighlight = MutableStateFlow(false)
+    val notificationsSectionHighlight: StateFlow<Boolean> = _notificationsSectionHighlight.asStateFlow()
+
+    fun requestBringSettingsSectionIntoView(section: SettingsBringIntoViewSection) {
+        if (section != SettingsBringIntoViewSection.None) {
+            _bringIntoViewSection.value = section
+        }
+    }
+
+    fun clearBringIntoViewSectionRequest() {
+        _bringIntoViewSection.value = SettingsBringIntoViewSection.None
+    }
+
+    fun requestFolderAccessSectionHighlight() {
+        _folderAccessSectionHighlight.value = true
+    }
+
+    fun clearFolderAccessSectionHighlight() {
+        _folderAccessSectionHighlight.value = false
+    }
+
+    fun requestNotificationsSectionHighlight() {
+        _notificationsSectionHighlight.value = true
+    }
+
+    fun clearNotificationsSectionHighlight() {
+        _notificationsSectionHighlight.value = false
+    }
+
     init {
         viewModelScope.launch {
             val prefs = userPreferencesRepository.getPreferencesSnapshot()
@@ -117,6 +165,33 @@ class SettingsViewModel @Inject constructor(
 
     fun clearUserMessage() {
         _userMessage.value = null
+    }
+
+    fun setFolderAccessMode(mode: FolderAccessMode) {
+        viewModelScope.launch {
+            userPreferencesRepository.setFolderAccessMode(mode)
+        }
+    }
+
+    suspend fun setFolderAccessModeNow(mode: FolderAccessMode) {
+        userPreferencesRepository.setFolderAccessMode(mode)
+    }
+
+    /**
+     * Rules that use filesystem paths (not SAF) will stop working when switching to Selective Access
+     * until the user re-picks folders with the system picker.
+     */
+    suspend fun countRulesUsingFilesystemFolderPaths(): Int = withContext(Dispatchers.IO) {
+        val rules = ruleRepository.getAllRules().first()
+        rules.count { rule -> ruleUsesFilesystemFolderPaths(rule) }
+    }
+
+    private fun ruleUsesFilesystemFolderPaths(rule: Rule): Boolean {
+        val paths = rule.sourceFolderPaths.toMutableList()
+        if (rule.destinationFolderPath.isNotBlank()) {
+            paths.add(rule.destinationFolderPath)
+        }
+        return paths.any { path -> isFilesystemFolderPathString(path) }
     }
 
     fun markIntroSeen(onComplete: () -> Unit = {}) = viewModelScope.launch {
@@ -433,6 +508,7 @@ class SettingsViewModel @Inject constructor(
                 try {
                     connection.connect()
                     val contentLength = connection.contentLength
+                    userPreferencesRepository.clearUpdateApkDownloadsCopySucceeded()
                     val file = File(context.cacheDir, FILEPIPE_UPDATE_APK_CACHE_NAME)
                     connection.inputStream.use { input ->
                         file.outputStream().use { output ->
@@ -468,6 +544,8 @@ class SettingsViewModel @Inject constructor(
                                         R.string.settings_update_apk_save_to_downloads_failed
                                     )
                                 }
+                            } else {
+                                userPreferencesRepository.markUpdateApkDownloadsCopySucceeded()
                             }
                         }
                     }
@@ -513,6 +591,15 @@ class SettingsViewModel @Inject constructor(
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { context.startActivity(intent) }
+    }
+
+    fun openManageAllFilesAccessSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        val manageIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+            data = Uri.parse("package:${context.packageName}")
+        }
+        manageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(manageIntent) }
     }
 
     private fun fetchRawChangelog(): String {

@@ -15,11 +15,12 @@ import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
 @Database(
     entities = [RuleEntity::class, RunHistoryEntity::class, FileMovedEntity::class],
     // Literal required by Room KSP. Keep in sync with [dev.bikram.filepipe.domain.export.APP_DATABASE_SCHEMA_VERSION].
-    version = 4,
+    version = 5,
     exportSchema = true,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 3, to = 4),
+        AutoMigration(from = 4, to = 5),
     ]
 )
 @TypeConverters(Converters::class)

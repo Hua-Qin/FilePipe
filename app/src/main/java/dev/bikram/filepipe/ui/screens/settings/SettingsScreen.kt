@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -32,14 +34,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
@@ -74,6 +83,7 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SnackbarDuration
@@ -124,6 +134,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import dev.bikram.filepipe.BuildConfig
@@ -131,6 +142,7 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
@@ -158,11 +170,34 @@ private val themePickerOrder = listOf(
     AppThemeMode.BLACK
 )
 
+/**
+ * Indices of the first unconditional [LazyColumn] items (Appearance, Folder access, Touch & sound, …)
+ * before the optional Updates block. Used to scroll from Help quick actions.
+ */
+private const val SETTINGS_LIST_INDEX_FOLDER_ACCESS = 1
+private const val SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS = 2
+
+@Composable
+private fun rememberSectionHighlightPulseAlpha(active: Boolean): Float {
+    val infiniteTransition = rememberInfiniteTransition(label = "settingsSectionHighlight")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.42f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 850, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+    return if (active) pulse else 1f
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen(
     contentPadding: PaddingValues,
     onOpenIntro: () -> Unit = {},
+    onOpenFaqStorageSection: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val playTap = rememberPlayTapSound()
@@ -183,9 +218,44 @@ fun SettingsScreen(
         }
     }
     var notificationsGranted by remember { mutableStateOf(computeNotificationsEnabled()) }
+    var allFilesAccessGranted by remember { mutableStateOf(Environment.isExternalStorageManager()) }
+    var pendingFolderAccessSwitch by remember { mutableStateOf<FolderAccessMode?>(null) }
     var pendingEnableUpdateNotificationsAfterPermission by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val settingsLazyListState = rememberLazyListState()
+    val bringIntoViewTarget by viewModel.bringIntoViewSection.collectAsStateWithLifecycle()
+    LaunchedEffect(bringIntoViewTarget) {
+        when (bringIntoViewTarget) {
+            SettingsBringIntoViewSection.None -> return@LaunchedEffect
+            SettingsBringIntoViewSection.FolderAccess,
+            SettingsBringIntoViewSection.Notifications -> {
+                val targetIndex = when (bringIntoViewTarget) {
+                    SettingsBringIntoViewSection.FolderAccess -> SETTINGS_LIST_INDEX_FOLDER_ACCESS
+                    SettingsBringIntoViewSection.Notifications ->
+                        SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS
+                    else -> return@LaunchedEffect
+                }
+                delay(220)
+                if (settingsLazyListState.layoutInfo.totalItemsCount > targetIndex) {
+                    settingsLazyListState.animateScrollToItem(targetIndex)
+                }
+                viewModel.clearBringIntoViewSectionRequest()
+            }
+        }
+    }
+    val folderAccessSectionHighlight by viewModel.folderAccessSectionHighlight.collectAsStateWithLifecycle()
+    LaunchedEffect(folderAccessSectionHighlight) {
+        if (!folderAccessSectionHighlight) return@LaunchedEffect
+        delay(4500)
+        viewModel.clearFolderAccessSectionHighlight()
+    }
+    val notificationsSectionHighlight by viewModel.notificationsSectionHighlight.collectAsStateWithLifecycle()
+    LaunchedEffect(notificationsSectionHighlight) {
+        if (!notificationsSectionHighlight) return@LaunchedEffect
+        delay(4500)
+        viewModel.clearNotificationsSectionHighlight()
+    }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -236,6 +306,7 @@ fun SettingsScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 notificationsGranted = computeNotificationsEnabled()
+                allFilesAccessGranted = Environment.isExternalStorageManager()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -367,6 +438,61 @@ fun SettingsScreen(
         }
     }
 
+    fun applyFolderAccessMode(mode: FolderAccessMode) {
+        playTap()
+        if (preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED &&
+            mode != FolderAccessMode.ALL_FILES_PREFERRED
+        ) {
+            pendingFolderAccessSwitch = mode
+        } else {
+            viewModel.setFolderAccessMode(mode)
+        }
+    }
+
+    pendingFolderAccessSwitch?.let { targetMode ->
+        AlertDialog(
+            onDismissRequest = { pendingFolderAccessSwitch = null },
+            title = { Text(stringResource(R.string.settings_folder_access_switch_to_saf_title)) },
+            text = { Text(stringResource(R.string.settings_folder_access_switch_to_saf_body)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    playTap()
+                    val confirmedTarget = targetMode
+                    pendingFolderAccessSwitch = null
+                    coroutineScope.launch {
+                        val affectedRuleCount = viewModel.countRulesUsingFilesystemFolderPaths()
+                        viewModel.setFolderAccessModeNow(confirmedTarget)
+                        val message = when {
+                            affectedRuleCount <= 0 ->
+                                context.getString(R.string.settings_folder_access_switched_selective_zero_rules)
+                            affectedRuleCount == 1 ->
+                                context.getString(
+                                    R.string.settings_folder_access_switched_selective_snackbar_one,
+                                    affectedRuleCount
+                                )
+                            else ->
+                                context.getString(
+                                    R.string.settings_folder_access_switched_selective_snackbar_other,
+                                    affectedRuleCount
+                                )
+                        }
+                        snackbarHostState.showSnackbar(
+                            message = message,
+                            duration = SnackbarDuration.Long
+                        )
+                    }
+                }) {
+                    Text(stringResource(R.string.settings_folder_access_switch_confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingFolderAccessSwitch = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
     if (showBackupImportRestoreHelp) {
         AlertDialog(
             onDismissRequest = { showBackupImportRestoreHelp = false },
@@ -404,6 +530,7 @@ fun SettingsScreen(
         }
     ) { innerPadding ->
         LazyColumn(
+            state = settingsLazyListState,
             modifier = Modifier
                 .fillMaxSize()
                 .then(scrollBlurModifier),
@@ -525,85 +652,271 @@ fun SettingsScreen(
                     }
                 }
             }
-
-            // ── Touch & Sound ────────────────────────────────────────────────
+            
+            // ── Folder access ─────────────────────────────────────────────────
             item {
+                val folderAccessHighlightShape = RoundedCornerShape(16.dp)
+                val folderHighlightPulse = rememberSectionHighlightPulseAlpha(folderAccessSectionHighlight)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (folderAccessSectionHighlight) {
+                                Modifier
+                                    .border(
+                                        width = 3.dp,
+                                        color = MaterialTheme.colorScheme.primary.copy(
+                                            alpha = folderHighlightPulse
+                                        ),
+                                        shape = folderAccessHighlightShape
+                                    )
+                                    .padding(10.dp)
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                 SettingsSectionHeader(
-                    icon = Icons.Default.Vibration,
-                    title = stringResource(R.string.settings_touch_sound_section)
+                    icon = Icons.Default.FolderOpen,
+                    title = stringResource(R.string.settings_folder_access_section)
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.onboarding_permissions_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 4.dp)
                 )
                 Spacer(Modifier.height(8.dp))
                 GroupedListColumn {
                     GroupedListItem(position = GroupPosition.FIRST) {
-                        SettingsToggleItem(
-                            icon = Icons.Default.Vibration,
-                            title = stringResource(R.string.settings_haptic_feedback),
-                            subtitle = stringResource(R.string.settings_haptic_feedback_desc),
-                            checked = preferences.hapticFeedbackEnabled,
-                            onCheckedChange = { enabled ->
-                                playTap()
-                                viewModel.setHapticFeedbackEnabled(enabled)
-                            }
+                        ListItem(
+                            headlineContent = {
+                                Text(
+                                    stringResource(R.string.settings_folder_access_saf_only),
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            },
+                            trailingContent = {
+                                RadioButton(
+                                    selected = preferences.folderAccessMode == FolderAccessMode.SAF_ONLY,
+                                    onClick = { applyFolderAccessMode(FolderAccessMode.SAF_ONLY) }
+                                )
+                            },
+                            modifier = Modifier.clickable {
+                                applyFolderAccessMode(FolderAccessMode.SAF_ONLY)
+                            },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
                     }
                     GroupedListItem(position = GroupPosition.LAST) {
                         ListItem(
                             headlineContent = {
                                 Text(
-                                    stringResource(R.string.settings_notifications),
+                                    stringResource(R.string.settings_folder_access_all_files),
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                             },
-                            supportingContent = {
-                                Text(
-                                    stringResource(R.string.settings_notifications_desc),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
-                            leadingContent = {
-                                Icon(
-                                    Icons.Default.Notifications,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            },
                             trailingContent = {
-                                Switch(
-                                    checked = notificationsGranted,
-                                    onCheckedChange = { wantEnabled ->
-                                        playTap()
-                                        when {
-                                            wantEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-                                                pendingEnableUpdateNotificationsAfterPermission = false
-                                                requestPostNotificationPermissionOrOpenAppSettings()
-                                            }
-                                            wantEnabled &&
-                                                !NotificationManagerCompat.from(context).areNotificationsEnabled() ->
-                                                viewModel.openAppNotificationSettings()
-                                            !wantEnabled ->
-                                                viewModel.openAppNotificationSettings()
-                                        }
-                                    }
+                                RadioButton(
+                                    selected = preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED,
+                                    onClick = { applyFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED) }
                                 )
                             },
                             modifier = Modifier.clickable {
-                                playTap()
-                                if (!notificationsGranted) {
-                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                        pendingEnableUpdateNotificationsAfterPermission = false
-                                        requestPostNotificationPermissionOrOpenAppSettings()
-                                    } else if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
-                                        viewModel.openAppNotificationSettings()
-                                    }
-                                } else {
-                                    viewModel.openAppNotificationSettings()
-                                }
+                                applyFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
                             },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                val selectiveLike =
+                    preferences.folderAccessMode == FolderAccessMode.SAF_ONLY ||
+                        preferences.folderAccessMode == FolderAccessMode.DEFERRED
+                val allFilesModeSelected =
+                    preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED
+                val allFilesStatusLine = when {
+                    selectiveLike && allFilesAccessGranted ->
+                        stringResource(R.string.settings_folder_access_all_files_status_granted_unused)
+                    selectiveLike && !allFilesAccessGranted ->
+                        stringResource(R.string.settings_folder_access_all_files_status_not_granted_idle)
+                    allFilesModeSelected && allFilesAccessGranted ->
+                        stringResource(R.string.settings_folder_access_all_files_status_granted_used)
+                    else ->
+                        stringResource(R.string.settings_folder_access_all_files_status_not_granted_required)
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val statusStyle = MaterialTheme.typography.bodySmall
+                    val statusColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    Text(
+                        text = allFilesStatusLine,
+                        style = statusStyle,
+                        color = statusColor,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = stringResource(R.string.onboarding_permissions_learn_more),
+                        style = statusStyle,
+                        color = statusColor,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .clickable {
+                                playTap()
+                                onOpenFaqStorageSection()
+                            }
+                    )
+                }
+                val showAllFilesActionButton = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                    when {
+                        selectiveLike && !allFilesAccessGranted -> false
+                        selectiveLike && allFilesAccessGranted -> true
+                        allFilesModeSelected && !allFilesAccessGranted -> true
+                        allFilesModeSelected && allFilesAccessGranted -> false
+                        else -> false
+                    }
+                if (showAllFilesActionButton) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            playTap()
+                            val manageIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                data = Uri.parse("package:${context.packageName}")
+                            }
+                            context.startActivity(manageIntent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            stringResource(
+                                if (selectiveLike) {
+                                    R.string.settings_folder_access_open_manage
+                                } else {
+                                    R.string.settings_folder_access_grant_all_files
+                                }
+                            )
+                        )
+                    }
+                }
+                }
+                }
+            }
+
+            // ── Touch & Sound ────────────────────────────────────────────────
+            item {
+                val notificationsHighlightShape = RoundedCornerShape(16.dp)
+                val notificationsHighlightPulse =
+                    rememberSectionHighlightPulseAlpha(notificationsSectionHighlight)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (notificationsSectionHighlight) {
+                                Modifier
+                                    .border(
+                                        width = 3.dp,
+                                        color = MaterialTheme.colorScheme.primary.copy(
+                                            alpha = notificationsHighlightPulse
+                                        ),
+                                        shape = notificationsHighlightShape
+                                    )
+                                    .padding(10.dp)
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        SettingsSectionHeader(
+                            icon = Icons.Default.Vibration,
+                            title = stringResource(R.string.settings_touch_sound_section)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        GroupedListColumn {
+                            GroupedListItem(position = GroupPosition.FIRST) {
+                                SettingsToggleItem(
+                                    icon = Icons.Default.Vibration,
+                                    title = stringResource(R.string.settings_haptic_feedback),
+                                    subtitle = stringResource(R.string.settings_haptic_feedback_desc),
+                                    checked = preferences.hapticFeedbackEnabled,
+                                    onCheckedChange = { enabled ->
+                                        playTap()
+                                        viewModel.setHapticFeedbackEnabled(enabled)
+                                    }
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.LAST) {
+                                ListItem(
+                                    headlineContent = {
+                                        Text(
+                                            stringResource(R.string.settings_notifications),
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                    },
+                                    supportingContent = {
+                                        Text(
+                                            stringResource(R.string.settings_notifications_desc),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    leadingContent = {
+                                        Icon(
+                                            Icons.Default.Notifications,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    },
+                                    trailingContent = {
+                                        Switch(
+                                            checked = notificationsGranted,
+                                            onCheckedChange = { wantEnabled ->
+                                                playTap()
+                                                when {
+                                                    wantEnabled &&
+                                                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                                                        pendingEnableUpdateNotificationsAfterPermission = false
+                                                        requestPostNotificationPermissionOrOpenAppSettings()
+                                                    }
+                                                    wantEnabled &&
+                                                        !NotificationManagerCompat.from(context)
+                                                            .areNotificationsEnabled() ->
+                                                        viewModel.openAppNotificationSettings()
+                                                    !wantEnabled ->
+                                                        viewModel.openAppNotificationSettings()
+                                                }
+                                            }
+                                        )
+                                    },
+                                    modifier = Modifier.clickable {
+                                        playTap()
+                                        if (!notificationsGranted) {
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                pendingEnableUpdateNotificationsAfterPermission = false
+                                                requestPostNotificationPermissionOrOpenAppSettings()
+                                            } else if (!NotificationManagerCompat.from(context)
+                                                    .areNotificationsEnabled()
+                                            ) {
+                                                viewModel.openAppNotificationSettings()
+                                            }
+                                        } else {
+                                            viewModel.openAppNotificationSettings()
+                                        }
+                                    },
+                                    colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -688,14 +1001,15 @@ fun SettingsScreen(
             // ── Import/Export ────────────────────────────────────────────────
             item {
                 SettingsSectionHeader(
-                    icon = Icons.Default.FolderOpen,
+                    icon = Icons.Default.Save,
                     title = stringResource(R.string.settings_backup_section)
                 )
                 Spacer(Modifier.height(8.dp))
 
+                val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
                 val folderLabel = preferences.exportFolderUri
                     .takeIf { it.isNotBlank() }
-                    ?.let { displayPath(it) }
+                    ?.let { displayPath(it, internalStorageDisplayName) }
                     ?: stringResource(R.string.settings_choose_export_folder)
 
                 val exportFolderReady = preferences.exportFolderUri.isNotBlank()
@@ -1005,7 +1319,7 @@ fun SettingsScreen(
                                     AppIconImage(
                                         modifier = Modifier
                                             .size(84.dp)
-                                            .clip(RoundedCornerShape(18.dp))
+                                            .clip(RoundedCornerShape(percent = 25))
                                             .clickable {
                                                 playTap()
                                                 onOpenIntro()

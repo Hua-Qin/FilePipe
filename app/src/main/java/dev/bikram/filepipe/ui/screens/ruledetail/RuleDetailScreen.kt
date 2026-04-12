@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -27,7 +29,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -41,7 +42,6 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.Image
@@ -63,6 +63,7 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.toShape
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.graphics.Color
@@ -115,15 +116,31 @@ import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.components.FileExtensionChips
+import dev.bikram.filepipe.ui.components.FilesystemFolderPickerSheetContent
 import dev.bikram.filepipe.ui.components.FolderPickerButton
 import dev.bikram.filepipe.ui.components.RuleIconEmojiPresets
 import dev.bikram.filepipe.ui.components.RuleIconOrEmoji
 import dev.bikram.filepipe.ui.components.ScheduleDialog
 import dev.bikram.filepipe.ui.components.toImageVector
 import android.content.Intent
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import androidx.compose.ui.platform.LocalContext
+import dev.bikram.filepipe.data.preferences.FolderAccessMode
+import dev.bikram.filepipe.data.preferences.treatAsSafUi
+import dev.bikram.filepipe.data.preferences.usesAllFilesPaths
+import dev.bikram.filepipe.data.storage.isFilesystemFolderPathAllowedForRules
+import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
+import dev.bikram.filepipe.data.storage.isFilesystemPathPrimarySharedStorageRoot
+import dev.bikram.filepipe.data.storage.isPublicDownloadsDirectoryOnUserAccessibleVolume
+import dev.bikram.filepipe.data.storage.isSafTreeUriPrimarySharedStorageRoot
+import dev.bikram.filepipe.data.storage.isSafTreeUriPublicDownloadRoot
+import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
+import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
 import dev.bikram.filepipe.ui.components.displayPath
+import java.io.File
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -137,7 +154,6 @@ import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ToggleButton
@@ -145,11 +161,37 @@ import androidx.compose.ui.text.input.KeyboardType
 
 private val SectionButtonShape = RoundedCornerShape(12.dp)
 
+/**
+ * No-entry when outside allowed volumes, or in selective access when the folder is a location Android
+ * typically does not expose as a SAF tree (primary shared root, public Download root). Otherwise warn for
+ * lost grants, unreadable trees, or paths fixable by re-picking SAF.
+ */
+private fun folderAccessIssueEmojiPrefix(path: String, folderAccessMode: FolderAccessMode): String {
+    if (isFilesystemFolderPathString(path)) {
+        if (!isFilesystemFolderPathAllowedForRules(path)) return "🚫 "
+        if (folderAccessMode.treatAsSafUi()) {
+            if (isFilesystemPathPrimarySharedStorageRoot(path)) return "🚫 "
+            if (isPublicDownloadsDirectoryOnUserAccessibleVolume(path)) return "🚫 "
+        }
+        return "⚠️ "
+    }
+    if (folderAccessMode.treatAsSafUi()) {
+        if (isSafTreeUriPrimarySharedStorageRoot(path)) return "🚫 "
+        if (isSafTreeUriPublicDownloadRoot(path)) return "🚫 "
+    }
+    return "⚠️ "
+}
+
 private sealed class FolderPickIntent {
     data object AddSource : FolderPickIntent()
     data class ReplaceSource(val previousPath: String) : FolderPickIntent()
     data object SetDestination : FolderPickIntent()
 }
+
+private data class PendingFilesystemFolderPick(
+    val intent: FolderPickIntent,
+    val startDirectory: String
+)
 private val PillShape = RoundedCornerShape(50)
 
 /** ObtainX-style large faded icon at bottom-right of error cards (~alpha 28/255). */
@@ -160,6 +202,7 @@ private fun RuleErrorAlertCard(
     title: String,
     modifier: Modifier = Modifier,
     verticalArrangement: Arrangement.Vertical = Arrangement.spacedBy(8.dp),
+    titleTrailing: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val onErrorContainer = MaterialTheme.colorScheme.onErrorContainer
@@ -173,7 +216,7 @@ private fun RuleErrorAlertCard(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .padding(PaddingValues(top = 8.dp, start = 12.dp, end = 12.dp, bottom = 12.dp)),
                 verticalArrangement = verticalArrangement
             ) {
                 Row(
@@ -190,6 +233,7 @@ private fun RuleErrorAlertCard(
                         style = MaterialTheme.typography.titleSmall,
                         modifier = Modifier.weight(1f)
                     )
+                    titleTrailing?.invoke(this)
                 }
                 content()
             }
@@ -216,6 +260,7 @@ private fun ruleIconOptionLabel(icon: RuleIcon): String = stringResource(
         RuleIcon.MUSIC -> R.string.rule_icon_label_music
         RuleIcon.DOWNLOAD -> R.string.rule_icon_label_download
         RuleIcon.DOCUMENT -> R.string.rule_icon_label_document
+        RuleIcon.INSTALLABLE -> R.string.rule_icon_label_installable
     }
 )
 
@@ -225,6 +270,7 @@ private fun RuleSectionCard(
     subtitle: String?,
     icon: ImageVector,
     modifier: Modifier = Modifier,
+    titleTrailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     ElevatedCard(
@@ -256,48 +302,12 @@ private fun RuleSectionCard(
                         )
                     }
                 }
+                titleTrailing?.invoke()
             }
             Spacer(Modifier.height(12.dp))
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 content = content
-            )
-        }
-    }
-}
-
-@Composable
-private fun ToggleLabelHelpDropdown(
-    tipText: String,
-    contentDescription: String,
-    playTap: () -> Unit,
-) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    Box {
-        IconButton(
-            onClick = {
-                playTap()
-                menuExpanded = true
-            },
-            modifier = Modifier.size(40.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Info,
-                contentDescription = contentDescription,
-                modifier = Modifier.size(20.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        DropdownMenu(
-            expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false },
-            modifier = Modifier.widthIn(max = 300.dp)
-        ) {
-            Text(
-                text = tipText,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
             )
         }
     }
@@ -311,6 +321,7 @@ private fun ToggleLabelHelpDropdown(
 @Composable
 fun RuleDetailScreen(
     onNavigateBack: () -> Unit,
+    onOpenFaq: () -> Unit,
     viewModel: RuleDetailViewModel = hiltViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -326,8 +337,10 @@ fun RuleDetailScreen(
     var advancedExpanded by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
 
     var pendingFolderPick by remember { mutableStateOf<FolderPickIntent?>(null) }
+    var pendingFilesystemFolderPick by remember { mutableStateOf<PendingFilesystemFolderPick?>(null) }
     val folderPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocumentTree()
     ) { uri: Uri? ->
@@ -355,7 +368,37 @@ fun RuleDetailScreen(
         }
     }
 
+    fun externalStorageRootPath(): String =
+        runCatching { Environment.getExternalStorageDirectory().canonicalPath }.getOrNull()
+            ?: "/storage/emulated/0"
+
+    fun resolveFilesystemPickerStartDirectory(initialPath: String?): String {
+        if (initialPath.isNullOrBlank()) return externalStorageRootPath()
+        if (initialPath.startsWith("content://")) {
+            val pathFromSaf = runCatching { safTreeUriToPath(Uri.parse(initialPath)) }.getOrNull()
+            val normalized = pathFromSaf?.let { normalizeFilesystemFolderPath(it) }
+            return normalized?.takeIf { candidate ->
+                val folder = File(candidate)
+                folder.isDirectory && folder.canRead()
+            } ?: externalStorageRootPath()
+        }
+        return normalizeFilesystemFolderPath(initialPath)
+            ?.takeIf { candidate ->
+                val folder = File(candidate)
+                folder.isDirectory && folder.canRead()
+            } ?: externalStorageRootPath()
+    }
+
     fun launchFolderPicker(intent: FolderPickIntent, initialPath: String?) {
+        val useFilesystemPicker =
+            !state.folderAccessMode.treatAsSafUi() && state.allFilesAccessGranted
+        if (useFilesystemPicker) {
+            pendingFilesystemFolderPick = PendingFilesystemFolderPick(
+                intent = intent,
+                startDirectory = resolveFilesystemPickerStartDirectory(initialPath)
+            )
+            return
+        }
         pendingFolderPick = intent
         folderPickerLauncher.launch(initialPath?.let { absoluteStoragePathToOpenTreeInitialUri(it) })
     }
@@ -454,13 +497,28 @@ fun RuleDetailScreen(
                 exit = fadeOut() + shrinkVertically(clip = false)
             ) {
                 RuleErrorAlertCard(
-                    title = stringResource(R.string.rule_detail_validation_errors_title)
-                ) {
-                    state.errors.forEach { errorLine ->
+                    title = stringResource(R.string.rule_detail_validation_errors_title),
+                    titleTrailing = {
                         Text(
-                            text = "• $errorLine",
-                            style = MaterialTheme.typography.bodySmall
+                            text = stringResource(R.string.rule_detail_open_faq),
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier
+                                .clickable { withTapSound(onOpenFaq) }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
                         )
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.rule_detail_validation_errors_summary),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        state.errors.forEach { errorLine ->
+                            Text(
+                                text = "\u2022 $errorLine",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
             }
@@ -478,55 +536,33 @@ fun RuleDetailScreen(
                 val showPermissionHint = anySourcePermission || destPermission
                 RuleErrorAlertCard(
                     title = stringResource(R.string.rule_detail_folder_access_title),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    titleTrailing = {
+                        Text(
+                            text = stringResource(R.string.rule_detail_open_faq),
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier
+                                .clickable { withTapSound(onOpenFaq) }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
                 ) {
-                    state.inaccessibleSourceIssues.forEach { (path, issue) ->
-                        val line = when (issue) {
-                            FolderAccessResult.Unavailable -> stringResource(
-                                R.string.rule_detail_folder_access_source_unavailable,
-                                displayPath(path)
-                            )
-                            FolderAccessResult.PermissionDenied -> stringResource(
-                                R.string.rule_detail_folder_access_source_permission,
-                                displayPath(path)
-                            )
-                            FolderAccessResult.Accessible -> ""
-                        }
-                        if (line.isNotEmpty()) {
-                            Text(text = line, style = MaterialTheme.typography.bodySmall)
-                        }
+                    val usesFilesystemPaths =
+                        state.sourceFolderPaths.any { path -> !path.startsWith("content://") } ||
+                            (state.destinationFolderPath.isNotBlank() &&
+                                !state.destinationFolderPath.startsWith("content://"))
+                    val summaryRes = when {
+                        showPermissionHint && usesFilesystemPaths ->
+                            R.string.rule_detail_folder_access_summary_filesystem
+                        showPermissionHint ->
+                            R.string.rule_detail_folder_access_summary_permission
+                        else ->
+                            R.string.rule_detail_folder_access_summary_unavailable
                     }
-                    state.destinationFolderAccessIssue?.let { issue ->
-                        val line = when (issue) {
-                            FolderAccessResult.Unavailable -> stringResource(
-                                R.string.rule_detail_folder_access_destination_unavailable,
-                                displayPath(state.destinationFolderPath)
-                            )
-                            FolderAccessResult.PermissionDenied -> stringResource(
-                                R.string.rule_detail_folder_access_destination_permission,
-                                displayPath(state.destinationFolderPath)
-                            )
-                            FolderAccessResult.Accessible -> ""
-                        }
-                        if (line.isNotEmpty()) {
-                            Text(text = line, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                    val hintColor = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.88f)
-                    if (showUnavailableHint) {
-                        Text(
-                            text = stringResource(R.string.rule_detail_folder_access_hint_unavailable),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = hintColor
-                        )
-                    }
-                    if (showPermissionHint) {
-                        Text(
-                            text = stringResource(R.string.rule_detail_folder_access_hint_permission),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = hintColor
-                        )
-                    }
+                    Text(
+                        text = stringResource(summaryRes),
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
 
@@ -540,14 +576,18 @@ fun RuleDetailScreen(
                     modifier = Modifier
                         .padding(top = 4.dp)
                         .size(56.dp),
-                    shape = SectionButtonShape
+                    shape = SectionButtonShape,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    )
                 ) {
                     RuleIconOrEmoji(
                         iconEmoji = state.iconEmoji,
                         icon = state.icon,
                         vectorSize = 34.dp,
                         emojiFontSize = 32.sp,
-                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        tint = MaterialTheme.colorScheme.primary,
                         contentDescription = stringResource(R.string.rule_icon_picker_cd),
                         modifier = Modifier
                     )
@@ -589,7 +629,12 @@ fun RuleDetailScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = displayPath(path),
+                            text = buildString {
+                                if (sourceNeedsAccess) {
+                                    append(folderAccessIssueEmojiPrefix(path, state.folderAccessMode))
+                                }
+                                append(displayPath(path, internalStorageDisplayName))
+                            },
                             style = MaterialTheme.typography.bodyMedium,
                             color = if (sourceNeedsAccess) {
                                 MaterialTheme.colorScheme.error
@@ -653,7 +698,7 @@ fun RuleDetailScreen(
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            text = displayPath(bookmarkPath),
+                                            text = displayPath(bookmarkPath, internalStorageDisplayName),
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     },
@@ -668,30 +713,36 @@ fun RuleDetailScreen(
                         }
                     }
                 }
+                if (state.folderAccessMode.usesAllFilesPaths() && !state.allFilesAccessGranted &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                ) {
+                    TextButton(
+                        onClick = {
+                            withTapSound {
+                                val allFilesIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                context.startActivity(allFilesIntent)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.rule_open_all_files_settings))
+                    }
+                }
                 Column(Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(
+                        Text(
+                            text = stringResource(R.string.rule_scan_subdirs_label),
+                            style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.rule_scan_subdirs_label),
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            ToggleLabelHelpDropdown(
-                                tipText = stringResource(R.string.rule_scan_subdirs_support),
-                                contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                                playTap = playTap
-                            )
-                        }
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         Switch(
                             checked = state.scanSubdirectories,
                             onCheckedChange = { enabled ->
@@ -706,24 +757,13 @@ fun RuleDetailScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Row(
+                        Text(
+                            text = stringResource(R.string.rule_suppress_missing_source_card_label),
+                            style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.weight(1f),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.rule_suppress_missing_source_card_label),
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.weight(1f),
-                                maxLines = 3,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            ToggleLabelHelpDropdown(
-                                tipText = stringResource(R.string.rule_suppress_missing_source_card_support),
-                                contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                                playTap = playTap
-                            )
-                        }
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
                         Switch(
                             checked = state.suppressMissingSourceFolderCardWarning,
                             onCheckedChange = { enabled ->
@@ -741,14 +781,25 @@ fun RuleDetailScreen(
             ) {
                 if (state.destinationFolderPath.isNotBlank()) {
                     val isDestBookmarked = state.destinationFolderPath in bookmarkedFolders
+                    val destinationAccessIssue = state.destinationFolderAccessIssue
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = displayPath(state.destinationFolderPath),
+                            text = buildString {
+                                if (destinationAccessIssue != null) {
+                                    append(
+                                        folderAccessIssueEmojiPrefix(
+                                            state.destinationFolderPath,
+                                            state.folderAccessMode
+                                        )
+                                    )
+                                }
+                                append(displayPath(state.destinationFolderPath, internalStorageDisplayName))
+                            },
                             style = MaterialTheme.typography.bodyMedium,
-                            color = if (state.destinationFolderAccessIssue != null) {
+                            color = if (destinationAccessIssue != null) {
                                 MaterialTheme.colorScheme.error
                             } else {
                                 MaterialTheme.colorScheme.primary
@@ -819,7 +870,7 @@ fun RuleDetailScreen(
                                 DropdownMenuItem(
                                     text = {
                                         Text(
-                                            text = displayPath(bookmarkPath),
+                                            text = displayPath(bookmarkPath, internalStorageDisplayName),
                                             style = MaterialTheme.typography.bodyMedium
                                         )
                                     },
@@ -832,6 +883,23 @@ fun RuleDetailScreen(
                                 )
                             }
                         }
+                    }
+                }
+                if (state.folderAccessMode.usesAllFilesPaths() && !state.allFilesAccessGranted &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                ) {
+                    TextButton(
+                        onClick = {
+                            withTapSound {
+                                val allFilesIntent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                                context.startActivity(allFilesIntent)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(stringResource(R.string.rule_open_all_files_settings))
                     }
                 }
             }
@@ -1150,6 +1218,42 @@ fun RuleDetailScreen(
         )
     }
 
+    if (pendingFilesystemFolderPick != null) {
+        val pickRequest = pendingFilesystemFolderPick!!
+        val pickedIntent = pickRequest.intent
+        ModalBottomSheet(
+            onDismissRequest = { pendingFilesystemFolderPick = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.filesystem_folder_picker_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                FilesystemFolderPickerSheetContent(
+                    initialDirectory = pickRequest.startDirectory,
+                    onDismiss = { pendingFilesystemFolderPick = null },
+                    onFolderChosen = { absolutePath ->
+                        when (pickedIntent) {
+                            FolderPickIntent.AddSource -> viewModel.addSourceFolder(absolutePath)
+                            is FolderPickIntent.ReplaceSource ->
+                                viewModel.replaceSourceFolder(pickedIntent.previousPath, absolutePath)
+                            FolderPickIntent.SetDestination -> viewModel.setDestination(absolutePath)
+                        }
+                        pendingFilesystemFolderPick = null
+                        viewModel.refreshFolderAccessAfterPermissionChange()
+                    }
+                )
+            }
+        }
+    }
+
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
@@ -1243,13 +1347,17 @@ fun RuleDetailScreen(
                                 }
                             },
                             modifier = Modifier.size(ruleIconGridCell),
-                            shape = SectionButtonShape
+                            shape = SectionButtonShape,
+                            colors = IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MaterialTheme.colorScheme.primary
+                            )
                         ) {
                             Icon(
                                 imageVector = iconOption.toImageVector(),
                                 contentDescription = ruleIconOptionLabel(iconOption),
                                 modifier = Modifier.size(34.dp),
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer
+                                tint = MaterialTheme.colorScheme.primary
                             )
                         }
                     }
@@ -1265,7 +1373,7 @@ fun RuleDetailScreen(
                 val emojiTextStyle = TextStyle(
                     fontSize = 28.sp,
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                    color = MaterialTheme.colorScheme.primary
                 )
                 BoxWithConstraints(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)) {
                 val emojiCellSize = (maxWidth - 48.dp) / 7f
@@ -1284,7 +1392,7 @@ fun RuleDetailScreen(
                             },
                             modifier = Modifier.size(emojiCellSize),
                             shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer
+                            color = MaterialTheme.colorScheme.surfaceContainerHigh
                         ) {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
@@ -1401,7 +1509,7 @@ fun RuleDetailScreen(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.primaryContainer,
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 modifier = Modifier.size(48.dp)
                             ) {
                                 Box(
@@ -1411,7 +1519,7 @@ fun RuleDetailScreen(
                                     Icon(
                                         imageVector = template.suggestedIcon.toImageVector(),
                                         contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(32.dp)
                                     )
                                 }
