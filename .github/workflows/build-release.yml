@@ -7,22 +7,29 @@
 # - GitHub Release: always draft; publish from the Releases UI when ready.
 # - Run from any branch (e.g. main); the tagged commit is the commit that was built.
 #
-# Optional Play Console upload (workflow input publish_to_internal):
+# Optional Play Console upload (workflow input play_track):
 # - Requires repository secret PLAY_SERVICE_ACCOUNT_JSON_B64 = base64-encoded Google Play service account JSON
 #   (Google Cloud: enable Play Android Developer API, create key; Play Console: add service account and grant access to releases and store listing as needed).
-# - Runs fastlane deploy_internal: uploads playstore AAB to the internal testing track and syncs listing from
-#   fastlane/metadata/android (screenshots and image assets upload only if PNGs/JPEGs are present there).
+# - Runs Fastlane deploy_internal / deploy_beta / deploy_production last: uploads playstore AAB to the chosen track and
+#   syncs listing from fastlane/metadata/android (screenshots and image assets upload only if PNGs/JPEGs are present there).
+#   Order is intentional so a Play failure does not skip the draft GitHub Release or workflow artifact.
+# - Tracks: internal (internal testing), beta (open/public testing), production. Choose "none" to skip upload.
 
 name: Build and release
 
 on:
   workflow_dispatch:
     inputs:
-      publish_to_internal:
-        description: "Upload AAB + Play listing to internal track (needs base64 PLAY_SERVICE_ACCOUNT_JSON_B64 secret)"
-        required: false
-        default: false
-        type: boolean
+      play_track:
+        description: "Upload AAB + Play listing (needs PLAY_SERVICE_ACCOUNT_JSON_B64). internal / beta (open testing) / production, or none to skip."
+        required: true
+        default: none
+        type: choice
+        options:
+          - none
+          - internal
+          - beta
+          - production
 
 permissions:
   contents: write
@@ -113,37 +120,6 @@ jobs:
           cp "$play_aab" "$out/filepipe-v${version}-playstore.aab"
           ls -la "$out"
 
-      - name: Write Play service account JSON
-        if: ${{ inputs.publish_to_internal }}
-        env:
-          PLAY_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON_B64 }}
-        run: |
-          set -euo pipefail
-          if [ -z "${PLAY_SERVICE_ACCOUNT_JSON_B64}" ]; then
-            echo "Missing repository secret PLAY_SERVICE_ACCOUNT_JSON_B64 (base64-encoded service account JSON)."
-            exit 1
-          fi
-          key_path="${RUNNER_TEMP}/play-service-account.json"
-          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON_B64" | tr -d '\n\r ' | base64 -d > "$key_path"
-          python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$key_path"
-
-      - name: Set up Ruby
-        if: ${{ inputs.publish_to_internal }}
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
-          bundler-cache: false
-
-      - name: Install Fastlane
-        if: ${{ inputs.publish_to_internal }}
-        run: bundle install --jobs 4 --retry 3
-
-      - name: Upload to Play internal track (Fastlane)
-        if: ${{ inputs.publish_to_internal }}
-        env:
-          PLAY_SERVICE_ACCOUNT_JSON: ${{ runner.temp }}/play-service-account.json
-        run: bundle exec fastlane deploy_internal
-
       - name: Upload release artifacts
         uses: actions/upload-artifact@v6
         with:
@@ -162,12 +138,45 @@ jobs:
           target_commitish: ${{ github.sha }}
           body: |
             **Release assets (same versionCode; distribution flavors)**
-
-            | File | Use |
-            |------|-----|
-            | `filepipe-v${{ steps.version.outputs.version }}-github.apk` | Sideload / GitHub Releases (`REQUEST_INSTALL_PACKAGES` for APK updates) |
-            | `filepipe-v${{ steps.version.outputs.version }}-playstore.aab` | Upload to Play Console (Android App Bundle; not for direct sideload) |
           files: |
             release-assets/filepipe-v${{ steps.version.outputs.version }}-github.apk
             release-assets/filepipe-v${{ steps.version.outputs.version }}-playstore.aab
           generate_release_notes: true
+
+      - name: Write Play service account JSON
+        if: ${{ inputs.play_track != 'none' }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PLAY_SERVICE_ACCOUNT_JSON_B64}" ]; then
+            echo "Missing repository secret PLAY_SERVICE_ACCOUNT_JSON_B64 (base64-encoded service account JSON)."
+            exit 1
+          fi
+          key_path="${RUNNER_TEMP}/play-service-account.json"
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON_B64" | tr -d '\n\r ' | base64 -d > "$key_path"
+          python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$key_path"
+
+      - name: Set up Ruby
+        if: ${{ inputs.play_track != 'none' }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      - name: Install Fastlane
+        if: ${{ inputs.play_track != 'none' }}
+        run: bundle install --jobs 4 --retry 3
+
+      - name: Upload to Play (Fastlane)
+        if: ${{ inputs.play_track != 'none' }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ runner.temp }}/play-service-account.json
+        run: |
+          set -euo pipefail
+          case "${{ inputs.play_track }}" in
+            internal) bundle exec fastlane deploy_internal ;;
+            beta) bundle exec fastlane deploy_beta ;;
+            production) bundle exec fastlane deploy_production ;;
+            *) echo "Unexpected play_track"; exit 1 ;;
+          esac

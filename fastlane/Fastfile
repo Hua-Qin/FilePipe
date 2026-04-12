@@ -3,10 +3,13 @@
 default_platform(:android)
 
 platform :android do
-  desc "Upload playstore release AAB to Play internal testing track. Listing from fastlane/metadata/android. " \
-       "Set PLAY_SERVICE_ACCOUNT_JSON to the absolute path of the decoded service account JSON file. " \
-       "Run from repo root after: ./gradlew :app:bundlePlaystoreRelease"
-  lane :deploy_internal do
+  private_lane :upload_play_aab do |options|
+    track = options.fetch(:track).to_s
+    allowed_tracks = %w[internal beta production]
+    unless allowed_tracks.include?(track)
+      UI.user_error!("track must be one of #{allowed_tracks.join(", ")} (got #{track})")
+    end
+
     repo_root = File.expand_path("..", __dir__)
     aab_relative = "app/build/outputs/bundle/playstoreRelease/app-playstore-release.aab"
     default_aab = File.join(repo_root, aab_relative)
@@ -43,7 +46,7 @@ platform :android do
     mapping_path = File.join(repo_root, "app/build/outputs/mapping/playstoreRelease/mapping.txt")
 
     upload_options = {
-      track: "internal",
+      track: track,
       aab: aab_path,
       json_key: json_key_path,
       skip_upload_apk: true,
@@ -56,5 +59,22 @@ platform :android do
     upload_options[:mapping] = mapping_path if File.exist?(mapping_path)
 
     upload_to_play_store(**upload_options)
+  end
+
+  desc "Upload playstore AAB to Play internal testing. Listing from fastlane/metadata/android. " \
+       "Set PLAY_SERVICE_ACCOUNT_JSON to the decoded service account JSON path. " \
+       "Run after ./gradlew :app:bundlePlaystoreRelease or set PLAY_AAB_PATH."
+  lane :deploy_internal do
+    upload_play_aab(track: "internal")
+  end
+
+  desc "Upload playstore AAB to Play open testing (public beta). Same env vars as deploy_internal."
+  lane :deploy_beta do
+    upload_play_aab(track: "beta")
+  end
+
+  desc "Upload playstore AAB to Play production. Same env vars as deploy_internal."
+  lane :deploy_production do
+    upload_play_aab(track: "production")
   end
 end
