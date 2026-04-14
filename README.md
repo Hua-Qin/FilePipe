@@ -1,5 +1,7 @@
 # FilePipe
 
+<img alt="FilePipe Banner" src="https://github.com/user-attachments/assets/e48792f0-0bb8-432a-8d49-bd1ee211a738" />
+
 FilePipe turns your chaotic storage into a perfectly organized library — automatically.
 
 Ever wish your Downloads folder would just sort itself? Or that all your videos would gather in one place regardless of which app saved them?
@@ -88,7 +90,7 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 <img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/7_history.png" alt="Per file list. Option to undo." width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<video src="https://github.com/user-attachments/assets/31377ddc-ccf0-4583-a558-39b285250d3a" alt="Extensive theming options. Make it your own." width="300" /><br />
+<video src="https://github.com/user-attachments/assets/99e8bd81-65b2-4961-908d-1d8a5a79b981" controls alt="FilePipe Intro." width="300" /><br />
 </td>
 </tr>
 </table>

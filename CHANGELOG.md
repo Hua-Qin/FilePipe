@@ -1,3 +1,18 @@
+## v3.0.2: Visual fixes
+
+### 🔧 Improved Features
+
+- Adjusted how the app works with **edge-to-edge** on newer Android versions: the theme no longer sets status and navigation bar colors the old way (which Android 15 flags as deprecated). System status and navigation icon contrast (light vs dark icons) now follows your **light, dark, or black** theme choice.
+- Updated the **AndroidX Activity** library so edge-to-edge behavior stays correct when the device rotates or the configuration changes.
+
+### 🐛 Bug Fixes
+
+- On the onboarding welcome screen, the app name uses the proper on-surface color so it stays readable with your theme.
+- On onboarding, the “full access” highlight card uses a clearer surface blend and no drop shadow so it looks flatter and more consistent with the rest of the screen.
+- Top bars on Rules, History, Settings, FAQ, rule detail, and history detail now use one shared style so titles, back buttons, and action icons stay readable on the gradient background instead of picking up colors that were hard to see on dark scrims.
+
+---
+
 ## v3.0.0: You control access
 
 ### ✨ New Features
