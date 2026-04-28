@@ -19,13 +19,13 @@ import dev.bikram.filepipe.R
 fun AboutAuthorPhoto(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Image(
             painter = painterResource(R.drawable.me_600),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
         )
     }
 }

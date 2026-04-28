@@ -16,25 +16,32 @@ enum class GroupPosition { FIRST, MIDDLE, LAST, ONLY }
 private val outerRadius = 16.dp
 private val innerRadius = 4.dp
 
-fun groupedItemShape(position: GroupPosition): RoundedCornerShape = when (position) {
-    GroupPosition.FIRST -> RoundedCornerShape(
-        topStart = outerRadius, topEnd = outerRadius,
-        bottomStart = innerRadius, bottomEnd = innerRadius
-    )
-    GroupPosition.MIDDLE -> RoundedCornerShape(innerRadius)
-    GroupPosition.LAST -> RoundedCornerShape(
-        topStart = innerRadius, topEnd = innerRadius,
-        bottomStart = outerRadius, bottomEnd = outerRadius
-    )
-    GroupPosition.ONLY -> RoundedCornerShape(outerRadius)
-}
+fun groupedItemShape(position: GroupPosition): RoundedCornerShape =
+    when (position) {
+        GroupPosition.FIRST ->
+            RoundedCornerShape(
+                topStart = outerRadius,
+                topEnd = outerRadius,
+                bottomStart = innerRadius,
+                bottomEnd = innerRadius,
+            )
+        GroupPosition.MIDDLE -> RoundedCornerShape(innerRadius)
+        GroupPosition.LAST ->
+            RoundedCornerShape(
+                topStart = innerRadius,
+                topEnd = innerRadius,
+                bottomStart = outerRadius,
+                bottomEnd = outerRadius,
+            )
+        GroupPosition.ONLY -> RoundedCornerShape(outerRadius)
+    }
 
 @Composable
 fun GroupedListItem(
     position: GroupPosition,
     modifier: Modifier = Modifier,
     color: Color? = null,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val cardColors = elevatedCardColors()
     Surface(
@@ -43,7 +50,7 @@ fun GroupedListItem(
         color = color ?: cardColors.containerColor,
         contentColor = cardColors.contentColor,
         tonalElevation = 1.dp,
-        shadowElevation = 0.dp
+        shadowElevation = 0.dp,
     ) {
         content()
     }
@@ -52,11 +59,11 @@ fun GroupedListItem(
 @Composable
 fun GroupedListColumn(
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         content()
     }

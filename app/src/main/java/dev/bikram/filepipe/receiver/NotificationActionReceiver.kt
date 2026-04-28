@@ -17,11 +17,13 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class NotificationActionReceiver : BroadcastReceiver() {
-
     @Inject
     lateinit var undoRunUseCase: UndoRunUseCase
 
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         if (intent.action != ACTION_UNDO_RUN) return
 
         val historyId = intent.getLongExtra(EXTRA_HISTORY_ID, -1L)

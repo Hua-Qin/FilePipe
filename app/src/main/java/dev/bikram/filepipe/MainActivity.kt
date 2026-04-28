@@ -18,24 +18,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
 import dev.bikram.filepipe.ui.InAppRatingAutoPromptHost
 import dev.bikram.filepipe.ui.navigation.AppNavigation
 import dev.bikram.filepipe.ui.theme.FilePipeTheme
 import dev.bikram.filepipe.update.AppReviewLauncher
-import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
     @Inject
     lateinit var userPreferencesRepository: UserPreferencesRepository
 
@@ -66,11 +65,12 @@ class MainActivity : ComponentActivity() {
             }
 
             SideEffect {
-                val nightMode = when (preferences.themeMode) {
-                    AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
-                    AppThemeMode.DARK, AppThemeMode.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
-                    AppThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-                }
+                val nightMode =
+                    when (preferences.themeMode) {
+                        AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
+                        AppThemeMode.DARK, AppThemeMode.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
+                        AppThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                    }
                 AppCompatDelegate.setDefaultNightMode(nightMode)
             }
 
@@ -81,12 +81,12 @@ class MainActivity : ComponentActivity() {
                 hapticFeedbackEnabled = preferences.hapticFeedbackEnabled,
                 useGradientBackground = preferences.useGradientBackground,
                 useEnhancedShading = preferences.useEnhancedShading,
-                activeCustomSeedHex = preferences.activeCustomSeedHex
+                activeCustomSeedHex = preferences.activeCustomSeedHex,
             ) {
                 if (introSeenAtLaunch == null) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
+                        color = MaterialTheme.colorScheme.background,
                     ) {
                         Box(Modifier.fillMaxSize())
                     }
@@ -95,13 +95,13 @@ class MainActivity : ComponentActivity() {
                         preferences = preferences,
                         activity = this@MainActivity,
                         userPreferencesRepository = userPreferencesRepository,
-                        appReviewLauncher = appReviewLauncher
+                        appReviewLauncher = appReviewLauncher,
                     )
                     AppNavigation(
                         hasSeenIntro = preferences.hasSeenIntro,
                         introSeenAtLaunch = introSeenAtLaunch!!,
                         preferences = preferences,
-                        pendingShortcutRepository = pendingShortcutRepository
+                        pendingShortcutRepository = pendingShortcutRepository,
                     )
                 }
             }
@@ -131,10 +131,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleOpenHistoryDetailIntent(intent: Intent?) {
-        val historyId = intent?.getLongExtra(
-            PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID,
-            -1L
-        ) ?: -1L
+        val historyId =
+            intent?.getLongExtra(
+                PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID,
+                -1L,
+            ) ?: -1L
         if (historyId != -1L) {
             pendingShortcutRepository.requestOpenHistoryDetail(historyId)
             intent?.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID)
@@ -148,4 +149,3 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-

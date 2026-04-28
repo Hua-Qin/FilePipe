@@ -43,11 +43,12 @@ fun normalizeFilesystemFolderPath(raw: String): String? {
  */
 fun isCanonicalPathUnderAllowedSharedStorage(canonicalPath: String): Boolean {
     if (canonicalPath.isBlank()) return false
-    val primaryRoot = try {
-        Environment.getExternalStorageDirectory().canonicalPath
-    } catch (_: Exception) {
-        return false
-    }
+    val primaryRoot =
+        try {
+            Environment.getExternalStorageDirectory().canonicalPath
+        } catch (_: Exception) {
+            return false
+        }
     if (canonicalPath == primaryRoot || canonicalPath.startsWith(primaryRoot + File.separator)) {
         return true
     }
@@ -66,12 +67,14 @@ fun isFilesystemFolderPathAllowedForRules(rawPath: String): Boolean {
  * That root is typically not grantable as a SAF tree; use All files access instead.
  */
 fun isFilesystemPathPrimarySharedStorageRoot(rawPath: String): Boolean {
-    val primaryRoot = runCatching {
-        Environment.getExternalStorageDirectory().canonicalPath
-    }.getOrNull() ?: return false
-    val pathCanonical = runCatching {
-        File(rawPath.trim().trimEnd('/')).canonicalPath
-    }.getOrNull() ?: return false
+    val primaryRoot =
+        runCatching {
+            Environment.getExternalStorageDirectory().canonicalPath
+        }.getOrNull() ?: return false
+    val pathCanonical =
+        runCatching {
+            File(rawPath.trim().trimEnd('/')).canonicalPath
+        }.getOrNull() ?: return false
     return pathCanonical == primaryRoot
 }
 
@@ -80,23 +83,26 @@ fun isFilesystemPathPrimarySharedStorageRoot(rawPath: String): Boolean {
  */
 fun isSafTreeUriPrimarySharedStorageRoot(treeUriString: String): Boolean {
     if (!treeUriString.startsWith("content://")) return false
-    val treeDocumentId = runCatching {
-        DocumentsContract.getTreeDocumentId(Uri.parse(treeUriString))
-    }.getOrNull() ?: return false
+    val treeDocumentId =
+        runCatching {
+            DocumentsContract.getTreeDocumentId(Uri.parse(treeUriString))
+        }.getOrNull() ?: return false
     if (!treeDocumentId.startsWith("primary", ignoreCase = true)) return false
     val relative = treeDocumentId.substringAfter(":", "").trim().trimEnd('/')
     return relative.isEmpty()
 }
 
 /** Suggested Downloads directory when All files access is granted. */
-fun primaryDownloadsDirectoryPath(): String = runCatching {
-    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).canonicalFile.absolutePath
-}.getOrElse { "/storage/emulated/0/Download" }
+fun primaryDownloadsDirectoryPath(): String =
+    runCatching {
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).canonicalFile.absolutePath
+    }.getOrElse { "/storage/emulated/0/Download" }
 
 private fun isUserAccessibleStorageVolumeRoot(canonicalParent: String): Boolean {
-    val primaryRoot = runCatching {
-        Environment.getExternalStorageDirectory().canonicalPath
-    }.getOrNull() ?: return false
+    val primaryRoot =
+        runCatching {
+            Environment.getExternalStorageDirectory().canonicalPath
+        }.getOrNull() ?: return false
     if (canonicalParent == primaryRoot) return true
     val match = adoptableSdRootRegex.find(canonicalParent) ?: return false
     val sdRoot = match.value.trimEnd('/')
@@ -121,9 +127,10 @@ fun isPublicDownloadsDirectoryOnUserAccessibleVolume(rawPath: String): Boolean {
  */
 fun isSafTreeUriPublicDownloadRoot(treeUriString: String): Boolean {
     if (!treeUriString.startsWith("content://")) return false
-    val treeDocumentId = runCatching {
-        DocumentsContract.getTreeDocumentId(Uri.parse(treeUriString))
-    }.getOrNull() ?: return false
+    val treeDocumentId =
+        runCatching {
+            DocumentsContract.getTreeDocumentId(Uri.parse(treeUriString))
+        }.getOrNull() ?: return false
     val colonIndex = treeDocumentId.indexOf(':')
     if (colonIndex < 0) return false
     val relative = treeDocumentId.substring(colonIndex + 1).trim().trimEnd('/')
@@ -134,17 +141,17 @@ fun isSafTreeUriPublicDownloadRoot(treeUriString: String): Boolean {
  * Typical device Screenshots directory on shared storage ([Environment.DIRECTORY_SCREENSHOTS] on API 31+,
  * else [Pictures]/Screenshots).
  */
-fun primaryScreenshotsDirectoryPath(): String = runCatching {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_SCREENSHOTS).canonicalFile.absolutePath
-    } else {
-        File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-            "Screenshots"
-        ).canonicalFile.absolutePath
-    }
-}.getOrElse { "/storage/emulated/0/Pictures/Screenshots" }
+fun primaryScreenshotsDirectoryPath(): String =
+    runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_SCREENSHOTS).canonicalFile.absolutePath
+        } else {
+            File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                "Screenshots",
+            ).canonicalFile.absolutePath
+        }
+    }.getOrElse { "/storage/emulated/0/Pictures/Screenshots" }
 
 /** True when the user prefers filesystem paths and the OS has granted All files access. */
-fun isFilesystemAccessEffective(folderAccessMode: FolderAccessMode): Boolean =
-    folderAccessMode.usesAllFilesPaths() && Environment.isExternalStorageManager()
+fun isFilesystemAccessEffective(folderAccessMode: FolderAccessMode): Boolean = folderAccessMode.usesAllFilesPaths() && Environment.isExternalStorageManager()

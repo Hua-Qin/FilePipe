@@ -40,7 +40,7 @@ import kotlin.math.roundToInt
 @Composable
 fun UpdateAvailablePromoCard(
     modifier: Modifier = Modifier,
-    onOpenSettingsClick: () -> Unit
+    onOpenSettingsClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     val cornerShape = RoundedCornerShape(28.dp)
@@ -48,43 +48,46 @@ fun UpdateAvailablePromoCard(
         modifier = modifier,
         shape = cornerShape,
         border = BorderStroke(1.dp, scheme.outlineVariant),
-        colors = CardDefaults.outlinedCardColors(
-            containerColor = scheme.surfaceContainerHigh,
-            contentColor = scheme.onSurface
-        )
+        colors =
+            CardDefaults.outlinedCardColors(
+                containerColor = scheme.surfaceContainerHigh,
+                contentColor = scheme.onSurface,
+            ),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Icon(
                 imageVector = Icons.Default.NewReleases,
                 contentDescription = null,
                 modifier = Modifier.size(40.dp),
-                tint = scheme.primary
+                tint = scheme.primary,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.rules_update_promo_title),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     text = stringResource(R.string.rules_update_promo_message),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant
+                    color = scheme.onSurfaceVariant,
                 )
             }
             Button(
                 onClick = onOpenSettingsClick,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = scheme.primary,
-                    contentColor = scheme.onPrimary
-                )
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = scheme.primary,
+                        contentColor = scheme.onPrimary,
+                    ),
             ) {
                 Text(stringResource(R.string.rules_update_promo_action))
             }
@@ -99,7 +102,7 @@ fun UpdateAvailablePromoCard(
 fun SwipeDismissableUpdatePromoBanner(
     modifier: Modifier = Modifier,
     onDismiss: () -> Unit,
-    onOpenSettingsClick: () -> Unit
+    onOpenSettingsClick: () -> Unit,
 ) {
     val density = LocalDensity.current
     val dismissThresholdPx = remember(density) { with(density) { 96.dp.toPx() } }
@@ -122,13 +125,13 @@ fun SwipeDismissableUpdatePromoBanner(
                     },
                     onDragCancel = {
                         dragAccumulatedPx.floatValue = 0f
-                    }
+                    },
                 )
-            }
+            },
     ) {
         UpdateAvailablePromoCard(
             modifier = Modifier.fillMaxWidth(),
-            onOpenSettingsClick = onOpenSettingsClick
+            onOpenSettingsClick = onOpenSettingsClick,
         )
     }
 }

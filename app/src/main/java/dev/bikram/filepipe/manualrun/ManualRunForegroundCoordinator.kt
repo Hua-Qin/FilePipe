@@ -12,17 +12,19 @@ import javax.inject.Singleton
  * [ManualRunForegroundService] only while a run is active and the app is backgrounded.
  */
 @Singleton
-class ManualRunForegroundCoordinator @Inject constructor(
-    @param:ApplicationContext private val appContext: Context
-) {
-    private val manualRunActive = AtomicBoolean(false)
+class ManualRunForegroundCoordinator
+    @Inject
+    constructor(
+        @param:ApplicationContext private val appContext: Context,
+    ) {
+        private val manualRunActive = AtomicBoolean(false)
 
-    fun setManualRunActive(active: Boolean) {
-        manualRunActive.set(active)
-        if (!active) {
-            appContext.stopService(Intent(appContext, ManualRunForegroundService::class.java))
+        fun setManualRunActive(active: Boolean) {
+            manualRunActive.set(active)
+            if (!active) {
+                appContext.stopService(Intent(appContext, ManualRunForegroundService::class.java))
+            }
         }
-    }
 
-    fun isManualRunActive(): Boolean = manualRunActive.get()
-}
+        fun isManualRunActive(): Boolean = manualRunActive.get()
+    }

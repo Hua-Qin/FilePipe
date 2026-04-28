@@ -11,10 +11,9 @@ enum class FolderAccessMode {
     ALL_FILES_PREFERRED,
 
     /** Onboarding "decide later"; same UX as [SAF_ONLY] until user picks a concrete mode. */
-    DEFERRED
+    DEFERRED,
 }
 
 fun FolderAccessMode.usesAllFilesPaths(): Boolean = this == FolderAccessMode.ALL_FILES_PREFERRED
 
-fun FolderAccessMode.treatAsSafUi(): Boolean =
-    this == FolderAccessMode.SAF_ONLY || this == FolderAccessMode.DEFERRED
+fun FolderAccessMode.treatAsSafUi(): Boolean = this == FolderAccessMode.SAF_ONLY || this == FolderAccessMode.DEFERRED

@@ -14,10 +14,10 @@ import dev.bikram.filepipe.domain.model.FileMoved
             entity = RunHistoryEntity::class,
             parentColumns = ["id"],
             childColumns = ["runHistoryId"],
-            onDelete = ForeignKey.CASCADE
-        )
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
-    indices = [Index("runHistoryId")]
+    indices = [Index("runHistoryId")],
 )
 data class FileMovedEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -31,33 +31,35 @@ data class FileMovedEntity(
     val movedAt: Long,
     val success: Boolean,
     val skipped: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )
 
-fun FileMovedEntity.toDomain(): FileMoved = FileMoved(
-    id = id,
-    runHistoryId = runHistoryId,
-    fileName = fileName,
-    sourceUri = sourceUri,
-    destinationUri = destinationUri,
-    fileSizeBytes = fileSizeBytes,
-    relativeParentSegments = relativeParentSegments,
-    movedAt = movedAt,
-    success = success,
-    skipped = skipped,
-    errorMessage = errorMessage
-)
+fun FileMovedEntity.toDomain(): FileMoved =
+    FileMoved(
+        id = id,
+        runHistoryId = runHistoryId,
+        fileName = fileName,
+        sourceUri = sourceUri,
+        destinationUri = destinationUri,
+        fileSizeBytes = fileSizeBytes,
+        relativeParentSegments = relativeParentSegments,
+        movedAt = movedAt,
+        success = success,
+        skipped = skipped,
+        errorMessage = errorMessage,
+    )
 
-fun FileMoved.toEntity(runHistoryId: Long): FileMovedEntity = FileMovedEntity(
-    id = id,
-    runHistoryId = runHistoryId,
-    fileName = fileName,
-    sourceUri = sourceUri,
-    destinationUri = destinationUri,
-    fileSizeBytes = fileSizeBytes,
-    relativeParentSegments = relativeParentSegments,
-    movedAt = movedAt,
-    success = success,
-    skipped = skipped,
-    errorMessage = errorMessage
-)
+fun FileMoved.toEntity(runHistoryId: Long): FileMovedEntity =
+    FileMovedEntity(
+        id = id,
+        runHistoryId = runHistoryId,
+        fileName = fileName,
+        sourceUri = sourceUri,
+        destinationUri = destinationUri,
+        fileSizeBytes = fileSizeBytes,
+        relativeParentSegments = relativeParentSegments,
+        movedAt = movedAt,
+        success = success,
+        skipped = skipped,
+        errorMessage = errorMessage,
+    )

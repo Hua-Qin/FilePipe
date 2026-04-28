@@ -10,9 +10,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.unit.dp
+import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.math.PI
 
 private const val ARTBOARD = 120f
 
@@ -26,7 +26,9 @@ fun ThemeColoredEmptyHistoryIllustration(modifier: Modifier = Modifier) {
     Canvas(modifier.size(120.dp)) {
         val scaleX = size.width / ARTBOARD
         val scaleY = size.height / ARTBOARD
+
         fun sx(x: Float) = x * scaleX
+
         fun sy(y: Float) = y * scaleY
 
         val centerClock = Offset(sx(60f), sy(60f))
@@ -41,11 +43,15 @@ fun ThemeColoredEmptyHistoryIllustration(modifier: Modifier = Modifier) {
         val minuteStroke = 3.dp.toPx()
         val minuteHandLength = radiusInner * 0.88f
         val hourHandLength = minuteHandLength * (2f / 3f)
-        fun tipClockwiseFrom12(clockwiseFrom12Rad: Double, lengthPx: Float): Offset {
+
+        fun tipClockwiseFrom12(
+            clockwiseFrom12Rad: Double,
+            lengthPx: Float,
+        ): Offset {
             val phi = clockwiseFrom12Rad
             return Offset(
                 centerClock.x + (sin(phi) * lengthPx).toFloat(),
-                centerClock.y + (-cos(phi) * lengthPx).toFloat()
+                centerClock.y + (-cos(phi) * lengthPx).toFloat(),
             )
         }
         val minuteClockwiseFrom12Rad = (10.0 / 60.0) * 2.0 * PI
@@ -96,45 +102,50 @@ fun ThemeColoredEmptyRulesIllustration(modifier: Modifier = Modifier) {
     Canvas(modifier.size(120.dp)) {
         val scaleX = size.width / ARTBOARD
         val scaleY = size.height / ARTBOARD
+
         fun sx(x: Float) = x * scaleX
+
         fun sy(y: Float) = y * scaleY
 
         val bodyColor = scheme.secondaryContainer
         val tabColor = scheme.secondary
 
-        val folderBody = Path().apply {
-            moveTo(sx(14f), sy(40f))
-            lineTo(sx(14f), sy(92f))
-            quadraticTo(sx(14f), sy(96f), sx(18f), sy(96f))
-            lineTo(sx(102f), sy(96f))
-            quadraticTo(sx(106f), sy(96f), sx(106f), sy(92f))
-            lineTo(sx(106f), sy(44f))
-            quadraticTo(sx(106f), sy(40f), sx(102f), sy(40f))
-            close()
-        }
+        val folderBody =
+            Path().apply {
+                moveTo(sx(14f), sy(40f))
+                lineTo(sx(14f), sy(92f))
+                quadraticTo(sx(14f), sy(96f), sx(18f), sy(96f))
+                lineTo(sx(102f), sy(96f))
+                quadraticTo(sx(106f), sy(96f), sx(106f), sy(92f))
+                lineTo(sx(106f), sy(44f))
+                quadraticTo(sx(106f), sy(40f), sx(102f), sy(40f))
+                close()
+            }
         drawPath(folderBody, color = bodyColor, style = Fill)
 
-        val folderTab = Path().apply {
-            moveTo(sx(14f), sy(40f))
-            lineTo(sx(14f), sy(30f))
-            quadraticTo(sx(14f), sy(26f), sx(18f), sy(26f))
-            lineTo(sx(46f), sy(26f))
-            quadraticTo(sx(49f), sy(26f), sx(51f), sy(29f))
-            lineTo(sx(57f), sy(36f))
-            lineTo(sx(14f), sy(40f))
-            close()
-        }
+        val folderTab =
+            Path().apply {
+                moveTo(sx(14f), sy(40f))
+                lineTo(sx(14f), sy(30f))
+                quadraticTo(sx(14f), sy(26f), sx(18f), sy(26f))
+                lineTo(sx(46f), sy(26f))
+                quadraticTo(sx(49f), sy(26f), sx(51f), sy(29f))
+                lineTo(sx(57f), sy(36f))
+                lineTo(sx(14f), sy(40f))
+                close()
+            }
         drawPath(folderTab, color = tabColor, style = Fill)
 
-        val folderTopEdge = Path().apply {
-            moveTo(sx(57f), sy(36f))
-            lineTo(sx(102f), sy(36f))
-            quadraticTo(sx(106f), sy(36f), sx(106f), sy(40f))
-            lineTo(sx(106f), sy(44f))
-            lineTo(sx(14f), sy(44f))
-            lineTo(sx(14f), sy(40f))
-            close()
-        }
+        val folderTopEdge =
+            Path().apply {
+                moveTo(sx(57f), sy(36f))
+                lineTo(sx(102f), sy(36f))
+                quadraticTo(sx(106f), sy(36f), sx(106f), sy(40f))
+                lineTo(sx(106f), sy(44f))
+                lineTo(sx(14f), sy(44f))
+                lineTo(sx(14f), sy(40f))
+                close()
+            }
         drawPath(folderTopEdge, color = tabColor, style = Fill)
 
         val plusColor = scheme.error

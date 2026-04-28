@@ -2,6 +2,7 @@ package dev.bikram.filepipe.ui.components
 
 import android.net.Uri
 import android.os.Environment
+import android.provider.DocumentsContract
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -12,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import android.provider.DocumentsContract
 import dev.bikram.filepipe.data.storage.absoluteStoragePathToTreeUri
 import dev.bikram.filepipe.ui.feedback.LocalTapSound
 import java.io.File
@@ -21,7 +21,7 @@ import java.io.File
 fun FolderPickerButton(
     label: String,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
     val playTap = LocalTapSound.current
     OutlinedButton(
@@ -30,7 +30,7 @@ fun FolderPickerButton(
             onClick()
         },
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        shape = RoundedCornerShape(12.dp),
     ) {
         Icon(Icons.Default.FolderOpen, contentDescription = null)
         Text("  $label")
@@ -49,8 +49,12 @@ fun FolderPickerButton(
  */
 fun displayPath(
     path: String,
-    internalStorageRootDisplayName: String
+    internalStorageRootDisplayName: String,
 ): String {
+    if (path.startsWith("file://")) {
+        val filePath = Uri.parse(path).path ?: path.removePrefix("file://")
+        return displayPath(filePath, internalStorageRootDisplayName)
+    }
     if (path.startsWith("content://")) {
         return try {
             val docId = DocumentsContract.getTreeDocumentId(Uri.parse(path))
@@ -62,15 +66,19 @@ fun displayPath(
                 docId.startsWith("primary", ignoreCase = true) -> relative
                 else -> "SD Card/$relative"
             }
-        } catch (_: Exception) { path }
+        } catch (_: Exception) {
+            path
+        }
     }
-    val primaryExternalRoot = runCatching {
-        Environment.getExternalStorageDirectory().canonicalPath
-    }.getOrNull()
-    if (primaryExternalRoot != null) {
-        val pathCanonical = runCatching {
-            File(path.trim().trimEnd('/')).canonicalPath
+    val primaryExternalRoot =
+        runCatching {
+            Environment.getExternalStorageDirectory().canonicalPath
         }.getOrNull()
+    if (primaryExternalRoot != null) {
+        val pathCanonical =
+            runCatching {
+                File(path.trim().trimEnd('/')).canonicalPath
+            }.getOrNull()
         if (pathCanonical == primaryExternalRoot) return internalStorageRootDisplayName
         val primaryPrefix = "$primaryExternalRoot/"
         if (path.startsWith(primaryPrefix)) {
@@ -98,7 +106,9 @@ fun absoluteStoragePathToOpenTreeInitialUri(path: String): Uri? {
             val treeUri = Uri.parse(path)
             val documentId = DocumentsContract.getTreeDocumentId(treeUri)
             DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
-        } catch (_: Exception) { null }
+        } catch (_: Exception) {
+            null
+        }
     }
     val treeUri = absoluteStoragePathToTreeUri(path) ?: return null
     val documentId = DocumentsContract.getTreeDocumentId(treeUri)

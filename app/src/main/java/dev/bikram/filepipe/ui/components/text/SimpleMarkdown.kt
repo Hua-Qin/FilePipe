@@ -44,35 +44,37 @@ import androidx.compose.ui.unit.dp
 fun SimpleMarkdown(
     content: String,
     modifier: Modifier = Modifier,
-    textAlign: TextAlign = TextAlign.Start
+    textAlign: TextAlign = TextAlign.Start,
 ) {
     val blocks = remember(content) { parseMarkdownToBlocks(content) }
 
     Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = if (textAlign == TextAlign.Center) Alignment.CenterHorizontally else Alignment.Start
+        horizontalAlignment = if (textAlign == TextAlign.Center) Alignment.CenterHorizontally else Alignment.Start,
     ) {
         blocks.forEach { block ->
             when (block) {
                 is MarkdownBlock.Header -> {
-                    val style = when (block.level) {
-                        1 -> MaterialTheme.typography.headlineSmall
-                        2 -> MaterialTheme.typography.titleLarge
-                        3 -> MaterialTheme.typography.titleMedium
-                        4 -> MaterialTheme.typography.titleMedium
-                        5 -> MaterialTheme.typography.titleSmall
-                        else -> MaterialTheme.typography.titleSmall
-                    }
+                    val style =
+                        when (block.level) {
+                            1 -> MaterialTheme.typography.headlineSmall
+                            2 -> MaterialTheme.typography.titleLarge
+                            3 -> MaterialTheme.typography.titleMedium
+                            4 -> MaterialTheme.typography.titleMedium
+                            5 -> MaterialTheme.typography.titleSmall
+                            else -> MaterialTheme.typography.titleSmall
+                        }
                     HeaderLine(block.text, style, block.isCentered)
                 }
 
                 is MarkdownBlock.Text -> MarkdownText(block.text, block.isCentered)
                 is MarkdownBlock.BulletPoint -> BulletPointLine(block.text, block.isCentered)
-                is MarkdownBlock.OrderedList -> OrderedListLine(
-                    block.index,
-                    block.text,
-                    block.isCentered
-                )
+                is MarkdownBlock.OrderedList ->
+                    OrderedListLine(
+                        block.index,
+                        block.text,
+                        block.isCentered,
+                    )
 
                 is MarkdownBlock.ImageGroup -> ImageBlock(block.images, block.isCentered)
                 is MarkdownBlock.CodeBlock -> CodeBlock(block.code)
@@ -84,19 +86,47 @@ fun SimpleMarkdown(
 }
 
 private sealed class MarkdownBlock {
-    data class Header(val text: String, val level: Int, val isCentered: Boolean) : MarkdownBlock()
-    data class Text(val text: String, val isCentered: Boolean) : MarkdownBlock()
-    data class BulletPoint(val text: String, val isCentered: Boolean) : MarkdownBlock()
-    data class OrderedList(val index: String, val text: String, val isCentered: Boolean) :
-        MarkdownBlock()
+    data class Header(
+        val text: String,
+        val level: Int,
+        val isCentered: Boolean,
+    ) : MarkdownBlock()
 
-    data class ImageGroup(val images: List<ImageData>, val isCentered: Boolean) : MarkdownBlock()
-    data class CodeBlock(val code: String) : MarkdownBlock()
+    data class Text(
+        val text: String,
+        val isCentered: Boolean,
+    ) : MarkdownBlock()
+
+    data class BulletPoint(
+        val text: String,
+        val isCentered: Boolean,
+    ) : MarkdownBlock()
+
+    data class OrderedList(
+        val index: String,
+        val text: String,
+        val isCentered: Boolean,
+    ) : MarkdownBlock()
+
+    data class ImageGroup(
+        val images: List<ImageData>,
+        val isCentered: Boolean,
+    ) : MarkdownBlock()
+
+    data class CodeBlock(
+        val code: String,
+    ) : MarkdownBlock()
+
     data object HorizontalRule : MarkdownBlock()
+
     data object Spacer : MarkdownBlock()
 }
 
-private data class ImageData(val url: String, val alt: String, val widthFraction: Float? = null)
+private data class ImageData(
+    val url: String,
+    val alt: String,
+    val widthFraction: Float? = null,
+)
 
 private fun parseMarkdownToBlocks(content: String): List<MarkdownBlock> {
     val blocks = mutableListOf<MarkdownBlock>()
@@ -162,8 +192,8 @@ private fun parseMarkdownToBlocks(content: String): List<MarkdownBlock> {
                     MarkdownBlock.Header(
                         trimmedLine.substringAfter("######").trim(),
                         6,
-                        isInsideCenter
-                    )
+                        isInsideCenter,
+                    ),
                 )
             }
 
@@ -172,8 +202,8 @@ private fun parseMarkdownToBlocks(content: String): List<MarkdownBlock> {
                     MarkdownBlock.Header(
                         trimmedLine.substringAfter("#####").trim(),
                         5,
-                        isInsideCenter
-                    )
+                        isInsideCenter,
+                    ),
                 )
             }
 
@@ -182,8 +212,8 @@ private fun parseMarkdownToBlocks(content: String): List<MarkdownBlock> {
                     MarkdownBlock.Header(
                         trimmedLine.substringAfter("####").trim(),
                         4,
-                        isInsideCenter
-                    )
+                        isInsideCenter,
+                    ),
                 )
             }
 
@@ -192,8 +222,8 @@ private fun parseMarkdownToBlocks(content: String): List<MarkdownBlock> {
                     MarkdownBlock.Header(
                         trimmedLine.substringAfter("###").trim(),
                         3,
-                        isInsideCenter
-                    )
+                        isInsideCenter,
+                    ),
                 )
             }
 
@@ -202,8 +232,8 @@ private fun parseMarkdownToBlocks(content: String): List<MarkdownBlock> {
                     MarkdownBlock.Header(
                         trimmedLine.substringAfter("##").trim(),
                         2,
-                        isInsideCenter
-                    )
+                        isInsideCenter,
+                    ),
                 )
             }
 
@@ -212,8 +242,8 @@ private fun parseMarkdownToBlocks(content: String): List<MarkdownBlock> {
                     MarkdownBlock.Header(
                         trimmedLine.substringAfter("#").trim(),
                         1,
-                        isInsideCenter
-                    )
+                        isInsideCenter,
+                    ),
                 )
             }
 
@@ -221,8 +251,8 @@ private fun parseMarkdownToBlocks(content: String): List<MarkdownBlock> {
                 blocks.add(
                     MarkdownBlock.BulletPoint(
                         trimmedLine.substring(1).trim(),
-                        isInsideCenter
-                    )
+                        isInsideCenter,
+                    ),
                 )
             }
 
@@ -233,8 +263,8 @@ private fun parseMarkdownToBlocks(content: String): List<MarkdownBlock> {
                         MarkdownBlock.OrderedList(
                             index,
                             trimmedLine.substringAfter(". ").trim(),
-                            isInsideCenter
-                        )
+                            isInsideCenter,
+                        ),
                     )
                 } else {
                     blocks.add(MarkdownBlock.Text(line, isInsideCenter))
@@ -269,13 +299,14 @@ private fun parseImagesFromLine(line: String): List<ImageData> {
         if (src != null) {
             val alt = altRegex.find(tag)?.groupValues?.get(1) ?: "image"
             val widthStr = widthRegex.find(tag)?.groupValues?.get(1)
-            val widthFraction = if (widthStr?.endsWith("%") == true) {
-                widthStr.substringBefore("%").toFloatOrNull()?.let { fraction -> fraction / 100f }
-            } else if (widthStr?.any { it.isDigit() } == true && !widthStr.contains("%")) {
-                null
-            } else {
-                null
-            }
+            val widthFraction =
+                if (widthStr?.endsWith("%") == true) {
+                    widthStr.substringBefore("%").toFloatOrNull()?.let { fraction -> fraction / 100f }
+                } else if (widthStr?.any { it.isDigit() } == true && !widthStr.contains("%")) {
+                    null
+                } else {
+                    null
+                }
 
             images.add(ImageData(url = src, alt = alt, widthFraction = widthFraction))
         }
@@ -287,71 +318,85 @@ private fun parseImagesFromLine(line: String): List<ImageData> {
 @Composable
 private fun HorizontalRule() {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp)
-            .height(1.dp)
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 12.dp)
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
     )
 }
 
 @Composable
 private fun CodeBlock(code: String) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(12.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(12.dp),
     ) {
         Text(
             text = code,
             style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
 
 @Composable
-private fun OrderedListLine(index: String, content: String, isCentered: Boolean) {
+private fun OrderedListLine(
+    index: String,
+    content: String,
+    isCentered: Boolean,
+) {
     Row(
         modifier = Modifier.padding(vertical = 2.dp),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.Top,
     ) {
         Text(
             text = "$index.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.width(24.dp)
+            modifier = Modifier.width(24.dp),
         )
         MarkdownText(content, isCentered)
     }
 }
 
 @Composable
-private fun HeaderLine(text: String, style: TextStyle, isCentered: Boolean) {
+private fun HeaderLine(
+    text: String,
+    style: TextStyle,
+    isCentered: Boolean,
+) {
     Text(
         text = parseMarkdownInline(text),
         style = style,
         color = MaterialTheme.colorScheme.primary,
         textAlign = if (isCentered) TextAlign.Center else TextAlign.Start,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp, bottom = 4.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp, bottom = 4.dp),
     )
 }
 
 @Composable
-private fun BulletPointLine(content: String, isCentered: Boolean) {
+private fun BulletPointLine(
+    content: String,
+    isCentered: Boolean,
+) {
     Row(
         modifier = Modifier.padding(vertical = 2.dp),
-        verticalAlignment = Alignment.Top
+        verticalAlignment = Alignment.Top,
     ) {
         Text(
             text = "•",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.width(8.dp))
         MarkdownText(content, isCentered)
@@ -360,12 +405,16 @@ private fun BulletPointLine(content: String, isCentered: Boolean) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ImageBlock(images: List<ImageData>, isCentered: Boolean) {
+private fun ImageBlock(
+    images: List<ImageData>,
+    isCentered: Boolean,
+) {
     FlowRow(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = if (isCentered) Arrangement.Center else Arrangement.Start
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+        horizontalArrangement = if (isCentered) Arrangement.Center else Arrangement.Start,
     ) {
         images.forEach { image ->
             val label = image.alt.ifBlank { "Image" }
@@ -374,14 +423,17 @@ private fun ImageBlock(images: List<ImageData>, isCentered: Boolean) {
                 text = parseMarkdownInline(syntheticLink),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(end = 8.dp, bottom = 4.dp)
+                modifier = Modifier.padding(end = 8.dp, bottom = 4.dp),
             )
         }
     }
 }
 
 @Composable
-private fun MarkdownText(text: String, isCentered: Boolean) {
+private fun MarkdownText(
+    text: String,
+    isCentered: Boolean,
+) {
     val cleanText = text.replace(Regex("<.*?>"), "").trim()
     if (cleanText.isNotBlank()) {
         Text(
@@ -389,14 +441,14 @@ private fun MarkdownText(text: String, isCentered: Boolean) {
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = if (isCentered) TextAlign.Center else TextAlign.Start,
-            modifier = if (isCentered) Modifier.fillMaxWidth() else Modifier
+            modifier = if (isCentered) Modifier.fillMaxWidth() else Modifier,
         )
     }
 }
 
 @Composable
-private fun parseMarkdownInline(text: String): AnnotatedString {
-    return buildAnnotatedString {
+private fun parseMarkdownInline(text: String): AnnotatedString =
+    buildAnnotatedString {
         var cursor = 0
 
         val regex =
@@ -433,11 +485,12 @@ private fun parseMarkdownInline(text: String): AnnotatedString {
 
                 matchValue.startsWith("`") && matchValue.endsWith("`") -> {
                     withStyle(
-                        style = SpanStyle(
-                            fontFamily = FontFamily.Monospace,
-                            background = MaterialTheme.colorScheme.surfaceVariant,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        style =
+                            SpanStyle(
+                                fontFamily = FontFamily.Monospace,
+                                background = MaterialTheme.colorScheme.surfaceVariant,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
                     ) {
                         append(matchValue.substring(1, matchValue.length - 1))
                     }
@@ -447,16 +500,19 @@ private fun parseMarkdownInline(text: String): AnnotatedString {
                     val title = matchValue.substringAfter("[").substringBefore("](")
                     val url = matchValue.substringAfter("](").substringBefore(")")
                     withLink(
-                        link = LinkAnnotation.Url(
-                            url = url,
-                            styles = TextLinkStyles(
-                                style = SpanStyle(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Medium,
-                                    textDecoration = TextDecoration.Underline
-                                )
-                            )
-                        )
+                        link =
+                            LinkAnnotation.Url(
+                                url = url,
+                                styles =
+                                    TextLinkStyles(
+                                        style =
+                                            SpanStyle(
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Medium,
+                                                textDecoration = TextDecoration.Underline,
+                                            ),
+                                    ),
+                            ),
                     ) {
                         append(title)
                     }
@@ -472,4 +528,3 @@ private fun parseMarkdownInline(text: String): AnnotatedString {
             append(text.substring(cursor))
         }
     }
-}

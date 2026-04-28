@@ -13,17 +13,19 @@ fun parseSeedColorHexToColorOrNull(raw: String): Color? {
     if (compact.isEmpty() || !compact.all { it in '0'..'9' || it in 'A'..'F' }) {
         return null
     }
-    val expanded = when (compact.length) {
-        3 -> compact.map { char -> "$char$char" }.joinToString("")
-        6, 8 -> compact
-        else -> return null
-    }
+    val expanded =
+        when (compact.length) {
+            3 -> compact.map { char -> "$char$char" }.joinToString("")
+            6, 8 -> compact
+            else -> return null
+        }
     val parsedLong = expanded.toLongOrNull(16) ?: return null
-    val argb = if (expanded.length == 6) {
-        (0xFF000000L or parsedLong).toInt()
-    } else {
-        parsedLong.toInt()
-    }
+    val argb =
+        if (expanded.length == 6) {
+            (0xFF000000L or parsedLong).toInt()
+        } else {
+            parsedLong.toInt()
+        }
     return Color(argb)
 }
 

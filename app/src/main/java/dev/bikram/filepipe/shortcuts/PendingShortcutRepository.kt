@@ -10,38 +10,40 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class PendingShortcutRepository @Inject constructor() {
-    private val _pendingRuleId = MutableSharedFlow<Long>(extraBufferCapacity = 1)
-    val pendingRuleId: SharedFlow<Long> = _pendingRuleId.asSharedFlow()
+class PendingShortcutRepository
+    @Inject
+    constructor() {
+        private val _pendingRuleId = MutableSharedFlow<Long>(extraBufferCapacity = 1)
+        val pendingRuleId: SharedFlow<Long> = _pendingRuleId.asSharedFlow()
 
-    private val _pendingHistoryDetailId = MutableStateFlow<Long?>(null)
-    val pendingHistoryDetailId: StateFlow<Long?> = _pendingHistoryDetailId.asStateFlow()
+        private val _pendingHistoryDetailId = MutableStateFlow<Long?>(null)
+        val pendingHistoryDetailId: StateFlow<Long?> = _pendingHistoryDetailId.asStateFlow()
 
-    private val _pendingOpenSettingsForUpdates = MutableStateFlow(false)
-    val pendingOpenSettingsForUpdates: StateFlow<Boolean> = _pendingOpenSettingsForUpdates.asStateFlow()
+        private val _pendingOpenSettingsForUpdates = MutableStateFlow(false)
+        val pendingOpenSettingsForUpdates: StateFlow<Boolean> = _pendingOpenSettingsForUpdates.asStateFlow()
 
-    fun requestRunRule(ruleId: Long) {
-        _pendingRuleId.tryEmit(ruleId)
+        fun requestRunRule(ruleId: Long) {
+            _pendingRuleId.tryEmit(ruleId)
+        }
+
+        fun requestOpenHistoryDetail(historyId: Long) {
+            _pendingHistoryDetailId.value = historyId
+        }
+
+        fun clearPendingHistoryDetail() {
+            _pendingHistoryDetailId.value = null
+        }
+
+        fun requestOpenSettingsForUpdates() {
+            _pendingOpenSettingsForUpdates.value = true
+        }
+
+        fun clearPendingOpenSettingsForUpdates() {
+            _pendingOpenSettingsForUpdates.value = false
+        }
+
+        companion object {
+            const val EXTRA_OPEN_HISTORY_DETAIL_ID = "extra_open_history_detail_id"
+            const val EXTRA_OPEN_SETTINGS_UPDATES = "extra_open_settings_updates"
+        }
     }
-
-    fun requestOpenHistoryDetail(historyId: Long) {
-        _pendingHistoryDetailId.value = historyId
-    }
-
-    fun clearPendingHistoryDetail() {
-        _pendingHistoryDetailId.value = null
-    }
-
-    fun requestOpenSettingsForUpdates() {
-        _pendingOpenSettingsForUpdates.value = true
-    }
-
-    fun clearPendingOpenSettingsForUpdates() {
-        _pendingOpenSettingsForUpdates.value = false
-    }
-
-    companion object {
-        const val EXTRA_OPEN_HISTORY_DETAIL_ID = "extra_open_history_detail_id"
-        const val EXTRA_OPEN_SETTINGS_UPDATES = "extra_open_settings_updates"
-    }
-}

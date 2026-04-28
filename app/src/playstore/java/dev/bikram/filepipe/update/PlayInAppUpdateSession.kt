@@ -5,18 +5,19 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class PlayInAppUpdateSession @Inject constructor() : PlayUpdateSessionHandle {
+class PlayInAppUpdateSession
+    @Inject
+    constructor() : PlayUpdateSessionHandle {
+        @Volatile
+        private var pendingInfo: AppUpdateInfo? = null
 
-    @Volatile
-    private var pendingInfo: AppUpdateInfo? = null
+        fun pendingAppUpdate(): AppUpdateInfo? = pendingInfo
 
-    fun pendingAppUpdate(): AppUpdateInfo? = pendingInfo
+        internal fun setPendingAppUpdateInfo(info: AppUpdateInfo?) {
+            pendingInfo = info
+        }
 
-    internal fun setPendingAppUpdateInfo(info: AppUpdateInfo?) {
-        pendingInfo = info
+        override fun clearPendingPlayUpdate() {
+            pendingInfo = null
+        }
     }
-
-    override fun clearPendingPlayUpdate() {
-        pendingInfo = null
-    }
-}

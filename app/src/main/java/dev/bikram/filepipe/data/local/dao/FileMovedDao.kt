@@ -8,7 +8,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FileMovedDao {
-
     @Query("SELECT * FROM files_moved WHERE runHistoryId = :runHistoryId ORDER BY movedAt ASC")
     fun getFilesForRun(runHistoryId: Long): Flow<List<FileMovedEntity>>
 

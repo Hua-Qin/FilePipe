@@ -13,23 +13,27 @@ import javax.inject.Inject
  * leaves Help and returns in the same session.
  */
 @HiltViewModel
-class FaqViewModel @Inject constructor() : ViewModel() {
+class FaqViewModel
+    @Inject
+    constructor() : ViewModel() {
+        private val expandedItemIdsMutable = MutableStateFlow<Set<String>>(emptySet())
 
-    private val expandedItemIdsMutable = MutableStateFlow<Set<String>>(emptySet())
+        val expandedItemIds: StateFlow<Set<String>> = expandedItemIdsMutable.asStateFlow()
 
-    val expandedItemIds: StateFlow<Set<String>> = expandedItemIdsMutable.asStateFlow()
+        fun setItemExpanded(
+            itemId: String,
+            expanded: Boolean,
+        ) {
+            expandedItemIdsMutable.update { current ->
+                if (expanded) current + itemId else current - itemId
+            }
+        }
 
-    fun setItemExpanded(itemId: String, expanded: Boolean) {
-        expandedItemIdsMutable.update { current ->
-            if (expanded) current + itemId else current - itemId
+        fun expandAll(itemIds: Collection<String>) {
+            expandedItemIdsMutable.value = itemIds.toSet()
+        }
+
+        fun collapseAll() {
+            expandedItemIdsMutable.value = emptySet()
         }
     }
-
-    fun expandAll(itemIds: Collection<String>) {
-        expandedItemIdsMutable.value = itemIds.toSet()
-    }
-
-    fun collapseAll() {
-        expandedItemIdsMutable.value = emptySet()
-    }
-}

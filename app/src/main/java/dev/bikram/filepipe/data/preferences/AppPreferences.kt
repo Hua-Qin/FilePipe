@@ -1,7 +1,11 @@
 package dev.bikram.filepipe.data.preferences
 
 enum class SwipeAction {
-    EDIT, DELETE, DUPLICATE, PREVIEW, VIEW_HISTORY
+    EDIT,
+    DELETE,
+    DUPLICATE,
+    PREVIEW,
+    VIEW_HISTORY,
 }
 
 data class AppPreferences(
@@ -13,6 +17,7 @@ data class AppPreferences(
     val activeCustomSeedHex: String = "",
     val themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     val exportFolderUri: String = "",
+    val cloudExportFolderUri: String = "",
     val autoExportOnRuleChange: Boolean = false,
     val scheduledExportEnabled: Boolean = false,
     val logRetentionDays: Int = 30,
@@ -50,7 +55,7 @@ data class AppPreferences(
      * Play flavor: [android.content.pm.PackageInfo.lastUpdateTime] for which we already requested the
      * automatic in-app review flow (or it completed) for this install/update cycle.
      */
-    val playAutoReviewPromptedForLastUpdateTime: Long = 0L
+    val playAutoReviewPromptedForLastUpdateTime: Long = 0L,
 ) {
     companion object {
         val DEFAULT = AppPreferences()

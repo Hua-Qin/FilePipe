@@ -9,7 +9,8 @@ enum class ThemePaletteStyle {
     FRUIT_SALAD,
     MONOCHROME,
     FIDELITY,
-    CONTENT;
+    CONTENT,
+    ;
 
     companion object {
         val all: List<ThemePaletteStyle> = entries

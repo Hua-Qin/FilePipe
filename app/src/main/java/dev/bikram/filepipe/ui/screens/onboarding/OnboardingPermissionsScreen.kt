@@ -21,11 +21,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -80,7 +79,7 @@ private val PermissionCardLeadingIconSlotWidth = 44.dp
 fun OnboardingPermissionsScreen(
     onContinue: () -> Unit,
     onOpenStorageAccessFaq: () -> Unit,
-    viewModel: OnboardingPermissionsViewModel = hiltViewModel()
+    viewModel: OnboardingPermissionsViewModel = hiltViewModel(),
 ) {
     val selected by viewModel.onboardingFolderAccessSelectionState.collectAsStateWithLifecycle()
     var grantPanelVisible by remember { mutableStateOf(false) }
@@ -126,56 +125,60 @@ fun OnboardingPermissionsScreen(
     }
 
     DisposableEffect(lifecycleOwner, selected, hasEnteredAllFilesGrantFlow, awaitingSettingsReturn) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
-            if (didAutoAdvanceFromGrant) return@LifecycleEventObserver
-            val allFilesSelected = selected == FolderAccessMode.ALL_FILES_PREFERRED
-            val manager = Environment.isExternalStorageManager()
-            if (allFilesSelected && manager && hasEnteredAllFilesGrantFlow) {
-                grantPanelVisible = false
-                showOpenSettingsInPanel = false
-                awaitingSettingsReturn = false
-                showAccessNotGrantedHint = false
-                didAutoAdvanceFromGrant = true
-                viewModel.setFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
-                onContinue()
-                return@LifecycleEventObserver
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
+                if (didAutoAdvanceFromGrant) return@LifecycleEventObserver
+                val allFilesSelected = selected == FolderAccessMode.ALL_FILES_PREFERRED
+                val manager = Environment.isExternalStorageManager()
+                if (allFilesSelected && manager && hasEnteredAllFilesGrantFlow) {
+                    grantPanelVisible = false
+                    showOpenSettingsInPanel = false
+                    awaitingSettingsReturn = false
+                    showAccessNotGrantedHint = false
+                    didAutoAdvanceFromGrant = true
+                    viewModel.setFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
+                    onContinue()
+                    return@LifecycleEventObserver
+                }
+                if (allFilesSelected && !manager && awaitingSettingsReturn) {
+                    showAccessNotGrantedHint = true
+                    grantPanelVisible = true
+                    showOpenSettingsInPanel = true
+                }
             }
-            if (allFilesSelected && !manager && awaitingSettingsReturn) {
-                showAccessNotGrantedHint = true
-                grantPanelVisible = true
-                showOpenSettingsInPanel = true
-            }
-        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(scheme.surface)
-            .background(
-                Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0f to scheme.primaryContainer.copy(alpha = 0.45f),
-                        0.55f to scheme.surface.copy(alpha = 0f)
-                    )
-                )
-            )
-            .systemBarsPadding()
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(scheme.surface)
+                .background(
+                    Brush.verticalGradient(
+                        colorStops =
+                            arrayOf(
+                                0f to scheme.primaryContainer.copy(alpha = 0.45f),
+                                0.55f to scheme.surface.copy(alpha = 0f),
+                            ),
+                    ),
+                ).systemBarsPadding(),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-                .padding(top = 20.dp, bottom = 8.dp)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp)
+                    .padding(top = 20.dp, bottom = 8.dp),
         ) {
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
             ) {
                 Text(
                     text = stringResource(R.string.onboarding_permissions_title),
@@ -183,7 +186,7 @@ fun OnboardingPermissionsScreen(
                     fontWeight = FontWeight.Bold,
                     color = scheme.onPrimaryContainer,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -191,7 +194,7 @@ fun OnboardingPermissionsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = scheme.onPrimaryContainer.copy(alpha = 0.9f),
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(20.dp))
                 FullAccessHighlightCard(
@@ -200,7 +203,7 @@ fun OnboardingPermissionsScreen(
                         viewModel.setOnboardingFolderAccessSelection(FolderAccessMode.ALL_FILES_PREFERRED)
                     },
                     title = stringResource(R.string.onboarding_permissions_all_files_title),
-                    body = stringResource(R.string.onboarding_permissions_all_files_body)
+                    body = stringResource(R.string.onboarding_permissions_all_files_body),
                 )
                 Spacer(Modifier.height(14.dp))
                 SelectFoldersSecondaryCard(
@@ -210,7 +213,7 @@ fun OnboardingPermissionsScreen(
                         resetGrantFlowUi()
                     },
                     title = stringResource(R.string.onboarding_permissions_saf_title),
-                    body = stringResource(R.string.onboarding_permissions_saf_body)
+                    body = stringResource(R.string.onboarding_permissions_saf_body),
                 )
                 Spacer(Modifier.height(16.dp))
                 Text(
@@ -218,14 +221,15 @@ fun OnboardingPermissionsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = scheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
                 )
                 Spacer(Modifier.height(8.dp))
                 TextButton(
                     onClick = onOpenStorageAccessFaq,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.onboarding_permissions_learn_more))
                 }
@@ -244,7 +248,7 @@ fun OnboardingPermissionsScreen(
                                         }
                                     context.startActivity(manageIntent)
                                 }
-                            }
+                            },
                         )
                     }
                 }
@@ -254,16 +258,17 @@ fun OnboardingPermissionsScreen(
 
         AnimatedVisibility(
             visible = !hideBottomPrimaryButton,
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            val primaryLabel = when {
-                selected == FolderAccessMode.SAF_ONLY ->
-                    stringResource(R.string.onboarding_permissions_continue)
-                needsAllFilesGrant ->
-                    stringResource(R.string.onboarding_permissions_grant_access)
-                else ->
-                    stringResource(R.string.onboarding_permissions_continue)
-            }
+            val primaryLabel =
+                when {
+                    selected == FolderAccessMode.SAF_ONLY ->
+                        stringResource(R.string.onboarding_permissions_continue)
+                    needsAllFilesGrant ->
+                        stringResource(R.string.onboarding_permissions_grant_access)
+                    else ->
+                        stringResource(R.string.onboarding_permissions_continue)
+                }
             Button(
                 onClick = {
                     when {
@@ -291,21 +296,22 @@ fun OnboardingPermissionsScreen(
                         }
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
                 shape = RoundedCornerShape(50),
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
             ) {
                 Text(
                     text = primaryLabel,
                     modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.SemiBold,
                 )
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null
+                    contentDescription = null,
                 )
             }
         }
@@ -316,49 +322,50 @@ fun OnboardingPermissionsScreen(
 private fun AllFilesInstructionPanel(
     showOpenSettingsButton: Boolean,
     showNotGrantedHint: Boolean,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = scheme.surfaceContainerHighest,
-        border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.5f))
+        border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.5f)),
     ) {
         Column(Modifier.padding(16.dp)) {
             Text(
                 text = stringResource(R.string.onboarding_permissions_instruction_heading),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = scheme.onSurface
+                color = scheme.onSurface,
             )
             Spacer(Modifier.height(10.dp))
             Text(
                 text = "• ${stringResource(R.string.onboarding_permissions_instruction_step1)}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = scheme.onSurfaceVariant
+                color = scheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(6.dp))
             Text(
                 text = "• ${stringResource(R.string.onboarding_permissions_instruction_step2)}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = scheme.onSurfaceVariant
+                color = scheme.onSurfaceVariant,
             )
             AnimatedVisibility(visible = showNotGrantedHint) {
                 Text(
                     text = stringResource(R.string.onboarding_permissions_access_not_granted),
                     style = MaterialTheme.typography.bodySmall,
                     color = scheme.error,
-                    modifier = Modifier.padding(top = 12.dp)
+                    modifier = Modifier.padding(top = 12.dp),
                 )
             }
             AnimatedVisibility(visible = showOpenSettingsButton) {
                 OutlinedButton(
                     onClick = onOpenSettings,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 16.dp),
-                    shape = RoundedCornerShape(50)
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp),
+                    shape = RoundedCornerShape(50),
                 ) {
                     Text(stringResource(R.string.onboarding_permissions_open_settings))
                 }
@@ -372,54 +379,60 @@ private fun FullAccessHighlightCard(
     selected: Boolean,
     onSelect: () -> Unit,
     title: String,
-    body: String
+    body: String,
 ) {
     val scheme = MaterialTheme.colorScheme
     val scale by animateFloatAsState(
         targetValue = if (selected) 1.03f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "fullAccessCardScale"
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMediumLow,
+            ),
+        label = "fullAccessCardScale",
     )
     val borderColor by animateColorAsState(
         targetValue = if (selected) scheme.primary else scheme.primary.copy(alpha = 0.55f),
-        label = "fullAccessBorder"
+        label = "fullAccessBorder",
     )
     val surfaceBlend = if (selected) 0.22f else 0.40f
     val containerColor = lerp(scheme.primaryContainer, scheme.surface, surfaceBlend)
     Card(
         onClick = onSelect,
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(scale),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .scale(scale),
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(2.dp, borderColor),
-        colors = CardDefaults.cardColors(
-            containerColor = containerColor
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 0.dp,
-            pressedElevation = 0.dp,
-            focusedElevation = 0.dp,
-            hoveredElevation = 0.dp,
-            draggedElevation = 0.dp,
-            disabledElevation = 0.dp
-        )
+        colors =
+            CardDefaults.cardColors(
+                containerColor = containerColor,
+            ),
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = 0.dp,
+                pressedElevation = 0.dp,
+                focusedElevation = 0.dp,
+                hoveredElevation = 0.dp,
+                draggedElevation = 0.dp,
+                disabledElevation = 0.dp,
+            ),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
-                modifier = Modifier
-                    .width(PermissionCardLeadingIconSlotWidth)
-                    .padding(top = 2.dp),
-                contentAlignment = Alignment.TopCenter
+                modifier =
+                    Modifier
+                        .width(PermissionCardLeadingIconSlotWidth)
+                        .padding(top = 2.dp),
+                contentAlignment = Alignment.TopCenter,
             ) {
                 StarGlowIcon(tint = scheme.primary)
             }
@@ -428,23 +441,24 @@ private fun FullAccessHighlightCard(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = scheme.onPrimaryContainer
+                    color = scheme.onPrimaryContainer,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
                     text = body,
                     style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onPrimaryContainer.copy(alpha = 0.92f)
+                    color = scheme.onPrimaryContainer.copy(alpha = 0.92f),
                 )
             }
             RadioButton(
                 selected = selected,
                 onClick = onSelect,
                 modifier = Modifier.padding(top = 2.dp),
-                colors = RadioButtonDefaults.colors(
-                    selectedColor = scheme.primary,
-                    unselectedColor = scheme.onSurfaceVariant
-                )
+                colors =
+                    RadioButtonDefaults.colors(
+                        selectedColor = scheme.primary,
+                        unselectedColor = scheme.onSurfaceVariant,
+                    ),
             )
         }
     }
@@ -454,24 +468,27 @@ private fun FullAccessHighlightCard(
 private fun StarGlowIcon(tint: Color) {
     Box(contentAlignment = Alignment.Center) {
         Box(
-            modifier = Modifier
-                .size(44.dp)
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(
-                            tint.copy(alpha = 0.45f),
-                            tint.copy(alpha = 0.08f),
-                            Color.Transparent
-                        )
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .background(
+                        brush =
+                            Brush.radialGradient(
+                                colors =
+                                    listOf(
+                                        tint.copy(alpha = 0.45f),
+                                        tint.copy(alpha = 0.08f),
+                                        Color.Transparent,
+                                    ),
+                            ),
+                        shape = CircleShape,
                     ),
-                    shape = CircleShape
-                )
         )
         Icon(
             imageVector = Icons.Filled.Star,
             contentDescription = null,
             modifier = Modifier.size(26.dp),
-            tint = tint
+            tint = tint,
         )
     }
 }
@@ -481,58 +498,65 @@ private fun SelectFoldersSecondaryCard(
     selected: Boolean,
     onSelect: () -> Unit,
     title: String,
-    body: String
+    body: String,
 ) {
     val scheme = MaterialTheme.colorScheme
     val scale by animateFloatAsState(
         targetValue = if (selected) 1.02f else 1f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "selectFoldersCardScale"
+        animationSpec =
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMediumLow,
+            ),
+        label = "selectFoldersCardScale",
     )
     val borderColor by animateColorAsState(
-        targetValue = when {
-            selected -> scheme.primary
-            else -> scheme.outlineVariant.copy(alpha = 0.5f)
-        },
-        label = "selectFoldersBorder"
+        targetValue =
+            when {
+                selected -> scheme.primary
+                else -> scheme.outlineVariant.copy(alpha = 0.5f)
+            },
+        label = "selectFoldersBorder",
     )
     val borderWidth = if (selected) 2.dp else 1.dp
     Card(
         onClick = onSelect,
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(scale),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .scale(scale),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(borderWidth, borderColor),
-        colors = CardDefaults.cardColors(
-            containerColor = scheme.surfaceContainerHigh
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (selected) 4.dp else 1.dp,
-            pressedElevation = 6.dp
-        )
+        colors =
+            CardDefaults.cardColors(
+                containerColor = scheme.surfaceContainerHigh,
+            ),
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = if (selected) 4.dp else 1.dp,
+                pressedElevation = 6.dp,
+            ),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(
-                modifier = Modifier
-                    .width(PermissionCardLeadingIconSlotWidth)
-                    .padding(top = 2.dp),
-                contentAlignment = Alignment.TopCenter
+                modifier =
+                    Modifier
+                        .width(PermissionCardLeadingIconSlotWidth)
+                        .padding(top = 2.dp),
+                contentAlignment = Alignment.TopCenter,
             ) {
                 Icon(
                     imageVector = Icons.Outlined.FolderOpen,
                     contentDescription = null,
                     modifier = Modifier.size(28.dp),
-                    tint = if (selected) scheme.primary else scheme.onSurfaceVariant
+                    tint = if (selected) scheme.primary else scheme.onSurfaceVariant,
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -540,23 +564,24 @@ private fun SelectFoldersSecondaryCard(
                     text = title,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = scheme.onSurface
+                    color = scheme.onSurface,
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = body,
                     style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onSurfaceVariant
+                    color = scheme.onSurfaceVariant,
                 )
             }
             RadioButton(
                 selected = selected,
                 onClick = onSelect,
                 modifier = Modifier.padding(top = 2.dp),
-                colors = RadioButtonDefaults.colors(
-                    selectedColor = scheme.primary,
-                    unselectedColor = scheme.onSurfaceVariant
-                )
+                colors =
+                    RadioButtonDefaults.colors(
+                        selectedColor = scheme.primary,
+                        unselectedColor = scheme.onSurfaceVariant,
+                    ),
             )
         }
     }

@@ -16,5 +16,4 @@ internal fun semanticVersionNameFromPlayStoreVersionCode(versionCode: Int): Stri
     return "$major.$minor.$patch"
 }
 
-internal fun semanticVersionNameFromPlayUpdateInfo(appUpdateInfo: AppUpdateInfo): String =
-    semanticVersionNameFromPlayStoreVersionCode(appUpdateInfo.availableVersionCode())
+internal fun semanticVersionNameFromPlayUpdateInfo(appUpdateInfo: AppUpdateInfo): String = semanticVersionNameFromPlayStoreVersionCode(appUpdateInfo.availableVersionCode())

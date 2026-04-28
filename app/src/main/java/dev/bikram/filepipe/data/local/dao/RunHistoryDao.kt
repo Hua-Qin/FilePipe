@@ -11,14 +11,16 @@ import kotlinx.coroutines.flow.Flow
 /** Latest [RunHistoryEntity.startedAt] per rule for rules-list sorting (not persisted on [RuleEntity]). */
 data class RuleLastRunRow(
     val ruleId: Long,
-    val lastStartedAt: Long
+    val lastStartedAt: Long,
 )
 
 @Dao
 interface RunHistoryDao {
-
     @Query("SELECT * FROM run_history ORDER BY startedAt DESC")
     fun getAllHistory(): Flow<List<RunHistoryEntity>>
+
+    @Query("SELECT COUNT(*) FROM run_history")
+    fun observeHistoryCount(): Flow<Int>
 
     @Query(
         """
@@ -26,7 +28,7 @@ interface RunHistoryDao {
         FROM run_history
         WHERE ruleId IS NOT NULL
         GROUP BY ruleId
-        """
+        """,
     )
     fun observeLastStartedAtByRuleId(): Flow<List<RuleLastRunRow>>
 

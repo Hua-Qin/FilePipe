@@ -28,11 +28,12 @@ fun View.playTapSound() {
  */
 fun View.performLongPressHaptic() {
     performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
-    } else {
-        context.getSystemService(Vibrator::class.java)
-    } ?: return
+    val vibrator =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            context.getSystemService(Vibrator::class.java)
+        } ?: return
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
     }
@@ -48,10 +49,11 @@ fun View.performSwipeThresholdHaptic() {
     } else {
         performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
     }
-    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
-    } else {
-        context.getSystemService(Vibrator::class.java)
-    } ?: return
+    val vibrator =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            context.getSystemService(Vibrator::class.java)
+        } ?: return
     vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
 }

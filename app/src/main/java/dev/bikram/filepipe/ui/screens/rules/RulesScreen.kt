@@ -2,34 +2,37 @@ package dev.bikram.filepipe.ui.screens.rules
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
@@ -40,37 +43,41 @@ import androidx.compose.material.icons.filled.Deselect
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Surface
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -78,54 +85,52 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import sh.calvin.reorderable.ReorderableItem
-import sh.calvin.reorderable.rememberReorderableLazyListState
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.graphics.vector.ImageVector
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
+import dev.bikram.filepipe.ui.components.CenteredTooltipText
+import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
 import dev.bikram.filepipe.ui.components.RuleCard
-import dev.bikram.filepipe.ui.components.ThemeColoredEmptyRulesIllustration
 import dev.bikram.filepipe.ui.components.RuleCardAction
+import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
+import dev.bikram.filepipe.ui.components.ThemeColoredEmptyRulesIllustration
+import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
-import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
-import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
-import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
-import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
-import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
 import dev.bikram.filepipe.ui.navigation.Screen
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -135,7 +140,7 @@ fun RulesScreen(
     onNavigateToHistoryDetail: (Long) -> Unit,
     onNavigateToHistoryList: () -> Unit,
     onNavigateToRuleHistory: (Long) -> Unit,
-    viewModel: RulesViewModel = hiltViewModel()
+    viewModel: RulesViewModel = hiltViewModel(),
 ) {
     val playTap = rememberPlayTapSound()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -159,10 +164,17 @@ fun RulesScreen(
     var pendingDeleteSelected by remember { mutableStateOf(false) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
+    val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
 
     val hasSelection = selectedRuleIds.isNotEmpty()
     val lazyListState = rememberLazyListState()
+    val listScrollEnabled =
+        rememberContentOverflowScrollEnabled(
+            listState = lazyListState,
+            additionalScrollEnabled = topAppBarState.collapsedFraction > 0f,
+            ignoredBottomPadding = 56.dp,
+        )
     var reorderableRules by remember { mutableStateOf(rules) }
     var dragActuallyMoved by remember { mutableStateOf(false) }
     var previousSortKey by remember { mutableStateOf<HistorySortKey?>(null) }
@@ -194,12 +206,14 @@ fun RulesScreen(
         val freshByRuleId = rules.associateBy { it.id }
         reorderableRules = reorderableRules.mapNotNull { rule -> freshByRuleId[rule.id] }
     }
-    val reorderableLazyListState = rememberReorderableLazyListState(lazyListState) { from, to ->
-        dragActuallyMoved = true
-        reorderableRules = reorderableRules.toMutableList().apply {
-            add(to.index, removeAt(from.index))
+    val reorderableLazyListState =
+        rememberReorderableLazyListState(lazyListState) { from, to ->
+            dragActuallyMoved = true
+            reorderableRules =
+                reorderableRules.toMutableList().apply {
+                    add(to.index, removeAt(from.index))
+                }
         }
-    }
     val sortKeyState = rememberUpdatedState(sortKey)
 
     BackHandler(enabled = hasSelection) {
@@ -219,11 +233,12 @@ fun RulesScreen(
         viewModel.deleteUndoEvent.collect { event ->
             val count = event.rules.size
             val label = if (count == 1) "\"${event.rules.first().name}\" deleted" else "$count rules deleted"
-            val result = snackbarHostState.showSnackbar(
-                message = label,
-                actionLabel = "Undo",
-                duration = SnackbarDuration.Long
-            )
+            val result =
+                snackbarHostState.showSnackbar(
+                    message = label,
+                    actionLabel = "Undo",
+                    duration = SnackbarDuration.Long,
+                )
             if (result == SnackbarResult.ActionPerformed) {
                 viewModel.undoDelete(event.rules)
             }
@@ -235,7 +250,7 @@ fun RulesScreen(
         try {
             snackbarHostState.showSnackbar(
                 message = msg,
-                duration = SnackbarDuration.Short
+                duration = SnackbarDuration.Short,
             )
         } finally {
             viewModel.clearUserMessage()
@@ -244,13 +259,14 @@ fun RulesScreen(
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, viewModel, snackbarHostState) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> viewModel.refreshStaleFolderAccess()
-                Lifecycle.Event.ON_STOP -> snackbarHostState.currentSnackbarData?.dismiss()
-                else -> Unit
+        val observer =
+            LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> viewModel.refreshStaleFolderAccess()
+                    Lifecycle.Event.ON_STOP -> snackbarHostState.currentSnackbarData?.dismiss()
+                    else -> Unit
+                }
             }
-        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
@@ -262,43 +278,82 @@ fun RulesScreen(
             Column(Modifier.fillMaxWidth()) {
                 LocalPrimaryTabTopBanner.current()
                 LargeTopAppBar(
-                    modifier = Modifier.then(
-                        if (LocalPrimaryTabTopBannerActive.current) {
-                            Modifier.consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
-                        } else {
-                            Modifier
-                        }
-                    ),
+                    modifier =
+                        Modifier.then(
+                            if (LocalPrimaryTabTopBannerActive.current) {
+                                Modifier.consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
+                            } else {
+                                Modifier
+                            },
+                        ),
                     title = { Text("Rules") },
                     scrollBehavior = scrollBehavior,
                     colors = gradientOverlayTopAppBarColors(),
                     actions = {
-                        if (hasSelection && !isRunning) {
-                            IconButton(onClick = {
-                                playTap()
-                                viewModel.selectAll()
-                            }) {
-                                Icon(Icons.Default.SelectAll, contentDescription = stringResource(R.string.run_select_all))
-                            }
-                            IconButton(onClick = {
-                                playTap()
-                                viewModel.clearSelection()
-                            }) {
-                                Icon(Icons.Default.Deselect, contentDescription = stringResource(R.string.run_deselect_all))
-                            }
-                        } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.End
-                            ) {
-                                Box {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            if (hasSelection && !isRunning) {
+                                TooltipBox(
+                                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                    tooltip = {
+                                        PlainTooltip {
+                                            CenteredTooltipText(stringResource(R.string.run_select_all))
+                                        }
+                                    },
+                                    state = rememberTooltipState(),
+                                ) {
+                                    Box(modifier = Modifier.size(48.dp)) {
+                                        FilledTonalIconButton(onClick = {
+                                            playTap()
+                                            viewModel.selectAll()
+                                        }, modifier = Modifier.align(Alignment.Center)) {
+                                            Icon(
+                                                Icons.Default.SelectAll,
+                                                contentDescription = stringResource(R.string.run_select_all),
+                                            )
+                                        }
+                                        Badge(
+                                            modifier =
+                                                Modifier
+                                                    .align(Alignment.BottomStart)
+                                                    .offset(x = 2.dp, y = (-2).dp),
+                                            containerColor = MaterialTheme.colorScheme.primary,
+                                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                                        ) {
+                                            Text(
+                                                text = selectedRuleIds.size.toString(),
+                                                style = MaterialTheme.typography.labelSmall,
+                                            )
+                                        }
+                                    }
+                                }
+                                TooltipBox(
+                                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                    tooltip = {
+                                        PlainTooltip {
+                                            CenteredTooltipText(stringResource(R.string.run_deselect_all))
+                                        }
+                                    },
+                                    state = rememberTooltipState(),
+                                ) {
+                                    FilledTonalIconButton(onClick = {
+                                        playTap()
+                                        viewModel.clearSelection()
+                                    }) {
+                                        Icon(Icons.Default.Deselect, contentDescription = stringResource(R.string.run_deselect_all))
+                                    }
+                                }
+                            } else {
+                                Box(modifier = Modifier.size(48.dp)) {
                                     FilledTonalIconButton(onClick = {
                                         playTap()
                                         sortMenuExpanded = true
-                                    }) {
+                                    }, modifier = Modifier.align(Alignment.Center)) {
                                         Icon(
                                             Icons.AutoMirrored.Filled.Sort,
-                                            contentDescription = stringResource(R.string.history_sort_menu)
+                                            contentDescription = stringResource(R.string.history_sort_menu),
                                         )
                                     }
                                     RulesSortDropdown(
@@ -310,55 +365,71 @@ fun RulesScreen(
                                             playTap()
                                             viewModel.setSort(key, direction)
                                             sortMenuExpanded = false
-                                        }
+                                        },
                                     )
                                 }
                                 FilledTonalIconButton(onClick = {
                                     playTap()
                                     viewModel.toggleGlobalViewMode()
                                 }) {
+                                    val expandCollapseLabel =
+                                        if (isCompactMode) {
+                                            stringResource(R.string.rules_expand_all)
+                                        } else {
+                                            stringResource(R.string.rules_collapse_all)
+                                        }
                                     Icon(
                                         imageVector = if (isCompactMode) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
-                                        contentDescription = if (isCompactMode) "Expand all" else "Collapse all"
+                                        contentDescription = expandCollapseLabel,
                                     )
                                 }
                             }
                         }
-                    }
+                    },
                 )
             }
         },
         snackbarHost = {
+            val snackbarBottomPadding =
+                if (hasSelection && !isRunning) {
+                    8.dp
+                } else {
+                    80.dp
+                }
             SnackbarHost(
                 snackbarHostState,
-                modifier = Modifier.padding(bottom = contentPadding.calculateBottomPadding())
+                modifier = Modifier.padding(bottom = snackbarBottomPadding),
             )
         },
         bottomBar = {
             when {
                 isRunning && manualRunCancelAnchor == ManualRunCancelAnchor.RunSelectedBar -> {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = 8.dp,
-                                bottom = contentPadding.calculateBottomPadding() + 8.dp
-                            ),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = 16.dp,
+                                    end = 16.dp,
+                                    top = 8.dp,
+                                    bottom = contentPadding.calculateBottomPadding() + 8.dp,
+                                ),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Surface(
                             shape = RoundedCornerShape(50),
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             tonalElevation = 3.dp,
-                            shadowElevation = 3.dp
+                            shadowElevation = 3.dp,
                         ) {
                             OutlinedButton(
-                                onClick = { playTap(); viewModel.cancelManualRun() },
+                                onClick = {
+                                    playTap()
+                                    viewModel.cancelManualRun()
+                                },
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 shape = RoundedCornerShape(50),
-                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
                             ) {
                                 Text(stringResource(R.string.cancel))
                             }
@@ -370,47 +441,109 @@ fun RulesScreen(
                     AnimatedVisibility(
                         visible = hasSelection,
                         enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        exit = shrinkVertically() + fadeOut(),
                     ) {
                         val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
                         Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = contentPadding.calculateBottomPadding() + 8.dp),
-                            contentAlignment = Alignment.Center
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = contentPadding.calculateBottomPadding() + 8.dp),
+                            contentAlignment = Alignment.Center,
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(50),
                                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                 tonalElevation = 3.dp,
-                                shadowElevation = 3.dp
+                                shadowElevation = 3.dp,
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
-                                    FilledTonalIconButton(onClick = { playTap(); viewModel.clearSelection() }) {
-                                        Icon(Icons.Default.Close, contentDescription = "Cancel selection")
-                                    }
-                                    FilledTonalIconButton(
-                                        onClick = { playTap(); pendingDeleteSelected = true },
-                                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                                            contentColor = MaterialTheme.colorScheme.onErrorContainer
-                                        )
+                                    TooltipBox(
+                                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                        tooltip = {
+                                            PlainTooltip {
+                                                CenteredTooltipText(stringResource(R.string.run_cancel_selection))
+                                            }
+                                        },
+                                        state = rememberTooltipState(),
                                     ) {
-                                        Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
+                                        FilledTonalIconButton(onClick = {
+                                            playTap()
+                                            viewModel.clearSelection()
+                                        }) {
+                                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.run_cancel_selection))
+                                        }
                                     }
-                                    FilledTonalButton(
-                                        onClick = { playTap(); viewModel.runSelected() },
-                                        enabled = enabledSelectedCount > 0,
-                                        shape = RoundedCornerShape(50),
-                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                    TooltipBox(
+                                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                        tooltip = {
+                                            PlainTooltip {
+                                                CenteredTooltipText(stringResource(R.string.delete))
+                                            }
+                                        },
+                                        state = rememberTooltipState(),
                                     ) {
-                                        Text("Run Selected (${selectedRuleIds.size})")
-                                        Spacer(Modifier.width(6.dp))
-                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        FilledTonalIconButton(
+                                            onClick = {
+                                                playTap()
+                                                pendingDeleteSelected = true
+                                            },
+                                            colors =
+                                                IconButtonDefaults.filledTonalIconButtonColors(
+                                                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                                ),
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
+                                        }
+                                    }
+                                    TooltipBox(
+                                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                        tooltip = {
+                                            PlainTooltip {
+                                                CenteredTooltipText(stringResource(R.string.preview_selected_rules))
+                                            }
+                                        },
+                                        state = rememberTooltipState(),
+                                    ) {
+                                        FilledTonalIconButton(
+                                            onClick = {
+                                                playTap()
+                                                viewModel.startPreviewSelected()
+                                            },
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Visibility,
+                                                contentDescription = stringResource(R.string.preview_selected_rules),
+                                            )
+                                        }
+                                    }
+                                    TooltipBox(
+                                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                                        tooltip = {
+                                            PlainTooltip {
+                                                CenteredTooltipText(stringResource(R.string.run_button))
+                                            }
+                                        },
+                                        state = rememberTooltipState(),
+                                    ) {
+                                        FilledTonalButton(
+                                            onClick = {
+                                                playTap()
+                                                viewModel.runSelected()
+                                            },
+                                            enabled = enabledSelectedCount > 0,
+                                            shape = RoundedCornerShape(50),
+                                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                                        ) {
+                                            Text(stringResource(R.string.run_button))
+                                            Spacer(Modifier.width(6.dp))
+                                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        }
                                     }
                                 }
                             }
@@ -418,7 +551,7 @@ fun RulesScreen(
                     }
                 }
             }
-        }
+        },
     ) { innerPadding ->
         if (rules.isEmpty()) {
             EmptyState(
@@ -426,58 +559,68 @@ fun RulesScreen(
                     playTap()
                     onEditRule(Screen.RuleDetail.NEW_RULE_ID)
                 },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(scrollBlurModifier)
-                    .padding(innerPadding)
-                    .padding(bottom = contentPadding.calculateBottomPadding())
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(scrollBlurModifier)
+                        .padding(innerPadding)
+                        .padding(bottom = contentPadding.calculateBottomPadding()),
             )
         } else {
             val reorderLongPressActive = !isRunning
-            val listColumnPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = innerPadding.calculateTopPadding() + 8.dp,
-                bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 56.dp
-            )
-            val listModifier = Modifier
-                .fillMaxSize()
-                .then(scrollBlurModifier)
+            val bottomChromePadding =
+                maxOf(
+                    innerPadding.calculateBottomPadding(),
+                    contentPadding.calculateBottomPadding(),
+                )
+            val listColumnPadding =
+                PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = innerPadding.calculateTopPadding() + 8.dp,
+                    bottom = bottomChromePadding + 56.dp,
+                )
+            val listModifier =
+                Modifier
+                    .fillMaxSize()
+                    .then(scrollBlurModifier)
 
             LazyColumn(
                 state = lazyListState,
                 modifier = listModifier,
                 contentPadding = listColumnPadding,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                userScrollEnabled = listScrollEnabled,
             ) {
                 items(reorderableRules, key = { it.id }) { rule ->
                     ReorderableItem(
                         reorderableLazyListState,
                         rule.id,
-                        modifier = Modifier.animateItem()
+                        modifier = Modifier.animateItem(),
                     ) { isDragging ->
                         val dragElevation by animateDpAsState(
                             targetValue = if (isDragging) 8.dp else 0.dp,
-                            label = "ruleCardReorderShadow"
+                            label = "ruleCardReorderShadow",
                         )
-                        val reorderLongPressModifier = if (reorderLongPressActive) {
-                            Modifier.longPressDraggableHandle(
-                                onDragStarted = { _ -> dragActuallyMoved = false },
-                                onDragStopped = {
-                                    if (!dragActuallyMoved) {
-                                        viewModel.toggleSelection(rule.id)
-                                    } else {
-                                        viewModel.applyDraggedOrder(
-                                            reorderableRules,
-                                            alsoSwitchSortToMyOrder = sortKeyState.value != HistorySortKey.MY_ORDER
-                                        )
-                                    }
-                                    dragActuallyMoved = false
-                                }
-                            )
-                        } else {
-                            Modifier
-                        }
+                        val reorderLongPressModifier =
+                            if (reorderLongPressActive) {
+                                Modifier.longPressDraggableHandle(
+                                    onDragStarted = { _ -> dragActuallyMoved = false },
+                                    onDragStopped = {
+                                        if (!dragActuallyMoved) {
+                                            viewModel.toggleSelection(rule.id)
+                                        } else {
+                                            viewModel.applyDraggedOrder(
+                                                reorderableRules,
+                                                alsoSwitchSortToMyOrder = sortKeyState.value != HistorySortKey.MY_ORDER,
+                                            )
+                                        }
+                                        dragActuallyMoved = false
+                                    },
+                                )
+                            } else {
+                                Modifier
+                            }
                         val isExpanded =
                             viewModel.isCardExpanded(rule.id, isCompactMode, cardModeOverrides)
                         val showInlineProgressCancel =
@@ -495,8 +638,11 @@ fun RulesScreen(
                             swipeEndToStart = swipeEndToStart,
                             onToggleEnabled = { enabled -> viewModel.toggleEnabled(rule, enabled) },
                             onToggleSelectOrExpand = {
-                                if (hasSelection) viewModel.toggleSelection(rule.id)
-                                else viewModel.toggleCardExpansion(rule.id)
+                                if (hasSelection) {
+                                    viewModel.toggleSelection(rule.id)
+                                } else {
+                                    viewModel.toggleCardExpansion(rule.id)
+                                }
                             },
                             onLongClick = {
                                 viewModel.toggleSelection(rule.id)
@@ -509,14 +655,15 @@ fun RulesScreen(
                             showInlineProgressCancel = showInlineProgressCancel,
                             onPreviewRule = { viewModel.startPreview(rule) },
                             onViewHistory = { onNavigateToRuleHistory(rule.id) },
-                            onLeadingLongClick = if (reorderLongPressActive) {
-                                { viewModel.toggleSelection(rule.id) }
-                            } else {
-                                null
-                            },
+                            onLeadingLongClick =
+                                if (reorderLongPressActive) {
+                                    { viewModel.toggleSelection(rule.id) }
+                                } else {
+                                    null
+                                },
                             reorderLongPressDragModifier = reorderLongPressModifier,
                             suppressLongClickForReorder = reorderLongPressActive,
-                            modifier = Modifier.shadow(dragElevation, RoundedCornerShape(16.dp))
+                            modifier = Modifier.shadow(dragElevation, RoundedCornerShape(16.dp)),
                         )
                     }
                 }
@@ -541,7 +688,7 @@ fun RulesScreen(
                     playTap()
                     pendingDeleteRule = null
                 }) { Text("Cancel") }
-            }
+            },
         )
     }
 
@@ -563,79 +710,157 @@ fun RulesScreen(
                     playTap()
                     pendingDeleteSelected = false
                 }) { Text("Cancel") }
-            }
+            },
         )
     }
 
     previewState?.let { preview ->
+        val previewRunEnabled =
+            !isRunning &&
+                !preview.isLoading &&
+                preview.ruleGroups.any { ruleGroup ->
+                    ruleGroup.results.any { result -> !result.wouldSkip } &&
+                        rules.any { rule -> rule.id == ruleGroup.ruleId && rule.isEnabled }
+                }
         ModalBottomSheet(
             onDismissRequest = { viewModel.dismissPreview() },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "Preview — ${preview.ruleName}",
-                    style = MaterialTheme.typography.titleMedium
+                    text =
+                        preview.selectedRuleCount?.let { selectedRuleCount ->
+                            pluralStringResource(
+                                R.plurals.preview_title_selected_rules,
+                                selectedRuleCount,
+                                selectedRuleCount,
+                            )
+                        } ?: stringResource(R.string.preview_title_for_rule, preview.ruleName),
+                    style = MaterialTheme.typography.titleMedium,
                 )
                 if (preview.isLoading) {
                     CircularProgressIndicator(
-                        modifier = Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .padding(32.dp)
+                        modifier =
+                            Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(32.dp),
                     )
-                } else if (preview.results.isEmpty()) {
+                } else if (preview.ruleGroups.all { it.results.isEmpty() }) {
                     Text(
-                        text = "No files would be affected.",
+                        text = stringResource(R.string.preview_empty),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 16.dp)
+                        modifier = Modifier.padding(vertical = 16.dp),
                     )
                 } else {
-                    Text(
-                        text = "${preview.results.size} file(s) would be affected",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
                     LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 400.dp)
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 400.dp),
                     ) {
-                        items(
-                            items = preview.results,
-                            key = { previewItem -> previewItem.sourcePath }
-                        ) { result ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(result.fileName, style = MaterialTheme.typography.bodySmall)
-                                    val status = when {
-                                        result.wouldSkip -> "Would skip"
-                                        result.renamedTo != null -> "→ ${result.renamedTo}"
-                                        else -> "→ ${result.simulatedDestPath.substringAfterLast('/')}"
-                                    }
+                        preview.ruleGroups.forEach { ruleGroup ->
+                            item(key = "header_${ruleGroup.ruleId}") {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp),
+                                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                                ) {
                                     Text(
-                                        status,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        text = ruleGroup.ruleName,
+                                        style = MaterialTheme.typography.titleSmall,
+                                    )
+                                    Text(
+                                        text =
+                                            pluralStringResource(
+                                                when (ruleGroup.operationMode) {
+                                                    OperationMode.MOVE -> R.plurals.preview_files_would_move
+                                                    OperationMode.COPY -> R.plurals.preview_files_would_copy
+                                                },
+                                                ruleGroup.results.size,
+                                                ruleGroup.results.size,
+                                            ),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
                                     )
                                 }
-                                val sizeKb = result.sizeBytes / 1024
-                                Text(
-                                    if (sizeKb > 1024) "${sizeKb / 1024} MB" else "$sizeKb KB",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
+                            }
+                            items(
+                                items = ruleGroup.results,
+                                key = { previewItem -> "${ruleGroup.ruleId}_${previewItem.sourcePath}" },
+                            ) { result ->
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = displayPath(result.sourcePath, internalStorageDisplayName),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                        when {
+                                            result.wouldSkip ->
+                                                Text(
+                                                    text = stringResource(R.string.preview_would_skip),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            result.wouldOverwrite ->
+                                                Text(
+                                                    text = stringResource(R.string.preview_would_overwrite),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            result.renamedTo != null ->
+                                                Text(
+                                                    text =
+                                                        stringResource(
+                                                            R.string.preview_destination_path,
+                                                            displayPath(result.simulatedDestPath, internalStorageDisplayName),
+                                                        ),
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                        }
+                                    }
+                                    val sizeKb = result.sizeBytes / 1024
+                                    Text(
+                                        if (sizeKb > 1024) "${sizeKb / 1024} MB" else "$sizeKb KB",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.outline,
+                                    )
+                                }
                             }
                         }
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = { viewModel.dismissPreview() }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            playTap()
+                            viewModel.runPreviewedRules()
+                        },
+                        enabled = previewRunEnabled,
+                    ) {
+                        Text(stringResource(R.string.preview_run))
                     }
                 }
                 Spacer(Modifier.height(16.dp))
@@ -644,33 +869,39 @@ fun RulesScreen(
     }
 }
 
-
 @Composable
 private fun RulesSortDropdown(
     expanded: Boolean,
     onDismiss: () -> Unit,
     sortKey: HistorySortKey,
     sortDirection: HistorySortDirection,
-    onSelect: (HistorySortKey, HistorySortDirection) -> Unit
+    onSelect: (HistorySortKey, HistorySortDirection) -> Unit,
 ) {
-    data class SortOption(val labelRes: Int, val key: HistorySortKey, val direction: HistorySortDirection)
-    val options = listOf(
-        SortOption(R.string.history_sort_last_ran_newest, HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING),
-        SortOption(R.string.history_sort_last_ran_oldest, HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING),
-        SortOption(R.string.history_sort_rule_name_az, HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING),
-        SortOption(R.string.history_sort_rule_name_za, HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING),
-        SortOption(R.string.rules_sort_my_order, HistorySortKey.MY_ORDER, HistorySortDirection.ASCENDING),
+    data class SortOption(
+        val labelRes: Int,
+        val key: HistorySortKey,
+        val direction: HistorySortDirection,
     )
+    val options =
+        listOf(
+            SortOption(R.string.history_sort_last_ran_newest, HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING),
+            SortOption(R.string.history_sort_last_ran_oldest, HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING),
+            SortOption(R.string.history_sort_rule_name_az, HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING),
+            SortOption(R.string.history_sort_rule_name_za, HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING),
+            SortOption(R.string.rules_sort_my_order, HistorySortKey.MY_ORDER, HistorySortDirection.ASCENDING),
+        )
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         options.forEach { option ->
-            val isSelected = if (option.key == HistorySortKey.MY_ORDER)
-                sortKey == HistorySortKey.MY_ORDER
-            else
-                sortKey == option.key && sortDirection == option.direction
+            val isSelected =
+                if (option.key == HistorySortKey.MY_ORDER) {
+                    sortKey == HistorySortKey.MY_ORDER
+                } else {
+                    sortKey == option.key && sortDirection == option.direction
+                }
             DropdownMenuItem(
                 text = { Text(stringResource(option.labelRes)) },
                 leadingIcon = { RadioButton(selected = isSelected, onClick = null) },
-                onClick = { onSelect(option.key, option.direction) }
+                onClick = { onSelect(option.key, option.direction) },
             )
         }
     }
@@ -701,23 +932,24 @@ private fun SwipeToDismissRuleCard(
     onLeadingLongClick: (() -> Unit)? = null,
     reorderLongPressDragModifier: Modifier = Modifier,
     suppressLongClickForReorder: Boolean = false,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val cardShape = RoundedCornerShape(16.dp)
     val swipeAssigned = setOf(swipeStartToEnd, swipeEndToStart)
-    val cardIconPairs: List<RuleCardAction> = SwipeAction.entries
-        .filter { it !in swipeAssigned }
-        .map { action ->
-            RuleCardAction(
-                icon = action.icon(),
-                label = action.label(),
-                onClick = { action.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule) }
-            )
-        }
+    val cardIconPairs: List<RuleCardAction> =
+        SwipeAction.entries
+            .filter { it !in swipeAssigned }
+            .map { action ->
+                RuleCardAction(
+                    icon = action.icon(),
+                    label = action.label(),
+                    onClick = { action.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule) },
+                )
+            }
 
     val hapticEnabled = LocalHapticEnabled.current
     DeliberateSwipeRevealCard(
-        commitThresholdFraction = SwipeDismissCardDefaults.CommitThresholdFraction,
+        commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
         cardShape = cardShape,
         onSwipeStartToEnd = {
             swipeStartToEnd.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
@@ -734,19 +966,19 @@ private fun SwipeToDismissRuleCard(
                     .background(action.semanticSwipeBackground(), cardShape)
                     .padding(
                         start = if (fromStart) 24.dp else 0.dp,
-                        end = if (fromStart) 0.dp else 24.dp
+                        end = if (fromStart) 0.dp else 24.dp,
                     ),
-                contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd
+                contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd,
             ) {
                 Icon(
                     imageVector = action.icon(),
                     contentDescription = null,
                     tint = action.semanticSwipeIconTint(),
-                    modifier = Modifier.size(32.dp)
+                    modifier = Modifier.size(32.dp),
                 )
             }
         },
-        modifier = modifier
+        modifier = modifier,
     ) {
         RuleCard(
             rule = rule,
@@ -761,13 +993,11 @@ private fun SwipeToDismissRuleCard(
             onCancelRunClick = onCancelManualRun,
             showInlineProgressCancel = showInlineProgressCancel,
             isAnyRuleRunning = isAnyRuleRunning,
-            onPreviewRule = onPreviewRule,
-            onViewHistory = onViewHistory,
             hasStaleFolder = hasStaleFolder,
             onStaleWarningClick = onStaleWarningClick,
             onLeadingLongClick = onLeadingLongClick,
             reorderLongPressDragModifier = reorderLongPressDragModifier,
-            suppressLongClickForReorder = suppressLongClickForReorder
+            suppressLongClickForReorder = suppressLongClickForReorder,
         )
     }
 }
@@ -777,7 +1007,7 @@ private fun SwipeAction.dispatch(
     onEdit: () -> Unit,
     onDuplicate: () -> Unit,
     onViewHistory: () -> Unit,
-    onPreview: () -> Unit
+    onPreview: () -> Unit,
 ) = when (this) {
     SwipeAction.EDIT -> onEdit()
     SwipeAction.DELETE -> onDelete()
@@ -786,61 +1016,63 @@ private fun SwipeAction.dispatch(
     SwipeAction.VIEW_HISTORY -> onViewHistory()
 }
 
-private fun SwipeAction.icon(): ImageVector = when (this) {
-    SwipeAction.EDIT -> Icons.Default.Edit
-    SwipeAction.DELETE -> Icons.Default.Delete
-    SwipeAction.DUPLICATE -> Icons.Default.ContentCopy
-    SwipeAction.PREVIEW -> Icons.Default.Visibility
-    SwipeAction.VIEW_HISTORY -> Icons.Default.History
-}
+private fun SwipeAction.icon(): ImageVector =
+    when (this) {
+        SwipeAction.EDIT -> Icons.Default.Edit
+        SwipeAction.DELETE -> Icons.Default.Delete
+        SwipeAction.DUPLICATE -> Icons.Default.ContentCopy
+        SwipeAction.PREVIEW -> Icons.Default.Visibility
+        SwipeAction.VIEW_HISTORY -> Icons.Default.History
+    }
 
 @Composable
-private fun SwipeAction.label(): String = when (this) {
-    SwipeAction.EDIT -> stringResource(R.string.edit_rule)
-    SwipeAction.DELETE -> stringResource(R.string.delete_rule)
-    SwipeAction.DUPLICATE -> stringResource(R.string.duplicate_rule)
-    SwipeAction.PREVIEW -> stringResource(R.string.preview_rule)
-    SwipeAction.VIEW_HISTORY -> stringResource(R.string.view_history)
-}
+private fun SwipeAction.label(): String =
+    when (this) {
+        SwipeAction.EDIT -> stringResource(R.string.edit_rule)
+        SwipeAction.DELETE -> stringResource(R.string.delete_rule)
+        SwipeAction.DUPLICATE -> stringResource(R.string.duplicate_rule)
+        SwipeAction.PREVIEW -> stringResource(R.string.preview_rule)
+        SwipeAction.VIEW_HISTORY -> stringResource(R.string.view_history)
+    }
 
 @Composable
 private fun EmptyState(
     onAddRule: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     AnimatedVisibility(
         visible = true,
-        enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }
+        enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 },
     ) {
         Column(
             modifier = modifier.fillMaxSize().padding(32.dp),
             verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             ThemeColoredEmptyRulesIllustration(Modifier.size(120.dp))
             Spacer(Modifier.height(24.dp))
             Text(
                 stringResource(R.string.rules_empty_title),
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(8.dp))
             Text(
                 stringResource(R.string.rules_empty_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(24.dp))
             Button(
                 onClick = onAddRule,
                 shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth(0.72f)
+                modifier = Modifier.fillMaxWidth(0.72f),
             ) {
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.rules_add_rule))

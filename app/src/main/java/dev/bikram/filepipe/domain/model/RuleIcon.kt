@@ -8,10 +8,10 @@ enum class RuleIcon {
     MUSIC,
     DOWNLOAD,
     DOCUMENT,
-    INSTALLABLE;
+    INSTALLABLE,
+    ;
 
     companion object {
-        fun fromStored(key: String?): RuleIcon =
-            entries.find { it.name == key } ?: DEFAULT
+        fun fromStored(key: String?): RuleIcon = entries.find { it.name == key } ?: DEFAULT
     }
 }

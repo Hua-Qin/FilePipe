@@ -15,10 +15,11 @@ import dev.bikram.filepipe.ui.theme.ProgressiveBlurStyle
 
 enum class BlurDirection {
     TOP,
-    BOTTOM
+    BOTTOM,
 }
 
-private val dualEdgeBlurAgsl = """
+private val dualEdgeBlurAgsl =
+    """
     uniform shader content;
     uniform float blurRadius;
     uniform float topHeight;
@@ -65,7 +66,7 @@ private val dualEdgeBlurAgsl = """
 
         return accum / weightSum;
     }
-""".trimIndent()
+    """.trimIndent()
 
 /**
  * Progressive blur on both edges simultaneously.
@@ -77,52 +78,59 @@ fun Modifier.progressiveBlur(
     bottomHeight: Float = 0f,
     showGradientOverlay: Boolean = true,
     overlayAlpha: Float = 0.28f,
-    overlayAlphaBottom: Float = overlayAlpha
-): Modifier = composed {
-    val overlayColorTop = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = overlayAlpha)
-    val overlayColorBottom = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = overlayAlphaBottom)
+    overlayAlphaBottom: Float = overlayAlpha,
+): Modifier =
+    composed {
+        val overlayColorTop = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = overlayAlpha)
+        val overlayColorBottom = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = overlayAlphaBottom)
 
-    val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && blurRadius > 0f) {
-        Modifier.graphicsLayer {
-            val shader = RuntimeShader(dualEdgeBlurAgsl)
-            shader.setFloatUniform("blurRadius", blurRadius)
-            shader.setFloatUniform("topHeight", topHeight)
-            shader.setFloatUniform("bottomHeight", bottomHeight)
-            shader.setFloatUniform("contentHeight", size.height)
+        val blurModifier =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && blurRadius > 0f) {
+                Modifier.graphicsLayer {
+                    val shader = RuntimeShader(dualEdgeBlurAgsl)
+                    shader.setFloatUniform("blurRadius", blurRadius)
+                    shader.setFloatUniform("topHeight", topHeight)
+                    shader.setFloatUniform("bottomHeight", bottomHeight)
+                    shader.setFloatUniform("contentHeight", size.height)
 
-            renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content")
-                .asComposeRenderEffect()
-        }
-    } else {
-        Modifier
-    }
-
-    val gradientModifier = if (showGradientOverlay) {
-        Modifier.drawWithContent {
-            drawContent()
-            if (topHeight > 0f) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(overlayColorTop, Color.Transparent),
-                        endY = topHeight
-                    )
-                )
+                    renderEffect =
+                        RenderEffect
+                            .createRuntimeShaderEffect(shader, "content")
+                            .asComposeRenderEffect()
+                }
+            } else {
+                Modifier
             }
-            if (bottomHeight > 0f) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, overlayColorBottom),
-                        startY = size.height - bottomHeight
-                    )
-                )
-            }
-        }
-    } else {
-        Modifier
-    }
 
-    this.then(blurModifier).then(gradientModifier)
-}
+        val gradientModifier =
+            if (showGradientOverlay) {
+                Modifier.drawWithContent {
+                    drawContent()
+                    if (topHeight > 0f) {
+                        drawRect(
+                            brush =
+                                Brush.verticalGradient(
+                                    colors = listOf(overlayColorTop, Color.Transparent),
+                                    endY = topHeight,
+                                ),
+                        )
+                    }
+                    if (bottomHeight > 0f) {
+                        drawRect(
+                            brush =
+                                Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, overlayColorBottom),
+                                    startY = size.height - bottomHeight,
+                                ),
+                        )
+                    }
+                }
+            } else {
+                Modifier
+            }
+
+        this.then(blurModifier).then(gradientModifier)
+    }
 
 /**
  * Single-edge progressive blur kept for backward compatibility.
@@ -131,30 +139,33 @@ fun Modifier.progressiveBlur(
     blurRadius: Float,
     height: Float,
     direction: BlurDirection = BlurDirection.TOP,
-    showGradientOverlay: Boolean = true
-): Modifier = progressiveBlur(
-    blurRadius = blurRadius,
-    topHeight = if (direction == BlurDirection.TOP) height else 0f,
-    bottomHeight = if (direction == BlurDirection.BOTTOM) height else 0f,
-    showGradientOverlay = showGradientOverlay
-)
+    showGradientOverlay: Boolean = true,
+): Modifier =
+    progressiveBlur(
+        blurRadius = blurRadius,
+        topHeight = if (direction == BlurDirection.TOP) height else 0f,
+        bottomHeight = if (direction == BlurDirection.BOTTOM) height else 0f,
+        showGradientOverlay = showGradientOverlay,
+    )
 
 /** Blur for [LazyColumn] under a transparent [LargeTopAppBar] (app bar is a sibling, not blurred). */
-fun ProgressiveBlurStyle.applyToScrollableList(): Modifier = Modifier.progressiveBlur(
-    blurRadius = blurRadius,
-    topHeight = topHeightPx,
-    bottomHeight = bottomHeightPx,
-    showGradientOverlay = true,
-    overlayAlpha = overlayAlpha,
-    overlayAlphaBottom = overlayAlphaBottom
-)
+fun ProgressiveBlurStyle.applyToScrollableList(): Modifier =
+    Modifier.progressiveBlur(
+        blurRadius = blurRadius,
+        topHeight = topHeightPx,
+        bottomHeight = bottomHeightPx,
+        showGradientOverlay = true,
+        overlayAlpha = overlayAlpha,
+        overlayAlphaBottom = overlayAlphaBottom,
+    )
 
 /** Blur for a full-screen layer (y=0 at window top), e.g. rule edit scroll under transparent chrome. */
-fun ProgressiveBlurStyle.applyToFullBleedLayer(): Modifier = Modifier.progressiveBlur(
-    blurRadius = blurRadius,
-    topHeight = topHeightPx,
-    bottomHeight = bottomHeightPx,
-    showGradientOverlay = true,
-    overlayAlpha = overlayAlpha,
-    overlayAlphaBottom = overlayAlphaBottom
-)
+fun ProgressiveBlurStyle.applyToFullBleedLayer(): Modifier =
+    Modifier.progressiveBlur(
+        blurRadius = blurRadius,
+        topHeight = topHeightPx,
+        bottomHeight = bottomHeightPx,
+        showGradientOverlay = true,
+        overlayAlpha = overlayAlpha,
+        overlayAlphaBottom = overlayAlphaBottom,
+    )

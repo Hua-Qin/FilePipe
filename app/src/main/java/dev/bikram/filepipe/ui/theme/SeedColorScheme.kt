@@ -18,12 +18,12 @@ import com.materialkolor.scheme.SchemeVibrant
 import com.materialkolor.scheme.Variant
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 
-private const val contrastLevel = 0.0
+private const val CONTRAST_LEVEL = 0.0
 
 fun colorSchemeFromSeed(
     seedPrimary: Color,
     paletteStyle: ThemePaletteStyle,
-    darkTheme: Boolean
+    darkTheme: Boolean,
 ): ColorScheme {
     val hct = Hct.fromInt(seedPrimary.toArgb())
     val hue = hct.hue
@@ -35,27 +35,29 @@ fun colorSchemeFromSeed(
     val neutralPalette = TonalPalette.fromHueAndChroma(hue, (chroma / 12.0).coerceAtMost(4.0))
     val neutralVariantPalette = TonalPalette.fromInt(neutralPalette.tone(90))
 
-    val dynamicScheme: DynamicScheme = when (paletteStyle) {
-        ThemePaletteStyle.TONAL_SPOT -> DynamicScheme(
-            hct,
-            Variant.TONAL_SPOT,
-            darkTheme,
-            contrastLevel,
-            primaryPalette,
-            secondaryPalette,
-            tertiaryPalette,
-            neutralPalette,
-            neutralVariantPalette
-        )
-        ThemePaletteStyle.NEUTRAL -> SchemeNeutral(hct, darkTheme, contrastLevel)
-        ThemePaletteStyle.VIBRANT -> SchemeVibrant(hct, darkTheme, contrastLevel)
-        ThemePaletteStyle.EXPRESSIVE -> SchemeExpressive(hct, darkTheme, contrastLevel)
-        ThemePaletteStyle.RAINBOW -> SchemeRainbow(hct, darkTheme, contrastLevel)
-        ThemePaletteStyle.FRUIT_SALAD -> SchemeFruitSalad(hct, darkTheme, contrastLevel)
-        ThemePaletteStyle.MONOCHROME -> SchemeMonochrome(hct, darkTheme, contrastLevel)
-        ThemePaletteStyle.FIDELITY -> SchemeFidelity(hct, darkTheme, contrastLevel)
-        ThemePaletteStyle.CONTENT -> SchemeContent(hct, darkTheme, contrastLevel)
-    }
+    val dynamicScheme: DynamicScheme =
+        when (paletteStyle) {
+            ThemePaletteStyle.TONAL_SPOT ->
+                DynamicScheme(
+                    hct,
+                    Variant.TONAL_SPOT,
+                    darkTheme,
+                    CONTRAST_LEVEL,
+                    primaryPalette,
+                    secondaryPalette,
+                    tertiaryPalette,
+                    neutralPalette,
+                    neutralVariantPalette,
+                )
+            ThemePaletteStyle.NEUTRAL -> SchemeNeutral(hct, darkTheme, CONTRAST_LEVEL)
+            ThemePaletteStyle.VIBRANT -> SchemeVibrant(hct, darkTheme, CONTRAST_LEVEL)
+            ThemePaletteStyle.EXPRESSIVE -> SchemeExpressive(hct, darkTheme, CONTRAST_LEVEL)
+            ThemePaletteStyle.RAINBOW -> SchemeRainbow(hct, darkTheme, CONTRAST_LEVEL)
+            ThemePaletteStyle.FRUIT_SALAD -> SchemeFruitSalad(hct, darkTheme, CONTRAST_LEVEL)
+            ThemePaletteStyle.MONOCHROME -> SchemeMonochrome(hct, darkTheme, CONTRAST_LEVEL)
+            ThemePaletteStyle.FIDELITY -> SchemeFidelity(hct, darkTheme, CONTRAST_LEVEL)
+            ThemePaletteStyle.CONTENT -> SchemeContent(hct, darkTheme, CONTRAST_LEVEL)
+        }
 
     return dynamicScheme.toComposeColorScheme()
 }
@@ -110,6 +112,6 @@ private fun DynamicScheme.toComposeColorScheme(): ColorScheme {
         tertiaryFixed = Color(colors.tertiaryFixed().getArgb(this)),
         tertiaryFixedDim = Color(colors.tertiaryFixedDim().getArgb(this)),
         onTertiaryFixed = Color(colors.onTertiaryFixed().getArgb(this)),
-        onTertiaryFixedVariant = Color(colors.onTertiaryFixedVariant().getArgb(this))
+        onTertiaryFixedVariant = Color(colors.onTertiaryFixedVariant().getArgb(this)),
     )
 }

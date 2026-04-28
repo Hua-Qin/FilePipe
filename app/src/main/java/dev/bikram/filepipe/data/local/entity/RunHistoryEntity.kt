@@ -11,7 +11,7 @@ import dev.bikram.filepipe.domain.model.TriggerType
 
 @Entity(
     tableName = "run_history",
-    indices = [Index(value = ["ruleId"])]
+    indices = [Index(value = ["ruleId"])],
 )
 data class RunHistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -31,23 +31,24 @@ data class RunHistoryEntity(
     @ColumnInfo(defaultValue = "MOVE")
     val operationMode: OperationMode = OperationMode.MOVE,
     @ColumnInfo(defaultValue = "[]")
-    val copyCreatedDestFolderUris: List<String> = emptyList()
+    val copyCreatedDestFolderUris: List<String> = emptyList(),
 )
 
-fun RunHistoryEntity.toDomain(): RunHistory = RunHistory(
-    id = id,
-    ruleId = ruleId,
-    ruleName = ruleName,
-    triggeredBy = triggeredBy,
-    startedAt = startedAt,
-    completedAt = completedAt,
-    status = status,
-    totalFilesFound = totalFilesFound,
-    cancelledUnprocessedCount = cancelledUnprocessedCount,
-    totalFilesMoved = totalFilesMoved,
-    totalFilesFailed = totalFilesFailed,
-    errorMessage = errorMessage,
-    isReversed = isReversed,
-    operationMode = operationMode,
-    copyCreatedDestFolderUris = copyCreatedDestFolderUris
-)
+fun RunHistoryEntity.toDomain(): RunHistory =
+    RunHistory(
+        id = id,
+        ruleId = ruleId,
+        ruleName = ruleName,
+        triggeredBy = triggeredBy,
+        startedAt = startedAt,
+        completedAt = completedAt,
+        status = status,
+        totalFilesFound = totalFilesFound,
+        cancelledUnprocessedCount = cancelledUnprocessedCount,
+        totalFilesMoved = totalFilesMoved,
+        totalFilesFailed = totalFilesFailed,
+        errorMessage = errorMessage,
+        isReversed = isReversed,
+        operationMode = operationMode,
+        copyCreatedDestFolderUris = copyCreatedDestFolderUris,
+    )

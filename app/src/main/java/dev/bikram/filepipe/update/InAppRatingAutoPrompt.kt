@@ -21,12 +21,13 @@ object InAppRatingAutoPrompt {
     fun packageLastUpdateTimeMillis(context: Context): Long {
         val packageManager = context.packageManager
         val packageName = context.packageName
-        val packageInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
-        } else {
-            @Suppress("DEPRECATION")
-            packageManager.getPackageInfo(packageName, 0)
-        }
+        val packageInfo =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0)
+            }
         return packageInfo.lastUpdateTime
     }
 
@@ -34,7 +35,7 @@ object InAppRatingAutoPrompt {
         lastUpdateTimeMillis: Long,
         nowMillis: Long,
         neverAskAgain: Boolean,
-        promptedForLastUpdateTimeMillis: Long
+        promptedForLastUpdateTimeMillis: Long,
     ): Boolean {
         if (neverAskAgain) return false
         if (nowMillis - lastUpdateTimeMillis < AUTO_PROMPT_DELAY_MS) return false

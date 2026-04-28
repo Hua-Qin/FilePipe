@@ -120,12 +120,15 @@
     <string name="delete_rule">Delete rule</string>
     <string name="duplicate_rule">Duplicate rule</string>
     <string name="view_history">View history</string>
+    <string name="rules_expand_all">Expand all</string>
+    <string name="rules_collapse_all">Collapse all</string>
 
     <!-- Run screen -->
     <string name="run_title">Run rules</string>
     <string name="run_select_all">Select all</string>
     <string name="run_deselect_all">Deselect all</string>
-    <string name="run_button">Run selected (%d)</string>
+    <string name="run_cancel_selection">Cancel selection</string>
+    <string name="run_button">Run selected</string>
     <string name="run_empty">No rules to run. Create a rule first.</string>
     <string name="run_in_progress">Running…</string>
     <string name="run_complete">Completed</string>
@@ -151,6 +154,9 @@
     <string name="history_clear_content_description">Clear all history</string>
     <string name="history_clear_confirm_title">Clear all history?</string>
     <string name="history_clear_confirm_message">This removes all run records and file move details. Rules are not affected.</string>
+    <string name="history_file_location_unavailable">File location not available</string>
+    <string name="history_file_open_no_app">No app found to open this file type</string>
+    <string name="history_file_open_failed">Couldn\'t open this file</string>
 
     <!-- Status labels -->
     <string name="status_success">Success</string>
@@ -267,16 +273,32 @@
     <string name="settings_folder_access_switch_to_saf_body">Existing rules will stop working. You\'ll need to re-select each folder they use. You can switch back to \"All files access\" anytime.</string>
     <string name="settings_folder_access_switch_confirm">Switch</string>
     <string name="settings_appearance_section">Appearance</string>
+    <string name="settings_section_expand_cd">Expand %1$s section</string>
+    <string name="settings_section_collapse_cd">Collapse %1$s section</string>
+    <string name="settings_expand_all_sections_cd">Expand all settings sections</string>
+    <string name="settings_collapse_all_sections_cd">Collapse all settings sections</string>
     <string name="settings_gradient_background">Gradient background</string>
     <string name="settings_gradient_background_desc">Tinted background using your theme color</string>
     <string name="settings_enhanced_shading">Enhanced shading</string>
     <string name="settings_enhanced_shading_desc">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="settings_backup_section">Backup &amp; restore</string>
     <string name="settings_choose_export_folder">Choose export folder</string>
-    <string name="settings_export_folder_hint">Folder for exporting backups (rules, history, settings).</string>
-    <string name="settings_export_select_folder_first">Select an export folder first</string>
+    <string name="settings_choose_local_backup_folder">Choose local backup folder</string>
+    <string name="settings_choose_cloud_backup_file">Choose cloud backup file</string>
+    <string name="settings_local_backup_folder_hint">Folder for exporting backups (rules, history, settings)</string>
+    <string name="settings_cloud_backup_folder_hint">File on cloud for exporting backups (rules, history, settings)</string>
+    <string name="settings_local_backup_folder_cleared">Local backup folder reset</string>
+    <string name="settings_cloud_backup_file_cleared">Cloud backup file reset</string>
+    <string name="settings_export_select_folder_first">Select a local or cloud backup folder first</string>
     <string name="settings_export_success">%1$s exported</string>
+    <string name="settings_backup_export_success">Backup exported</string>
+    <string name="settings_backup_export_success_to">Backup exported to %1$s</string>
+    <string name="settings_backup_export_failed">Export failed: %1$s</string>
     <string name="settings_export_now">Export backup</string>
+    <string name="cloud_provider_google_drive">Google Drive</string>
+    <string name="cloud_provider_onedrive">OneDrive</string>
+    <string name="cloud_provider_dropbox">Dropbox</string>
+    <string name="cloud_provider_box">Box</string>
     <string name="settings_fab_open_help">Help and FAQs</string>
     <string name="settings_import_rules">Import backup</string>
     <string name="settings_restore_backup">Restore backup</string>
@@ -287,9 +309,13 @@
     <string name="settings_import_merge_success">Rules imported: %1$d added, %2$d updated</string>
     <string name="settings_restore_success">Backup restored (%1$s)</string>
     <string name="settings_auto_export_on_change">Auto-export on app exit</string>
-    <string name="settings_auto_export_on_change_hint">Saves a full backup when you exit the app after making changes.</string>
+    <string name="settings_auto_export_on_change_hint">Saves a full backup to configured backup folders when you exit after making changes.</string>
     <string name="settings_scheduled_export">Daily scheduled backup</string>
-    <string name="settings_scheduled_export_hint">Automatically backs up once a day (requires an export folder).</string>
+    <string name="settings_scheduled_export_hint">Automatically backs up once a day to configured backup folders.</string>
+    <plurals name="settings_backup_exported_to_destinations">
+        <item quantity="one">Backup exported to %1$d folder</item>
+        <item quantity="other">Backup exported to %1$d folders</item>
+    </plurals>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
     <string name="theme_system">System</string>
@@ -333,6 +359,9 @@
     <string name="onboarding_byline">by Bikram Agarwal</string>
     <!-- Feedback / new settings -->
     <string name="settings_touch_sound_section">Touch &amp; Sound</string>
+    <string name="settings_swipe_gestures_section">Swipe gestures</string>
+    <string name="settings_swipe_right">Swipe right →</string>
+    <string name="settings_swipe_left">← Swipe left</string>
     <string name="settings_haptic_feedback">Haptic feedback</string>
     <string name="settings_haptic_feedback_desc">Tap sounds and swipe vibrations</string>
     <string name="settings_progressive_blur">Progressive blur</string>
@@ -392,8 +421,10 @@
 
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>
-    <string name="rule_scan_subdirs_label">Scan subdirectories</string>
-    <string name="rule_scan_subdirs_support">Subfolders are scanned too, and their structure is recreated at the destination.</string>
+    <string name="rule_scan_subdirs_label">Scan subfolders</string>
+    <string name="rule_scan_subdirs_support">Subfolders will be scanned too for matching files.</string>
+    <string name="rule_recreate_subfolders_label">Mirror subfolders to destination</string>
+    <string name="rule_recreate_subfolders_support">Replicate the source folder hierarchy at the destination, instead of saving all matched files directly at the destination folder.</string>
     <string name="rule_suppress_missing_source_card_label">Hide missing source folder warnings</string>
     <string name="rule_suppress_missing_source_card_support">When a source folder is missing, hide the warning on the rules screen. You will still see it while editing this rule. Doesn\'t apply to the destination folder or lost access.</string>
     <string name="rule_toggle_tip_show_help">Show help</string>
@@ -408,8 +439,26 @@
 
     <!-- Preview sheet -->
     <string name="preview_title">Preview</string>
+    <string name="preview_title_for_rule">Preview — %1$s</string>
+    <plurals name="preview_title_selected_rules">
+        <item quantity="one">Preview — %1$d selected rule</item>
+        <item quantity="other">Preview — %1$d selected rules</item>
+    </plurals>
+    <string name="preview_selected_rules">Preview selected</string>
+    <string name="preview_run">Run</string>
     <string name="preview_empty">No matching files found in the selected source folders.</string>
     <string name="preview_count">%d file(s) would be affected</string>
+    <string name="preview_would_skip">Would skip</string>
+    <string name="preview_would_overwrite">Would overwrite</string>
+    <string name="preview_destination_path">To: %1$s</string>
+    <plurals name="preview_files_would_move">
+        <item quantity="one">%1$d file would be moved</item>
+        <item quantity="other">%1$d files would be moved</item>
+    </plurals>
+    <plurals name="preview_files_would_copy">
+        <item quantity="one">%1$d file would be copied</item>
+        <item quantity="other">%1$d files would be copied</item>
+    </plurals>
 
     <!-- Template picker -->
     <string name="template_picker_title">Start from a template</string>

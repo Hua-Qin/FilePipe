@@ -38,7 +38,7 @@ import dev.bikram.filepipe.ui.theme.parseSeedColorHexToColorOrNull
 fun CustomSeedHexDialog(
     initialDraft: String = "",
     onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
+    onConfirm: (String) -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     var draftHex by remember(initialDraft) { mutableStateOf(initialDraft) }
@@ -48,67 +48,69 @@ fun CustomSeedHexDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             tonalElevation = 6.dp,
-            modifier = Modifier
-                .widthIn(max = 400.dp)
-                .padding(24.dp)
+            modifier =
+                Modifier
+                    .widthIn(max = 400.dp)
+                    .padding(24.dp),
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
                     text = stringResource(R.string.settings_custom_seed_dialog_title),
                     style = MaterialTheme.typography.headlineSmall,
-                    modifier = Modifier.padding(bottom = 4.dp)
+                    modifier = Modifier.padding(bottom = 4.dp),
                 )
                 Text(
                     text = stringResource(R.string.settings_custom_seed_supporting),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
                     text = stringResource(R.string.settings_custom_seed_row_hint),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )                
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
                         text = stringResource(R.string.settings_custom_seed_preview_label),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    val swatchModifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .clip(previewShape)
-                        .then(
-                            if (previewColor != null) {
-                                Modifier
-                                    .background(previewColor)
-                                    .border(1.dp, outlineColor, previewShape)
-                            } else {
-                                Modifier
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .border(1.dp, outlineColor, previewShape)
-                            }
-                        )
+                    val swatchModifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .clip(previewShape)
+                            .then(
+                                if (previewColor != null) {
+                                    Modifier
+                                        .background(previewColor)
+                                        .border(1.dp, outlineColor, previewShape)
+                                } else {
+                                    Modifier
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .border(1.dp, outlineColor, previewShape)
+                                },
+                            )
                     Box(
                         modifier = swatchModifier,
-                        contentAlignment = Alignment.Center
+                        contentAlignment = Alignment.Center,
                     ) {
                         if (previewColor == null && draftHex.isNotBlank()) {
                             Text(
                                 text = stringResource(R.string.settings_custom_seed_preview_invalid),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
                     }
@@ -119,12 +121,12 @@ fun CustomSeedHexDialog(
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text(stringResource(R.string.settings_custom_seed_label)) },
                     placeholder = { Text(stringResource(R.string.settings_custom_seed_placeholder)) },
-                    singleLine = true
+                    singleLine = true,
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = {
                         playTap()
@@ -138,7 +140,7 @@ fun CustomSeedHexDialog(
                             playTap()
                             onConfirm(draftHex.trim())
                         },
-                        enabled = previewColor != null
+                        enabled = previewColor != null,
                     ) {
                         Text(stringResource(R.string.settings_custom_seed_dialog_add))
                     }

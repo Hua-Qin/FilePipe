@@ -3,48 +3,48 @@ package dev.bikram.filepipe.ui.screens.history
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.consumeWindowInsets
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -76,22 +76,26 @@ import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.paging.compose.itemKey
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.HistoryStatusFilter
 import dev.bikram.filepipe.domain.model.RunHistory
+import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
 import dev.bikram.filepipe.ui.components.HistoryCard
+import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyHistoryIllustration
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
-import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
-import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
-import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
-import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
+import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
+import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,10 +103,11 @@ fun HistoryScreen(
     contentPadding: PaddingValues = PaddingValues(),
     onHistoryClick: (Long) -> Unit,
     onNavigateBack: (() -> Unit)? = null,
-    viewModel: HistoryViewModel = hiltViewModel()
+    viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val playTap = rememberPlayTapSound()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val availableStatusFilters by viewModel.availableStatusFilters.collectAsStateWithLifecycle()
     val pagingItems = viewModel.historyPagingFlow.collectAsLazyPagingItems()
     val filteredItems by viewModel.filteredHistoryItems.collectAsStateWithLifecycle()
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
@@ -117,11 +122,25 @@ fun HistoryScreen(
 
     val isInitialLoad = pagingItems.loadState.refresh is LoadState.Loading
     val isUsingPaging = !uiState.isFilterActive
-    val isEmpty = if (isUsingPaging) {
-        !isInitialLoad && pagingItems.itemCount == 0
-    } else {
-        filteredItems.isEmpty()
-    }
+    val isEmpty =
+        if (isUsingPaging) {
+            !isInitialLoad && pagingItems.itemCount == 0
+        } else {
+            filteredItems.isEmpty()
+        }
+    val pagingListState = rememberLazyListState()
+    val filteredListState = rememberLazyListState()
+    val headerCollapsed = topAppBarState.collapsedFraction > 0f
+    val pagingListScrollEnabled =
+        rememberContentOverflowScrollEnabled(
+            listState = pagingListState,
+            additionalScrollEnabled = headerCollapsed,
+        )
+    val filteredListScrollEnabled =
+        rememberContentOverflowScrollEnabled(
+            listState = filteredListState,
+            additionalScrollEnabled = headerCollapsed,
+        )
 
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(userMessage) {
@@ -129,31 +148,33 @@ fun HistoryScreen(
         try {
             snackbarHostState.showSnackbar(
                 message = msg,
-                duration = SnackbarDuration.Short
+                duration = SnackbarDuration.Short,
             )
         } finally {
             viewModel.clearUserMessage()
         }
     }
     DisposableEffect(lifecycleOwner, snackbarHostState) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) {
-                snackbarHostState.currentSnackbarData?.dismiss()
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                }
             }
-        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val filterChipsData = listOf(
-        HistoryStatusFilter.ALL to stringResource(R.string.history_filter_all),
-        HistoryStatusFilter.SUCCESS to stringResource(R.string.status_success),
-        HistoryStatusFilter.FAILED to stringResource(R.string.status_failed),
-        HistoryStatusFilter.PARTIAL to stringResource(R.string.status_partial),
-        HistoryStatusFilter.NO_CHANGES to stringResource(R.string.status_no_changes),
-        HistoryStatusFilter.CANCELLED to stringResource(R.string.status_cancelled),
-        HistoryStatusFilter.UNDONE to stringResource(R.string.status_undone)
-    )
+    val filterChipsData =
+        listOf(
+            HistoryStatusFilter.ALL to stringResource(R.string.history_filter_all),
+            HistoryStatusFilter.SUCCESS to stringResource(R.string.status_success),
+            HistoryStatusFilter.FAILED to stringResource(R.string.status_failed),
+            HistoryStatusFilter.PARTIAL to stringResource(R.string.status_partial),
+            HistoryStatusFilter.NO_CHANGES to stringResource(R.string.status_no_changes),
+            HistoryStatusFilter.CANCELLED to stringResource(R.string.status_cancelled),
+            HistoryStatusFilter.UNDONE to stringResource(R.string.status_undone),
+        )
 
     if (showClearConfirm) {
         AlertDialog(
@@ -166,7 +187,7 @@ fun HistoryScreen(
                         playTap()
                         showClearConfirm = false
                         viewModel.clearAllHistory()
-                    }
+                    },
                 ) {
                     Text(stringResource(R.string.history_clear))
                 }
@@ -178,7 +199,7 @@ fun HistoryScreen(
                 }) {
                     Text(stringResource(R.string.cancel))
                 }
-            }
+            },
         )
     }
 
@@ -199,13 +220,14 @@ fun HistoryScreen(
             Column(Modifier.fillMaxWidth()) {
                 LocalPrimaryTabTopBanner.current()
                 LargeTopAppBar(
-                    modifier = Modifier.then(
-                        if (LocalPrimaryTabTopBannerActive.current) {
-                            Modifier.consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
-                        } else {
-                            Modifier
-                        }
-                    ),
+                    modifier =
+                        Modifier.then(
+                            if (LocalPrimaryTabTopBannerActive.current) {
+                                Modifier.consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
+                            } else {
+                                Modifier
+                            },
+                        ),
                     title = { Text(stringResource(R.string.history_title)) },
                     scrollBehavior = scrollBehavior,
                     colors = gradientOverlayTopAppBarColors(),
@@ -216,19 +238,20 @@ fun HistoryScreen(
                                 playTap()
                                 groupMenuExpanded = true
                             }) {
-                                val groupIcon = when (uiState.viewMode) {
-                                    HistoryViewMode.BY_DATE -> Icons.Default.DateRange
-                                    HistoryViewMode.BY_RULE -> Icons.AutoMirrored.Filled.List
-                                    HistoryViewMode.BY_STATUS -> Icons.Default.Category
-                                }
+                                val groupIcon =
+                                    when (uiState.viewMode) {
+                                        HistoryViewMode.BY_DATE -> Icons.Default.DateRange
+                                        HistoryViewMode.BY_RULE -> Icons.AutoMirrored.Filled.List
+                                        HistoryViewMode.BY_STATUS -> Icons.Default.Category
+                                    }
                                 Icon(
                                     imageVector = groupIcon,
-                                    contentDescription = stringResource(R.string.history_group_menu)
+                                    contentDescription = stringResource(R.string.history_group_menu),
                                 )
                             }
                             DropdownMenu(
                                 expanded = groupMenuExpanded,
-                                onDismissRequest = { groupMenuExpanded = false }
+                                onDismissRequest = { groupMenuExpanded = false },
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_date)) },
@@ -237,7 +260,7 @@ fun HistoryScreen(
                                         playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_DATE)
                                         groupMenuExpanded = false
-                                    }
+                                    },
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_rule)) },
@@ -246,7 +269,7 @@ fun HistoryScreen(
                                         playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_RULE)
                                         groupMenuExpanded = false
-                                    }
+                                    },
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_status)) },
@@ -255,7 +278,7 @@ fun HistoryScreen(
                                         playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_STATUS)
                                         groupMenuExpanded = false
-                                    }
+                                    },
                                 )
                             }
                         }
@@ -266,12 +289,12 @@ fun HistoryScreen(
                             }) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.Sort,
-                                    contentDescription = stringResource(R.string.history_sort_menu)
+                                    contentDescription = stringResource(R.string.history_sort_menu),
                                 )
                             }
                             DropdownMenu(
                                 expanded = sortMenuExpanded,
-                                onDismissRequest = { sortMenuExpanded = false }
+                                onDismissRequest = { sortMenuExpanded = false },
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
@@ -280,7 +303,7 @@ fun HistoryScreen(
                                         playTap()
                                         viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
                                         sortMenuExpanded = false
-                                    }
+                                    },
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
@@ -289,7 +312,7 @@ fun HistoryScreen(
                                         playTap()
                                         viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
                                         sortMenuExpanded = false
-                                    }
+                                    },
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
@@ -298,7 +321,7 @@ fun HistoryScreen(
                                         playTap()
                                         viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
                                         sortMenuExpanded = false
-                                    }
+                                    },
                                 )
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
@@ -307,35 +330,52 @@ fun HistoryScreen(
                                         playTap()
                                         viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)
                                         sortMenuExpanded = false
-                                    }
+                                    },
                                 )
                             }
                         }
-                    }
+                    },
                 )
                 LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(
                         items = filterChipsData,
-                        key = { (filter, _) -> filter.ordinal }
+                        key = { (filter, _) -> filter.ordinal },
                     ) { (filter, label) ->
+                        val filterEnabled = filter in availableStatusFilters
                         FilterChip(
                             selected = uiState.statusFilter == filter,
-                            onClick = { playTap(); viewModel.setStatusFilter(filter) },
+                            onClick = {
+                                playTap()
+                                viewModel.setStatusFilter(filter)
+                            },
+                            enabled = filterEnabled,
                             label = { Text(label) },
-                            leadingIcon = if (uiState.statusFilter == filter) {
-                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                            } else null
+                            leadingIcon =
+                                if (uiState.statusFilter == filter) {
+                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                } else {
+                                    null
+                                },
                         )
                     }
                 }
             }
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
+        snackbarHost = {
+            SnackbarHost(
+                snackbarHostState,
+                modifier =
+                    Modifier.padding(
+                        bottom = if (onNavigateBack == null) 80.dp else 16.dp,
+                    ),
+            )
+        },
     ) { innerPadding ->
         val scrollBlurModifier =
             LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
@@ -344,46 +384,51 @@ fun HistoryScreen(
             AnimatedVisibility(
                 visible = true,
                 enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 },
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(scrollBlurModifier)
-                        .padding(top = innerPadding.calculateTopPadding())
-                        .padding(bottom = contentPadding.calculateBottomPadding())
-                        .padding(32.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .then(scrollBlurModifier)
+                            .padding(top = innerPadding.calculateTopPadding())
+                            .padding(bottom = contentPadding.calculateBottomPadding())
+                            .padding(32.dp),
                     verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     ThemeColoredEmptyHistoryIllustration(Modifier.size(120.dp))
                     Spacer(Modifier.height(24.dp))
                     Text(
                         text = stringResource(R.string.history_empty_title),
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
                         text = stringResource(R.string.history_empty_subtitle),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
-                        textAlign = TextAlign.Center
+                        textAlign = TextAlign.Center,
                     )
                 }
             }
         } else if (isUsingPaging) {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(scrollBlurModifier),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = innerPadding.calculateTopPadding() + 8.dp,
-                    bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding()
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                state = pagingListState,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(scrollBlurModifier),
+                contentPadding =
+                    PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = innerPadding.calculateTopPadding() + 8.dp,
+                        bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
+                    ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                userScrollEnabled = pagingListScrollEnabled,
             ) {
                 if (isFiltered) {
                     item(key = "filter_header") {
@@ -391,20 +436,21 @@ fun HistoryScreen(
                             text = "Showing runs for this rule only",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(bottom = 4.dp)
+                            modifier = Modifier.padding(bottom = 4.dp),
                         )
                     }
                 }
                 items(
                     count = pagingItems.itemCount,
-                    key = pagingItems.itemKey { item ->
-                        when (item) {
-                            is HistoryItem.Entry -> "entry_${item.history.id}"
-                            is HistoryItem.DateHeader -> "header_${item.label}"
-                            is HistoryItem.RuleHeader -> "rule_${item.ruleName}"
-                            is HistoryItem.StatusHeader -> "status_${item.section.name}"
-                        }
-                    }
+                    key =
+                        pagingItems.itemKey { item ->
+                            when (item) {
+                                is HistoryItem.Entry -> "entry_${item.history.id}"
+                                is HistoryItem.DateHeader -> "header_${item.label}"
+                                is HistoryItem.RuleHeader -> "rule_${item.ruleName}"
+                                is HistoryItem.StatusHeader -> "status_${item.section.name}"
+                            }
+                        },
                 ) { index ->
                     when (val item = pagingItems[index]) {
                         is HistoryItem.DateHeader -> {
@@ -412,7 +458,7 @@ fun HistoryScreen(
                                 text = item.label,
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(vertical = 4.dp)
+                                modifier = Modifier.padding(vertical = 4.dp),
                             )
                         }
                         is HistoryItem.RuleHeader -> Unit
@@ -420,9 +466,12 @@ fun HistoryScreen(
                         is HistoryItem.Entry -> {
                             SwipeToDismissHistoryCard(
                                 history = item.history,
-                                onClick = { playTap(); onHistoryClick(item.history.id) },
+                                onClick = {
+                                    playTap()
+                                    onHistoryClick(item.history.id)
+                                },
                                 onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
-                                modifier = Modifier.animateItem()
+                                modifier = Modifier.animateItem(),
                             )
                         }
                         null -> Unit
@@ -431,16 +480,20 @@ fun HistoryScreen(
             }
         } else {
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(scrollBlurModifier),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = innerPadding.calculateTopPadding() + 8.dp,
-                    bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding()
-                ),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                state = filteredListState,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(scrollBlurModifier),
+                contentPadding =
+                    PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = innerPadding.calculateTopPadding() + 8.dp,
+                        bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
+                    ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                userScrollEnabled = filteredListScrollEnabled,
             ) {
                 items(
                     items = filteredItems,
@@ -451,7 +504,7 @@ fun HistoryScreen(
                             is HistoryItem.RuleHeader -> "rule_${item.ruleName}"
                             is HistoryItem.StatusHeader -> "status_${item.section.name}"
                         }
-                    }
+                    },
                 ) { item ->
                     when (item) {
                         is HistoryItem.DateHeader -> {
@@ -459,24 +512,24 @@ fun HistoryScreen(
                                 text = item.label,
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(vertical = 4.dp).animateItem()
+                                modifier = Modifier.padding(vertical = 4.dp).animateItem(),
                             )
                         }
                         is HistoryItem.RuleHeader -> {
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).animateItem(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
                                 Text(
                                     text = item.ruleName,
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                                 Text(
                                     text = "${item.count}",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
@@ -484,26 +537,29 @@ fun HistoryScreen(
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).animateItem(),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
                                 Text(
                                     text = historyStatusSectionTitle(item.section),
                                     style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary
+                                    color = MaterialTheme.colorScheme.primary,
                                 )
                                 Text(
                                     text = "${item.count}",
                                     style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }
                         is HistoryItem.Entry -> {
                             SwipeToDismissHistoryCard(
                                 history = item.history,
-                                onClick = { playTap(); onHistoryClick(item.history.id) },
+                                onClick = {
+                                    playTap()
+                                    onHistoryClick(item.history.id)
+                                },
                                 onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
-                                modifier = Modifier.animateItem()
+                                modifier = Modifier.animateItem(),
                             )
                         }
                     }
@@ -514,27 +570,28 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun historyStatusSectionTitle(section: HistoryStatusSection): String = when (section) {
-    HistoryStatusSection.SUCCESS -> stringResource(R.string.status_success)
-    HistoryStatusSection.FAILED -> stringResource(R.string.status_failed)
-    HistoryStatusSection.PARTIAL -> stringResource(R.string.status_partial)
-    HistoryStatusSection.NO_CHANGES -> stringResource(R.string.status_no_changes)
-    HistoryStatusSection.IN_PROGRESS -> stringResource(R.string.history_status_header_in_progress)
-    HistoryStatusSection.CANCELLED -> stringResource(R.string.status_cancelled)
-    HistoryStatusSection.UNDONE -> stringResource(R.string.status_undone)
-}
+private fun historyStatusSectionTitle(section: HistoryStatusSection): String =
+    when (section) {
+        HistoryStatusSection.SUCCESS -> stringResource(R.string.status_success)
+        HistoryStatusSection.FAILED -> stringResource(R.string.status_failed)
+        HistoryStatusSection.PARTIAL -> stringResource(R.string.status_partial)
+        HistoryStatusSection.NO_CHANGES -> stringResource(R.string.status_no_changes)
+        HistoryStatusSection.IN_PROGRESS -> stringResource(R.string.history_status_header_in_progress)
+        HistoryStatusSection.CANCELLED -> stringResource(R.string.status_cancelled)
+        HistoryStatusSection.UNDONE -> stringResource(R.string.status_undone)
+    }
 
 @Composable
 private fun SwipeToDismissHistoryCard(
     history: RunHistory,
     onClick: () -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val hapticEnabled = LocalHapticEnabled.current
     val cardShape = RoundedCornerShape(12.dp)
     DeliberateSwipeRevealCard(
-        commitThresholdFraction = SwipeDismissCardDefaults.CommitThresholdFraction,
+        commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
         cardShape = cardShape,
         onSwipeStartToEnd = { },
         onSwipeEndToStart = onDelete,
@@ -546,23 +603,20 @@ private fun SwipeToDismissHistoryCard(
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .background(
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.32f),
-                            cardShape
-                        )
+                        .background(SwipeAction.DELETE.semanticSwipeBackground(), cardShape)
                         .padding(end = 24.dp),
-                    contentAlignment = Alignment.CenterEnd
+                    contentAlignment = Alignment.CenterEnd,
                 ) {
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = stringResource(R.string.delete),
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(28.dp)
+                        tint = SwipeAction.DELETE.semanticSwipeIconTint(),
+                        modifier = Modifier.size(28.dp),
                     )
                 }
             }
         },
-        modifier = modifier
+        modifier = modifier,
     ) {
         HistoryCard(history = history, onClick = onClick)
     }

@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RuleDao {
-
     @Query("SELECT * FROM rules ORDER BY updatedAt DESC")
     fun getAllRules(): Flow<List<RuleEntity>>
 

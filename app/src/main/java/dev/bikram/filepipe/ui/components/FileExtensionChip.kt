@@ -28,16 +28,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 
-private data class ExtensionGroup(val label: String, val extensions: List<String>)
-
-private val EXTENSION_GROUPS = listOf(
-    ExtensionGroup("Images", listOf("jpg", "jpeg", "png", "gif", "heic", "webp", "bmp")),
-    ExtensionGroup("Videos", listOf("mp4", "mkv", "avi", "mov", "m4v", "webm")),
-    ExtensionGroup("Audio", listOf("mp3", "flac", "aac", "ogg", "m4a", "wav")),
-    ExtensionGroup("Documents", listOf("pdf", "docx", "xlsx", "pptx", "txt", "odt")),
-    ExtensionGroup("Installables", listOf("apk", "apkm", "xapk", "zip")),
-    ExtensionGroup("Archives", listOf("zip", "rar", "7z", "tar", "gz")),
+private data class ExtensionGroup(
+    val label: String,
+    val extensions: List<String>,
 )
+
+private val EXTENSION_GROUPS =
+    listOf(
+        ExtensionGroup("Images", listOf("jpg", "jpeg", "png", "gif", "heic", "webp", "bmp")),
+        ExtensionGroup("Videos", listOf("mp4", "mkv", "avi", "mov", "m4v", "webm")),
+        ExtensionGroup("Audio", listOf("mp3", "flac", "aac", "ogg", "m4a", "wav")),
+        ExtensionGroup("Documents", listOf("pdf", "docx", "xlsx", "pptx", "txt", "odt")),
+        ExtensionGroup("Installables", listOf("apk", "apkm", "xapk", "zip")),
+        ExtensionGroup("Archives", listOf("zip", "rar", "7z", "tar", "gz")),
+    )
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -46,7 +50,7 @@ fun FileExtensionChips(
     onAdd: (String) -> Unit,
     onRemove: (String) -> Unit,
     onAddGroup: (List<String>) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val playTap = rememberPlayTapSound()
     var showAddDialog by remember { mutableStateOf(false) }
@@ -55,7 +59,7 @@ fun FileExtensionChips(
     FlowRow(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         extensions.forEach { ext ->
             InputChip(
@@ -65,18 +69,19 @@ fun FileExtensionChips(
                     onRemove(ext)
                 },
                 label = { Text(ext) },
-                colors = InputChipDefaults.inputChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ),
+                colors =
+                    InputChipDefaults.inputChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
                 trailingIcon = {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "Remove $ext",
-                        modifier = Modifier.size(InputChipDefaults.AvatarSize)
+                        modifier = Modifier.size(InputChipDefaults.AvatarSize),
                     )
-                }
+                },
             )
         }
         FilterChip(
@@ -90,9 +95,9 @@ fun FileExtensionChips(
                 Icon(
                     Icons.Default.Add,
                     contentDescription = "Add file type",
-                    modifier = Modifier.size(InputChipDefaults.AvatarSize)
+                    modifier = Modifier.size(InputChipDefaults.AvatarSize),
                 )
-            }
+            },
         )
         FilterChip(
             selected = false,
@@ -105,13 +110,13 @@ fun FileExtensionChips(
                 Icon(
                     Icons.Default.Add,
                     contentDescription = "Add extension group",
-                    modifier = Modifier.size(InputChipDefaults.AvatarSize)
+                    modifier = Modifier.size(InputChipDefaults.AvatarSize),
                 )
-            }
+            },
         )
         DropdownMenu(
             expanded = showGroupMenu,
-            onDismissRequest = { showGroupMenu = false }
+            onDismissRequest = { showGroupMenu = false },
         ) {
             EXTENSION_GROUPS.forEachIndexed { index, group ->
                 DropdownMenuItem(
@@ -122,7 +127,7 @@ fun FileExtensionChips(
                         playTap()
                         onAddGroup(group.extensions)
                         showGroupMenu = false
-                    }
+                    },
                 )
                 if (index < EXTENSION_GROUPS.lastIndex) {
                     HorizontalDivider()
@@ -137,7 +142,7 @@ fun FileExtensionChips(
             onAdd = { ext ->
                 onAdd(ext)
                 showAddDialog = false
-            }
+            },
         )
     }
 }
@@ -145,7 +150,7 @@ fun FileExtensionChips(
 @Composable
 private fun AddExtensionDialog(
     onDismiss: () -> Unit,
-    onAdd: (String) -> Unit
+    onAdd: (String) -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     var text by remember { mutableStateOf("") }
@@ -159,19 +164,22 @@ private fun AddExtensionDialog(
                 onValueChange = { text = it },
                 label = { Text("Extension (e.g. .jpg, mp4)") },
                 singleLine = true,
-                placeholder = { Text(".jpg") }
+                placeholder = { Text(".jpg") },
             )
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     playTap()
-                    val ext = text.trim().let {
-                        if (it.startsWith(".")) it else ".$it"
-                    }.lowercase()
+                    val ext =
+                        text
+                            .trim()
+                            .let {
+                                if (it.startsWith(".")) it else ".$it"
+                            }.lowercase()
                     if (ext.length > 1) onAdd(ext)
                 },
-                enabled = text.isNotBlank()
+                enabled = text.isNotBlank(),
             ) {
                 Text("Add")
             }
@@ -183,6 +191,6 @@ private fun AddExtensionDialog(
             }) {
                 Text("Cancel")
             }
-        }
+        },
     )
 }

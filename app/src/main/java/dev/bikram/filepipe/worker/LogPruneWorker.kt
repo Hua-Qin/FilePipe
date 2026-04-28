@@ -10,20 +10,21 @@ import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 
 @HiltWorker
-class LogPruneWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
-    @Assisted workerParams: WorkerParameters,
-    private val runHistoryRepository: RunHistoryRepository,
-    private val userPreferencesRepository: UserPreferencesRepository
-) : CoroutineWorker(appContext, workerParams) {
+class LogPruneWorker
+    @AssistedInject
+    constructor(
+        @Assisted appContext: Context,
+        @Assisted workerParams: WorkerParameters,
+        private val runHistoryRepository: RunHistoryRepository,
+        private val userPreferencesRepository: UserPreferencesRepository,
+    ) : CoroutineWorker(appContext, workerParams) {
+        override suspend fun doWork(): Result {
+            val prefs = userPreferencesRepository.getPreferencesSnapshot()
+            runHistoryRepository.pruneOldHistory(prefs.logRetentionDays)
+            return Result.success()
+        }
 
-    override suspend fun doWork(): Result {
-        val prefs = userPreferencesRepository.getPreferencesSnapshot()
-        runHistoryRepository.pruneOldHistory(prefs.logRetentionDays)
-        return Result.success()
+        companion object {
+            const val WORK_NAME = "log_prune_worker"
+        }
     }
-
-    companion object {
-        const val WORK_NAME = "log_prune_worker"
-    }
-}

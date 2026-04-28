@@ -22,6 +22,8 @@ datastore = "1.1.1"
 materialKolor = "5.0.0-alpha07"
 paging = "3.3.6"
 reorderable = "3.0.0"
+detekt = "2.0.0-alpha.3"
+ktlintGradle = "14.2.0"
 
 [libraries]
 # Compose BOM
@@ -90,3 +92,5 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 androidx-room = { id = "androidx.room", version.ref = "room" }
+detekt = { id = "dev.detekt", version.ref = "detekt" }
+ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }

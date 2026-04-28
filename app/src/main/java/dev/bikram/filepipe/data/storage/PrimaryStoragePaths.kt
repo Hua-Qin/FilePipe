@@ -5,14 +5,13 @@ import android.net.Uri
 import android.provider.DocumentsContract
 
 /**
- * Converts a SAF tree URI (content://.../tree/primary%3ADCIM%2FCamera)
- * to an absolute file system path (/storage/emulated/0/DCIM/Camera).
- */
-/**
  * Derives a persistable tree URI (same format as [androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree])
  * from a document URI returned by [androidx.activity.result.contract.ActivityResultContracts.CreateDocument].
  */
-fun treeUriFromDocumentUri(context: Context, documentUri: Uri): Uri? {
+fun treeUriFromDocumentUri(
+    context: Context,
+    documentUri: Uri,
+): Uri? {
     return try {
         if (!DocumentsContract.isDocumentUri(context, documentUri)) return null
         val authority = documentUri.authority ?: return null

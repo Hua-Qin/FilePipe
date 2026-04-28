@@ -9,7 +9,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class PlayStorePlayUpdateModule {
-
     @Binds
     @Singleton
     abstract fun bindPlayUpdateSessionHandle(session: PlayInAppUpdateSession): PlayUpdateSessionHandle
@@ -17,13 +16,13 @@ abstract class PlayStorePlayUpdateModule {
     @Binds
     @Singleton
     abstract fun bindPlayInAppUpdateStarter(
-        impl: PlayStorePlayInAppUpdateStarter
+        impl: PlayStorePlayInAppUpdateStarter,
     ): PlayInAppUpdateStarter
 
     @Binds
     @Singleton
     abstract fun bindPlayInAppUpdateProgressController(
-        impl: PlayStorePlayInAppUpdateCoordinator
+        impl: PlayStorePlayInAppUpdateCoordinator,
     ): PlayInAppUpdateProgressController
 
     @Binds

@@ -17,28 +17,29 @@ import javax.inject.Singleton
  * never accumulates duplicate observers across activity recreations.
  */
 @Singleton
-class ManualRunProcessLifecycleBinder @Inject constructor(
-    @param:ApplicationContext private val appContext: Context,
-    private val coordinator: ManualRunForegroundCoordinator
-) : DefaultLifecycleObserver {
+class ManualRunProcessLifecycleBinder
+    @Inject
+    constructor(
+        @param:ApplicationContext private val appContext: Context,
+        private val coordinator: ManualRunForegroundCoordinator,
+    ) : DefaultLifecycleObserver {
+        private val registered = AtomicBoolean(false)
 
-    private val registered = AtomicBoolean(false)
+        fun ensureRegistered() {
+            if (!registered.compareAndSet(false, true)) return
+            ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+        }
 
-    fun ensureRegistered() {
-        if (!registered.compareAndSet(false, true)) return
-        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
-    }
+        override fun onStart(owner: LifecycleOwner) {
+            appContext.stopService(Intent(appContext, ManualRunForegroundService::class.java))
+        }
 
-    override fun onStart(owner: LifecycleOwner) {
-        appContext.stopService(Intent(appContext, ManualRunForegroundService::class.java))
-    }
-
-    override fun onStop(owner: LifecycleOwner) {
-        if (coordinator.isManualRunActive()) {
-            ContextCompat.startForegroundService(
-                appContext,
-                Intent(appContext, ManualRunForegroundService::class.java)
-            )
+        override fun onStop(owner: LifecycleOwner) {
+            if (coordinator.isManualRunActive()) {
+                ContextCompat.startForegroundService(
+                    appContext,
+                    Intent(appContext, ManualRunForegroundService::class.java),
+                )
+            }
         }
     }
-}

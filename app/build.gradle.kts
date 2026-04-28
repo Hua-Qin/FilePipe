@@ -9,10 +9,16 @@ plugins {
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.androidx.room)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
 kotlin {
-    jvmToolchain(libs.versions.java.get().toInt())
+    jvmToolchain(
+        libs.versions.java
+            .get()
+            .toInt(),
+    )
     compilerOptions {
         freeCompilerArgs.add("-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi")
     }
@@ -27,7 +33,11 @@ if (keystorePropsFile.exists()) {
 }
 
 val releaseStoreFile =
-    keystoreProps.getProperty("storeFile")?.takeIf { it.isNotBlank() }?.let { rootProject.file(it) }?.takeIf { it.isFile }
+    keystoreProps
+        .getProperty("storeFile")
+        ?.takeIf { it.isNotBlank() }
+        ?.let { rootProject.file(it) }
+        ?.takeIf { it.isFile }
 val releaseStorePassword = keystoreProps.getProperty("storePassword")?.takeIf { it.isNotBlank() }
 val releaseKeyAlias = keystoreProps.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
 val releaseKeyPassword =
@@ -47,15 +57,15 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = filePipeApplicationId
         minSdk = 30
         targetSdk = 36
-        versionCode = 312
-        versionName = "3.1.2"
+        versionCode = 320
+        versionName = "3.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField(
             "String",
             "PLAY_STORE_LISTING_URL",
-            "\"https://play.google.com/store/apps/details?id=$filePipeApplicationId\""
+            "\"https://play.google.com/store/apps/details?id=$filePipeApplicationId\"",
         )
 
         ndk {
@@ -77,6 +87,21 @@ extensions.configure<ApplicationExtension>("android") {
     buildTypes {
         debug {
         }
+        // Declare before devRelease so initWith(getByName("release")) always resolves (Gradle
+        // registers build types in declaration order; release signing above is optional).
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+            // Embed native debug symbols in the AAB for Play Console crash/ANR symbolication (transitive .so from deps).
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
+        }
         create("devRelease") {
             initWith(getByName("release"))
             applicationIdSuffix = ".dev"
@@ -87,22 +112,9 @@ extensions.configure<ApplicationExtension>("android") {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             matchingFallbacks += listOf("release")
-        }
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-            signingConfigs.findByName("release")?.let { signingConfig = it }
-            // Embed native debug symbols in the AAB for Play Console crash/ANR symbolication (transitive .so from deps).
-            ndk {
-                debugSymbolLevel = "SYMBOL_TABLE"
-            }
         }
     }
 
@@ -148,6 +160,15 @@ extensions.configure<ApplicationExtension>("android") {
 
 room {
     schemaDirectory("$projectDir/schemas")
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+}
+
+ktlint {
+    android.set(true)
 }
 
 dependencies {

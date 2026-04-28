@@ -47,15 +47,16 @@ fun OnboardingRuleWizardScreen(
     onBackToPermissions: () -> Unit,
     onUseTemplate: (templateIndex: Int) -> Unit,
     onStartBlank: () -> Unit,
-    onSkip: () -> Unit
+    onSkip: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding()
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .systemBarsPadding(),
     ) {
         Column(
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) {
             Spacer(Modifier.height(28.dp))
 
@@ -64,34 +65,37 @@ fun OnboardingRuleWizardScreen(
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                textAlign = TextAlign.Center
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.onboarding_wizard_subtitle),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
-                textAlign = TextAlign.Center
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(28.dp))
 
             LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 itemsIndexed(RuleTemplate.ALL) { index, template ->
                     TemplateCard(
                         template = template,
-                        onUseTemplate = { onUseTemplate(index) }
+                        onUseTemplate = { onUseTemplate(index) },
                     )
                 }
                 item {
@@ -100,34 +104,35 @@ fun OnboardingRuleWizardScreen(
             }
         }
         Row(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             val onboardingCtaPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
             OutlinedButton(
                 onClick = onBackToPermissions,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(50),
-                contentPadding = onboardingCtaPadding
+                contentPadding = onboardingCtaPadding,
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp),
                     )
                     Spacer(Modifier.weight(1f))
                     Text(
                         text = stringResource(R.string.onboarding_wizard_back_to_permissions),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.weight(1f))
                     Spacer(Modifier.size(24.dp))
@@ -137,24 +142,24 @@ fun OnboardingRuleWizardScreen(
                 onClick = onSkip,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(50),
-                contentPadding = onboardingCtaPadding
+                contentPadding = onboardingCtaPadding,
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Spacer(Modifier.size(24.dp))
                     Spacer(Modifier.weight(1f))
                     Text(
                         text = stringResource(R.string.onboarding_wizard_skip),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.weight(1f))
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(24.dp),
                     )
                 }
             }
@@ -166,21 +171,23 @@ fun OnboardingRuleWizardScreen(
 @Composable
 private fun TemplateCard(
     template: RuleTemplate,
-    onUseTemplate: () -> Unit
+    onUseTemplate: () -> Unit,
 ) {
     ElevatedCard(
         onClick = onUseTemplate,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
-        )
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.Top
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.Top,
         ) {
             RuleIconOrEmoji(
                 iconEmoji = null,
@@ -188,7 +195,7 @@ private fun TemplateCard(
                 vectorSize = 28.dp,
                 emojiFontSize = 24.sp,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(28.dp),
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -196,22 +203,23 @@ private fun TemplateCard(
                     text = template.name,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = template.extensions.take(4).joinToString(", "),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Spacer(Modifier.width(8.dp))
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                modifier = Modifier
-                    .padding(top = 2.dp)
-                    .size(24.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                modifier =
+                    Modifier
+                        .padding(top = 2.dp)
+                        .size(24.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -224,21 +232,23 @@ private fun StartBlankCard(onStartBlank: () -> Unit) {
         onClick = onStartBlank,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
-        )
+        colors =
+            CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.Top
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.Top,
         ) {
             Icon(
                 imageVector = Icons.Filled.Edit,
                 contentDescription = null,
                 modifier = Modifier.size(28.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = MaterialTheme.colorScheme.primary,
             )
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -246,22 +256,23 @@ private fun StartBlankCard(onStartBlank: () -> Unit) {
                     text = stringResource(R.string.onboarding_wizard_start_blank),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
                     text = stringResource(R.string.onboarding_wizard_start_blank_desc),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Spacer(Modifier.width(8.dp))
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,
-                modifier = Modifier
-                    .padding(top = 2.dp)
-                    .size(24.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                modifier =
+                    Modifier
+                        .padding(top = 2.dp)
+                        .size(24.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

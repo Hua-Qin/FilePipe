@@ -11,5 +11,5 @@ enum class UpdateCheckSchedule {
     WEEKLY_MONDAY_AT_21,
 
     /** No automatic checks. */
-    NEVER
+    NEVER,
 }

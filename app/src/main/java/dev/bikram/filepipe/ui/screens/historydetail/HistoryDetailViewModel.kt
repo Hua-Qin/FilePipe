@@ -4,14 +4,14 @@ import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.usecase.UndoRunUseCase
 import dev.bikram.filepipe.ui.feedback.toUserMessage
 import dev.bikram.filepipe.ui.navigation.Screen
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -21,35 +21,41 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
-class HistoryDetailViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
-    private val runHistoryRepository: RunHistoryRepository,
-    private val undoRunUseCase: UndoRunUseCase,
-    @param:ApplicationContext private val appContext: Context,
-) : ViewModel() {
+class HistoryDetailViewModel
+    @Inject
+    constructor(
+        savedStateHandle: SavedStateHandle,
+        private val runHistoryRepository: RunHistoryRepository,
+        private val undoRunUseCase: UndoRunUseCase,
+        @param:ApplicationContext private val appContext: Context,
+    ) : ViewModel() {
+        private val historyId: Long = savedStateHandle[Screen.HistoryDetail.ARG_HISTORY_ID] ?: 0L
 
-    private val historyId: Long = savedStateHandle[Screen.HistoryDetail.ARG_HISTORY_ID] ?: 0L
+        private val _history = MutableStateFlow<RunHistory?>(null)
+        val history: StateFlow<RunHistory?> = _history.asStateFlow()
 
-    private val _history = MutableStateFlow<RunHistory?>(null)
-    val history: StateFlow<RunHistory?> = _history.asStateFlow()
+        val files: StateFlow<List<FileMoved>> =
+            runHistoryRepository
+                .getFilesForRun(historyId)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    val files: StateFlow<List<FileMoved>> = runHistoryRepository.getFilesForRun(historyId)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        private val _userMessage = MutableStateFlow<String?>(null)
+        val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
 
-    private val _userMessage = MutableStateFlow<String?>(null)
-    val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
-
-    fun clearUserMessage() { _userMessage.value = null }
-
-    init {
-        viewModelScope.launch {
-            _history.value = runHistoryRepository.getHistoryById(historyId)
+        fun clearUserMessage() {
+            _userMessage.value = null
         }
-    }
 
-    fun undoRun() = viewModelScope.launch {
-        val result = undoRunUseCase(historyId)
-        _userMessage.value = result.toUserMessage(appContext)
-        _history.value = runHistoryRepository.getHistoryById(historyId)
+        init {
+            viewModelScope.launch {
+                _history.value = runHistoryRepository.getHistoryById(historyId)
+            }
+        }
+
+        fun undoRun() =
+            viewModelScope.launch {
+                val result = undoRunUseCase(historyId)
+                _userMessage.value = result.toUserMessage(appContext)
+                _history.value = runHistoryRepository.getHistoryById(historyId)
+            }
     }
-}

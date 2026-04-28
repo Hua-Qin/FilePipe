@@ -14,25 +14,29 @@ fun Modifier.tapSoundCombinedClickable(
     enabled: Boolean = true,
     onClickLabel: String? = null,
     onLongClickLabel: String? = null,
-    role: Role? = null
-): Modifier = composed {
-    val playTap = LocalTapSound.current
-    val hapticEnabled = LocalHapticEnabled.current
-    val view = LocalView.current
-    combinedClickable(
-        enabled = enabled,
-        onClickLabel = onClickLabel,
-        onLongClickLabel = onLongClickLabel,
-        role = role,
-        onClick = {
-            playTap()
-            onClick()
-        },
-        onLongClick = if (onLongClick != null) {
-            {
-                if (hapticEnabled) view.performLongPressHaptic()
-                onLongClick()
-            }
-        } else null
-    )
-}
+    role: Role? = null,
+): Modifier =
+    composed {
+        val playTap = LocalTapSound.current
+        val hapticEnabled = LocalHapticEnabled.current
+        val view = LocalView.current
+        combinedClickable(
+            enabled = enabled,
+            onClickLabel = onClickLabel,
+            onLongClickLabel = onLongClickLabel,
+            role = role,
+            onClick = {
+                playTap()
+                onClick()
+            },
+            onLongClick =
+                if (onLongClick != null) {
+                    {
+                        if (hapticEnabled) view.performLongPressHaptic()
+                        onLongClick()
+                    }
+                } else {
+                    null
+                },
+        )
+    }
