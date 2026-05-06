@@ -94,7 +94,9 @@ class FileOperationRepository
                     if (scanSubdirectories) {
                         walkDocFilesWithRelativeParents(folder, maxDepth, emptyList())
                     } else {
-                        (folder.listFiles()?.asSequence() ?: emptySequence())
+                        folder
+                            .listFiles()
+                            .asSequence()
                             .filter { it.isFile }
                             .map { it to emptyList() }
                     }
@@ -213,7 +215,7 @@ class FileOperationRepository
         ): Sequence<Pair<DocumentFile, List<String>>> =
             sequence {
                 if (maxDepth <= 0) return@sequence
-                dir.listFiles()?.forEach { child ->
+                dir.listFiles().forEach { child ->
                     val segment = child.name?.trim().orEmpty()
                     if (child.isFile) {
                         yield(child to relativeParentSegments)

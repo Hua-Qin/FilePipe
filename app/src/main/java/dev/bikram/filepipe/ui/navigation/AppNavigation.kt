@@ -76,6 +76,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -87,7 +88,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -101,6 +102,7 @@ import androidx.navigation.navArgument
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
+import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.ui.components.CenteredTooltipText
@@ -119,6 +121,7 @@ import dev.bikram.filepipe.ui.screens.settings.SettingsBringIntoViewSection
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
 import dev.bikram.filepipe.ui.screens.settings.launchAppShareChooser
+import dev.bikram.filepipe.ui.theme.LocalGradientBackgroundColors
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
@@ -207,7 +210,7 @@ fun AppNavigation(
             isRuleDetailRoute -> fullScreenBottomBlurRuleEdit
             else -> fullScreenBottomBlurShort
         }
-    val contentPaddingBottom = if (showBottomBar) scrimHeight else navBarInset
+    val primaryTabContentPadding = PaddingValues(bottom = scrimHeight)
     val density = LocalDensity.current
     val bottomBlurHeightPx = with(density) { bottomBlurHeightDp.toPx() }
 
@@ -360,8 +363,10 @@ fun AppNavigation(
         )
     }
 
+    val effectiveUseGradientBackground =
+        preferences.useGradientBackground && preferences.themeMode != AppThemeMode.BLACK
     CompositionLocalProvider(
-        LocalUseGradientBackground provides preferences.useGradientBackground,
+        LocalUseGradientBackground provides effectiveUseGradientBackground,
         LocalProgressiveBlurEnabled provides preferences.progressiveBlurEnabled,
         LocalProgressiveBlurStyle provides progressiveBlurStyle,
     ) {
@@ -410,18 +415,18 @@ fun AppNavigation(
                 },
             ) {
                 Box(Modifier.fillMaxSize()) {
-                    if (preferences.useGradientBackground) {
-                        val scheme = MaterialTheme.colorScheme
+                    val backgroundColors = LocalGradientBackgroundColors.current
+                    if (effectiveUseGradientBackground) {
                         Box(
                             Modifier
                                 .fillMaxSize()
-                                .background(scheme.surface)
+                                .background(backgroundColors.gradientBase)
                                 .background(
                                     Brush.verticalGradient(
                                         colorStops =
                                             arrayOf(
-                                                0f to scheme.primaryContainer.copy(alpha = 0.45f),
-                                                0.55f to scheme.surface.copy(alpha = 0f),
+                                                0f to backgroundColors.gradientTop.copy(alpha = 0.48f),
+                                                0.55f to backgroundColors.gradientBase.copy(alpha = 0f),
                                             ),
                                     ),
                                 ),
@@ -430,7 +435,7 @@ fun AppNavigation(
                         Box(
                             Modifier
                                 .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.background),
+                                .background(backgroundColors.pageBackground),
                         )
                     }
                     Column(Modifier.fillMaxSize()) {
@@ -507,7 +512,7 @@ fun AppNavigation(
 
                             composable(Screen.Rules.route) {
                                 RulesScreen(
-                                    contentPadding = PaddingValues(bottom = contentPaddingBottom),
+                                    contentPadding = primaryTabContentPadding,
                                     onEditRule = { ruleId -> navController.navigate(Screen.RuleDetail.createRoute(ruleId)) },
                                     onNavigateToHistoryDetail = { historyId ->
                                         navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
@@ -552,7 +557,7 @@ fun AppNavigation(
                             }
                             composable(Screen.History.route) {
                                 HistoryScreen(
-                                    contentPadding = PaddingValues(bottom = contentPaddingBottom),
+                                    contentPadding = primaryTabContentPadding,
                                     onHistoryClick = { historyId ->
                                         navController.navigate(Screen.HistoryDetail.createRoute(historyId))
                                     },
@@ -560,7 +565,7 @@ fun AppNavigation(
                             }
                             composable(Screen.Settings.route) {
                                 SettingsScreen(
-                                    contentPadding = PaddingValues(bottom = contentPaddingBottom),
+                                    contentPadding = primaryTabContentPadding,
                                     onOpenIntro = {
                                         navController.navigate(Screen.OnboardingTitle.route)
                                     },
@@ -694,22 +699,27 @@ fun AppNavigation(
                                                     if (hasAnyHistory) {
                                                         fabModifier
                                                     } else {
-                                                        fabModifier.semantics { disabled() }
+                                                        fabModifier
+                                                            .alpha(0.58f)
+                                                            .semantics { disabled() }
                                                     },
                                                 containerColor =
                                                     if (hasAnyHistory) {
                                                         containerColor
                                                     } else {
-                                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                                        MaterialTheme.colorScheme.surfaceContainerHigh
                                                     },
                                                 contentColor =
                                                     if (hasAnyHistory) {
                                                         contentColor
                                                     } else {
-                                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                                                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                                                     },
                                             ) {
-                                                Icon(Icons.Default.DeleteSweep, contentDescription = stringResource(R.string.history_clear))
+                                                Icon(
+                                                    Icons.Default.DeleteSweep,
+                                                    contentDescription = stringResource(R.string.history_clear),
+                                                )
                                             }
                                         }
 

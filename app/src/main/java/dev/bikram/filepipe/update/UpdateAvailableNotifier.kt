@@ -26,7 +26,6 @@ class UpdateAvailableNotifier
         private val userPreferencesRepository: UserPreferencesRepository,
     ) {
         fun ensureNotificationChannel() {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
             val manager = context.getSystemService(NotificationManager::class.java) ?: return
             if (manager.getNotificationChannel(CHANNEL_ID) != null) return
             val channel =
@@ -63,12 +62,7 @@ class UpdateAvailableNotifier
                     flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
                     putExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES, true)
                 }
-            val pendingFlags =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                } else {
-                    PendingIntent.FLAG_UPDATE_CURRENT
-                }
+            val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             val contentPendingIntent =
                 PendingIntent.getActivity(
                     context,

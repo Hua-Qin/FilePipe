@@ -2,7 +2,6 @@ package dev.bikram.filepipe.ui.screens.onboarding
 
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
@@ -63,7 +62,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -95,7 +94,6 @@ fun OnboardingPermissionsScreen(
 
     val needsAllFilesGrant =
         selected == FolderAccessMode.ALL_FILES_PREFERRED &&
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
             !Environment.isExternalStorageManager()
     val hideBottomPrimaryButton = grantPanelVisible && needsAllFilesGrant
 
@@ -241,13 +239,11 @@ fun OnboardingPermissionsScreen(
                             onOpenSettings = {
                                 awaitingSettingsReturn = true
                                 showAccessNotGrantedHint = false
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                                    val manageIntent =
-                                        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                            data = Uri.parse("package:${context.packageName}")
-                                        }
-                                    context.startActivity(manageIntent)
-                                }
+                                val manageIntent =
+                                    Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    }
+                                context.startActivity(manageIntent)
                             },
                         )
                     }
@@ -282,7 +278,6 @@ fun OnboardingPermissionsScreen(
                             onContinue()
                         }
                         selected == FolderAccessMode.ALL_FILES_PREFERRED &&
-                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
                             !Environment.isExternalStorageManager() -> {
                             viewModel.setFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
                             hasEnteredAllFilesGrantFlow = true

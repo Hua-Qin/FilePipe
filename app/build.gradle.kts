@@ -3,7 +3,6 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
@@ -55,10 +54,10 @@ extensions.configure<ApplicationExtension>("android") {
     compileSdk = 36
     defaultConfig {
         applicationId = filePipeApplicationId
-        minSdk = 30
+        minSdk = 31
         targetSdk = 36
-        versionCode = 320
-        versionName = "3.2.0"
+        versionCode = 329
+        versionName = "3.2.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

@@ -20,6 +20,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -30,6 +31,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -66,7 +68,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ContentCopy
@@ -90,7 +91,6 @@ import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -114,7 +114,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTopAppBarState
@@ -156,16 +155,14 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
-import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppPreferences
-import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
@@ -196,14 +193,6 @@ import dev.bikram.filepipe.update.UpdateInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-
-private val themePickerOrder =
-    listOf(
-        AppThemeMode.SYSTEM,
-        AppThemeMode.LIGHT,
-        AppThemeMode.DARK,
-        AppThemeMode.BLACK,
-    )
 
 /**
  * Indices of the first unconditional [LazyColumn] items (Appearance, Folder access, Touch & sound, …)
@@ -771,44 +760,19 @@ fun SettingsScreen(
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
                     playTap = playTap,
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-                    ) {
-                        themePickerOrder.forEachIndexed { index, mode ->
-                            ToggleButton(
-                                checked = preferences.themeMode == mode,
-                                onCheckedChange = { checked ->
-                                    if (checked) {
-                                        playTap()
-                                        viewModel.setThemeMode(mode)
-                                    }
-                                },
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .semantics { role = Role.RadioButton },
-                                shapes =
-                                    when (index) {
-                                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                                        themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                                    },
-                            ) {
-                                Text(
-                                    text = themeModeLabel(mode),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    maxLines = 1,
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    ThemeColorSection(
+                    AppearanceSection(
+                        themeMode = preferences.themeMode,
                         colorSource = preferences.colorSource,
                         savedCustomSeedHexes = preferences.savedCustomSeedHexes,
                         activeCustomSeedHex = preferences.activeCustomSeedHex,
                         themePaletteStyle = preferences.themePaletteStyle,
+                        useGradientBackground = preferences.useGradientBackground,
+                        useEnhancedShading = preferences.useEnhancedShading,
+                        progressiveBlurEnabled = preferences.progressiveBlurEnabled,
+                        onThemeMode = { mode ->
+                            playTap()
+                            viewModel.setThemeMode(mode)
+                        },
                         onColorSource = { source ->
                             playTap()
                             viewModel.setColorSource(source)
@@ -829,52 +793,28 @@ fun SettingsScreen(
                             playTap()
                             viewModel.removeCustomSeedHex(hex)
                         },
+                        onUseGradientBackground = { enabled ->
+                            playTap()
+                            viewModel.setUseGradientBackground(enabled)
+                        },
+                        onUseEnhancedShading = { enabled ->
+                            playTap()
+                            viewModel.setUseEnhancedShading(enabled)
+                        },
+                        onProgressiveBlurEnabled = { enabled ->
+                            playTap()
+                            viewModel.setProgressiveBlurEnabled(enabled)
+                        },
+                        onBlackThemeEffectClick = {
+                            playTap()
+                            coroutineScope.launch {
+                                snackbarHostState.currentSnackbarData?.dismiss()
+                                snackbarHostState.showSnackbar(
+                                    context.getString(R.string.settings_black_theme_effect_disabled),
+                                )
+                            }
+                        },
                     )
-                    if (preferences.colorSource == AppColorSource.MATERIAL_YOU && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = stringResource(R.string.settings_material_you_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    GroupedListColumn {
-                        GroupedListItem(position = GroupPosition.FIRST) {
-                            SettingsToggleItem(
-                                title = stringResource(R.string.settings_gradient_background),
-                                subtitle = stringResource(R.string.settings_gradient_background_desc),
-                                checked = preferences.useGradientBackground,
-                                onCheckedChange = { enabled ->
-                                    playTap()
-                                    viewModel.setUseGradientBackground(enabled)
-                                },
-                            )
-                        }
-                        GroupedListItem(position = GroupPosition.MIDDLE) {
-                            SettingsToggleItem(
-                                title = stringResource(R.string.settings_enhanced_shading),
-                                subtitle = stringResource(R.string.settings_enhanced_shading_desc),
-                                checked = preferences.useEnhancedShading,
-                                onCheckedChange = { enabled ->
-                                    playTap()
-                                    viewModel.setUseEnhancedShading(enabled)
-                                },
-                            )
-                        }
-                        GroupedListItem(position = GroupPosition.LAST) {
-                            SettingsToggleItem(
-                                icon = Icons.Default.BlurOn,
-                                title = stringResource(R.string.settings_progressive_blur),
-                                subtitle = stringResource(R.string.settings_progressive_blur_desc),
-                                checked = preferences.progressiveBlurEnabled,
-                                onCheckedChange = { enabled ->
-                                    playTap()
-                                    viewModel.setProgressiveBlurEnabled(enabled)
-                                },
-                            )
-                        }
-                    }
                 }
             }
 
@@ -1000,14 +940,13 @@ fun SettingsScreen(
                             )
                         }
                         val showAllFilesActionButton =
-                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
-                                when {
-                                    selectiveLike && !allFilesAccessGranted -> false
-                                    selectiveLike && allFilesAccessGranted -> true
-                                    allFilesModeSelected && !allFilesAccessGranted -> true
-                                    allFilesModeSelected && allFilesAccessGranted -> false
-                                    else -> false
-                                }
+                            when {
+                                selectiveLike && !allFilesAccessGranted -> false
+                                selectiveLike && allFilesAccessGranted -> true
+                                allFilesModeSelected && !allFilesAccessGranted -> true
+                                allFilesModeSelected && allFilesAccessGranted -> false
+                                else -> false
+                            }
                         if (showAllFilesActionButton) {
                             Spacer(Modifier.height(8.dp))
                             OutlinedButton(
@@ -2569,42 +2508,124 @@ private fun SettingsExpandableSectionHeader(
     val cdExpand = stringResource(R.string.settings_section_expand_cd, title)
     val cdCollapse = stringResource(R.string.settings_section_collapse_cd, title)
     val interactionSource = remember { MutableInteractionSource() }
+    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Dp>()
+    val colorSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
+    val headerCorner by animateDpAsState(
+        targetValue = if (collapsed) 28.dp else 4.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_header_corner",
+    )
+    val headerColor by animateColorAsState(
+        targetValue = if (collapsed) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+        animationSpec = colorSpec,
+        label = "settings_section_header_color",
+    )
+    val horizontalPadding by animateDpAsState(
+        targetValue = if (collapsed) 12.dp else 0.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_header_horizontal_padding",
+    )
+    val verticalPadding by animateDpAsState(
+        targetValue = if (collapsed) 8.dp else 4.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_header_vertical_padding",
+    )
+    val iconContainerSize by animateDpAsState(
+        targetValue = if (collapsed) 36.dp else 20.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_icon_container_size",
+    )
+    val iconSize by animateDpAsState(
+        targetValue = if (collapsed) 21.dp else 19.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_icon_size",
+    )
+    val iconContainerColor by animateColorAsState(
+        targetValue =
+            if (collapsed) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
+            } else {
+                Color.Transparent
+            },
+        animationSpec = colorSpec,
+        label = "settings_section_icon_container_color",
+    )
+    val chevronContainerSize by animateDpAsState(
+        targetValue = if (collapsed) 32.dp else 20.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_chevron_container_size",
+    )
+    val chevronSize by animateDpAsState(
+        targetValue = if (collapsed) 20.dp else 18.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_chevron_size",
+    )
+    val chevronContainerColor by animateColorAsState(
+        targetValue = if (collapsed) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
+        animationSpec = colorSpec,
+        label = "settings_section_chevron_container_color",
+    )
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(RoundedCornerShape(headerCorner))
+                .background(headerColor)
                 .semantics { contentDescription = if (collapsed) cdExpand else cdCollapse }
                 .clickable(
-                    indication = null,
+                    indication = LocalIndication.current,
                     interactionSource = interactionSource,
                 ) {
                     playTap()
                     onToggle()
-                },
+                }.padding(
+                    horizontal = horizontalPadding.coerceAtLeast(0.dp),
+                    vertical = verticalPadding.coerceAtLeast(0.dp),
+                ),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(Modifier.weight(1f))
-        Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = null,
+        Box(
             modifier =
                 Modifier
-                    .size(18.dp)
-                    .graphicsLayer { rotationZ = rotation },
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    .size(iconContainerSize)
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(iconContainerColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(iconSize),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
+        Box(
+            modifier =
+                Modifier
+                    .size(chevronContainerSize)
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(chevronContainerColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(chevronSize)
+                        .graphicsLayer { rotationZ = rotation },
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -2961,13 +2982,4 @@ private fun SwipeAction.previewIcon(): androidx.compose.ui.graphics.vector.Image
         SwipeAction.DUPLICATE -> Icons.Default.ContentCopy
         SwipeAction.PREVIEW -> Icons.Default.Visibility
         SwipeAction.VIEW_HISTORY -> Icons.Default.History
-    }
-
-@Composable
-private fun themeModeLabel(mode: AppThemeMode): String =
-    when (mode) {
-        AppThemeMode.LIGHT -> stringResource(R.string.theme_light)
-        AppThemeMode.DARK -> stringResource(R.string.theme_dark)
-        AppThemeMode.SYSTEM -> stringResource(R.string.theme_system)
-        AppThemeMode.BLACK -> stringResource(R.string.theme_black)
     }

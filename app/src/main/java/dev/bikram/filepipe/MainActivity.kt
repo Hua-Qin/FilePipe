@@ -79,7 +79,6 @@ class MainActivity : ComponentActivity() {
                 colorSource = preferences.colorSource,
                 themePaletteStyle = preferences.themePaletteStyle,
                 hapticFeedbackEnabled = preferences.hapticFeedbackEnabled,
-                useGradientBackground = preferences.useGradientBackground,
                 useEnhancedShading = preferences.useEnhancedShading,
                 activeCustomSeedHex = preferences.activeCustomSeedHex,
             ) {

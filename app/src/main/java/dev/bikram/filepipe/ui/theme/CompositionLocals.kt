@@ -1,9 +1,25 @@
 package dev.bikram.filepipe.ui.theme
 
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.ui.graphics.Color
 
 /** When true, main tab [androidx.compose.material3.Scaffold]s use a transparent container so the root gradient shows through. */
 val LocalUseGradientBackground = compositionLocalOf { false }
+
+data class GradientBackgroundColors(
+    val pageBackground: Color,
+    val gradientBase: Color,
+    val gradientTop: Color,
+)
+
+val LocalGradientBackgroundColors =
+    compositionLocalOf {
+        GradientBackgroundColors(
+            pageBackground = Color.Unspecified,
+            gradientBase = Color.Unspecified,
+            gradientTop = Color.Unspecified,
+        )
+    }
 
 /** When true, root chrome may apply progressive edge blur; inner screens can match with transparent app bars. */
 val LocalProgressiveBlurEnabled = compositionLocalOf { true }

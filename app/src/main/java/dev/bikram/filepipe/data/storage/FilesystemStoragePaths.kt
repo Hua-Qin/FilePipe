@@ -1,7 +1,6 @@
 package dev.bikram.filepipe.data.storage
 
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
@@ -138,19 +137,11 @@ fun isSafTreeUriPublicDownloadRoot(treeUriString: String): Boolean {
 }
 
 /**
- * Typical device Screenshots directory on shared storage ([Environment.DIRECTORY_SCREENSHOTS] on API 31+,
- * else [Pictures]/Screenshots).
+ * Typical device Screenshots directory on shared storage.
  */
 fun primaryScreenshotsDirectoryPath(): String =
     runCatching {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_SCREENSHOTS).canonicalFile.absolutePath
-        } else {
-            File(
-                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-                "Screenshots",
-            ).canonicalFile.absolutePath
-        }
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_SCREENSHOTS).canonicalFile.absolutePath
     }.getOrElse { "/storage/emulated/0/Pictures/Screenshots" }
 
 /** True when the user prefers filesystem paths and the OS has granted All files access. */

@@ -203,7 +203,7 @@ private fun CompactContent(
 ) {
     val playTap = rememberPlayTapSound()
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
-    val runInProgress = progress != null && !progress.isComplete
+    val activeProgress = progress?.takeUnless { progressValue -> progressValue.isComplete }
     val runBlocked = isAnyRuleRunning && progress == null
 
     val typesText =
@@ -293,14 +293,14 @@ private fun CompactContent(
                             onToggleEnabled(enabled)
                         },
                     )
-                    if (runInProgress) {
+                    if (activeProgress != null) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
                                 CircularWavyProgressIndicator(
-                                    progress = { if (progress!!.totalFiles > 0) progress.progress else 0f },
+                                    progress = { if (activeProgress.totalFiles > 0) activeProgress.progress else 0f },
                                     modifier = Modifier.size(26.dp),
                                 )
                             }

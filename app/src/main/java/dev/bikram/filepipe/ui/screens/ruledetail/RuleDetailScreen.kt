@@ -2,7 +2,6 @@ package dev.bikram.filepipe.ui.screens.ruledetail
 
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
@@ -126,7 +125,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -818,8 +817,7 @@ fun RuleDetailScreen(
                             }
                         }
                         if (state.folderAccessMode.usesAllFilesPaths() &&
-                            !state.allFilesAccessGranted &&
-                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                            !state.allFilesAccessGranted
                         ) {
                             TextButton(
                                 onClick = {
@@ -1069,8 +1067,7 @@ fun RuleDetailScreen(
                             }
                         }
                         if (state.folderAccessMode.usesAllFilesPaths() &&
-                            !state.allFilesAccessGranted &&
-                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
+                            !state.allFilesAccessGranted
                         ) {
                             TextButton(
                                 onClick = {

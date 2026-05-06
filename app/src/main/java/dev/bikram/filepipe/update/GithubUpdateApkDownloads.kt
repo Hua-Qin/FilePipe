@@ -2,7 +2,6 @@ package dev.bikram.filepipe.update
 
 import android.content.ContentValues
 import android.content.Context
-import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import java.io.File
@@ -11,7 +10,7 @@ import java.security.MessageDigest
 
 /**
  * Copies [cacheApkFile] into the public Downloads collection with [displayName] as shown in Files.
- * Uses [MediaStore.Downloads]; minSdk 30 is sufficient.
+ * Uses [MediaStore.Downloads].
  */
 fun copyUpdateApkToMediaStoreDownloads(
     context: Context,
@@ -29,9 +28,7 @@ fun copyUpdateApkToMediaStoreDownloads(
                 put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "application/vnd.android.package-archive")
                 put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.MediaColumns.IS_PENDING, 1)
-                }
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
         val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
         val itemUri =
@@ -43,13 +40,11 @@ fun copyUpdateApkToMediaStoreDownloads(
                     input.copyTo(output)
                 }
             } ?: error("openOutputStream returned null")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val publish =
-                    ContentValues().apply {
-                        put(MediaStore.MediaColumns.IS_PENDING, 0)
-                    }
-                resolver.update(itemUri, publish, null, null)
-            }
+            val publish =
+                ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+            resolver.update(itemUri, publish, null, null)
         } catch (t: Throwable) {
             runCatching { resolver.delete(itemUri, null, null) }
             throw t

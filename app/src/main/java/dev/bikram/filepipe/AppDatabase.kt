@@ -17,6 +17,7 @@ import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
     // Literal required by Room KSP. Keep in sync with [dev.bikram.filepipe.domain.export.APP_DATABASE_SCHEMA_VERSION].
     version = 6,
     exportSchema = true,
+    // 2 -> 3 and 5 -> 6 are manual migrations in [dev.bikram.filepipe.di.DatabaseModule].
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 3, to = 4),

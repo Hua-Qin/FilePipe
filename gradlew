@@ -114,7 +114,6 @@ case "$( uname )" in                #(
   NONSTOP* )        nonstop=true ;;
 esac
 
-CLASSPATH="\\\"\\\""
 
 
 # Determine the Java command to use to start the JVM.
@@ -172,7 +171,6 @@ fi
 # For Cygwin or MSYS, switch paths to Windows format before running java
 if "$cygwin" || "$msys" ; then
     APP_HOME=$( cygpath --path --mixed "$APP_HOME" )
-    CLASSPATH=$( cygpath --path --mixed "$CLASSPATH" )
 
     JAVACMD=$( cygpath --unix "$JAVACMD" )
 
@@ -210,21 +208,10 @@ DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 #   * For example: A user cannot expect ${Hostname} to be expanded, as it is an environment variable and will be
 #     treated as '${Hostname}' itself on the command line.
 
-# Align Gradle with JAVA_HOME when set (overrides stale org.gradle.java.home in user gradle.properties).
-if [ -n "$JAVA_HOME" ]; then
-    set -- \
-            "-Dorg.gradle.java.home=$JAVA_HOME" \
-            "-Dorg.gradle.appname=$APP_BASE_NAME" \
-            -classpath "$CLASSPATH" \
-            -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
-            "$@"
-else
-    set -- \
-            "-Dorg.gradle.appname=$APP_BASE_NAME" \
-            -classpath "$CLASSPATH" \
-            -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
-            "$@"
-fi
+set -- \
+        "-Dorg.gradle.appname=$APP_BASE_NAME" \
+        -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
+        "$@"
 
 # Stop when "xargs" is not available.
 if ! command -v xargs >/dev/null 2>&1

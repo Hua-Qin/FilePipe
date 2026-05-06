@@ -107,7 +107,7 @@ class UserPreferencesRepository
                     }
                 val storedColorSource =
                     prefs[PrefKeys.COLOR_SOURCE]?.let { raw ->
-                        runCatching { AppColorSource.valueOf(raw) }.getOrNull()
+                        runCatching { AppColorSource.valueOf(raw) }.getOrNull()?.migrated()
                     }
                 val colorSource =
                     storedColorSource ?: when {
@@ -495,7 +495,7 @@ class UserPreferencesRepository
 
                 val parsedColorSource =
                     dto.colorSource?.let { raw ->
-                        runCatching { AppColorSource.valueOf(raw) }.getOrNull()
+                        runCatching { AppColorSource.valueOf(raw) }.getOrNull()?.migrated()
                     }
                 when {
                     parsedColorSource != null -> {
@@ -547,7 +547,7 @@ class UserPreferencesRepository
                     }
                 prefs[PrefKeys.UPDATE_CHECK_SCHEDULE] = resolvedSchedule.name
                 prefs.remove(PrefKeys.AUTO_CHECK_UPDATES)
-                prefs[PrefKeys.NOTIFY_ON_NEW_UPDATES] = dto.notifyOnNewUpdates ?: false
+                prefs[PrefKeys.NOTIFY_ON_NEW_UPDATES] = dto.notifyOnNewUpdates
                 prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] = dto.saveUpdateApkToDownloads
                 prefs.remove(PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED)
                 prefs[PrefKeys.USE_GRADIENT_BACKGROUND] = dto.useGradientBackground

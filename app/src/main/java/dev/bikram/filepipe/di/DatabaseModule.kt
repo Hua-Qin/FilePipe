@@ -41,6 +41,7 @@ object DatabaseModule {
                 db.execSQL(
                     "ALTER TABLE rules ADD COLUMN recreateDestinationSubfolders INTEGER NOT NULL DEFAULT 0",
                 )
+                // Preserve the previous recursive rule behavior for existing users.
                 db.execSQL(
                     "UPDATE rules SET recreateDestinationSubfolders = CASE WHEN scanSubdirectories = 1 THEN 1 ELSE 0 END",
                 )
