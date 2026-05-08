@@ -3,9 +3,17 @@ package dev.bikram.filepipe.ui.screens.historydetail
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.media.MediaMetadataRetriever
+import android.media.ThumbnailUtils
 import android.net.Uri
+import android.util.LruCache
+import android.util.Size
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -55,12 +63,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -87,7 +99,26 @@ import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.roundToInt
+
+private const val THUMBNAIL_CACHE_SIZE_KB = 6 * 1024
+
+private val fileThumbnailMemoryCache =
+    object : LruCache<String, Bitmap>(THUMBNAIL_CACHE_SIZE_KB) {
+        override fun sizeOf(
+            key: String,
+            value: Bitmap,
+        ): Int = (value.allocationByteCount / 1024).coerceAtLeast(1)
+    }
+
+private enum class ThumbnailMediaType {
+    IMAGE,
+    VIDEO,
+    AUDIO,
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -399,19 +430,7 @@ private fun FileMovedCard(
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            // File type icon
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                modifier = Modifier.size(40.dp),
-            ) {
-                Icon(
-                    imageVector = fileTypeIcon(file.fileName),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(8.dp),
-                )
-            }
+            FileThumbnailOrIcon(file = file, isSuccess = isSuccess)
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(
@@ -480,6 +499,344 @@ private fun FileMovedCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FileThumbnailOrIcon(
+    file: FileMoved,
+    isSuccess: Boolean,
+) {
+    val context = LocalContext.current
+    val thumbnailSize = 40.dp
+    val targetSizePx = with(LocalDensity.current) { thumbnailSize.toPx().roundToInt().coerceAtLeast(1) }
+    val uriString = if (isSuccess) file.destinationUri else file.sourceUri
+    val thumbnailBitmap by produceState<Bitmap?>(
+        initialValue = null,
+        uriString,
+        file.fileName,
+        targetSizePx,
+    ) {
+        value =
+            withContext(Dispatchers.IO) {
+                loadCachedFileThumbnail(
+                    context = context.applicationContext,
+                    uriString = uriString,
+                    fileName = file.fileName,
+                    targetSizePx = targetSizePx,
+                )
+            }
+    }
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = Modifier.size(thumbnailSize),
+    ) {
+        val bitmap = thumbnailBitmap
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Icon(
+                imageVector = fileTypeIcon(file.fileName),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier.padding(8.dp),
+            )
+        }
+    }
+}
+
+private fun loadCachedFileThumbnail(
+    context: Context,
+    uriString: String,
+    fileName: String,
+    targetSizePx: Int,
+): Bitmap? {
+    val mediaType = thumbnailMediaType(fileName) ?: return null
+    val cacheKey = "$targetSizePx:$uriString"
+    val cachedBitmap = fileThumbnailMemoryCache.get(cacheKey)
+    if (cachedBitmap != null) {
+        return cachedBitmap
+    }
+
+    val thumbnailBitmap =
+        loadFileThumbnail(
+            context = context,
+            uriString = uriString,
+            mediaType = mediaType,
+            targetSize = Size(targetSizePx, targetSizePx),
+        ) ?: return null
+    fileThumbnailMemoryCache.put(cacheKey, thumbnailBitmap)
+    return thumbnailBitmap
+}
+
+private fun loadFileThumbnail(
+    context: Context,
+    uriString: String,
+    mediaType: ThumbnailMediaType,
+    targetSize: Size,
+): Bitmap? {
+    if (uriString.isBlank()) {
+        return null
+    }
+
+    val uri =
+        try {
+            Uri.parse(uriString)
+        } catch (_: RuntimeException) {
+            return null
+        }
+
+    return when {
+        uri.scheme == "content" ->
+            loadContentThumbnail(
+                context = context,
+                uri = uri,
+                mediaType = mediaType,
+                targetSize = targetSize,
+            )
+        uri.scheme == "file" -> {
+            val filePath = uri.path ?: return null
+            loadFilePathThumbnail(
+                context = context,
+                file = File(filePath),
+                mediaType = mediaType,
+                targetSize = targetSize,
+            )
+        }
+        uri.scheme.isNullOrBlank() && uriString.startsWith("/") ->
+            loadFilePathThumbnail(
+                context = context,
+                file = File(uriString),
+                mediaType = mediaType,
+                targetSize = targetSize,
+            )
+        else -> null
+    }
+}
+
+private fun loadContentThumbnail(
+    context: Context,
+    uri: Uri,
+    mediaType: ThumbnailMediaType,
+    targetSize: Size,
+): Bitmap? {
+    val providerThumbnail =
+        runCatching {
+            context.contentResolver.loadThumbnail(uri, targetSize, null)
+        }.getOrNull()
+    if (providerThumbnail != null) {
+        return providerThumbnail
+    }
+
+    return when (mediaType) {
+        ThumbnailMediaType.IMAGE -> loadImageContentThumbnail(context, uri, targetSize)
+        ThumbnailMediaType.VIDEO ->
+            loadVideoFrameThumbnail(
+                context = context,
+                uri = uri,
+                file = null,
+                targetSize = targetSize,
+            )
+        ThumbnailMediaType.AUDIO ->
+            loadAudioArtworkThumbnail(
+                context = context,
+                uri = uri,
+                file = null,
+                targetSize = targetSize,
+            )
+    }
+}
+
+private fun loadFilePathThumbnail(
+    context: Context,
+    file: File,
+    mediaType: ThumbnailMediaType,
+    targetSize: Size,
+): Bitmap? {
+    if (!file.isFile) {
+        return null
+    }
+
+    return when (mediaType) {
+        ThumbnailMediaType.IMAGE -> loadImageFileThumbnail(file, targetSize)
+        ThumbnailMediaType.VIDEO ->
+            runCatching {
+                ThumbnailUtils.createVideoThumbnail(file, targetSize, null)
+            }.getOrNull()
+                ?: loadVideoFrameThumbnail(
+                    context = context,
+                    uri = null,
+                    file = file,
+                    targetSize = targetSize,
+                )
+        ThumbnailMediaType.AUDIO ->
+            loadAudioArtworkThumbnail(
+                context = context,
+                uri = null,
+                file = file,
+                targetSize = targetSize,
+            )
+    }
+}
+
+private fun loadImageContentThumbnail(
+    context: Context,
+    uri: Uri,
+    targetSize: Size,
+): Bitmap? =
+    runCatching {
+        val source = ImageDecoder.createSource(context.contentResolver, uri)
+        decodeImageThumbnail(source, targetSize)
+    }.getOrNull()
+
+private fun loadImageFileThumbnail(
+    file: File,
+    targetSize: Size,
+): Bitmap? =
+    runCatching {
+        val source = ImageDecoder.createSource(file)
+        decodeImageThumbnail(source, targetSize)
+    }.getOrNull()
+
+private fun decodeImageThumbnail(
+    source: ImageDecoder.Source,
+    targetSize: Size,
+): Bitmap =
+    ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+        setDecoderTargetSize(decoder, info.size, targetSize)
+    }
+
+private fun setDecoderTargetSize(
+    decoder: ImageDecoder,
+    sourceSize: Size,
+    targetSize: Size,
+) {
+    if (sourceSize.width <= 0 || sourceSize.height <= 0) {
+        return
+    }
+
+    val scale =
+        minOf(
+            targetSize.width.toFloat() / sourceSize.width.toFloat(),
+            targetSize.height.toFloat() / sourceSize.height.toFloat(),
+        ).coerceAtMost(1f)
+    if (scale >= 1f) {
+        return
+    }
+
+    decoder.setTargetSize(
+        (sourceSize.width * scale).roundToInt().coerceAtLeast(1),
+        (sourceSize.height * scale).roundToInt().coerceAtLeast(1),
+    )
+}
+
+private fun loadVideoFrameThumbnail(
+    context: Context,
+    uri: Uri?,
+    file: File?,
+    targetSize: Size,
+): Bitmap? {
+    val mediaMetadataRetriever = MediaMetadataRetriever()
+    return try {
+        setMediaDataSource(mediaMetadataRetriever, context, uri, file)
+        mediaMetadataRetriever.getScaledFrameAtTime(
+            0,
+            MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+            targetSize.width,
+            targetSize.height,
+        )
+    } catch (_: RuntimeException) {
+        null
+    } finally {
+        runCatching { mediaMetadataRetriever.release() }
+    }
+}
+
+private fun loadAudioArtworkThumbnail(
+    context: Context,
+    uri: Uri?,
+    file: File?,
+    targetSize: Size,
+): Bitmap? {
+    val mediaMetadataRetriever = MediaMetadataRetriever()
+    return try {
+        setMediaDataSource(mediaMetadataRetriever, context, uri, file)
+        val embeddedPicture = mediaMetadataRetriever.embeddedPicture ?: return null
+        decodeByteArrayThumbnail(embeddedPicture, targetSize)
+    } catch (_: RuntimeException) {
+        null
+    } finally {
+        runCatching { mediaMetadataRetriever.release() }
+    }
+}
+
+private fun setMediaDataSource(
+    mediaMetadataRetriever: MediaMetadataRetriever,
+    context: Context,
+    uri: Uri?,
+    file: File?,
+) {
+    when {
+        uri != null -> mediaMetadataRetriever.setDataSource(context, uri)
+        file != null -> mediaMetadataRetriever.setDataSource(file.absolutePath)
+        else -> throw IllegalArgumentException("Missing media source")
+    }
+}
+
+private fun decodeByteArrayThumbnail(
+    data: ByteArray,
+    targetSize: Size,
+): Bitmap? {
+    val boundsOptions =
+        BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+    BitmapFactory.decodeByteArray(data, 0, data.size, boundsOptions)
+    if (boundsOptions.outWidth <= 0 || boundsOptions.outHeight <= 0) {
+        return null
+    }
+
+    val decodeOptions =
+        BitmapFactory.Options().apply {
+            inSampleSize =
+                calculateSampleSize(
+                    sourceWidth = boundsOptions.outWidth,
+                    sourceHeight = boundsOptions.outHeight,
+                    targetSize = targetSize,
+                )
+        }
+    return BitmapFactory.decodeByteArray(data, 0, data.size, decodeOptions)
+}
+
+private fun calculateSampleSize(
+    sourceWidth: Int,
+    sourceHeight: Int,
+    targetSize: Size,
+): Int {
+    var sampleSize = 1
+    while (
+        sourceWidth / (sampleSize * 2) >= targetSize.width &&
+        sourceHeight / (sampleSize * 2) >= targetSize.height
+    ) {
+        sampleSize *= 2
+    }
+    return sampleSize
+}
+
+private fun thumbnailMediaType(fileName: String): ThumbnailMediaType? {
+    val ext = fileName.substringAfterLast('.', "").lowercase()
+    return when (ext) {
+        "jpg", "jpeg", "png", "gif", "heic", "heif", "webp", "bmp" -> ThumbnailMediaType.IMAGE
+        "mp4", "mkv", "avi", "mov", "m4v", "webm", "3gp" -> ThumbnailMediaType.VIDEO
+        "mp3", "flac", "aac", "ogg", "m4a", "wav", "opus" -> ThumbnailMediaType.AUDIO
+        else -> null
     }
 }
 

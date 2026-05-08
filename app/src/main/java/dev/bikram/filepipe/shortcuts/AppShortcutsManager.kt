@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
-import androidx.core.graphics.drawable.IconCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.MainActivity
 import dev.bikram.filepipe.R
@@ -17,6 +16,7 @@ class AppShortcutsManager
     @Inject
     constructor(
         @param:ApplicationContext private val context: Context,
+        private val ruleShortcutIconFactory: RuleShortcutIconFactory,
     ) {
         companion object {
             const val EXTRA_SHORTCUT_RULE_ID = "extra_shortcut_rule_id"
@@ -36,8 +36,8 @@ class AppShortcutsManager
                     ShortcutInfoCompat
                         .Builder(context, "rule_${rule.id}")
                         .setShortLabel(rule.name.take(25))
-                        .setLongLabel("Run: ${rule.name}")
-                        .setIcon(IconCompat.createWithResource(context, R.mipmap.ic_launcher))
+                        .setLongLabel(context.getString(R.string.shortcut_run_rule_label, rule.name))
+                        .setIcon(ruleShortcutIconFactory.createIcon(rule))
                         .setIntent(intent)
                         .build()
                 }

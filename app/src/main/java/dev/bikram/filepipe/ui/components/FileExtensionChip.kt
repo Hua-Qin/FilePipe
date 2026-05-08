@@ -117,6 +117,7 @@ fun FileExtensionChips(
         DropdownMenu(
             expanded = showGroupMenu,
             onDismissRequest = { showGroupMenu = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             EXTENSION_GROUPS.forEachIndexed { index, group ->
                 DropdownMenuItem(

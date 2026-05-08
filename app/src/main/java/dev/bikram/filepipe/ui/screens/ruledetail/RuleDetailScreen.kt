@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,6 +16,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -50,7 +52,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.FolderSpecial
@@ -86,7 +87,6 @@ import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
@@ -111,6 +111,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -150,6 +151,8 @@ import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.components.CenteredTooltipText
 import dev.bikram.filepipe.ui.components.FileExtensionChips
+import dev.bikram.filepipe.ui.components.FilePipeBottomSheetDragHandle
+import dev.bikram.filepipe.ui.components.FilePipeSwitch
 import dev.bikram.filepipe.ui.components.FilesystemFolderPickerSheetContent
 import dev.bikram.filepipe.ui.components.FolderPickerButton
 import dev.bikram.filepipe.ui.components.RuleIconEmojiPresets
@@ -796,6 +799,7 @@ fun RuleDetailScreen(
                                 DropdownMenu(
                                     expanded = bookmarkDropdownExpanded,
                                     onDismissRequest = { bookmarkDropdownExpanded = false },
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 ) {
                                     unusedBookmarks.forEach { bookmarkPath ->
                                         DropdownMenuItem(
@@ -858,7 +862,7 @@ fun RuleDetailScreen(
                                         playTap = playTap,
                                     )
                                 }
-                                Switch(
+                                FilePipeSwitch(
                                     checked = state.scanSubdirectories,
                                     onCheckedChange = { enabled ->
                                         withTapSound { viewModel.setScanSubdirectories(enabled) }
@@ -890,7 +894,7 @@ fun RuleDetailScreen(
                                         playTap = playTap,
                                     )
                                 }
-                                Switch(
+                                FilePipeSwitch(
                                     checked = state.scanSubdirectories && state.recreateDestinationSubfolders,
                                     onCheckedChange = { enabled ->
                                         withTapSound { viewModel.setRecreateDestinationSubfolders(enabled) }
@@ -923,7 +927,7 @@ fun RuleDetailScreen(
                                         playTap = playTap,
                                     )
                                 }
-                                Switch(
+                                FilePipeSwitch(
                                     checked = state.suppressMissingSourceFolderCardWarning,
                                     onCheckedChange = { enabled ->
                                         withTapSound { viewModel.setSuppressMissingSourceFolderCardWarning(enabled) }
@@ -1046,6 +1050,7 @@ fun RuleDetailScreen(
                                 DropdownMenu(
                                     expanded = destBookmarkDropdownExpanded,
                                     onDismissRequest = { destBookmarkDropdownExpanded = false },
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 ) {
                                     unusedDestBookmarks.forEach { bookmarkPath ->
                                         DropdownMenuItem(
@@ -1234,11 +1239,22 @@ fun RuleDetailScreen(
                         colors = elevatedCardColors(),
                     ) {
                         Column(Modifier.padding(16.dp)) {
+                            val advancedHeaderInteractionSource = remember { MutableInteractionSource() }
+                            val advancedChevronRotation by animateFloatAsState(
+                                targetValue = if (advancedExpanded) 180f else 0f,
+                                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>(),
+                                label = "advanced_filters_chevron_rotation",
+                            )
                             Row(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .clickable { advancedExpanded = !advancedExpanded },
+                                        .clickable(
+                                            interactionSource = advancedHeaderInteractionSource,
+                                            indication = null,
+                                        ) {
+                                            withTapSound { advancedExpanded = !advancedExpanded }
+                                        },
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
@@ -1276,17 +1292,29 @@ fun RuleDetailScreen(
                                     )
                                 }
                                 Icon(
-                                    imageVector = if (advancedExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                                    imageVector = Icons.Filled.ExpandMore,
                                     contentDescription = null,
+                                    modifier = Modifier.graphicsLayer { rotationZ = advancedChevronRotation },
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
 
-                            val advancedExpandSpec = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>()
+                            val advancedExpandSpec =
+                                MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntSize>()
+                            val advancedFadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                            val advancedFadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
                             AnimatedVisibility(
                                 visible = advancedExpanded,
-                                enter = expandVertically(animationSpec = advancedExpandSpec) + fadeIn(),
-                                exit = shrinkVertically() + fadeOut(),
+                                enter =
+                                    expandVertically(
+                                        animationSpec = advancedExpandSpec,
+                                        expandFrom = Alignment.Top,
+                                    ) + fadeIn(advancedFadeInSpec),
+                                exit =
+                                    shrinkVertically(
+                                        animationSpec = advancedExpandSpec,
+                                        shrinkTowards = Alignment.Top,
+                                    ) + fadeOut(advancedFadeOutSpec),
                             ) {
                                 Column(
                                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1473,6 +1501,7 @@ fun RuleDetailScreen(
             onDismissRequest = { pendingFilesystemFolderPick = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            dragHandle = { FilePipeBottomSheetDragHandle() },
         ) {
             Column(
                 Modifier
@@ -1560,6 +1589,7 @@ fun RuleDetailScreen(
         ModalBottomSheet(
             onDismissRequest = { showRuleIconSheet = false },
             sheetState = ruleIconSheetState,
+            dragHandle = { FilePipeBottomSheetDragHandle() },
         ) {
             Column(
                 Modifier
@@ -1730,6 +1760,7 @@ fun RuleDetailScreen(
         ModalBottomSheet(
             onDismissRequest = { showTemplateSheet = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            dragHandle = { FilePipeBottomSheetDragHandle() },
         ) {
             Column(Modifier.padding(horizontal = 16.dp)) {
                 Text(
@@ -1806,12 +1837,13 @@ fun RuleDetailScreen(
         ModalBottomSheet(
             onDismissRequest = { viewModel.dismissPreview() },
             sheetState = previewSheetState,
+            dragHandle = { FilePipeBottomSheetDragHandle() },
         ) {
             Column(Modifier.padding(horizontal = 16.dp)) {
                 Text(
                     text = stringResource(R.string.preview_title),
                     style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(bottom = 8.dp),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                 )
                 if (state.isPreviewLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(32.dp))

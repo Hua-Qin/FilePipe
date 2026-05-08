@@ -126,6 +126,7 @@ class MainActivity : ComponentActivity() {
         val ruleId = intent?.getLongExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID, -1L) ?: -1L
         if (ruleId != -1L) {
             pendingShortcutRepository.requestRunRule(ruleId)
+            intent?.removeExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID)
         }
     }
 

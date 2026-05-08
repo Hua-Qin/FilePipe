@@ -47,7 +47,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
@@ -286,7 +285,7 @@ private fun CompactContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Switch(
+                    FilePipeSwitch(
                         checked = rule.isEnabled,
                         onCheckedChange = { enabled ->
                             playTap()
@@ -428,7 +427,7 @@ private fun ExpandedContent(
                     modifier = Modifier.weight(1f, fill = false),
                 )
             }
-            Switch(
+            FilePipeSwitch(
                 checked = rule.isEnabled,
                 onCheckedChange = { enabled ->
                     playTap()

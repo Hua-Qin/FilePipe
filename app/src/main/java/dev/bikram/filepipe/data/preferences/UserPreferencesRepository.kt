@@ -431,13 +431,7 @@ class UserPreferencesRepository
             migrateLegacyCustomSeedIfNeeded()
             val targetNorm = normalizeCustomSeedHexOrNull(hex) ?: return
             dataStore.edit { prefs ->
-                val current = decodeCustomSeedHexList(prefs[PrefKeys.CUSTOM_SEED_HEX_LIST])
-                val matchedStored =
-                    current.firstOrNull { stored ->
-                        normalizeCustomSeedHexOrNull(stored) == targetNorm
-                    } ?: return@edit
-                prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] =
-                    normalizeCustomSeedHexOrNull(matchedStored) ?: matchedStored
+                prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] = targetNorm
                 prefs[PrefKeys.COLOR_SOURCE] = AppColorSource.CUSTOM.name
                 prefs.remove(PrefKeys.USE_MATERIAL_YOU)
             }

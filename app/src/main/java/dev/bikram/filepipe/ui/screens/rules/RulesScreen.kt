@@ -111,6 +111,7 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.ui.components.CenteredTooltipText
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
+import dev.bikram.filepipe.ui.components.FilePipeBottomSheetDragHandle
 import dev.bikram.filepipe.ui.components.RuleCard
 import dev.bikram.filepipe.ui.components.RuleCardAction
 import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
@@ -725,6 +726,7 @@ fun RulesScreen(
         ModalBottomSheet(
             onDismissRequest = { viewModel.dismissPreview() },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            dragHandle = { FilePipeBottomSheetDragHandle() },
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -740,6 +742,7 @@ fun RulesScreen(
                             )
                         } ?: stringResource(R.string.preview_title_for_rule, preview.ruleName),
                     style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 8.dp),
                 )
                 if (preview.isLoading) {
                     CircularProgressIndicator(
@@ -890,7 +893,11 @@ private fun RulesSortDropdown(
             SortOption(R.string.history_sort_rule_name_za, HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING),
             SortOption(R.string.rules_sort_my_order, HistorySortKey.MY_ORDER, HistorySortDirection.ASCENDING),
         )
-    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+    DropdownMenu(
+        expanded = expanded,
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+    ) {
         options.forEach { option ->
             val isSelected =
                 if (option.key == HistorySortKey.MY_ORDER) {

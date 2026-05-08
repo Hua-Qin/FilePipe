@@ -49,6 +49,7 @@ fun ToggleLabelHelpDropdown(
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false },
             modifier = Modifier.widthIn(max = 300.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             Text(
                 text = tipText,

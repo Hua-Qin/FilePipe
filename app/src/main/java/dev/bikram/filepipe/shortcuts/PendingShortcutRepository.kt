@@ -1,10 +1,7 @@
 package dev.bikram.filepipe.shortcuts
 
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -13,8 +10,8 @@ import javax.inject.Singleton
 class PendingShortcutRepository
     @Inject
     constructor() {
-        private val _pendingRuleId = MutableSharedFlow<Long>(extraBufferCapacity = 1)
-        val pendingRuleId: SharedFlow<Long> = _pendingRuleId.asSharedFlow()
+        private val _pendingRuleId = MutableStateFlow<Long?>(null)
+        val pendingRuleId: StateFlow<Long?> = _pendingRuleId.asStateFlow()
 
         private val _pendingHistoryDetailId = MutableStateFlow<Long?>(null)
         val pendingHistoryDetailId: StateFlow<Long?> = _pendingHistoryDetailId.asStateFlow()
@@ -23,7 +20,11 @@ class PendingShortcutRepository
         val pendingOpenSettingsForUpdates: StateFlow<Boolean> = _pendingOpenSettingsForUpdates.asStateFlow()
 
         fun requestRunRule(ruleId: Long) {
-            _pendingRuleId.tryEmit(ruleId)
+            _pendingRuleId.value = ruleId
+        }
+
+        fun clearPendingRule() {
+            _pendingRuleId.value = null
         }
 
         fun requestOpenHistoryDetail(historyId: Long) {

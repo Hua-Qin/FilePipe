@@ -3,7 +3,7 @@ java = "21"
 agp = "9.2.1"
 kotlin = "2.3.21"
 ksp = "2.3.7"
-composeBom = "2026.04.01"
+composeBom = "2026.05.00"
 # BOM material3 is older; this line tracks the expressive build used by the app (override BOM for this artifact).
 composeMaterial3Expressive = "1.5.0-alpha18"
 hilt = "2.59.2"

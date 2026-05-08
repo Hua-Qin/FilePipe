@@ -165,6 +165,7 @@ fun ScheduleDialog(
                         ExposedDropdownMenu(
                             expanded = typeExpanded,
                             onDismissRequest = { typeExpanded = false },
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.schedule_hourly)) },
@@ -210,6 +211,7 @@ fun ScheduleDialog(
                             ExposedDropdownMenu(
                                 expanded = dayExpanded,
                                 onDismissRequest = { dayExpanded = false },
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             ) {
                                 days.forEach { (calDay, name) ->
                                     DropdownMenuItem(

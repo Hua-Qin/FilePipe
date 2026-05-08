@@ -1,6 +1,6 @@
 # FilePipe
 
-<img alt="FilePipe Banner" src="https://github.com/user-attachments/assets/e48792f0-0bb8-432a-8d49-bd1ee211a738" />
+<img alt="FilePipe Banner" src="./fastlane/metadata/android/en-US/images/featureGraphic.png" />
 
 FilePipe turns your chaotic storage into a perfectly organized library — automatically.
 

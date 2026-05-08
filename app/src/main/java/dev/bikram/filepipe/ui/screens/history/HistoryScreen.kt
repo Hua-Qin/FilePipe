@@ -252,6 +252,7 @@ fun HistoryScreen(
                             DropdownMenu(
                                 expanded = groupMenuExpanded,
                                 onDismissRequest = { groupMenuExpanded = false },
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_date)) },
@@ -295,6 +296,7 @@ fun HistoryScreen(
                             DropdownMenu(
                                 expanded = sortMenuExpanded,
                                 onDismissRequest = { sortMenuExpanded = false },
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             ) {
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },

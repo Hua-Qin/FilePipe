@@ -35,6 +35,7 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -111,7 +112,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -170,6 +170,8 @@ import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.ui.components.AboutAuthorPhoto
 import dev.bikram.filepipe.ui.components.AppIconImage
+import dev.bikram.filepipe.ui.components.FilePipeBottomSheetDragHandle
+import dev.bikram.filepipe.ui.components.FilePipeSwitch
 import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
@@ -556,6 +558,7 @@ fun SettingsScreen(
             sheetState = updateSheetState,
             containerColor = updateSheetContainerColors.containerColor,
             contentColor = updateSheetContainerColors.contentColor,
+            dragHandle = { FilePipeBottomSheetDragHandle() },
         ) {
             UpdateCheckBottomSheetContent(
                 maxSheetHeight = maxUpdateSheetHeight,
@@ -1037,7 +1040,7 @@ fun SettingsScreen(
                                         )
                                     },
                                     trailingContent = {
-                                        Switch(
+                                        FilePipeSwitch(
                                             checked = notificationsGranted,
                                             onCheckedChange = { wantEnabled ->
                                                 playTap()
@@ -1558,6 +1561,20 @@ fun SettingsScreen(
                         .trim()
                         .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
                 val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
+                val buildFlavorLabel =
+                    when (BuildConfig.FLAVOR) {
+                        "github" -> stringResource(R.string.build_flavor_github)
+                        "playstore" -> stringResource(R.string.build_flavor_playstore)
+                        else -> BuildConfig.FLAVOR
+                    }
+                val buildTypeLabel =
+                    when (BuildConfig.BUILD_TYPE) {
+                        "debug" -> stringResource(R.string.build_type_debug)
+                        "devRelease" -> stringResource(R.string.build_type_dev_release)
+                        "release" -> stringResource(R.string.build_type_release)
+                        else -> BuildConfig.BUILD_TYPE
+                    }
+                val buildVariantToastText = stringResource(R.string.about_build_variant_format, buildFlavorLabel, buildTypeLabel)
                 val copyAboutLinkToClipboard =
                     remember(aboutContext) {
                         { url: String ->
@@ -1589,7 +1606,23 @@ fun SettingsScreen(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Text(
-                                    text = "${stringResource(R.string.app_name)} v${BuildConfig.VERSION_NAME}",
+                                    text =
+                                        stringResource(
+                                            R.string.app_version_format,
+                                            stringResource(R.string.app_name),
+                                            BuildConfig.VERSION_NAME,
+                                        ),
+                                    modifier =
+                                        Modifier.combinedClickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            onClick = {},
+                                            onLongClick = {
+                                                Toast
+                                                    .makeText(aboutContext, buildVariantToastText, Toast.LENGTH_SHORT)
+                                                    .show()
+                                            },
+                                        ),
                                     style = MaterialTheme.typography.displaySmall,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     textAlign = TextAlign.Center,
@@ -1948,7 +1981,11 @@ private fun UpdateCheckScheduleDropdown(
             expanded = true
         }) {
             Text(updateScheduleSummaryBeforeColon(selected))
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
                 options.forEach { option ->
                     DropdownMenuItem(
                         text = { Text(updateScheduleLabel(option)) },
@@ -2696,7 +2733,7 @@ private fun SettingsToggleItem(
         }
         Spacer(Modifier.width(16.dp))
         val switchInteractive = switchEnabled || onDisabledInteraction != null
-        Switch(
+        FilePipeSwitch(
             checked = checked,
             onCheckedChange = { enabled ->
                 when {
@@ -2812,7 +2849,11 @@ private fun LogRetentionDropdown(
         expanded = true
     }) {
         Text(logRetentionLabel(currentDays))
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ) {
             LOG_RETENTION_OPTIONS.forEach { option ->
                 DropdownMenuItem(
                     text = { Text(logRetentionLabel(option)) },
@@ -2850,7 +2891,11 @@ private fun SwipeActionDropdown(
         expanded = true
     }) {
         Text(swipeActionLabel(current))
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ) {
             SwipeAction.entries.filter { it != excluded }.forEach { action ->
                 DropdownMenuItem(
                     text = { Text(swipeActionLabel(action)) },

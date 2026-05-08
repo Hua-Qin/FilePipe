@@ -39,3 +39,7 @@ fun View.performSwipeThresholdHaptic() {
     val vibrator = context.getSystemService(VibratorManager::class.java)?.defaultVibrator ?: return
     vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
 }
+
+fun View.performRejectHaptic() {
+    performHapticFeedback(HapticFeedbackConstants.REJECT)
+}

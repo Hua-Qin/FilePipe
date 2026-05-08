@@ -23,6 +23,7 @@
     <string name="rule_card_progress_files_copied_summary">%1$d / %2$d files copied</string>
     <string name="rule_delete_confirm">Delete rule?</string>
     <string name="rule_delete_message">This will also remove any scheduled runs for this rule</string>
+    <string name="shortcut_run_rule_label">Run: %1$s</string>
 
     <!-- Rule detail screen -->
     <string name="rule_detail_redundant_subfolder_removed">Removed redundant subfolder(s): %1$s</string>
@@ -347,15 +348,8 @@
     <string name="settings_theme_preview_label_secondary">secondary</string>
     <string name="settings_theme_preview_label_tertiary">tertiary</string>
     <string name="settings_theme_preview_sample">Aa</string>
-    <string name="settings_custom_seed_label">Custom accent (hex)</string>
-    <string name="settings_custom_seed_placeholder">#RRGGBB or RRGGBB</string>
-    <string name="settings_custom_seed_supporting">If the code isn\'t valid, the default blue is used</string>
-    <string name="settings_custom_seed_apply">Apply</string>
+    <string name="settings_custom_seed_slider_title">Select a color</string>
     <string name="settings_custom_seed_dialog_title">Add custom accent color</string>
-    <string name="settings_custom_seed_dialog_add">Add</string>
-    <string name="settings_custom_seed_preview_label">Preview</string>
-    <string name="settings_custom_seed_preview_invalid">Enter a valid hex color</string>
-    <string name="settings_custom_seed_row_hint">Long-press a custom color swatch to delete it</string>
     <string name="settings_custom_seed_remove_title">Remove this color?</string>
     <string name="settings_custom_seed_remove_message">It will be removed from your saved custom accents</string>
     <string name="theme_palette_tonal_spot">Tonal spot</string>
@@ -369,6 +363,13 @@
     <string name="theme_palette_content">Content</string>
     <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
     <string name="settings_about_section">About</string>
+    <string name="app_version_format">%1$s v%2$s</string>
+    <string name="about_build_variant_format">%1$s, %2$s</string>
+    <string name="build_flavor_github">GitHub</string>
+    <string name="build_flavor_playstore">PlayStore</string>
+    <string name="build_type_debug">Debug</string>
+    <string name="build_type_dev_release">devRelease</string>
+    <string name="build_type_release">Release</string>
     <string name="settings_rate_on_play_store">Rate on Play Store</string>
     <string name="settings_star_on_github">Star on GitHub</string>
     <string name="settings_share_app">Share</string>

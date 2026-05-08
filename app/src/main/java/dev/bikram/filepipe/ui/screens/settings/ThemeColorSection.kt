@@ -1,9 +1,17 @@
 package dev.bikram.filepipe.ui.screens.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,57 +27,90 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.ColorUtils
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
-import dev.bikram.filepipe.ui.components.CustomSeedHexDialog
+import dev.bikram.filepipe.ui.components.FilePipeSwitch
+import dev.bikram.filepipe.ui.components.HueColorSlider
+import dev.bikram.filepipe.ui.components.colorHexFromHue
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
+import dev.bikram.filepipe.ui.components.hueFromHexColor
+import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
+import dev.bikram.filepipe.ui.feedback.performRejectHaptic
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
 import dev.bikram.filepipe.ui.theme.parseSeedColorHexToColorOrNull
+import kotlinx.coroutines.delay
+import java.util.Locale
+import android.graphics.Color as AndroidColor
 
 @Composable
 fun themePaletteStyleLabel(style: ThemePaletteStyle): String =
@@ -106,6 +147,7 @@ fun ThemeAccentRow(
     colorSource: AppColorSource,
     activeCustomSeedHex: String,
     savedCustomSeedHexes: List<String>,
+    customPickerExpanded: Boolean,
     onSelectPreset: (AppColorSource) -> Unit,
     onSelectCustomHex: (String) -> Unit,
     onCustomHexLongPress: (String) -> Unit,
@@ -198,7 +240,12 @@ fun ThemeAccentRow(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    imageVector = Icons.Outlined.Add,
+                    imageVector =
+                        if (customPickerExpanded) {
+                            Icons.Default.KeyboardArrowDown
+                        } else {
+                            Icons.Outlined.Add
+                        },
                     contentDescription = stringResource(R.string.settings_custom_seed_dialog_title),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.size(26.dp),
@@ -343,19 +390,7 @@ fun AppearanceSection(
     onProgressiveBlurEnabled: (Boolean) -> Unit,
     onBlackThemeEffectClick: () -> Unit,
 ) {
-    var showCustomHexDialog by remember { mutableStateOf(false) }
     var hexPendingRemove by remember { mutableStateOf<String?>(null) }
-
-    if (showCustomHexDialog) {
-        CustomSeedHexDialog(
-            initialDraft = "",
-            onDismiss = { showCustomHexDialog = false },
-            onConfirm = { raw ->
-                onAddCustomSeedHex(raw)
-                showCustomHexDialog = false
-            },
-        )
-    }
 
     val hexToConfirmRemove = hexPendingRemove
     if (hexToConfirmRemove != null) {
@@ -393,7 +428,7 @@ fun AppearanceSection(
                 onPaletteStyle = onPaletteStyle,
                 onSelectCustomSeedHex = onSelectCustomSeedHex,
                 onCustomHexLongPress = { hexPendingRemove = it },
-                onAddCustomHexClick = { showCustomHexDialog = true },
+                onAddCustomSeedHex = onAddCustomSeedHex,
             )
         }
         GroupedListItem(position = GroupPosition.MIDDLE) {
@@ -440,8 +475,13 @@ private fun AppearanceStudioControls(
     onPaletteStyle: (ThemePaletteStyle) -> Unit,
     onSelectCustomSeedHex: (String) -> Unit,
     onCustomHexLongPress: (String) -> Unit,
-    onAddCustomHexClick: () -> Unit,
+    onAddCustomSeedHex: (String) -> Unit,
 ) {
+    var customPickerExpanded by rememberSaveable { mutableStateOf(false) }
+    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
+    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+
     Column(
         modifier =
             Modifier
@@ -457,11 +497,30 @@ private fun AppearanceStudioControls(
             colorSource = colorSource,
             activeCustomSeedHex = activeCustomSeedHex,
             savedCustomSeedHexes = savedCustomSeedHexes,
+            customPickerExpanded = customPickerExpanded,
             onSelectPreset = onColorSource,
             onSelectCustomHex = onSelectCustomSeedHex,
             onCustomHexLongPress = onCustomHexLongPress,
-            onAddCustomHexClick = onAddCustomHexClick,
+            onAddCustomHexClick = {
+                customPickerExpanded = !customPickerExpanded
+            },
         )
+        AnimatedVisibility(
+            visible = customPickerExpanded,
+            enter = fadeIn(animationSpec = fadeInSpec) + expandVertically(animationSpec = spatialSpec),
+            exit = fadeOut(animationSpec = fadeOutSpec) + shrinkVertically(animationSpec = spatialSpec),
+        ) {
+            CustomColorSlider(
+                initialSeedHex =
+                    customSliderInitialSeedHex(
+                        colorSource = colorSource,
+                        activeCustomSeedHex = activeCustomSeedHex,
+                        currentPrimary = MaterialTheme.colorScheme.primary,
+                    ),
+                onPreviewColor = onSelectCustomSeedHex,
+                onSaveColor = onAddCustomSeedHex,
+            )
+        }
         AppearanceStudioSection(title = stringResource(R.string.settings_palette_style)) {
             ThemePaletteStyleRow(
                 selected = themePaletteStyle,
@@ -472,6 +531,312 @@ private fun AppearanceStudioControls(
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f))
         ThemePreviewPanel(colorSource = colorSource)
     }
+}
+
+@Composable
+private fun CustomColorSlider(
+    initialSeedHex: String,
+    onPreviewColor: (String) -> Unit,
+    onSaveColor: (String) -> Unit,
+) {
+    val normalizedInitialSeedHex = normalizeCustomSeedHexOrNull(initialSeedHex) ?: colorHexFromHue(DEFAULT_CUSTOM_HUE)
+    var selectedSeedHex by rememberSaveable(normalizedInitialSeedHex) { mutableStateOf(normalizedInitialSeedHex) }
+    var hexEditing by rememberSaveable { mutableStateOf(false) }
+    var hexDraft by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(normalizedInitialSeedHex.toHexFieldValue())
+    }
+    val hexFocusRequester = remember { FocusRequester() }
+    var panelCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var hexEditorBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+
+    fun commitHexEditing(): String {
+        val draftHex =
+            if (hexDraft.text.length == 6) {
+                normalizeCustomSeedHexOrNull("#${hexDraft.text}")
+            } else {
+                null
+            }
+        val committedHex = draftHex ?: selectedSeedHex
+        selectedSeedHex = committedHex
+        hexDraft = committedHex.toHexFieldValue()
+        if (hexEditing && draftHex != null) onPreviewColor(committedHex)
+        hexEditing = false
+        return committedHex
+    }
+    LaunchedEffect(normalizedInitialSeedHex) {
+        selectedSeedHex = normalizedInitialSeedHex
+        hexDraft = normalizedInitialSeedHex.toHexFieldValue()
+    }
+    LaunchedEffect(hexEditing) {
+        if (hexEditing) hexFocusRequester.requestFocus()
+    }
+    LaunchedEffect(hexDraft, hexEditing) {
+        if (!hexEditing || hexDraft.text.length != 6) return@LaunchedEffect
+        delay(HEX_INPUT_DEBOUNCE_MILLIS)
+        val normalized = "#${hexDraft.text.uppercase(Locale.US)}"
+        if (hueFromHexColor(normalized) != null) {
+            selectedSeedHex = normalized
+            onPreviewColor(normalized)
+        }
+    }
+    val selectedHex = selectedSeedHex
+    val panelShape = MaterialTheme.shapes.extraLarge
+    val sliderPanelColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val saveColorLabel = stringResource(R.string.save)
+
+    Surface(
+        color = sliderPanelColor,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = panelShape,
+        tonalElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { panelCoordinates = it }
+                    .pointerInput(hexEditing, hexDraft, selectedSeedHex) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            val wasEditingAtDown = hexEditing
+                            val up = waitForUpOrCancellation(pass = PointerEventPass.Initial) ?: return@awaitEachGesture
+                            if (!wasEditingAtDown || !hexEditing) return@awaitEachGesture
+                            val tapInRoot = panelCoordinates?.localToRoot(up.position) ?: return@awaitEachGesture
+                            val editorBounds = hexEditorBoundsInRoot
+                            if (editorBounds == null || !editorBounds.contains(tapInRoot)) {
+                                commitHexEditing()
+                            }
+                        }
+                    }.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_custom_seed_slider_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                EditableHexValue(
+                    hex = selectedHex,
+                    editing = hexEditing,
+                    draft = hexDraft,
+                    focusRequester = hexFocusRequester,
+                    onStartEditing = {
+                        hexDraft = selectedSeedHex.toHexFieldValue()
+                        hexEditing = true
+                    },
+                    onDraftChange = { hexDraft = it },
+                    onStopEditing = { commitHexEditing() },
+                    onBoundsChange = { hexEditorBoundsInRoot = it },
+                )
+                FilledTonalIconButton(
+                    onClick = { onSaveColor(commitHexEditing()) },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = saveColorLabel,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+            HueColorSlider(
+                selectedHex = selectedSeedHex,
+                onSelect = {
+                    selectedSeedHex = it
+                    hexDraft = it.toHexFieldValue()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                fallbackHue = DEFAULT_CUSTOM_HUE,
+                sliderPanelColor = sliderPanelColor,
+                onValueChangeFinished = onPreviewColor,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditableHexValue(
+    hex: String,
+    editing: Boolean,
+    draft: TextFieldValue,
+    focusRequester: FocusRequester,
+    onStartEditing: () -> Unit,
+    onDraftChange: (TextFieldValue) -> Unit,
+    onStopEditing: () -> Unit,
+    onBoundsChange: (Rect?) -> Unit,
+) {
+    val view = LocalView.current
+    val hapticEnabled = LocalHapticEnabled.current
+    val shape = CircleShape
+    val textStyle =
+        MaterialTheme.typography.labelMedium.copy(
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.Center,
+        )
+    var hadFocus by remember(editing) { mutableStateOf(false) }
+    LaunchedEffect(editing) {
+        if (!editing) onBoundsChange(null)
+    }
+    if (!editing) {
+        Box(
+            modifier =
+                Modifier
+                    .width(HexValueWidth)
+                    .height(HexValueHeight)
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = shape,
+                    ).tapSoundCombinedClickable(onClick = onStartEditing)
+                    .padding(horizontal = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = hex,
+                style = textStyle,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+            )
+        }
+        return
+    }
+
+    Box(
+        modifier =
+            Modifier
+                .width(HexValueWidth)
+                .height(HexValueHeight)
+                .onGloballyPositioned { onBoundsChange(it.boundsInRoot()) }
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    shape = shape,
+                ).padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        BasicTextField(
+            value = draft.toPrefixedHexFieldValue(),
+            onValueChange = { value ->
+                val acceptedValue = value.acceptPrefixedHexInput()
+                if (acceptedValue != null) {
+                    onDraftChange(acceptedValue)
+                } else if (hapticEnabled) {
+                    view.performRejectHaptic()
+                }
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { state ->
+                        if (state.isFocused) {
+                            hadFocus = true
+                        } else if (hadFocus) {
+                            onStopEditing()
+                        }
+                    },
+            singleLine = true,
+            textStyle = textStyle,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions =
+                KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Characters,
+                    keyboardType = KeyboardType.Ascii,
+                    imeAction = ImeAction.Done,
+                ),
+            keyboardActions = KeyboardActions(onDone = { onStopEditing() }),
+        )
+    }
+}
+
+private const val DEFAULT_CUSTOM_HUE = 270f
+private const val HEX_INPUT_DEBOUNCE_MILLIS = 450L
+private val HexValueWidth = 84.dp
+private val HexValueHeight = 40.dp
+
+private fun String.dropHexPrefix(): String = removePrefix("#").take(6).uppercase(Locale.US)
+
+private fun String.toHexFieldValue(): TextFieldValue {
+    val text = dropHexPrefix()
+    return TextFieldValue(text = text, selection = TextRange(text.length))
+}
+
+private fun TextFieldValue.toPrefixedHexFieldValue(): TextFieldValue {
+    val prefixedSelection =
+        TextRange(
+            start = (selection.start + 1).coerceIn(1, text.length + 1),
+            end = (selection.end + 1).coerceIn(1, text.length + 1),
+        )
+    return copy(text = "#$text", selection = prefixedSelection)
+}
+
+private fun TextFieldValue.acceptPrefixedHexInput(): TextFieldValue? {
+    val hasPrefix = text.startsWith("#")
+    val hexText = text.removePrefix("#").take(6).uppercase(Locale.US)
+    if (text.removePrefix("#").length > 6) return null
+    if (hexText.any { !it.isDigit() && it.lowercaseChar() !in 'a'..'f' }) return null
+    val prefixOffset = if (hasPrefix) 1 else 0
+    return TextFieldValue(
+        text = hexText,
+        selection =
+            TextRange(
+                start = (selection.start - prefixOffset).coerceIn(0, hexText.length),
+                end = (selection.end - prefixOffset).coerceIn(0, hexText.length),
+            ),
+    )
+}
+
+private fun TextFieldValue.acceptHexInput(): TextFieldValue? {
+    if (text.length > 6) return null
+    if (text.any { !it.isDigit() && it.lowercaseChar() !in 'a'..'f' }) return null
+    val uppercaseText = text.uppercase(Locale.US)
+    return copy(
+        text = uppercaseText,
+        selection =
+            TextRange(
+                start = selection.start.coerceIn(0, uppercaseText.length),
+                end = selection.end.coerceIn(0, uppercaseText.length),
+            ),
+    )
+}
+
+private fun customSliderInitialSeedHex(
+    colorSource: AppColorSource,
+    activeCustomSeedHex: String,
+    currentPrimary: Color,
+): String {
+    val activeCustomSeed = normalizeCustomSeedHexOrNull(activeCustomSeedHex)
+    if (colorSource == AppColorSource.CUSTOM && activeCustomSeed != null) {
+        return activeCustomSeed
+    }
+    if (colorSource == AppColorSource.MATERIAL_YOU) {
+        return hexFromColor(currentPrimary)
+    }
+    return hexFromColor(colorSource.migrated().seedPrimary() ?: Color(0xFF16A34A))
+}
+
+private fun hexFromColor(color: Color): String {
+    val colorInt =
+        AndroidColor.argb(
+            255,
+            (color.red * 255).toInt(),
+            (color.green * 255).toInt(),
+            (color.blue * 255).toInt(),
+        )
+    return String.format(Locale.US, "#%06X", 0xFFFFFF and colorInt)
 }
 
 @Composable
@@ -588,7 +953,7 @@ private fun AppearanceToggleItem(
         }
         Spacer(Modifier.width(16.dp))
         Box {
-            Switch(
+            FilePipeSwitch(
                 checked = checked,
                 enabled = enabled,
                 onCheckedChange = if (enabled) onCheckedChange else null,

@@ -256,9 +256,18 @@ class RulesViewModel
             }
             _rules.onEach { appShortcutsManager.updateShortcuts(it) }.launchIn(viewModelScope)
             pendingShortcutRepository.pendingRuleId
-                .onEach { ruleId ->
-                    val rule = _rules.value.find { it.id == ruleId }
-                    if (rule != null) runRule(rule)
+                .combine(_rules) { pendingRuleId, rules -> pendingRuleId to rules }
+                .onEach { (pendingRuleId, rules) ->
+                    val ruleId = pendingRuleId ?: return@onEach
+                    val rule = rules.find { it.id == ruleId }
+                    if (rule == null) {
+                        if (rules.isNotEmpty()) {
+                            pendingShortcutRepository.clearPendingRule()
+                        }
+                        return@onEach
+                    }
+                    pendingShortcutRepository.clearPendingRule()
+                    runRule(rule)
                 }.launchIn(viewModelScope)
         }
 
