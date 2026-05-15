@@ -57,7 +57,6 @@ enum class AppColorSource {
         get() =
             when (this) {
                 CUSTOM,
-                DEFAULT,
                 CURATED_EMBER,
                 CURATED_GROVE,
                 CURATED_HONEY,

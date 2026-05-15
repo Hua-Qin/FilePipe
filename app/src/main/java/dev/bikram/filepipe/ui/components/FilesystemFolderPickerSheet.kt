@@ -1,7 +1,6 @@
 package dev.bikram.filepipe.ui.components
 
 import android.os.Environment
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,17 +20,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathAllowedForRules
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
+import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -208,13 +205,13 @@ fun FilesystemFolderPickerSheetContent(
                 )
             },
             confirmButton = {
-                TextButton(
+                FilePipeTextButton(
                     onClick = {
                         val trimmed = newFolderNameInput.trim()
                         val validationError = validationMessageForNewFolderName(trimmed)
                         if (validationError != null) {
                             newFolderDialogErrorResId = validationError
-                            return@TextButton
+                            return@FilePipeTextButton
                         }
                         val parentNormalized = normalizeFilesystemFolderPath(currentPath)
                         if (parentNormalized == null ||
@@ -222,25 +219,25 @@ fun FilesystemFolderPickerSheetContent(
                         ) {
                             newFolderDialogErrorResId =
                                 R.string.filesystem_folder_picker_new_folder_error_cannot_write
-                            return@TextButton
+                            return@FilePipeTextButton
                         }
                         val parentFile = File(parentNormalized)
                         if (!parentFile.isDirectory || !parentFile.canWrite()) {
                             newFolderDialogErrorResId =
                                 R.string.filesystem_folder_picker_new_folder_error_cannot_write
-                            return@TextButton
+                            return@FilePipeTextButton
                         }
                         val newFolder = File(parentFile, trimmed)
                         if (newFolder.exists()) {
                             newFolderDialogErrorResId =
                                 R.string.filesystem_folder_picker_new_folder_error_exists
-                            return@TextButton
+                            return@FilePipeTextButton
                         }
                         val created = newFolder.mkdir()
                         if (!created) {
                             newFolderDialogErrorResId =
                                 R.string.filesystem_folder_picker_new_folder_error_failed
-                            return@TextButton
+                            return@FilePipeTextButton
                         }
                         val canonicalNew = runCatching { newFolder.canonicalFile.absolutePath }.getOrNull()
                         val normalizedNew = canonicalNew?.let { normalizeFilesystemFolderPath(it) }
@@ -249,7 +246,7 @@ fun FilesystemFolderPickerSheetContent(
                         ) {
                             newFolderDialogErrorResId =
                                 R.string.filesystem_folder_picker_new_folder_error_failed
-                            return@TextButton
+                            return@FilePipeTextButton
                         }
                         showNewFolderDialog = false
                         newFolderNameInput = ""
@@ -262,7 +259,7 @@ fun FilesystemFolderPickerSheetContent(
                 }
             },
             dismissButton = {
-                TextButton(
+                FilePipeTextButton(
                     onClick = {
                         showNewFolderDialog = false
                         newFolderNameInput = ""
@@ -304,8 +301,8 @@ fun FilesystemFolderPickerSheetContent(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier =
-                        Modifier.clickable {
-                            val target = normalizeFilesystemFolderPath(segment.path) ?: return@clickable
+                        Modifier.tapSoundClickable {
+                            val target = normalizeFilesystemFolderPath(segment.path) ?: return@tapSoundClickable
                             if (File(target).isDirectory &&
                                 File(target).canRead() &&
                                 isFilesystemFolderPathAllowedForRules(target)
@@ -350,7 +347,7 @@ fun FilesystemFolderPickerSheetContent(
                             )
                         },
                         modifier =
-                            Modifier.clickable {
+                            Modifier.tapSoundClickable {
                                 runCatching { child.canonicalFile.absolutePath }
                                     .getOrNull()
                                     ?.let { canonicalChild ->
@@ -372,7 +369,7 @@ fun FilesystemFolderPickerSheetContent(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            TextButton(onClick = onDismiss) {
+            FilePipeTextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.filesystem_folder_picker_cancel))
             }
             Spacer(Modifier.weight(1f))
@@ -381,7 +378,7 @@ fun FilesystemFolderPickerSheetContent(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                OutlinedButton(
+                FilePipeOutlinedButton(
                     onClick = {
                         newFolderNameInput = ""
                         newFolderDialogErrorResId = null
@@ -396,9 +393,9 @@ fun FilesystemFolderPickerSheetContent(
                 ) {
                     Text(stringResource(R.string.filesystem_folder_picker_new_folder))
                 }
-                Button(
+                FilePipeButton(
                     onClick = {
-                        val normalized = normalizeFilesystemFolderPath(currentPath) ?: return@Button
+                        val normalized = normalizeFilesystemFolderPath(currentPath) ?: return@FilePipeButton
                         if (File(normalized).isDirectory &&
                             File(normalized).canRead() &&
                             isFilesystemFolderPathAllowedForRules(normalized)

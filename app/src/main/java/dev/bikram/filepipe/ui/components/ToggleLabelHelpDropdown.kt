@@ -8,7 +8,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -26,14 +25,12 @@ import androidx.compose.ui.unit.dp
 fun ToggleLabelHelpDropdown(
     tipText: String,
     contentDescription: String,
-    playTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     Box(modifier = modifier) {
-        IconButton(
+        FilePipeIconButton(
             onClick = {
-                playTap()
                 menuExpanded = true
             },
             modifier = Modifier.size(40.dp),

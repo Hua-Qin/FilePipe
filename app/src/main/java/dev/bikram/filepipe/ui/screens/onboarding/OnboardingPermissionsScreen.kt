@@ -32,18 +32,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -69,6 +66,12 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
+import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
+import dev.bikram.filepipe.ui.components.FilePipeTextButton
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
+import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
+import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
 import kotlinx.coroutines.delay
 
 private val PermissionCardLeadingIconSlotWidth = 44.dp
@@ -225,13 +228,17 @@ fun OnboardingPermissionsScreen(
                             .padding(horizontal = 8.dp),
                 )
                 Spacer(Modifier.height(8.dp))
-                TextButton(
+                FilePipeTextButton(
                     onClick = onOpenStorageAccessFaq,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.onboarding_permissions_learn_more))
                 }
-                AnimatedVisibility(visible = grantPanelVisible) {
+                AnimatedVisibility(
+                    visible = grantPanelVisible,
+                    enter = reducedMotionEnterTransition(),
+                    exit = reducedMotionExitTransition(),
+                ) {
                     Column(modifier = Modifier.padding(top = 16.dp)) {
                         AllFilesInstructionPanel(
                             showOpenSettingsButton = showOpenSettingsInPanel,
@@ -255,6 +262,8 @@ fun OnboardingPermissionsScreen(
         AnimatedVisibility(
             visible = !hideBottomPrimaryButton,
             modifier = Modifier.align(Alignment.BottomCenter),
+            enter = reducedMotionEnterTransition(),
+            exit = reducedMotionExitTransition(),
         ) {
             val primaryLabel =
                 when {
@@ -265,7 +274,7 @@ fun OnboardingPermissionsScreen(
                     else ->
                         stringResource(R.string.onboarding_permissions_continue)
                 }
-            Button(
+            FilePipeButton(
                 onClick = {
                     when {
                         selected == FolderAccessMode.SAF_ONLY -> {
@@ -345,7 +354,11 @@ private fun AllFilesInstructionPanel(
                 style = MaterialTheme.typography.bodyMedium,
                 color = scheme.onSurfaceVariant,
             )
-            AnimatedVisibility(visible = showNotGrantedHint) {
+            AnimatedVisibility(
+                visible = showNotGrantedHint,
+                enter = reducedMotionEnterTransition(),
+                exit = reducedMotionExitTransition(),
+            ) {
                 Text(
                     text = stringResource(R.string.onboarding_permissions_access_not_granted),
                     style = MaterialTheme.typography.bodySmall,
@@ -353,8 +366,12 @@ private fun AllFilesInstructionPanel(
                     modifier = Modifier.padding(top = 12.dp),
                 )
             }
-            AnimatedVisibility(visible = showOpenSettingsButton) {
-                OutlinedButton(
+            AnimatedVisibility(
+                visible = showOpenSettingsButton,
+                enter = reducedMotionEnterTransition(),
+                exit = reducedMotionExitTransition(),
+            ) {
+                FilePipeOutlinedButton(
                     onClick = onOpenSettings,
                     modifier =
                         Modifier
@@ -380,14 +397,17 @@ private fun FullAccessHighlightCard(
     val scale by animateFloatAsState(
         targetValue = if (selected) 1.03f else 1f,
         animationSpec =
-            spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMediumLow,
+            reducedMotionAwareSpec(
+                spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
             ),
         label = "fullAccessCardScale",
     )
     val borderColor by animateColorAsState(
         targetValue = if (selected) scheme.primary else scheme.primary.copy(alpha = 0.55f),
+        animationSpec = reducedMotionAwareSpec(spring()),
         label = "fullAccessBorder",
     )
     val surfaceBlend = if (selected) 0.22f else 0.40f
@@ -499,9 +519,11 @@ private fun SelectFoldersSecondaryCard(
     val scale by animateFloatAsState(
         targetValue = if (selected) 1.02f else 1f,
         animationSpec =
-            spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMediumLow,
+            reducedMotionAwareSpec(
+                spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessMediumLow,
+                ),
             ),
         label = "selectFoldersCardScale",
     )
@@ -511,6 +533,7 @@ private fun SelectFoldersSecondaryCard(
                 selected -> scheme.primary
                 else -> scheme.outlineVariant.copy(alpha = 0.5f)
             },
+        animationSpec = reducedMotionAwareSpec(spring()),
         label = "selectFoldersBorder",
     )
     val borderWidth = if (selected) 2.dp else 1.dp

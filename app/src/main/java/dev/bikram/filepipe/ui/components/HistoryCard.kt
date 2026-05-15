@@ -2,7 +2,6 @@ package dev.bikram.filepipe.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -11,9 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,6 +19,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.R
@@ -32,6 +32,7 @@ import dev.bikram.filepipe.domain.model.TriggerType
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import dev.bikram.filepipe.domain.model.isNoChangesRun
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -45,11 +46,14 @@ fun HistoryCard(
     modifier: Modifier = Modifier,
 ) {
     val cardColors = elevatedCardColors()
-    Surface(
+    FilePipeSurface(
+        onClick = onClick,
         modifier =
             modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick),
+                .semantics(mergeDescendants = true) {
+                    role = Role.Button
+                },
         shape = HistoryCardShape,
         color = cardColors.containerColor,
         contentColor = cardColors.contentColor,
@@ -136,7 +140,6 @@ fun HistoryCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatusChip(
     status: RunStatus,
@@ -158,15 +161,21 @@ fun StatusChip(
         }
     val containerColor by animateColorAsState(
         targetValue = targetColor,
-        animationSpec = tween(300),
+        animationSpec = reducedMotionAwareSpec(tween(300)),
         label = "chipColor",
     )
-    SuggestionChip(
-        onClick = {},
-        label = { Text(label, style = MaterialTheme.typography.labelMedium) },
+    Surface(
         modifier = modifier,
-        colors = SuggestionChipDefaults.suggestionChipColors(containerColor = containerColor),
-    )
+        shape = SuggestionChipDefaults.shape,
+        color = containerColor,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+        )
+    }
 }
 
 private val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())

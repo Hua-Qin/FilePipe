@@ -36,12 +36,8 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -50,7 +46,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
@@ -65,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -82,11 +78,15 @@ import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.HistoryStatusFilter
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
+import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeFilterChip
+import dev.bikram.filepipe.ui.components.FilePipeIconButton
+import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.HistoryCard
 import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyHistoryIllustration
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
@@ -94,6 +94,7 @@ import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 
@@ -105,7 +106,6 @@ fun HistoryScreen(
     onNavigateBack: (() -> Unit)? = null,
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
-    val playTap = rememberPlayTapSound()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val availableStatusFilters by viewModel.availableStatusFilters.collectAsStateWithLifecycle()
     val pagingItems = viewModel.historyPagingFlow.collectAsLazyPagingItems()
@@ -182,9 +182,8 @@ fun HistoryScreen(
             title = { Text(stringResource(R.string.history_clear_confirm_title)) },
             text = { Text(stringResource(R.string.history_clear_confirm_message)) },
             confirmButton = {
-                TextButton(
+                FilePipeTextButton(
                     onClick = {
-                        playTap()
                         showClearConfirm = false
                         viewModel.clearAllHistory()
                     },
@@ -193,8 +192,7 @@ fun HistoryScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    playTap()
+                FilePipeTextButton(onClick = {
                     showClearConfirm = false
                 }) {
                     Text(stringResource(R.string.cancel))
@@ -209,11 +207,12 @@ fun HistoryScreen(
         topBar = {
             val navigationIcon: @Composable () -> Unit = {
                 if (onNavigateBack != null) {
-                    IconButton(onClick = {
-                        playTap()
-                        onNavigateBack()
-                    }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    val backLabel = stringResource(R.string.nav_back)
+                    FilePipeIconButton(
+                        onClick = onNavigateBack,
+                        tooltipLabel = backLabel,
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, backLabel)
                     }
                 }
             }
@@ -234,10 +233,11 @@ fun HistoryScreen(
                     navigationIcon = navigationIcon,
                     actions = {
                         Box {
-                            FilledTonalIconButton(onClick = {
-                                playTap()
-                                groupMenuExpanded = true
-                            }) {
+                            val groupMenuLabel = stringResource(R.string.history_group_menu)
+                            FilePipeFilledTonalIconButton(
+                                onClick = { groupMenuExpanded = true },
+                                tooltipLabel = groupMenuLabel,
+                            ) {
                                 val groupIcon =
                                     when (uiState.viewMode) {
                                         HistoryViewMode.BY_DATE -> Icons.Default.DateRange
@@ -246,7 +246,7 @@ fun HistoryScreen(
                                     }
                                 Icon(
                                     imageVector = groupIcon,
-                                    contentDescription = stringResource(R.string.history_group_menu),
+                                    contentDescription = groupMenuLabel,
                                 )
                             }
                             DropdownMenu(
@@ -254,29 +254,26 @@ fun HistoryScreen(
                                 onDismissRequest = { groupMenuExpanded = false },
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             ) {
-                                DropdownMenuItem(
+                                FilePipeDropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_date)) },
                                     leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_DATE, onClick = null) },
                                     onClick = {
-                                        playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_DATE)
                                         groupMenuExpanded = false
                                     },
                                 )
-                                DropdownMenuItem(
+                                FilePipeDropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_rule)) },
                                     leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_RULE, onClick = null) },
                                     onClick = {
-                                        playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_RULE)
                                         groupMenuExpanded = false
                                     },
                                 )
-                                DropdownMenuItem(
+                                FilePipeDropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_group_by_status)) },
                                     leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_STATUS, onClick = null) },
                                     onClick = {
-                                        playTap()
                                         viewModel.setViewMode(HistoryViewMode.BY_STATUS)
                                         groupMenuExpanded = false
                                     },
@@ -284,13 +281,14 @@ fun HistoryScreen(
                             }
                         }
                         Box {
-                            FilledTonalIconButton(onClick = {
-                                playTap()
-                                sortMenuExpanded = true
-                            }) {
+                            val sortMenuLabel = stringResource(R.string.history_sort_menu)
+                            FilePipeFilledTonalIconButton(
+                                onClick = { sortMenuExpanded = true },
+                                tooltipLabel = sortMenuLabel,
+                            ) {
                                 Icon(
                                     Icons.AutoMirrored.Filled.Sort,
-                                    contentDescription = stringResource(R.string.history_sort_menu),
+                                    contentDescription = sortMenuLabel,
                                 )
                             }
                             DropdownMenu(
@@ -298,38 +296,34 @@ fun HistoryScreen(
                                 onDismissRequest = { sortMenuExpanded = false },
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             ) {
-                                DropdownMenuItem(
+                                FilePipeDropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
                                     leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
                                     onClick = {
-                                        playTap()
                                         viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
                                         sortMenuExpanded = false
                                     },
                                 )
-                                DropdownMenuItem(
+                                FilePipeDropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
                                     leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
                                     onClick = {
-                                        playTap()
                                         viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
                                         sortMenuExpanded = false
                                     },
                                 )
-                                DropdownMenuItem(
+                                FilePipeDropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
                                     leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
                                     onClick = {
-                                        playTap()
                                         viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
                                         sortMenuExpanded = false
                                     },
                                 )
-                                DropdownMenuItem(
+                                FilePipeDropdownMenuItem(
                                     text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
                                     leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
                                     onClick = {
-                                        playTap()
                                         viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)
                                         sortMenuExpanded = false
                                     },
@@ -350,10 +344,9 @@ fun HistoryScreen(
                         key = { (filter, _) -> filter.ordinal },
                     ) { (filter, label) ->
                         val filterEnabled = filter in availableStatusFilters
-                        FilterChip(
+                        FilePipeFilterChip(
                             selected = uiState.statusFilter == filter,
                             onClick = {
-                                playTap()
                                 viewModel.setStatusFilter(filter)
                             },
                             enabled = filterEnabled,
@@ -385,7 +378,7 @@ fun HistoryScreen(
         if (isEmpty) {
             AnimatedVisibility(
                 visible = true,
-                enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 },
+                enter = reducedMotionEnterTransition(fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 Column(
@@ -401,18 +394,23 @@ fun HistoryScreen(
                 ) {
                     ThemeColoredEmptyHistoryIllustration(Modifier.size(120.dp))
                     Spacer(Modifier.height(24.dp))
-                    Text(
-                        text = stringResource(R.string.history_empty_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.history_empty_subtitle),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
-                        textAlign = TextAlign.Center,
-                    )
+                    Column(
+                        modifier = Modifier.semantics(mergeDescendants = true) { },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text(
+                            text = stringResource(R.string.history_empty_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.history_empty_subtitle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
                 }
             }
         } else if (isUsingPaging) {
@@ -468,10 +466,7 @@ fun HistoryScreen(
                         is HistoryItem.Entry -> {
                             SwipeToDismissHistoryCard(
                                 history = item.history,
-                                onClick = {
-                                    playTap()
-                                    onHistoryClick(item.history.id)
-                                },
+                                onClick = { onHistoryClick(item.history.id) },
                                 onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
                                 modifier = Modifier.animateItem(),
                             )
@@ -556,10 +551,7 @@ fun HistoryScreen(
                         is HistoryItem.Entry -> {
                             SwipeToDismissHistoryCard(
                                 history = item.history,
-                                onClick = {
-                                    playTap()
-                                    onHistoryClick(item.history.id)
-                                },
+                                onClick = { onHistoryClick(item.history.id) },
                                 onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
                                 modifier = Modifier.animateItem(),
                             )

@@ -177,6 +177,7 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3.expressive)
+    implementation(libs.compose.material3.adaptive.navigation.suite)
     implementation(libs.compose.material.icons.core)
     implementation(libs.compose.material.icons.extended)
     implementation(libs.reorderable)

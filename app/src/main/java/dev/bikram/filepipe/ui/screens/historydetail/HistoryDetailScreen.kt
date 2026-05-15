@@ -15,7 +15,6 @@ import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,13 +44,11 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -90,10 +87,12 @@ import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.TriggerType
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import dev.bikram.filepipe.domain.model.isNoChangesRun
+import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.StatusChip
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.formatTime
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
@@ -126,7 +125,6 @@ fun HistoryDetailScreen(
     onNavigateBack: () -> Unit,
     viewModel: HistoryDetailViewModel = hiltViewModel(),
 ) {
-    val playTap = rememberPlayTapSound()
     val history by viewModel.history.collectAsStateWithLifecycle()
     val files by viewModel.files.collectAsStateWithLifecycle()
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
@@ -211,10 +209,7 @@ fun HistoryDetailScreen(
                     item {
                         RunSummaryCard(
                             history = h,
-                            onUndo = {
-                                playTap()
-                                viewModel.undoRun()
-                            },
+                            onUndo = viewModel::undoRun,
                         )
                     }
                     if (files.isNotEmpty()) {
@@ -250,10 +245,7 @@ fun HistoryDetailScreen(
                 )
             },
             navigationIcon = {
-                IconButton(onClick = {
-                    playTap()
-                    onNavigateBack()
-                }) {
+                FilePipeIconButton(onClick = onNavigateBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                 }
             },
@@ -338,7 +330,7 @@ private fun RunSummaryCard(
                 (history.status == RunStatus.SUCCESS || history.status == RunStatus.CANCELLED)
             ) {
                 Spacer(Modifier.height(8.dp))
-                Button(
+                FilePipeButton(
                     onClick = onUndo,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(50),
@@ -413,7 +405,7 @@ private fun FileMovedCard(
                 .fillMaxWidth()
                 .then(
                     if (isSuccess) {
-                        Modifier.clickable {
+                        Modifier.tapSoundClickable {
                             openFileWithDefaultApp(context, file.destinationUri)
                         }
                     } else {

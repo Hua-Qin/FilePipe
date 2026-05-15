@@ -282,6 +282,11 @@ class SettingsViewModel
                 userPreferencesRepository.selectCustomSeedHex(hex)
             }
 
+        fun previewCustomSeedHex(hex: String) =
+            viewModelScope.launch {
+                userPreferencesRepository.previewCustomSeedHex(hex)
+            }
+
         fun removeCustomSeedHex(hex: String) =
             viewModelScope.launch {
                 userPreferencesRepository.removeCustomSeedHex(hex)

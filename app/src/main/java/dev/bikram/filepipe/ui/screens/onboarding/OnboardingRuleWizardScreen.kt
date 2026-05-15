@@ -21,13 +21,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -39,6 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.RuleTemplate
+import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeElevatedCard
+import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.RuleIconOrEmoji
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,7 +113,7 @@ fun OnboardingRuleWizardScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             val onboardingCtaPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
-            OutlinedButton(
+            FilePipeOutlinedButton(
                 onClick = onBackToPermissions,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(50),
@@ -138,7 +138,7 @@ fun OnboardingRuleWizardScreen(
                     Spacer(Modifier.size(24.dp))
                 }
             }
-            Button(
+            FilePipeButton(
                 onClick = onSkip,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(50),
@@ -173,7 +173,7 @@ private fun TemplateCard(
     template: RuleTemplate,
     onUseTemplate: () -> Unit,
 ) {
-    ElevatedCard(
+    FilePipeElevatedCard(
         onClick = onUseTemplate,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -228,7 +228,7 @@ private fun TemplateCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun StartBlankCard(onStartBlank: () -> Unit) {
-    ElevatedCard(
+    FilePipeElevatedCard(
         onClick = onStartBlank,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),

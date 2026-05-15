@@ -14,22 +14,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TooltipAnchorPosition
@@ -53,7 +48,6 @@ import androidx.compose.ui.window.DialogProperties
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.ScheduleType
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,7 +57,6 @@ fun ScheduleDialog(
     onDismiss: () -> Unit,
     onSave: (RuleSchedule?) -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     var scheduleType by remember { mutableStateOf(initialSchedule?.type ?: ScheduleType.DAILY) }
     var hour by remember { mutableIntStateOf(initialSchedule?.hour ?: 9) }
     var minute by remember { mutableIntStateOf(initialSchedule?.minute ?: 0) }
@@ -105,7 +98,6 @@ fun ScheduleDialog(
             onConfirm = { pickedHour, pickedMinute ->
                 hour = pickedHour
                 minute = pickedMinute
-                playTap()
                 showTimePicker = false
             },
         )
@@ -167,21 +159,21 @@ fun ScheduleDialog(
                             onDismissRequest = { typeExpanded = false },
                             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                         ) {
-                            DropdownMenuItem(
+                            FilePipeDropdownMenuItem(
                                 text = { Text(stringResource(R.string.schedule_hourly)) },
                                 onClick = {
                                     scheduleType = ScheduleType.EVERY_N_HOURS
                                     typeExpanded = false
                                 },
                             )
-                            DropdownMenuItem(
+                            FilePipeDropdownMenuItem(
                                 text = { Text(stringResource(R.string.schedule_daily)) },
                                 onClick = {
                                     scheduleType = ScheduleType.DAILY
                                     typeExpanded = false
                                 },
                             )
-                            DropdownMenuItem(
+                            FilePipeDropdownMenuItem(
                                 text = { Text(stringResource(R.string.schedule_weekly)) },
                                 onClick = {
                                     scheduleType = ScheduleType.WEEKLY
@@ -214,7 +206,7 @@ fun ScheduleDialog(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                             ) {
                                 days.forEach { (calDay, name) ->
-                                    DropdownMenuItem(
+                                    FilePipeDropdownMenuItem(
                                         text = { Text(name) },
                                         onClick = {
                                             dayOfWeek = calDay
@@ -262,7 +254,7 @@ fun ScheduleDialog(
                                 else -> hourMod
                             }
                         val amPm = if (hour < 12) "AM" else "PM"
-                        OutlinedButton(
+                        FilePipeOutlinedButton(
                             onClick = { showTimePicker = true },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -284,9 +276,8 @@ fun ScheduleDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (initialSchedule != null) {
-                        TextButton(
+                        FilePipeTextButton(
                             onClick = {
-                                playTap()
                                 onSave(null)
                             },
                             modifier = Modifier.weight(1f),
@@ -297,22 +288,18 @@ fun ScheduleDialog(
                             )
                         }
                     }
-                    OutlinedButton(
-                        onClick = {
-                            playTap()
-                            onDismiss()
-                        },
+                    FilePipeOutlinedButton(
+                        onClick = onDismiss,
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(12.dp),
                     ) {
                         Text(stringResource(R.string.cancel))
                     }
-                    Button(
+                    FilePipeButton(
                         onClick = {
                             if (scheduleType == ScheduleType.EVERY_N_HOURS && !validateIntervalText()) {
-                                return@Button
+                                return@FilePipeButton
                             }
-                            playTap()
                             val intervalParsed = intervalHoursText.toIntOrNull()?.coerceIn(1, 24) ?: 6
                             onSave(
                                 RuleSchedule(
@@ -413,7 +400,7 @@ private fun ScheduleTimePickerDialog(
                             },
                             state = rememberTooltipState(),
                         ) {
-                            IconButton(
+                            FilePipeIconButton(
                                 onClick = { showDial = !showDial },
                             ) {
                                 Icon(
@@ -428,10 +415,10 @@ private fun ScheduleTimePickerDialog(
                             }
                         }
                         Spacer(Modifier.weight(1f))
-                        TextButton(onClick = onDismiss) {
+                        FilePipeTextButton(onClick = onDismiss) {
                             Text(stringResource(R.string.cancel))
                         }
-                        TextButton(
+                        FilePipeTextButton(
                             onClick = {
                                 onConfirm(timePickerState.hour, timePickerState.minute)
                             },

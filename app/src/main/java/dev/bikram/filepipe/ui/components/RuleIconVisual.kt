@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -49,6 +50,12 @@ fun RuleIconOrEmoji(
     contentDescription: String? = null,
 ) {
     val emoji = iconEmoji?.trim()?.takeIf { it.isNotEmpty() }
+    val semanticsModifier =
+        if (contentDescription == null) {
+            modifier.clearAndSetSemantics { }
+        } else {
+            modifier
+        }
     if (emoji != null) {
         Text(
             text = emoji,
@@ -56,13 +63,13 @@ fun RuleIconOrEmoji(
             color = tint,
             maxLines = 1,
             textAlign = TextAlign.Center,
-            modifier = modifier,
+            modifier = semanticsModifier,
         )
     } else {
         Icon(
             imageVector = icon.toImageVector(),
             contentDescription = contentDescription,
-            modifier = modifier.size(vectorSize),
+            modifier = semanticsModifier.size(vectorSize),
             tint = tint,
         )
     }

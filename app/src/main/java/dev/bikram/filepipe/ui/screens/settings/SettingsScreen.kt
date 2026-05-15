@@ -34,7 +34,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -51,7 +50,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -90,13 +88,10 @@ import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
@@ -104,8 +99,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -113,7 +106,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTopAppBarState
@@ -168,17 +160,22 @@ import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
+import dev.bikram.filepipe.ui.common.AppBottomSheet
 import dev.bikram.filepipe.ui.components.AboutAuthorPhoto
 import dev.bikram.filepipe.ui.components.AppIconImage
-import dev.bikram.filepipe.ui.components.FilePipeBottomSheetDragHandle
+import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
+import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.text.SimpleMarkdown
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
@@ -188,6 +185,7 @@ import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
@@ -261,7 +259,6 @@ fun SettingsScreen(
     onOpenHelp: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
-    val playTap = rememberPlayTapSound()
     val preferences by viewModel.preferencesFlow.collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
@@ -550,15 +547,18 @@ fun SettingsScreen(
 
     if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
         val updateSheetContainerColors = elevatedCardColors()
-        ModalBottomSheet(
-            onDismissRequest = {
+        AppBottomSheet(
+            title = "",
+            onDismiss = {
                 showUpdateSheet = false
                 viewModel.dismissUpdateSheet()
             },
             sheetState = updateSheetState,
+            showTitleBar = false,
+            scrollable = false,
+            contentPadding = PaddingValues(0.dp),
             containerColor = updateSheetContainerColors.containerColor,
             contentColor = updateSheetContainerColors.contentColor,
-            dragHandle = { FilePipeBottomSheetDragHandle() },
         ) {
             UpdateCheckBottomSheetContent(
                 maxSheetHeight = maxUpdateSheetHeight,
@@ -569,9 +569,7 @@ fun SettingsScreen(
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
                 usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
-                playTap = playTap,
                 onDownloadClick = { info ->
-                    playTap()
                     if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.downloadUrl.isBlank()) {
                         val hostActivity = context as? ComponentActivity
                         viewModel.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
@@ -580,7 +578,6 @@ fun SettingsScreen(
                     }
                 },
                 onSkipVersionClick = {
-                    playTap()
                     updateInfo?.let { info ->
                         viewModel.skipAcknowledgedGithubRelease(info)
                         showUpdateSheet = false
@@ -592,7 +589,6 @@ fun SettingsScreen(
     }
 
     fun applyFolderAccessMode(mode: FolderAccessMode) {
-        playTap()
         if (preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED &&
             mode != FolderAccessMode.ALL_FILES_PREFERRED
         ) {
@@ -608,8 +604,7 @@ fun SettingsScreen(
             title = { Text(stringResource(R.string.settings_folder_access_switch_to_saf_title)) },
             text = { Text(stringResource(R.string.settings_folder_access_switch_to_saf_body)) },
             confirmButton = {
-                TextButton(onClick = {
-                    playTap()
+                FilePipeTextButton(onClick = {
                     val confirmedTarget = targetMode
                     pendingFolderAccessSwitch = null
                     coroutineScope.launch {
@@ -640,7 +635,7 @@ fun SettingsScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingFolderAccessSwitch = null }) {
+                FilePipeTextButton(onClick = { pendingFolderAccessSwitch = null }) {
                     Text(stringResource(R.string.cancel))
                 }
             },
@@ -653,8 +648,7 @@ fun SettingsScreen(
             title = { Text(stringResource(R.string.settings_backup_import_restore_help_title)) },
             text = { Text(stringResource(R.string.settings_backup_import_restore_help_body)) },
             confirmButton = {
-                TextButton(onClick = {
-                    playTap()
+                FilePipeTextButton(onClick = {
                     showBackupImportRestoreHelp = false
                 }) {
                     Text(stringResource(R.string.settings_backup_help_ok))
@@ -683,11 +677,8 @@ fun SettingsScreen(
                     colors = gradientOverlayTopAppBarColors(),
                     actions = {
                         val helpOpenLabel = stringResource(R.string.settings_fab_open_help)
-                        FilledTonalIconButton(
-                            onClick = {
-                                playTap()
-                                onOpenHelp()
-                            },
+                        FilePipeFilledTonalIconButton(
+                            onClick = onOpenHelp,
                             modifier = Modifier.semantics { contentDescription = helpOpenLabel },
                         ) {
                             Text(
@@ -704,9 +695,8 @@ fun SettingsScreen(
                                     R.string.settings_collapse_all_sections_cd
                                 },
                             )
-                        FilledTonalIconButton(
+                        FilePipeFilledTonalIconButton(
                             onClick = {
-                                playTap()
                                 collapsedSettingsSectionKeys =
                                     if (allSettingsSectionsCollapsed) {
                                         collapsedSettingsSectionKeys - settingsExpandableSectionKeys
@@ -761,7 +751,6 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_appearance_section),
                     collapsedSectionKeys = collapsedSettingsSectionKeys,
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                    playTap = playTap,
                 ) {
                     AppearanceSection(
                         themeMode = preferences.themeMode,
@@ -772,44 +761,17 @@ fun SettingsScreen(
                         useGradientBackground = preferences.useGradientBackground,
                         useEnhancedShading = preferences.useEnhancedShading,
                         progressiveBlurEnabled = preferences.progressiveBlurEnabled,
-                        onThemeMode = { mode ->
-                            playTap()
-                            viewModel.setThemeMode(mode)
-                        },
-                        onColorSource = { source ->
-                            playTap()
-                            viewModel.setColorSource(source)
-                        },
-                        onPaletteStyle = { style ->
-                            playTap()
-                            viewModel.setThemePaletteStyle(style)
-                        },
-                        onAddCustomSeedHex = { hex ->
-                            playTap()
-                            viewModel.addCustomSeedHex(hex)
-                        },
-                        onSelectCustomSeedHex = { hex ->
-                            playTap()
-                            viewModel.selectCustomSeedHex(hex)
-                        },
-                        onRemoveCustomSeedHex = { hex ->
-                            playTap()
-                            viewModel.removeCustomSeedHex(hex)
-                        },
-                        onUseGradientBackground = { enabled ->
-                            playTap()
-                            viewModel.setUseGradientBackground(enabled)
-                        },
-                        onUseEnhancedShading = { enabled ->
-                            playTap()
-                            viewModel.setUseEnhancedShading(enabled)
-                        },
-                        onProgressiveBlurEnabled = { enabled ->
-                            playTap()
-                            viewModel.setProgressiveBlurEnabled(enabled)
-                        },
+                        onThemeMode = viewModel::setThemeMode,
+                        onColorSource = viewModel::setColorSource,
+                        onPaletteStyle = viewModel::setThemePaletteStyle,
+                        onAddCustomSeedHex = viewModel::addCustomSeedHex,
+                        onSelectCustomSeedHex = viewModel::selectCustomSeedHex,
+                        onPreviewCustomSeedHex = viewModel::previewCustomSeedHex,
+                        onRemoveCustomSeedHex = viewModel::removeCustomSeedHex,
+                        onUseGradientBackground = viewModel::setUseGradientBackground,
+                        onUseEnhancedShading = viewModel::setUseEnhancedShading,
+                        onProgressiveBlurEnabled = viewModel::setProgressiveBlurEnabled,
                         onBlackThemeEffectClick = {
-                            playTap()
                             coroutineScope.launch {
                                 snackbarHostState.currentSnackbarData?.dismiss()
                                 snackbarHostState.showSnackbar(
@@ -842,7 +804,6 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_folder_access_section),
                         collapsedSectionKeys = collapsedSettingsSectionKeys,
                         onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                        playTap = playTap,
                     ) {
                         Text(
                             text = stringResource(R.string.onboarding_permissions_subtitle),
@@ -863,11 +824,11 @@ fun SettingsScreen(
                                     trailingContent = {
                                         RadioButton(
                                             selected = preferences.folderAccessMode == FolderAccessMode.SAF_ONLY,
-                                            onClick = { applyFolderAccessMode(FolderAccessMode.SAF_ONLY) },
+                                            onClick = null,
                                         )
                                     },
                                     modifier =
-                                        Modifier.clickable {
+                                        Modifier.tapSoundClickable {
                                             applyFolderAccessMode(FolderAccessMode.SAF_ONLY)
                                         },
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -884,11 +845,11 @@ fun SettingsScreen(
                                     trailingContent = {
                                         RadioButton(
                                             selected = preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED,
-                                            onClick = { applyFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED) },
+                                            onClick = null,
                                         )
                                     },
                                     modifier =
-                                        Modifier.clickable {
+                                        Modifier.tapSoundClickable {
                                             applyFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
                                         },
                                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -936,10 +897,7 @@ fun SettingsScreen(
                                 modifier =
                                     Modifier
                                         .padding(start = 8.dp)
-                                        .clickable {
-                                            playTap()
-                                            onOpenFaqStorageSection()
-                                        },
+                                        .tapSoundClickable(onClick = onOpenFaqStorageSection),
                             )
                         }
                         val showAllFilesActionButton =
@@ -952,9 +910,8 @@ fun SettingsScreen(
                             }
                         if (showAllFilesActionButton) {
                             Spacer(Modifier.height(8.dp))
-                            OutlinedButton(
+                            FilePipeOutlinedButton(
                                 onClick = {
-                                    playTap()
                                     val manageIntent =
                                         Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
                                             data = Uri.parse("package:${context.packageName}")
@@ -1000,7 +957,6 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_touch_sound_section),
                         collapsedSectionKeys = collapsedSettingsSectionKeys,
                         onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                        playTap = playTap,
                     ) {
                         GroupedListColumn {
                             GroupedListItem(position = GroupPosition.FIRST) {
@@ -1009,10 +965,7 @@ fun SettingsScreen(
                                     title = stringResource(R.string.settings_haptic_feedback),
                                     subtitle = stringResource(R.string.settings_haptic_feedback_desc),
                                     checked = preferences.hapticFeedbackEnabled,
-                                    onCheckedChange = { enabled ->
-                                        playTap()
-                                        viewModel.setHapticFeedbackEnabled(enabled)
-                                    },
+                                    onCheckedChange = viewModel::setHapticFeedbackEnabled,
                                 )
                             }
                             GroupedListItem(position = GroupPosition.LAST) {
@@ -1043,7 +996,6 @@ fun SettingsScreen(
                                         FilePipeSwitch(
                                             checked = notificationsGranted,
                                             onCheckedChange = { wantEnabled ->
-                                                playTap()
                                                 when {
                                                     wantEnabled &&
                                                         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
@@ -1062,8 +1014,7 @@ fun SettingsScreen(
                                         )
                                     },
                                     modifier =
-                                        Modifier.clickable {
-                                            playTap()
+                                        Modifier.tapSoundClickable {
                                             if (!notificationsGranted) {
                                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                                     pendingEnableUpdateNotificationsAfterPermission = false
@@ -1094,7 +1045,6 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_swipe_gestures_section),
                     collapsedSectionKeys = collapsedSettingsSectionKeys,
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                    playTap = playTap,
                 ) {
                     GroupedListColumn {
                         GroupedListItem(position = GroupPosition.FIRST) {
@@ -1150,7 +1100,6 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_history_section),
                     collapsedSectionKeys = collapsedSettingsSectionKeys,
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                    playTap = playTap,
                 ) {
                     GroupedListColumn {
                         GroupedListItem(position = GroupPosition.ONLY) {
@@ -1189,7 +1138,6 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_backup_section),
                     collapsedSectionKeys = collapsedSettingsSectionKeys,
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                    playTap = playTap,
                 ) {
                     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
                     val localFolderLabel =
@@ -1258,7 +1206,6 @@ fun SettingsScreen(
                                 checked = preferences.autoExportOnRuleChange,
                                 switchEnabled = autoExportSwitchEnabled,
                                 onDisabledInteraction = {
-                                    playTap()
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
                                             message = context.getString(R.string.settings_export_select_folder_first),
@@ -1266,10 +1213,7 @@ fun SettingsScreen(
                                         )
                                     }
                                 },
-                                onCheckedChange = { enabled ->
-                                    playTap()
-                                    viewModel.setAutoExportOnChange(enabled)
-                                },
+                                onCheckedChange = viewModel::setAutoExportOnChange,
                             )
                         }
                         GroupedListItem(position = GroupPosition.MIDDLE) {
@@ -1279,7 +1223,6 @@ fun SettingsScreen(
                                 checked = preferences.scheduledExportEnabled,
                                 switchEnabled = scheduledExportSwitchEnabled,
                                 onDisabledInteraction = {
-                                    playTap()
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
                                             message = context.getString(R.string.settings_export_select_folder_first),
@@ -1287,10 +1230,7 @@ fun SettingsScreen(
                                         )
                                     }
                                 },
-                                onCheckedChange = { enabled ->
-                                    playTap()
-                                    viewModel.setScheduledExportEnabled(enabled)
-                                },
+                                onCheckedChange = viewModel::setScheduledExportEnabled,
                             )
                         }
                         GroupedListItem(position = GroupPosition.LAST) {
@@ -1306,9 +1246,8 @@ fun SettingsScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    OutlinedButton(
+                                    FilePipeOutlinedButton(
                                         onClick = {
-                                            playTap()
                                             pendingBackupPickAction = BackupImportPickAction.ImportMerge
                                             importLauncher.launch("application/json")
                                         },
@@ -1316,9 +1255,8 @@ fun SettingsScreen(
                                     ) {
                                         Text(stringResource(R.string.settings_import_rules))
                                     }
-                                    OutlinedButton(
+                                    FilePipeOutlinedButton(
                                         onClick = {
-                                            playTap()
                                             if (exportFolderReady) {
                                                 viewModel.exportToConfiguredBackupFolders()
                                             } else {
@@ -1350,8 +1288,7 @@ fun SettingsScreen(
                                         modifier =
                                             Modifier
                                                 .matchParentSize()
-                                                .clickable {
-                                                    playTap()
+                                                .tapSoundClickable {
                                                     pendingBackupPickAction = BackupImportPickAction.RestoreFull
                                                     importLauncher.launch("application/json")
                                                 },
@@ -1369,8 +1306,7 @@ fun SettingsScreen(
                                                 .align(Alignment.CenterEnd)
                                                 .fillMaxHeight()
                                                 .width(40.dp)
-                                                .clickable {
-                                                    playTap()
+                                                .tapSoundClickable {
                                                     showBackupImportRestoreHelp = true
                                                 },
                                         contentAlignment = Alignment.Center,
@@ -1399,14 +1335,12 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_updates_section),
                             collapsedSectionKeys = collapsedSettingsSectionKeys,
                             onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                            playTap = playTap,
                         ) {
                             GroupedListColumn {
                                 GroupedListItem(position = GroupPosition.FIRST) {
                                     UpdateCheckScheduleDropdown(
                                         selected = preferences.updateCheckSchedule,
                                         onSelect = { schedule ->
-                                            playTap()
                                             viewModel.setUpdateCheckSchedule(schedule)
                                         },
                                         modifier =
@@ -1420,10 +1354,7 @@ fun SettingsScreen(
                                         SettingsToggleItem(
                                             title = stringResource(R.string.settings_save_update_apk_to_downloads),
                                             checked = preferences.saveUpdateApkToDownloads,
-                                            onCheckedChange = { enabled ->
-                                                playTap()
-                                                viewModel.setSaveUpdateApkToDownloads(enabled)
-                                            },
+                                            onCheckedChange = viewModel::setSaveUpdateApkToDownloads,
                                         )
                                     }
                                 }
@@ -1432,7 +1363,6 @@ fun SettingsScreen(
                                         title = stringResource(R.string.settings_notify_new_updates),
                                         checked = preferences.notifyOnNewUpdates,
                                         onCheckedChange = { enabled ->
-                                            playTap()
                                             when {
                                                 !enabled -> {
                                                     pendingEnableUpdateNotificationsAfterPermission = false
@@ -1496,8 +1426,7 @@ fun SettingsScreen(
                                             )
                                         },
                                         modifier =
-                                            Modifier.clickable {
-                                                playTap()
+                                            Modifier.tapSoundClickable {
                                                 viewModel.beginManualUpdateCheckFromSheet()
                                                 viewModel.loadChangelogForUpdateSheet()
                                                 showUpdateSheet = true
@@ -1520,7 +1449,6 @@ fun SettingsScreen(
                             title = stringResource(R.string.settings_dev_release_mocks_section),
                             collapsedSectionKeys = collapsedSettingsSectionKeys,
                             onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                            playTap = playTap,
                         ) {
                             Column(
                                 modifier =
@@ -1529,18 +1457,16 @@ fun SettingsScreen(
                                         .padding(horizontal = 16.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                OutlinedButton(
+                                FilePipeOutlinedButton(
                                     onClick = {
-                                        playTap()
                                         viewModel.devReleaseMockArmRulesUpdatePromoForRulesTab()
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                 ) {
                                     Text(stringResource(R.string.settings_dev_release_mock_rules_banner))
                                 }
-                                OutlinedButton(
+                                FilePipeOutlinedButton(
                                     onClick = {
-                                        playTap()
                                         viewModel.devReleaseMockStartPlayUpdateBannerSequence()
                                     },
                                     modifier = Modifier.fillMaxWidth(),
@@ -1647,10 +1573,7 @@ fun SettingsScreen(
                                             Modifier
                                                 .size(84.dp)
                                                 .clip(RoundedCornerShape(percent = 25))
-                                                .clickable {
-                                                    playTap()
-                                                    onOpenIntro()
-                                                },
+                                                .tapSoundClickable(onClick = onOpenIntro),
                                     )
                                     Spacer(Modifier.width(20.dp))
                                     AboutAuthorPhoto(
@@ -1658,8 +1581,7 @@ fun SettingsScreen(
                                             Modifier
                                                 .size(84.dp)
                                                 .clip(RoundedCornerShape(16.dp))
-                                                .clickable {
-                                                    playTap()
+                                                .tapSoundClickable {
                                                     val profileUrl =
                                                         aboutContext.getString(R.string.about_author_github_profile_url)
                                                     runCatching {
@@ -1963,7 +1885,6 @@ private fun UpdateCheckScheduleDropdown(
     onSelect: (UpdateCheckSchedule) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val playTap = rememberPlayTapSound()
     var expanded by remember { mutableStateOf(false) }
     val options = remember { UpdateCheckSchedule.entries }
     Row(
@@ -1976,10 +1897,7 @@ private fun UpdateCheckScheduleDropdown(
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f),
         )
-        OutlinedButton(onClick = {
-            playTap()
-            expanded = true
-        }) {
+        FilePipeOutlinedButton(onClick = { expanded = true }) {
             Text(updateScheduleSummaryBeforeColon(selected))
             DropdownMenu(
                 expanded = expanded,
@@ -1987,10 +1905,9 @@ private fun UpdateCheckScheduleDropdown(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             ) {
                 options.forEach { option ->
-                    DropdownMenuItem(
+                    FilePipeDropdownMenuItem(
                         text = { Text(updateScheduleLabel(option)) },
                         onClick = {
-                            playTap()
                             onSelect(option)
                             expanded = false
                         },
@@ -2033,7 +1950,6 @@ private fun UpdateCheckBottomSheetContent(
     changelogState: ChangelogUiState,
     showGithubExtraUi: Boolean,
     usePlayInAppUpdates: Boolean,
-    playTap: () -> Unit,
     onDownloadClick: (UpdateInfo) -> Unit,
     onSkipVersionClick: () -> Unit,
 ) {
@@ -2044,7 +1960,6 @@ private fun UpdateCheckBottomSheetContent(
         Modifier
             .fillMaxWidth()
             .heightIn(max = maxSheetHeight)
-            .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 8.dp)
             .verticalScroll(sheetScroll),
     ) {
@@ -2105,7 +2020,6 @@ private fun UpdateCheckBottomSheetContent(
                                 ToggleLabelHelpDropdown(
                                     tipText = stringResource(R.string.settings_update_sheet_false_positive_tooltip),
                                     contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                                    playTap = playTap,
                                 )
                             }
                         } else {
@@ -2122,7 +2036,7 @@ private fun UpdateCheckBottomSheetContent(
                             )
                         }
                         Spacer(Modifier.height(12.dp))
-                        Button(
+                        FilePipeButton(
                             onClick = { onDownloadClick(availableUpdate) },
                             modifier =
                                 Modifier
@@ -2145,7 +2059,7 @@ private fun UpdateCheckBottomSheetContent(
                         }
                         if (showGithubExtraUi && availableUpdate.remoteApkAssetUpdatedAt.isNotBlank()) {
                             Spacer(Modifier.height(8.dp))
-                            TextButton(onClick = onSkipVersionClick) {
+                            FilePipeTextButton(onClick = onSkipVersionClick) {
                                 Text(stringResource(R.string.settings_update_skip_version))
                             }
                         }
@@ -2252,7 +2166,7 @@ private fun UpdateCheckBottomSheetContent(
                                         Modifier
                                             .size(32.dp)
                                             .clip(RoundedCornerShape(50))
-                                            .clickable(
+                                            .tapSoundClickable(
                                                 enabled = canGoBack,
                                                 onClick = {
                                                     pagerCoroutineScope.launch {
@@ -2298,7 +2212,7 @@ private fun UpdateCheckBottomSheetContent(
                                         Modifier
                                             .size(32.dp)
                                             .clip(RoundedCornerShape(50))
-                                            .clickable(
+                                            .tapSoundClickable(
                                                 enabled = canGoForward,
                                                 onClick = {
                                                     pagerCoroutineScope.launch {
@@ -2483,20 +2397,18 @@ private fun SettingsExpandableSection(
     title: String,
     collapsedSectionKeys: Set<String>,
     onCollapsedSectionKeysChange: (Set<String>) -> Unit,
-    playTap: () -> Unit,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     val collapsed = sectionKey in collapsedSectionKeys
-    val spatialSpec = MaterialTheme.motionScheme.slowSpatialSpec<IntSize>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     Column(modifier = modifier) {
         SettingsExpandableSectionHeader(
             icon = icon,
             title = title,
             collapsed = collapsed,
-            playTap = playTap,
             onToggle = {
                 onCollapsedSectionKeysChange(
                     if (collapsed) {
@@ -2534,19 +2446,18 @@ private fun SettingsExpandableSectionHeader(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     collapsed: Boolean,
-    playTap: () -> Unit,
     onToggle: () -> Unit,
 ) {
     val rotation by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (collapsed) 0f else 90f,
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>(),
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
         label = "settings_section_chevron_rotation",
     )
     val cdExpand = stringResource(R.string.settings_section_expand_cd, title)
     val cdCollapse = stringResource(R.string.settings_section_collapse_cd, title)
     val interactionSource = remember { MutableInteractionSource() }
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Dp>()
-    val colorSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Dp>())
+    val colorSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
     val headerCorner by animateDpAsState(
         targetValue = if (collapsed) 28.dp else 4.dp,
         animationSpec = spatialSpec,
@@ -2609,13 +2520,11 @@ private fun SettingsExpandableSectionHeader(
                 .clip(RoundedCornerShape(headerCorner))
                 .background(headerColor)
                 .semantics { contentDescription = if (collapsed) cdExpand else cdCollapse }
-                .clickable(
+                .tapSoundClickable(
+                    onClick = onToggle,
                     indication = LocalIndication.current,
                     interactionSource = interactionSource,
-                ) {
-                    playTap()
-                    onToggle()
-                }.padding(
+                ).padding(
                     horizontal = horizontalPadding.coerceAtLeast(0.dp),
                     vertical = verticalPadding.coerceAtLeast(0.dp),
                 ),
@@ -2703,7 +2612,7 @@ private fun SettingsToggleItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable {
+                .tapSoundClickable {
                     if (!switchEnabled) {
                         onDisabledInteraction?.invoke()
                     } else {
@@ -2754,7 +2663,6 @@ private fun BackupFolderPickerItem(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
 ) {
-    val playTap = rememberPlayTapSound()
     Row(
         modifier =
             Modifier
@@ -2779,9 +2687,8 @@ private fun BackupFolderPickerItem(
             )
         }
         Spacer(Modifier.width(16.dp))
-        OutlinedButton(
+        FilePipeOutlinedButton(
             onClick = {
-                playTap()
                 onClick()
             },
         ) {
@@ -2842,12 +2749,8 @@ private fun LogRetentionDropdown(
     currentDays: Int,
     onSelect: (Int) -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     var expanded by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = {
-        playTap()
-        expanded = true
-    }) {
+    FilePipeOutlinedButton(onClick = { expanded = true }) {
         Text(logRetentionLabel(currentDays))
         DropdownMenu(
             expanded = expanded,
@@ -2855,10 +2758,9 @@ private fun LogRetentionDropdown(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             LOG_RETENTION_OPTIONS.forEach { option ->
-                DropdownMenuItem(
+                FilePipeDropdownMenuItem(
                     text = { Text(logRetentionLabel(option)) },
                     onClick = {
-                        playTap()
                         onSelect(option)
                         expanded = false
                     },
@@ -2884,12 +2786,8 @@ private fun SwipeActionDropdown(
     excluded: SwipeAction,
     onSelect: (SwipeAction) -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     var expanded by remember { mutableStateOf(false) }
-    OutlinedButton(onClick = {
-        playTap()
-        expanded = true
-    }) {
+    FilePipeOutlinedButton(onClick = { expanded = true }) {
         Text(swipeActionLabel(current))
         DropdownMenu(
             expanded = expanded,
@@ -2897,10 +2795,9 @@ private fun SwipeActionDropdown(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             SwipeAction.entries.filter { it != excluded }.forEach { action ->
-                DropdownMenuItem(
+                FilePipeDropdownMenuItem(
                     text = { Text(swipeActionLabel(action)) },
                     onClick = {
-                        playTap()
                         onSelect(action)
                         expanded = false
                     },
@@ -2917,12 +2814,12 @@ private fun SwipeActionPreviewCard(
 ) {
     val leftBg by animateColorAsState(
         targetValue = swipeStartToEnd.semanticSwipeBackground(),
-        animationSpec = tween(300),
+        animationSpec = reducedMotionAwareSpec(tween(300)),
         label = "leftBg",
     )
     val rightBg by animateColorAsState(
         targetValue = swipeEndToStart.semanticSwipeBackground(),
-        animationSpec = tween(300),
+        animationSpec = reducedMotionAwareSpec(tween(300)),
         label = "rightBg",
     )
 

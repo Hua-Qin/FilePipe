@@ -22,7 +22,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -45,6 +44,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.ui.components.AppIconImage
+import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
 import kotlinx.coroutines.delay
 
 @Composable
@@ -96,7 +97,7 @@ fun OnboardingTitleScreen(
         AnimatedVisibility(
             visible = iconVisible,
             modifier = Modifier.align(Alignment.Center),
-            enter = iconEnter,
+            enter = reducedMotionEnterTransition(iconEnter),
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 32.dp),
@@ -111,7 +112,7 @@ fun OnboardingTitleScreen(
                 Spacer(Modifier.height(24.dp))
                 AnimatedVisibility(
                     visible = titleVisible,
-                    enter = blockEnter,
+                    enter = reducedMotionEnterTransition(blockEnter),
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
@@ -135,7 +136,7 @@ fun OnboardingTitleScreen(
         AnimatedVisibility(
             visible = bylineVisible,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp),
-            enter = blockEnter,
+            enter = reducedMotionEnterTransition(blockEnter),
         ) {
             Surface(
                 shape = RoundedCornerShape(50),
@@ -172,9 +173,9 @@ fun OnboardingTitleScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
-            enter = blockEnter,
+            enter = reducedMotionEnterTransition(blockEnter),
         ) {
-            Button(
+            FilePipeButton(
                 onClick = onLetsBegan,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(50),

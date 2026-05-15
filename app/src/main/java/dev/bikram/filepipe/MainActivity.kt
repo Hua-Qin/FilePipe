@@ -77,10 +77,13 @@ class MainActivity : ComponentActivity() {
             FilePipeTheme(
                 themeMode = preferences.themeMode,
                 colorSource = preferences.colorSource,
+                savedCustomSeedHexes = preferences.savedCustomSeedHexes,
                 themePaletteStyle = preferences.themePaletteStyle,
                 hapticFeedbackEnabled = preferences.hapticFeedbackEnabled,
                 useEnhancedShading = preferences.useEnhancedShading,
                 activeCustomSeedHex = preferences.activeCustomSeedHex,
+                useGradientBackground = preferences.useGradientBackground,
+                progressiveBlurEnabled = preferences.progressiveBlurEnabled,
             ) {
                 if (introSeenAtLaunch == null) {
                     Surface(
@@ -123,22 +126,24 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleShortcutIntent(intent: Intent?) {
-        val ruleId = intent?.getLongExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID, -1L) ?: -1L
+        val sourceIntent = intent ?: return
+        val ruleId = sourceIntent.getLongExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID, -1L)
         if (ruleId != -1L) {
             pendingShortcutRepository.requestRunRule(ruleId)
-            intent?.removeExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID)
+            sourceIntent.removeExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID)
         }
     }
 
     private fun handleOpenHistoryDetailIntent(intent: Intent?) {
+        val sourceIntent = intent ?: return
         val historyId =
-            intent?.getLongExtra(
+            sourceIntent.getLongExtra(
                 PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID,
                 -1L,
-            ) ?: -1L
+            )
         if (historyId != -1L) {
             pendingShortcutRepository.requestOpenHistoryDetail(historyId)
-            intent?.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID)
+            sourceIntent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID)
         }
     }
 

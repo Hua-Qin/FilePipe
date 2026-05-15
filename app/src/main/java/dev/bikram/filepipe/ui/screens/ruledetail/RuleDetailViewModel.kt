@@ -148,10 +148,8 @@ class RuleDetailViewModel
     ) : ViewModel() {
         private val ruleId: Long = savedStateHandle[Screen.RuleDetail.ARG_RULE_ID] ?: Screen.RuleDetail.NEW_RULE_ID
         private val templateIndex: Int = savedStateHandle[Screen.RuleDetail.ARG_TEMPLATE_INDEX] ?: -1
-        private val skipTemplatePicker: Boolean =
-            savedStateHandle[Screen.RuleDetail.ARG_SKIP_TEMPLATE_PICKER] ?: false
         val isNewRule = ruleId == Screen.RuleDetail.NEW_RULE_ID
-        val showInitialTemplatePicker: Boolean = isNewRule && !skipTemplatePicker
+        val showInitialTemplatePicker: Boolean = false
 
         private val _uiState = MutableStateFlow(RuleDetailUiState())
         val uiState: StateFlow<RuleDetailUiState> = _uiState.asStateFlow()

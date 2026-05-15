@@ -19,15 +19,15 @@ fun FilePipeBottomSheetDragHandle(modifier: Modifier = Modifier) {
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(top = 12.dp, bottom = 8.dp),
+                .padding(top = 14.dp, bottom = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             modifier =
                 Modifier
-                    .width(48.dp)
+                    .width(36.dp)
                     .height(4.dp)
-                    .clip(MaterialTheme.shapes.extraLarge)
+                    .clip(MaterialTheme.shapes.extraSmall)
                     .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)),
         )
     }

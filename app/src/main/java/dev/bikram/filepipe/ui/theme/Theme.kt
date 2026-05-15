@@ -1,15 +1,26 @@
 package dev.bikram.filepipe.ui.theme
 
 import android.app.Activity
+import android.app.WallpaperColors
+import android.app.WallpaperManager
 import android.content.Context
 import android.content.ContextWrapper
-import android.os.SystemClock
+import android.database.ContentObserver
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.view.SoundEffectConstants
+import android.view.View
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -17,8 +28,14 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +49,30 @@ import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.LocalTapSound
+
+private const val MIN_TAP_SOUND_SPACING_MS = 85L
+
+private class TapSoundPlayer(
+    private val view: View,
+) {
+    private var tapSoundReady = true
+
+    fun play() {
+        if (!tapSoundReady) return
+        tapSoundReady = false
+        if (view.isShown) {
+            view.playSoundEffect(SoundEffectConstants.CLICK)
+        }
+        view.handler?.postDelayed(
+            {
+                tapSoundReady = true
+            },
+            MIN_TAP_SOUND_SPACING_MS,
+        ) ?: run {
+            tapSoundReady = true
+        }
+    }
+}
 
 private val LightColors =
     lightColorScheme(
@@ -151,15 +192,20 @@ private fun ColorScheme.boostContainersForSeedThemes(darkTheme: Boolean): ColorS
 fun FilePipeTheme(
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     colorSource: AppColorSource = AppColorSource.DEFAULT,
+    savedCustomSeedHexes: List<String> = emptyList(),
     themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     hapticFeedbackEnabled: Boolean = true,
     /** When true, omit primary surface boost (Remember-style enhanced shading). */
     useEnhancedShading: Boolean = false,
     activeCustomSeedHex: String = "",
+    useGradientBackground: Boolean = true,
+    progressiveBlurEnabled: Boolean = true,
+    paintBackground: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
     val systemDark = isSystemInDarkTheme()
+    val reducedMotion = rememberSystemReducedMotionEnabled(context)
 
     val darkTheme =
         when (themeMode) {
@@ -171,6 +217,7 @@ fun FilePipeTheme(
 
     val useDynamic = colorSource == AppColorSource.MATERIAL_YOU
     val black = themeMode == AppThemeMode.BLACK
+    val effectiveUseGradientBackground = useGradientBackground && !black
 
     /** Non-wallpaper themes use either curated triplets or a custom seed ramp. */
     val staticTriplet =
@@ -252,40 +299,146 @@ fun FilePipeTheme(
             isAppearanceLightNavigationBars = !darkTheme
         }
     }
-    val realTapSound =
+    val realTapSoundPlayer =
         remember(view) {
-            val lastTapTimeMs = longArrayOf(0L)
-            val minTapSoundSpacingMs = 85L
-            {
-                val now = SystemClock.uptimeMillis()
-                if (now - lastTapTimeMs[0] >= minTapSoundSpacingMs) {
-                    lastTapTimeMs[0] = now
-                    if (view.isShown) {
-                        view.playSoundEffect(SoundEffectConstants.CLICK)
-                    }
-                }
-            }
+            TapSoundPlayer(view)
         }
     val noopSound = remember { {} }
-    val playTapSound = if (hapticFeedbackEnabled) realTapSound else noopSound
+    val playTapSound = if (hapticFeedbackEnabled) realTapSoundPlayer::play else noopSound
+    val wallpaperTint = rememberWallpaperTintColor(context, enabled = effectiveUseGradientBackground)
+    val gradientTop =
+        wallpaperTint?.let { tint ->
+            blendColors(oledAdjusted.primaryContainer, tint, 0.28f)
+        } ?: oledAdjusted.primaryContainer
     val gradientBackgroundColors =
         GradientBackgroundColors(
             pageBackground = oledAdjusted.background,
             gradientBase = oledAdjusted.surface,
-            gradientTop = oledAdjusted.primaryContainer,
+            gradientTop = gradientTop,
+        )
+    val themeState =
+        FilePipeThemeState(
+            themeMode = themeMode,
+            colorSource = colorSource,
+            savedCustomSeedHexes = savedCustomSeedHexes,
+            activeCustomSeedHex = activeCustomSeedHex,
+            themePaletteStyle = themePaletteStyle,
+            useGradientBackground = effectiveUseGradientBackground,
+            useEnhancedShading = useEnhancedShading,
+            progressiveBlurEnabled = progressiveBlurEnabled,
         )
 
     CompositionLocalProvider(
+        LocalIsDark provides darkTheme,
+        LocalUseGradientBackground provides effectiveUseGradientBackground,
+        LocalUseEnhancedShading provides useEnhancedShading,
+        LocalHeroOnCards provides false,
+        LocalBlurBars provides progressiveBlurEnabled,
+        LocalFilePipeThemeState provides themeState,
         LocalGradientBackgroundColors provides gradientBackgroundColors,
+        LocalProgressiveBlurEnabled provides progressiveBlurEnabled,
+        LocalReducedMotion provides reducedMotion,
         LocalTapSound provides playTapSound,
         LocalHapticEnabled provides hapticFeedbackEnabled,
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,
+            motionScheme = MotionScheme.expressive(),
+            shapes = AppShapes,
             typography = AppTypography,
-            content = content,
+        ) {
+            Box(Modifier.fillMaxSize()) {
+                if (paintBackground) {
+                    GradientBackground(
+                        colors = gradientBackgroundColors,
+                        useGradient = effectiveUseGradientBackground,
+                    )
+                }
+                content()
+            }
+        }
+    }
+}
+
+@Composable
+private fun GradientBackground(
+    colors: GradientBackgroundColors,
+    useGradient: Boolean,
+) {
+    if (useGradient) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(colors.gradientBase)
+                .background(
+                    Brush.verticalGradient(
+                        colorStops =
+                            arrayOf(
+                                0f to colors.gradientTop.copy(alpha = 0.48f),
+                                0.55f to colors.gradientBase.copy(alpha = 0f),
+                            ),
+                    ),
+                ),
+        )
+    } else {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(colors.pageBackground),
         )
     }
+}
+
+private fun blendColors(
+    base: Color,
+    tint: Color,
+    tintWeight: Float,
+): Color =
+    Color(
+        ColorUtils.blendARGB(
+            base.toArgb(),
+            tint.toArgb(),
+            tintWeight,
+        ),
+    )
+
+@Composable
+private fun rememberWallpaperTintColor(
+    context: Context,
+    enabled: Boolean,
+): Color? {
+    if (!enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) {
+        return null
+    }
+    val appContext = context.applicationContext
+    val wallpaperManager = remember(appContext) { WallpaperManager.getInstance(appContext) }
+
+    fun extractTint(colors: WallpaperColors?): Color? = colors?.primaryColor?.toArgb()?.let(::Color)
+
+    fun readWallpaperTint(): Color? =
+        runCatching {
+            extractTint(wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM))
+        }.getOrNull()
+
+    var tint by remember(appContext, enabled) { mutableStateOf(readWallpaperTint()) }
+    DisposableEffect(appContext, enabled) {
+        if (!enabled) {
+            tint = null
+            onDispose { }
+        } else {
+            val listener =
+                WallpaperManager.OnColorsChangedListener { colors, which ->
+                    if (which and WallpaperManager.FLAG_SYSTEM != 0) {
+                        tint = extractTint(colors)
+                    }
+                }
+            wallpaperManager.addOnColorsChangedListener(listener, Handler(Looper.getMainLooper()))
+            onDispose {
+                wallpaperManager.removeOnColorsChangedListener(listener)
+            }
+        }
+    }
+    return tint
 }
 
 private fun ThemePaletteStyle.toLib(): PaletteStyle =
@@ -300,6 +453,37 @@ private fun ThemePaletteStyle.toLib(): PaletteStyle =
         ThemePaletteStyle.FIDELITY -> PaletteStyle.Fidelity
         ThemePaletteStyle.CONTENT -> PaletteStyle.Content
     }
+
+@Composable
+private fun rememberSystemReducedMotionEnabled(context: Context): Boolean {
+    val contentResolver = context.contentResolver
+
+    fun readReducedMotion(): Boolean =
+        Settings.Global.getFloat(
+            contentResolver,
+            Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) == 0f
+
+    var reducedMotion by remember(context) { mutableStateOf(readReducedMotion()) }
+    DisposableEffect(contentResolver) {
+        val observer =
+            object : ContentObserver(Handler(Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean) {
+                    reducedMotion = readReducedMotion()
+                }
+            }
+        contentResolver.registerContentObserver(
+            Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE),
+            false,
+            observer,
+        )
+        onDispose {
+            contentResolver.unregisterContentObserver(observer)
+        }
+    }
+    return reducedMotion
+}
 
 /**
  * [TopAppBarDefaults.topAppBarColors] with a transparent bar body and explicit on-surface chrome colors.

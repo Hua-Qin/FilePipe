@@ -4,7 +4,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.provider.Settings
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -15,7 +14,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,6 +22,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -62,25 +61,19 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.Bookmark
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
@@ -88,8 +81,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -149,10 +140,20 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
+import dev.bikram.filepipe.ui.common.AppBottomSheet
+import dev.bikram.filepipe.ui.common.FilePipePredictiveBackHandler
 import dev.bikram.filepipe.ui.components.CenteredTooltipText
 import dev.bikram.filepipe.ui.components.FileExtensionChips
-import dev.bikram.filepipe.ui.components.FilePipeBottomSheetDragHandle
+import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
+import dev.bikram.filepipe.ui.components.FilePipeElevatedCard
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeIconButton
+import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
+import dev.bikram.filepipe.ui.components.FilePipeSurface
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
+import dev.bikram.filepipe.ui.components.FilePipeTextButton
+import dev.bikram.filepipe.ui.components.FilePipeToggleButton
 import dev.bikram.filepipe.ui.components.FilesystemFolderPickerSheetContent
 import dev.bikram.filepipe.ui.components.FolderPickerButton
 import dev.bikram.filepipe.ui.components.RuleIconEmojiPresets
@@ -162,12 +163,15 @@ import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.toImageVector
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
+import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
+import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
 import java.io.File
 
 private val SectionButtonShape = RoundedCornerShape(12.dp)
@@ -365,7 +369,6 @@ fun RuleDetailScreen(
     var showRuleIconSheet by remember { mutableStateOf(false) }
     var customEmojiDraft by remember { mutableStateOf("") }
     val previewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val playTap = rememberPlayTapSound()
     val bookmarkedFolders by viewModel.bookmarkedFolders.collectAsStateWithLifecycle()
     var advancedExpanded by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -441,11 +444,6 @@ fun RuleDetailScreen(
         folderPickerLauncher.launch(initialPath?.let { absoluteStoragePathToOpenTreeInitialUri(it) })
     }
 
-    fun withTapSound(action: () -> Unit) {
-        playTap()
-        action()
-    }
-
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer =
@@ -478,7 +476,18 @@ fun RuleDetailScreen(
         }
     }
 
-    BackHandler(onBack = ::tryNavigateBack)
+    FilePipePredictiveBackHandler(
+        enabled =
+            isDirty &&
+                !showDiscardDialog &&
+                !showScheduleDialog &&
+                !showTemplateSheet &&
+                !showRuleIconSheet &&
+                state.previewFiles == null &&
+                !state.isPreviewLoading,
+    ) {
+        showDiscardDialog = true
+    }
 
     val scrollState = rememberScrollState()
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -539,8 +548,8 @@ fun RuleDetailScreen(
                     Spacer(Modifier.height(topContentPadding))
                     AnimatedVisibility(
                         visible = state.errors.isNotEmpty(),
-                        enter = fadeIn() + expandVertically(clip = false),
-                        exit = fadeOut() + shrinkVertically(clip = false),
+                        enter = reducedMotionEnterTransition(fadeIn() + expandVertically(clip = false)),
+                        exit = reducedMotionExitTransition(fadeOut() + shrinkVertically(clip = false)),
                     ) {
                         RuleErrorAlertCard(
                             title = stringResource(R.string.rule_detail_validation_errors_title),
@@ -550,7 +559,7 @@ fun RuleDetailScreen(
                                     style = MaterialTheme.typography.labelLarge,
                                     modifier =
                                         Modifier
-                                            .clickable { withTapSound(onOpenFaq) }
+                                            .tapSoundClickable(onClick = onOpenFaq)
                                             .padding(horizontal = 4.dp, vertical = 2.dp),
                                 )
                             },
@@ -590,7 +599,7 @@ fun RuleDetailScreen(
                                     style = MaterialTheme.typography.labelLarge,
                                     modifier =
                                         Modifier
-                                            .clickable { withTapSound(onOpenFaq) }
+                                            .tapSoundClickable(onClick = onOpenFaq)
                                             .padding(horizontal = 4.dp, vertical = 2.dp),
                                 )
                             },
@@ -634,8 +643,8 @@ fun RuleDetailScreen(
                             },
                             state = rememberTooltipState(),
                         ) {
-                            FilledTonalIconButton(
-                                onClick = { withTapSound { showRuleIconSheet = true } },
+                            FilePipeFilledTonalIconButton(
+                                onClick = { showRuleIconSheet = true },
                                 modifier =
                                     Modifier
                                         .padding(top = 4.dp)
@@ -676,8 +685,8 @@ fun RuleDetailScreen(
                         FileExtensionChips(
                             extensions = state.fileExtensions,
                             onAdd = viewModel::addExtension,
-                            onAddGroup = viewModel::addExtensions,
                             onRemove = viewModel::removeExtension,
+                            onUseTemplate = { showTemplateSheet = true },
                         )
                     }
 
@@ -713,10 +722,8 @@ fun RuleDetailScreen(
                                         modifier =
                                             Modifier
                                                 .weight(1f)
-                                                .clickable {
-                                                    withTapSound {
-                                                        launchFolderPicker(FolderPickIntent.ReplaceSource(path), path)
-                                                    }
+                                                .tapSoundClickable {
+                                                    launchFolderPicker(FolderPickIntent.ReplaceSource(path), path)
                                                 },
                                     )
                                     TooltipBox(
@@ -731,7 +738,7 @@ fun RuleDetailScreen(
                                         },
                                         state = rememberTooltipState(),
                                     ) {
-                                        IconButton(onClick = { withTapSound { viewModel.toggleBookmark(path) } }) {
+                                        FilePipeIconButton(onClick = { viewModel.toggleBookmark(path) }) {
                                             Icon(
                                                 imageVector = if (isSourceBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                                                 contentDescription = stringResource(R.string.bookmark_toggle_cd),
@@ -757,7 +764,7 @@ fun RuleDetailScreen(
                                         },
                                         state = rememberTooltipState(),
                                     ) {
-                                        IconButton(onClick = { withTapSound { viewModel.removeSourceFolder(path) } }) {
+                                        FilePipeIconButton(onClick = { viewModel.removeSourceFolder(path) }) {
                                             Icon(
                                                 Icons.Default.Close,
                                                 contentDescription = stringResource(R.string.schedule_remove_short),
@@ -783,7 +790,7 @@ fun RuleDetailScreen(
                                 modifier = Modifier.weight(1f),
                             )
                             Box(modifier = Modifier.weight(1f)) {
-                                OutlinedButton(
+                                FilePipeOutlinedButton(
                                     onClick = { if (unusedBookmarks.isNotEmpty()) bookmarkDropdownExpanded = true },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = SectionButtonShape,
@@ -802,7 +809,7 @@ fun RuleDetailScreen(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 ) {
                                     unusedBookmarks.forEach { bookmarkPath ->
-                                        DropdownMenuItem(
+                                        FilePipeDropdownMenuItem(
                                             text = {
                                                 Text(
                                                     text = displayPath(bookmarkPath, internalStorageDisplayName),
@@ -810,10 +817,8 @@ fun RuleDetailScreen(
                                                 )
                                             },
                                             onClick = {
-                                                withTapSound {
-                                                    viewModel.addSourceFolder(bookmarkPath)
-                                                    bookmarkDropdownExpanded = false
-                                                }
+                                                viewModel.addSourceFolder(bookmarkPath)
+                                                bookmarkDropdownExpanded = false
                                             },
                                         )
                                     }
@@ -823,15 +828,13 @@ fun RuleDetailScreen(
                         if (state.folderAccessMode.usesAllFilesPaths() &&
                             !state.allFilesAccessGranted
                         ) {
-                            TextButton(
+                            FilePipeTextButton(
                                 onClick = {
-                                    withTapSound {
-                                        val allFilesIntent =
-                                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                                data = Uri.parse("package:${context.packageName}")
-                                            }
-                                        context.startActivity(allFilesIntent)
-                                    }
+                                    val allFilesIntent =
+                                        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                            data = Uri.parse("package:${context.packageName}")
+                                        }
+                                    context.startActivity(allFilesIntent)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
@@ -859,14 +862,11 @@ fun RuleDetailScreen(
                                     ToggleLabelHelpDropdown(
                                         tipText = stringResource(R.string.rule_scan_subdirs_support),
                                         contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                                        playTap = playTap,
                                     )
                                 }
                                 FilePipeSwitch(
                                     checked = state.scanSubdirectories,
-                                    onCheckedChange = { enabled ->
-                                        withTapSound { viewModel.setScanSubdirectories(enabled) }
-                                    },
+                                    onCheckedChange = viewModel::setScanSubdirectories,
                                 )
                             }
                         }
@@ -891,14 +891,11 @@ fun RuleDetailScreen(
                                     ToggleLabelHelpDropdown(
                                         tipText = stringResource(R.string.rule_recreate_subfolders_support),
                                         contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                                        playTap = playTap,
                                     )
                                 }
                                 FilePipeSwitch(
                                     checked = state.scanSubdirectories && state.recreateDestinationSubfolders,
-                                    onCheckedChange = { enabled ->
-                                        withTapSound { viewModel.setRecreateDestinationSubfolders(enabled) }
-                                    },
+                                    onCheckedChange = viewModel::setRecreateDestinationSubfolders,
                                     enabled = state.scanSubdirectories,
                                 )
                             }
@@ -924,14 +921,11 @@ fun RuleDetailScreen(
                                     ToggleLabelHelpDropdown(
                                         tipText = stringResource(R.string.rule_suppress_missing_source_card_support),
                                         contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                                        playTap = playTap,
                                     )
                                 }
                                 FilePipeSwitch(
                                     checked = state.suppressMissingSourceFolderCardWarning,
-                                    onCheckedChange = { enabled ->
-                                        withTapSound { viewModel.setSuppressMissingSourceFolderCardWarning(enabled) }
-                                    },
+                                    onCheckedChange = viewModel::setSuppressMissingSourceFolderCardWarning,
                                 )
                             }
                         }
@@ -972,13 +966,11 @@ fun RuleDetailScreen(
                                     modifier =
                                         Modifier
                                             .weight(1f)
-                                            .clickable {
-                                                withTapSound {
-                                                    launchFolderPicker(
-                                                        FolderPickIntent.SetDestination,
-                                                        state.destinationFolderPath,
-                                                    )
-                                                }
+                                            .tapSoundClickable {
+                                                launchFolderPicker(
+                                                    FolderPickIntent.SetDestination,
+                                                    state.destinationFolderPath,
+                                                )
                                             },
                                 )
                                 TooltipBox(
@@ -993,7 +985,7 @@ fun RuleDetailScreen(
                                     },
                                     state = rememberTooltipState(),
                                 ) {
-                                    IconButton(onClick = { withTapSound { viewModel.toggleBookmark(state.destinationFolderPath) } }) {
+                                    FilePipeIconButton(onClick = { viewModel.toggleBookmark(state.destinationFolderPath) }) {
                                         Icon(
                                             imageVector = if (isDestBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
                                             contentDescription = stringResource(R.string.bookmark_toggle_cd),
@@ -1034,7 +1026,7 @@ fun RuleDetailScreen(
                                 modifier = Modifier.weight(1f),
                             )
                             Box(modifier = Modifier.weight(1f)) {
-                                OutlinedButton(
+                                FilePipeOutlinedButton(
                                     onClick = { if (unusedDestBookmarks.isNotEmpty()) destBookmarkDropdownExpanded = true },
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = SectionButtonShape,
@@ -1053,7 +1045,7 @@ fun RuleDetailScreen(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                                 ) {
                                     unusedDestBookmarks.forEach { bookmarkPath ->
-                                        DropdownMenuItem(
+                                        FilePipeDropdownMenuItem(
                                             text = {
                                                 Text(
                                                     text = displayPath(bookmarkPath, internalStorageDisplayName),
@@ -1061,10 +1053,8 @@ fun RuleDetailScreen(
                                                 )
                                             },
                                             onClick = {
-                                                withTapSound {
-                                                    viewModel.setDestination(bookmarkPath)
-                                                    destBookmarkDropdownExpanded = false
-                                                }
+                                                viewModel.setDestination(bookmarkPath)
+                                                destBookmarkDropdownExpanded = false
                                             },
                                         )
                                     }
@@ -1074,15 +1064,13 @@ fun RuleDetailScreen(
                         if (state.folderAccessMode.usesAllFilesPaths() &&
                             !state.allFilesAccessGranted
                         ) {
-                            TextButton(
+                            FilePipeTextButton(
                                 onClick = {
-                                    withTapSound {
-                                        val allFilesIntent =
-                                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                                data = Uri.parse("package:${context.packageName}")
-                                            }
-                                        context.startActivity(allFilesIntent)
-                                    }
+                                    val allFilesIntent =
+                                        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                            data = Uri.parse("package:${context.packageName}")
+                                        }
+                                    context.startActivity(allFilesIntent)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
@@ -1109,9 +1097,9 @@ fun RuleDetailScreen(
                                         OperationMode.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                                         else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                                     }
-                                ToggleButton(
+                                FilePipeToggleButton(
                                     checked = state.operationMode == mode,
-                                    onCheckedChange = { withTapSound { viewModel.setOperationMode(mode) } },
+                                    onCheckedChange = { viewModel.setOperationMode(mode) },
                                     shapes = shapes,
                                     modifier = Modifier.weight(1f),
                                 ) {
@@ -1140,9 +1128,9 @@ fun RuleDetailScreen(
                                         ConflictPolicy.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
                                         else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
                                     }
-                                ToggleButton(
+                                FilePipeToggleButton(
                                     checked = state.conflictPolicy == policy,
-                                    onCheckedChange = { withTapSound { viewModel.setConflictPolicy(policy) } },
+                                    onCheckedChange = { viewModel.setConflictPolicy(policy) },
                                     shapes = shapes,
                                     modifier = Modifier.weight(1f),
                                 ) {
@@ -1181,8 +1169,8 @@ fun RuleDetailScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                OutlinedButton(
-                                    onClick = { withTapSound { showScheduleDialog = true } },
+                                FilePipeOutlinedButton(
+                                    onClick = { showScheduleDialog = true },
                                     modifier = Modifier.weight(1f),
                                     shape = SectionButtonShape,
                                 ) {
@@ -1205,7 +1193,7 @@ fun RuleDetailScreen(
                                     },
                                     state = rememberTooltipState(),
                                 ) {
-                                    IconButton(onClick = { withTapSound { viewModel.setSchedule(null) } }) {
+                                    FilePipeIconButton(onClick = { viewModel.setSchedule(null) }) {
                                         Icon(
                                             Icons.Default.Close,
                                             contentDescription = stringResource(R.string.remove_schedule),
@@ -1214,8 +1202,8 @@ fun RuleDetailScreen(
                                 }
                             }
                         } else {
-                            OutlinedButton(
-                                onClick = { withTapSound { showScheduleDialog = true } },
+                            FilePipeOutlinedButton(
+                                onClick = { showScheduleDialog = true },
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = SectionButtonShape,
                             ) {
@@ -1242,19 +1230,18 @@ fun RuleDetailScreen(
                             val advancedHeaderInteractionSource = remember { MutableInteractionSource() }
                             val advancedChevronRotation by animateFloatAsState(
                                 targetValue = if (advancedExpanded) 180f else 0f,
-                                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>(),
+                                animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
                                 label = "advanced_filters_chevron_rotation",
                             )
                             Row(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .clickable(
+                                        .tapSoundClickable(
+                                            onClick = { advancedExpanded = !advancedExpanded },
                                             interactionSource = advancedHeaderInteractionSource,
                                             indication = null,
-                                        ) {
-                                            withTapSound { advancedExpanded = !advancedExpanded }
-                                        },
+                                        ),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
@@ -1300,9 +1287,13 @@ fun RuleDetailScreen(
                             }
 
                             val advancedExpandSpec =
-                                MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntSize>()
-                            val advancedFadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-                            val advancedFadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+                                reducedMotionAwareSpec(
+                                    MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntSize>(),
+                                )
+                            val advancedFadeInSpec =
+                                reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+                            val advancedFadeOutSpec =
+                                reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
                             AnimatedVisibility(
                                 visible = advancedExpanded,
                                 enter =
@@ -1408,7 +1399,7 @@ fun RuleDetailScreen(
                     },
                     state = rememberTooltipState(),
                 ) {
-                    IconButton(onClick = { withTapSound(::tryNavigateBack) }) {
+                    FilePipeIconButton(onClick = { tryNavigateBack() }) {
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.nav_back),
@@ -1429,8 +1420,8 @@ fun RuleDetailScreen(
                     },
                     state = rememberTooltipState(),
                 ) {
-                    IconButton(
-                        onClick = { withTapSound { viewModel.loadPreview() } },
+                    FilePipeIconButton(
+                        onClick = { viewModel.loadPreview() },
                         enabled = state.sourceFolderPaths.isNotEmpty() && state.fileExtensions.isNotEmpty(),
                     ) {
                         Icon(
@@ -1460,15 +1451,15 @@ fun RuleDetailScreen(
                             .padding(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    OutlinedButton(
-                        onClick = { withTapSound(::tryNavigateBack) },
+                    FilePipeOutlinedButton(
+                        onClick = { tryNavigateBack() },
                         modifier = Modifier.weight(1f),
                         shape = PillShape,
                     ) {
                         Text(stringResource(R.string.cancel))
                     }
-                    Button(
-                        onClick = { withTapSound { viewModel.save() } },
+                    FilePipeButton(
+                        onClick = { viewModel.save() },
                         modifier = Modifier.weight(1f),
                         shape = PillShape,
                     ) {
@@ -1497,37 +1488,28 @@ fun RuleDetailScreen(
     if (pendingFilesystemFolderPick != null) {
         val pickRequest = pendingFilesystemFolderPick!!
         val pickedIntent = pickRequest.intent
-        ModalBottomSheet(
-            onDismissRequest = { pendingFilesystemFolderPick = null },
+        AppBottomSheet(
+            title = stringResource(R.string.filesystem_folder_picker_title),
+            onDismiss = { pendingFilesystemFolderPick = null },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            dragHandle = { FilePipeBottomSheetDragHandle() },
+            scrollable = false,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-            ) {
-                Text(
-                    text = stringResource(R.string.filesystem_folder_picker_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-                FilesystemFolderPickerSheetContent(
-                    initialDirectory = pickRequest.startDirectory,
-                    onDismiss = { pendingFilesystemFolderPick = null },
-                    onFolderChosen = { absolutePath ->
-                        when (pickedIntent) {
-                            FolderPickIntent.AddSource -> viewModel.addSourceFolder(absolutePath)
-                            is FolderPickIntent.ReplaceSource ->
-                                viewModel.replaceSourceFolder(pickedIntent.previousPath, absolutePath)
-                            FolderPickIntent.SetDestination -> viewModel.setDestination(absolutePath)
-                        }
-                        pendingFilesystemFolderPick = null
-                        viewModel.refreshFolderAccessAfterPermissionChange()
-                    },
-                )
-            }
+            FilesystemFolderPickerSheetContent(
+                initialDirectory = pickRequest.startDirectory,
+                onDismiss = { pendingFilesystemFolderPick = null },
+                onFolderChosen = { absolutePath ->
+                    when (pickedIntent) {
+                        FolderPickIntent.AddSource -> viewModel.addSourceFolder(absolutePath)
+                        is FolderPickIntent.ReplaceSource ->
+                            viewModel.replaceSourceFolder(pickedIntent.previousPath, absolutePath)
+                        FolderPickIntent.SetDestination -> viewModel.setDestination(absolutePath)
+                    }
+                    pendingFilesystemFolderPick = null
+                    viewModel.refreshFolderAccessAfterPermissionChange()
+                },
+            )
         }
     }
 
@@ -1537,12 +1519,10 @@ fun RuleDetailScreen(
             title = { Text(stringResource(R.string.unsaved_changes_title)) },
             text = { Text(stringResource(R.string.unsaved_changes_message)) },
             confirmButton = {
-                TextButton(
+                FilePipeTextButton(
                     onClick = {
-                        withTapSound {
-                            showDiscardDialog = false
-                            onNavigateBack()
-                        }
+                        showDiscardDialog = false
+                        onNavigateBack()
                     },
                 ) {
                     Text(stringResource(R.string.discard_changes))
@@ -1550,15 +1530,13 @@ fun RuleDetailScreen(
             },
             dismissButton = {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { withTapSound { showDiscardDialog = false } }) {
+                    FilePipeTextButton(onClick = { showDiscardDialog = false }) {
                         Text(stringResource(R.string.keep_editing))
                     }
-                    TextButton(
+                    FilePipeTextButton(
                         onClick = {
-                            withTapSound {
-                                showDiscardDialog = false
-                                viewModel.save()
-                            }
+                            showDiscardDialog = false
+                            viewModel.save()
                         },
                     ) {
                         Text(stringResource(R.string.save_and_exit))
@@ -1586,23 +1564,13 @@ fun RuleDetailScreen(
                 customEmojiDraft = state.iconEmoji.orEmpty()
             }
         }
-        ModalBottomSheet(
-            onDismissRequest = { showRuleIconSheet = false },
+        AppBottomSheet(
+            title = stringResource(R.string.rule_icon_sheet_title),
+            onDismiss = { showRuleIconSheet = false },
             sheetState = ruleIconSheetState,
-            dragHandle = { FilePipeBottomSheetDragHandle() },
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp)
-                    .navigationBarsPadding(),
-            ) {
-                Text(
-                    text = stringResource(R.string.rule_icon_sheet_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
+            Column(Modifier.fillMaxWidth()) {
                 Text(
                     text = stringResource(R.string.rule_icon_preset_section),
                     style = MaterialTheme.typography.titleSmall,
@@ -1617,12 +1585,10 @@ fun RuleDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         RuleIcon.entries.forEach { iconOption ->
-                            FilledTonalIconButton(
+                            FilePipeFilledTonalIconButton(
                                 onClick = {
-                                    withTapSound {
-                                        viewModel.setIcon(iconOption)
-                                        showRuleIconSheet = false
-                                    }
+                                    viewModel.setIcon(iconOption)
+                                    showRuleIconSheet = false
                                 },
                                 modifier = Modifier.size(ruleIconGridCell),
                                 shape = SectionButtonShape,
@@ -1663,12 +1629,10 @@ fun RuleDetailScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         RuleIconEmojiPresets.forEach { emojiPreset ->
-                            Surface(
+                            FilePipeSurface(
                                 onClick = {
-                                    withTapSound {
-                                        viewModel.setIconEmoji(emojiPreset)
-                                        showRuleIconSheet = false
-                                    }
+                                    viewModel.setIconEmoji(emojiPreset)
+                                    showRuleIconSheet = false
                                 },
                                 modifier = Modifier.size(emojiCellSize),
                                 shape = RoundedCornerShape(12.dp),
@@ -1722,14 +1686,10 @@ fun RuleDetailScreen(
                             )
                         }
                         val applyEmojiEnabled = customEmojiDraft.isNotBlank()
-                        Surface(
+                        FilePipeSurface(
                             onClick = {
-                                if (applyEmojiEnabled) {
-                                    withTapSound {
-                                        viewModel.setIconEmoji(customEmojiDraft)
-                                        showRuleIconSheet = false
-                                    }
-                                }
+                                viewModel.setIconEmoji(customEmojiDraft)
+                                showRuleIconSheet = false
                             },
                             enabled = applyEmojiEnabled,
                             modifier = Modifier.size(emojiCellSize),
@@ -1755,96 +1715,72 @@ fun RuleDetailScreen(
         }
     }
 
-    // Template picker — shown only for new rules, once
-    if (showTemplateSheet && viewModel.isNewRule) {
-        ModalBottomSheet(
-            onDismissRequest = { showTemplateSheet = false },
+    // Template picker
+    if (showTemplateSheet) {
+        AppBottomSheet(
+            title = "",
+            onDismiss = { showTemplateSheet = false },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            dragHandle = { FilePipeBottomSheetDragHandle() },
+            showTitleBar = false,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
         ) {
-            Column(Modifier.padding(horizontal = 16.dp)) {
-                Text(
-                    text = stringResource(R.string.template_picker_title),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
-                Text(
-                    text = stringResource(R.string.template_picker_subtitle),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-                RuleTemplate.ALL.forEach { template ->
-                    ElevatedCard(
-                        onClick = {
-                            withTapSound {
-                                viewModel.applyTemplate(template)
-                                showTemplateSheet = false
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        shape = RoundedCornerShape(16.dp),
+            Spacer(Modifier.height(8.dp))
+            RuleTemplate.ALL.forEach { template ->
+                FilePipeElevatedCard(
+                    onClick = {
+                        viewModel.applyTemplate(template)
+                        showTemplateSheet = false
+                    },
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        Row(
-                            modifier = Modifier.padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            modifier = Modifier.size(48.dp),
                         ) {
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                modifier = Modifier.size(48.dp),
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center,
                             ) {
-                                Box(
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Icon(
-                                        imageVector = template.suggestedIcon.toImageVector(),
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(32.dp),
-                                    )
-                                }
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(template.name, style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    template.extensions.take(5).joinToString(" · "),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                Icon(
+                                    imageVector = template.suggestedIcon.toImageVector(),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(32.dp),
                                 )
                             }
                         }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(template.name, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                template.extensions.joinToString(" · "),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
-                TextButton(
-                    onClick = { withTapSound { showTemplateSheet = false } },
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    shape = PillShape,
-                ) {
-                    Text(stringResource(R.string.onboarding_wizard_start_blank))
-                }
-                Spacer(Modifier.height(24.dp))
             }
+            Spacer(Modifier.height(24.dp))
         }
     }
 
     // Preview bottom sheet
     if (state.previewFiles != null || state.isPreviewLoading) {
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.dismissPreview() },
+        AppBottomSheet(
+            title = stringResource(R.string.preview_title),
+            onDismiss = { viewModel.dismissPreview() },
             sheetState = previewSheetState,
-            dragHandle = { FilePipeBottomSheetDragHandle() },
+            scrollable = false,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
         ) {
-            Column(Modifier.padding(horizontal = 16.dp)) {
-                Text(
-                    text = stringResource(R.string.preview_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                )
+            Column {
                 if (state.isPreviewLoading) {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(32.dp))
                 } else {

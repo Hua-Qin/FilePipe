@@ -7,8 +7,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -40,16 +38,12 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ColorScheme
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
@@ -96,7 +90,11 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeFilterChip
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
+import dev.bikram.filepipe.ui.components.FilePipeTextButton
+import dev.bikram.filepipe.ui.components.FilePipeToggleButton
 import dev.bikram.filepipe.ui.components.HueColorSlider
 import dev.bikram.filepipe.ui.components.colorHexFromHue
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
@@ -105,9 +103,11 @@ import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.components.hueFromHexColor
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.performRejectHaptic
+import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
 import dev.bikram.filepipe.ui.theme.parseSeedColorHexToColorOrNull
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
 import java.util.Locale
 import android.graphics.Color as AndroidColor
@@ -176,7 +176,7 @@ fun ThemeAccentRow(
                             width = if (isSelected) 3.dp else 1.dp,
                             color = borderColor,
                             shape = CircleShape,
-                        ).clickable(
+                        ).tapSoundClickable(
                             onClick = { onSelectPreset(source) },
                             indication = ripple(bounded = true),
                             interactionSource = remember { MutableInteractionSource() },
@@ -206,7 +206,7 @@ fun ThemeAccentRow(
                             width = if (isSelected) 3.dp else 1.dp,
                             color = borderColor,
                             shape = CircleShape,
-                        ).combinedClickable(
+                        ).tapSoundCombinedClickable(
                             onClick = { onSelectCustomHex(storedHex) },
                             onLongClick = { onCustomHexLongPress(storedHex) },
                             indication = ripple(bounded = true),
@@ -232,7 +232,7 @@ fun ThemeAccentRow(
                         .clip(CircleShape)
                         .border(width = 1.dp, color = addBorder, shape = CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
-                        .clickable(
+                        .tapSoundClickable(
                             onClick = onAddCustomHexClick,
                             indication = ripple(bounded = true),
                             interactionSource = remember { MutableInteractionSource() },
@@ -348,7 +348,7 @@ fun ThemePaletteStyleRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(ThemePaletteStyle.all, key = { it.name }) { style ->
-            FilterChip(
+            FilePipeFilterChip(
                 selected = selected == style,
                 onClick = { if (enabled) onSelect(style) },
                 enabled = enabled,
@@ -384,6 +384,7 @@ fun AppearanceSection(
     onPaletteStyle: (ThemePaletteStyle) -> Unit,
     onAddCustomSeedHex: (String) -> Unit,
     onSelectCustomSeedHex: (String) -> Unit,
+    onPreviewCustomSeedHex: (String) -> Unit,
     onRemoveCustomSeedHex: (String) -> Unit,
     onUseGradientBackground: (Boolean) -> Unit,
     onUseEnhancedShading: (Boolean) -> Unit,
@@ -399,7 +400,7 @@ fun AppearanceSection(
             title = { Text(stringResource(R.string.settings_custom_seed_remove_title)) },
             text = { Text(stringResource(R.string.settings_custom_seed_remove_message)) },
             confirmButton = {
-                TextButton(onClick = {
+                FilePipeTextButton(onClick = {
                     onRemoveCustomSeedHex(hexToConfirmRemove)
                     hexPendingRemove = null
                 }) {
@@ -407,7 +408,7 @@ fun AppearanceSection(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { hexPendingRemove = null }) {
+                FilePipeTextButton(onClick = { hexPendingRemove = null }) {
                     Text(stringResource(R.string.cancel))
                 }
             },
@@ -429,6 +430,7 @@ fun AppearanceSection(
                 onSelectCustomSeedHex = onSelectCustomSeedHex,
                 onCustomHexLongPress = { hexPendingRemove = it },
                 onAddCustomSeedHex = onAddCustomSeedHex,
+                onPreviewCustomSeedHex = onPreviewCustomSeedHex,
             )
         }
         GroupedListItem(position = GroupPosition.MIDDLE) {
@@ -476,11 +478,12 @@ private fun AppearanceStudioControls(
     onSelectCustomSeedHex: (String) -> Unit,
     onCustomHexLongPress: (String) -> Unit,
     onAddCustomSeedHex: (String) -> Unit,
+    onPreviewCustomSeedHex: (String) -> Unit,
 ) {
     var customPickerExpanded by rememberSaveable { mutableStateOf(false) }
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     Column(
         modifier =
@@ -517,7 +520,7 @@ private fun AppearanceStudioControls(
                         activeCustomSeedHex = activeCustomSeedHex,
                         currentPrimary = MaterialTheme.colorScheme.primary,
                     ),
-                onPreviewColor = onSelectCustomSeedHex,
+                onPreviewColor = onPreviewCustomSeedHex,
                 onSaveColor = onAddCustomSeedHex,
             )
         }
@@ -635,7 +638,7 @@ private fun CustomColorSlider(
                     onStopEditing = { commitHexEditing() },
                     onBoundsChange = { hexEditorBoundsInRoot = it },
                 )
-                FilledTonalIconButton(
+                FilePipeFilledTonalIconButton(
                     onClick = { onSaveColor(commitHexEditing()) },
                     modifier = Modifier.size(40.dp),
                 ) {
@@ -857,7 +860,7 @@ private fun ThemeModeSegmentedRow(
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
     ) {
         themePickerOrder.forEachIndexed { index, mode ->
-            ToggleButton(
+            FilePipeToggleButton(
                 checked = selected == mode,
                 onCheckedChange = { checked -> if (checked) onSelect(mode) },
                 modifier =

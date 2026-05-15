@@ -10,6 +10,7 @@ import androidx.compose.material3.SwitchColors
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 
 @Composable
 fun FilePipeSwitch(
@@ -20,9 +21,18 @@ fun FilePipeSwitch(
     colors: SwitchColors = SwitchDefaults.colors(),
     interactionSource: MutableInteractionSource? = null,
 ) {
+    val playTap = rememberPlayTapSound()
     Switch(
         checked = checked,
-        onCheckedChange = onCheckedChange,
+        onCheckedChange =
+            if (onCheckedChange != null) {
+                {
+                    playTap()
+                    onCheckedChange(it)
+                }
+            } else {
+                null
+            },
         modifier = modifier,
         thumbContent =
             if (checked) {

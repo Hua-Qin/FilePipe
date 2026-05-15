@@ -9,7 +9,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,13 +39,9 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.UnfoldLess
 import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -76,7 +71,11 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeIconButton
+import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.screens.onboarding.FolderAccessLearnMoreFullModeSection
@@ -85,6 +84,7 @@ import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
 
 private enum class FaqInlineAction {
@@ -218,7 +218,6 @@ fun FaqScreen(
     onOpenSettingsNotifications: () -> Unit,
     onOpenAppNotificationSettings: () -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     val latestFolderAccess by rememberUpdatedState(onOpenFolderAccessInSettings)
     val latestNotifications by rememberUpdatedState(onOpenSettingsNotifications)
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -227,9 +226,9 @@ fun FaqScreen(
     val expandedItemIds by faqViewModel.expandedItemIds.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
     val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer() ?: Modifier
-    val spatialSpec = MaterialTheme.motionScheme.slowSpatialSpec<IntSize>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     val faqSections =
         remember {
@@ -573,11 +572,8 @@ fun FaqScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Button(
-                                    onClick = {
-                                        playTap()
-                                        latestFolderAccess()
-                                    },
+                                FilePipeButton(
+                                    onClick = latestFolderAccess,
                                 ) {
                                     Icon(
                                         Icons.Default.FolderOpen,
@@ -586,11 +582,8 @@ fun FaqScreen(
                                     )
                                     Text(stringResource(R.string.faq_quick_action_folder_access))
                                 }
-                                Button(
-                                    onClick = {
-                                        playTap()
-                                        latestNotifications()
-                                    },
+                                FilePipeButton(
+                                    onClick = latestNotifications,
                                 ) {
                                     Icon(
                                         Icons.Default.Notifications,
@@ -617,7 +610,7 @@ fun FaqScreen(
                             trailingIcon =
                                 if (searchQuery.isNotBlank()) {
                                     {
-                                        IconButton(onClick = { searchQuery = "" }) {
+                                        FilePipeIconButton(onClick = { searchQuery = "" }) {
                                             Icon(
                                                 imageVector = Icons.Default.Close,
                                                 contentDescription = stringResource(R.string.faq_clear_search),
@@ -735,7 +728,7 @@ fun FaqScreen(
                                     Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(16.dp))
-                                        .clickable {
+                                        .tapSoundClickable {
                                             faqViewModel.setItemExpanded(itemContent.id, !isExpanded)
                                         },
                             ) {
@@ -834,11 +827,8 @@ fun FaqScreen(
                                                     actionOrder.forEach { action ->
                                                         when (action) {
                                                             FaqInlineAction.OPEN_FOLDER_ACCESS_IN_SETTINGS -> {
-                                                                FilledTonalButton(
-                                                                    onClick = {
-                                                                        playTap()
-                                                                        onOpenFolderAccessInSettings()
-                                                                    },
+                                                                FilePipeFilledTonalButton(
+                                                                    onClick = onOpenFolderAccessInSettings,
                                                                 ) {
                                                                     Text(
                                                                         stringResource(
@@ -848,11 +838,8 @@ fun FaqScreen(
                                                                 }
                                                             }
                                                             FaqInlineAction.OPEN_APP_NOTIFICATION_SETTINGS -> {
-                                                                FilledTonalButton(
-                                                                    onClick = {
-                                                                        playTap()
-                                                                        onOpenAppNotificationSettings()
-                                                                    },
+                                                                FilePipeFilledTonalButton(
+                                                                    onClick = onOpenAppNotificationSettings,
                                                                 ) {
                                                                     Text(
                                                                         stringResource(
@@ -879,10 +866,7 @@ fun FaqScreen(
             modifier = Modifier.align(Alignment.TopCenter),
             title = { Text(stringResource(R.string.faq_title)) },
             navigationIcon = {
-                IconButton(onClick = {
-                    playTap()
-                    onNavigateBack()
-                }) {
+                FilePipeIconButton(onClick = onNavigateBack) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = stringResource(R.string.nav_back),
@@ -890,9 +874,8 @@ fun FaqScreen(
                 }
             },
             actions = {
-                FilledTonalIconButton(
+                FilePipeFilledTonalIconButton(
                     onClick = {
-                        playTap()
                         if (allItemsExpanded) {
                             faqViewModel.collapseAll()
                         } else {

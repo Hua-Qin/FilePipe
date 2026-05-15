@@ -49,20 +49,13 @@ import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -71,13 +64,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TooltipAnchorPosition
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -95,6 +83,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -109,16 +98,20 @@ import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
-import dev.bikram.filepipe.ui.components.CenteredTooltipText
+import dev.bikram.filepipe.ui.common.AppBottomSheet
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
-import dev.bikram.filepipe.ui.components.FilePipeBottomSheetDragHandle
+import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
+import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.RuleCard
 import dev.bikram.filepipe.ui.components.RuleCardAction
 import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyRulesIllustration
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
@@ -127,6 +120,9 @@ import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
+import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
+import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 import kotlinx.coroutines.flow.first
@@ -143,7 +139,6 @@ fun RulesScreen(
     onNavigateToRuleHistory: (Long) -> Unit,
     viewModel: RulesViewModel = hiltViewModel(),
 ) {
-    val playTap = rememberPlayTapSound()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val rules = uiState.rules
     val sortKey = uiState.sortKey
@@ -287,7 +282,7 @@ fun RulesScreen(
                                 Modifier
                             },
                         ),
-                    title = { Text("Rules") },
+                    title = { Text(stringResource(R.string.nav_rules)) },
                     scrollBehavior = scrollBehavior,
                     colors = gradientOverlayTopAppBarColors(),
                     actions = {
@@ -296,65 +291,50 @@ fun RulesScreen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
                             if (hasSelection && !isRunning) {
-                                TooltipBox(
-                                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                                    tooltip = {
-                                        PlainTooltip {
-                                            CenteredTooltipText(stringResource(R.string.run_select_all))
-                                        }
-                                    },
-                                    state = rememberTooltipState(),
-                                ) {
-                                    Box(modifier = Modifier.size(48.dp)) {
-                                        FilledTonalIconButton(onClick = {
-                                            playTap()
-                                            viewModel.selectAll()
-                                        }, modifier = Modifier.align(Alignment.Center)) {
-                                            Icon(
-                                                Icons.Default.SelectAll,
-                                                contentDescription = stringResource(R.string.run_select_all),
-                                            )
-                                        }
-                                        Badge(
-                                            modifier =
-                                                Modifier
-                                                    .align(Alignment.BottomStart)
-                                                    .offset(x = 2.dp, y = (-2).dp),
-                                            containerColor = MaterialTheme.colorScheme.primary,
-                                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                                        ) {
-                                            Text(
-                                                text = selectedRuleIds.size.toString(),
-                                                style = MaterialTheme.typography.labelSmall,
-                                            )
-                                        }
+                                Box(modifier = Modifier.size(48.dp)) {
+                                    val selectAllLabel = stringResource(R.string.run_select_all)
+                                    FilePipeFilledTonalIconButton(
+                                        onClick = { viewModel.selectAll() },
+                                        modifier = Modifier.align(Alignment.Center),
+                                        tooltipLabel = selectAllLabel,
+                                    ) {
+                                        Icon(
+                                            Icons.Default.SelectAll,
+                                            contentDescription = selectAllLabel,
+                                        )
+                                    }
+                                    Badge(
+                                        modifier =
+                                            Modifier
+                                                .align(Alignment.BottomStart)
+                                                .offset(x = 2.dp, y = (-2).dp),
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    ) {
+                                        Text(
+                                            text = selectedRuleIds.size.toString(),
+                                            style = MaterialTheme.typography.labelSmall,
+                                        )
                                     }
                                 }
-                                TooltipBox(
-                                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                                    tooltip = {
-                                        PlainTooltip {
-                                            CenteredTooltipText(stringResource(R.string.run_deselect_all))
-                                        }
-                                    },
-                                    state = rememberTooltipState(),
+                                val deselectAllLabel = stringResource(R.string.run_deselect_all)
+                                FilePipeFilledTonalIconButton(
+                                    onClick = { viewModel.clearSelection() },
+                                    tooltipLabel = deselectAllLabel,
                                 ) {
-                                    FilledTonalIconButton(onClick = {
-                                        playTap()
-                                        viewModel.clearSelection()
-                                    }) {
-                                        Icon(Icons.Default.Deselect, contentDescription = stringResource(R.string.run_deselect_all))
-                                    }
+                                    Icon(Icons.Default.Deselect, contentDescription = deselectAllLabel)
                                 }
                             } else {
                                 Box(modifier = Modifier.size(48.dp)) {
-                                    FilledTonalIconButton(onClick = {
-                                        playTap()
-                                        sortMenuExpanded = true
-                                    }, modifier = Modifier.align(Alignment.Center)) {
+                                    val sortLabel = stringResource(R.string.history_sort_menu)
+                                    FilePipeFilledTonalIconButton(
+                                        onClick = { sortMenuExpanded = true },
+                                        modifier = Modifier.align(Alignment.Center),
+                                        tooltipLabel = sortLabel,
+                                    ) {
                                         Icon(
                                             Icons.AutoMirrored.Filled.Sort,
-                                            contentDescription = stringResource(R.string.history_sort_menu),
+                                            contentDescription = sortLabel,
                                         )
                                     }
                                     RulesSortDropdown(
@@ -363,22 +343,21 @@ fun RulesScreen(
                                         sortKey = sortKey,
                                         sortDirection = sortDirection,
                                         onSelect = { key, direction ->
-                                            playTap()
                                             viewModel.setSort(key, direction)
                                             sortMenuExpanded = false
                                         },
                                     )
                                 }
-                                FilledTonalIconButton(onClick = {
-                                    playTap()
-                                    viewModel.toggleGlobalViewMode()
-                                }) {
-                                    val expandCollapseLabel =
-                                        if (isCompactMode) {
-                                            stringResource(R.string.rules_expand_all)
-                                        } else {
-                                            stringResource(R.string.rules_collapse_all)
-                                        }
+                                val expandCollapseLabel =
+                                    if (isCompactMode) {
+                                        stringResource(R.string.rules_expand_all)
+                                    } else {
+                                        stringResource(R.string.rules_collapse_all)
+                                    }
+                                FilePipeFilledTonalIconButton(
+                                    onClick = { viewModel.toggleGlobalViewMode() },
+                                    tooltipLabel = expandCollapseLabel,
+                                ) {
                                     Icon(
                                         imageVector = if (isCompactMode) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
                                         contentDescription = expandCollapseLabel,
@@ -423,11 +402,8 @@ fun RulesScreen(
                             tonalElevation = 3.dp,
                             shadowElevation = 3.dp,
                         ) {
-                            OutlinedButton(
-                                onClick = {
-                                    playTap()
-                                    viewModel.cancelManualRun()
-                                },
+                            FilePipeOutlinedButton(
+                                onClick = { viewModel.cancelManualRun() },
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                 shape = RoundedCornerShape(50),
                                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
@@ -441,8 +417,8 @@ fun RulesScreen(
                 else -> {
                     AnimatedVisibility(
                         visible = hasSelection,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut(),
+                        enter = reducedMotionEnterTransition(expandVertically() + fadeIn()),
+                        exit = reducedMotionExitTransition(shrinkVertically() + fadeOut()),
                     ) {
                         val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
                         Box(
@@ -463,88 +439,44 @@ fun RulesScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
-                                    TooltipBox(
-                                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                                        tooltip = {
-                                            PlainTooltip {
-                                                CenteredTooltipText(stringResource(R.string.run_cancel_selection))
-                                            }
-                                        },
-                                        state = rememberTooltipState(),
+                                    val cancelSelectionLabel = stringResource(R.string.run_cancel_selection)
+                                    FilePipeFilledTonalIconButton(
+                                        onClick = { viewModel.clearSelection() },
+                                        tooltipLabel = cancelSelectionLabel,
                                     ) {
-                                        FilledTonalIconButton(onClick = {
-                                            playTap()
-                                            viewModel.clearSelection()
-                                        }) {
-                                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.run_cancel_selection))
-                                        }
+                                        Icon(Icons.Default.Close, contentDescription = cancelSelectionLabel)
                                     }
-                                    TooltipBox(
-                                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                                        tooltip = {
-                                            PlainTooltip {
-                                                CenteredTooltipText(stringResource(R.string.delete))
-                                            }
-                                        },
-                                        state = rememberTooltipState(),
+                                    val deleteLabel = stringResource(R.string.delete)
+                                    FilePipeFilledTonalIconButton(
+                                        onClick = { pendingDeleteSelected = true },
+                                        tooltipLabel = deleteLabel,
+                                        colors =
+                                            IconButtonDefaults.filledTonalIconButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                            ),
                                     ) {
-                                        FilledTonalIconButton(
-                                            onClick = {
-                                                playTap()
-                                                pendingDeleteSelected = true
-                                            },
-                                            colors =
-                                                IconButtonDefaults.filledTonalIconButtonColors(
-                                                    containerColor = MaterialTheme.colorScheme.errorContainer,
-                                                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                                                ),
-                                        ) {
-                                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete))
-                                        }
+                                        Icon(Icons.Default.Delete, contentDescription = deleteLabel)
                                     }
-                                    TooltipBox(
-                                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                                        tooltip = {
-                                            PlainTooltip {
-                                                CenteredTooltipText(stringResource(R.string.preview_selected_rules))
-                                            }
-                                        },
-                                        state = rememberTooltipState(),
+                                    val previewSelectedLabel = stringResource(R.string.preview_selected_rules)
+                                    FilePipeFilledTonalIconButton(
+                                        onClick = { viewModel.startPreviewSelected() },
+                                        tooltipLabel = previewSelectedLabel,
                                     ) {
-                                        FilledTonalIconButton(
-                                            onClick = {
-                                                playTap()
-                                                viewModel.startPreviewSelected()
-                                            },
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Visibility,
-                                                contentDescription = stringResource(R.string.preview_selected_rules),
-                                            )
-                                        }
+                                        Icon(
+                                            Icons.Default.Visibility,
+                                            contentDescription = previewSelectedLabel,
+                                        )
                                     }
-                                    TooltipBox(
-                                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                                        tooltip = {
-                                            PlainTooltip {
-                                                CenteredTooltipText(stringResource(R.string.run_button))
-                                            }
-                                        },
-                                        state = rememberTooltipState(),
+                                    FilePipeFilledTonalButton(
+                                        onClick = { viewModel.runSelected() },
+                                        enabled = enabledSelectedCount > 0,
+                                        shape = RoundedCornerShape(50),
+                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                                     ) {
-                                        FilledTonalButton(
-                                            onClick = {
-                                                playTap()
-                                                viewModel.runSelected()
-                                            },
-                                            enabled = enabledSelectedCount > 0,
-                                            shape = RoundedCornerShape(50),
-                                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                                        ) {
-                                            Text(stringResource(R.string.run_button))
-                                            Spacer(Modifier.width(6.dp))
-                                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                                        }
+                                        Text(stringResource(R.string.run_button))
+                                        Spacer(Modifier.width(6.dp))
+                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                                     }
                                 }
                             }
@@ -557,7 +489,6 @@ fun RulesScreen(
         if (rules.isEmpty()) {
             EmptyState(
                 onAddRule = {
-                    playTap()
                     onEditRule(Screen.RuleDetail.NEW_RULE_ID)
                 },
                 modifier =
@@ -601,6 +532,7 @@ fun RulesScreen(
                     ) { isDragging ->
                         val dragElevation by animateDpAsState(
                             targetValue = if (isDragging) 8.dp else 0.dp,
+                            animationSpec = reducedMotionAwareSpec(tween(220)),
                             label = "ruleCardReorderShadow",
                         )
                         val reorderLongPressModifier =
@@ -630,6 +562,7 @@ fun RulesScreen(
                         SwipeToDismissRuleCard(
                             rule = rule,
                             isSelected = rule.id in selectedRuleIds,
+                            isSelectionMode = hasSelection,
                             isExpanded = isExpanded,
                             progress = progressMap[rule.id],
                             isAnyRuleRunning = isRunning,
@@ -678,15 +611,13 @@ fun RulesScreen(
             title = { Text("Delete rule?") },
             text = { Text("\"${rule.name}\" and its schedule will be removed.") },
             confirmButton = {
-                TextButton(onClick = {
-                    playTap()
+                FilePipeTextButton(onClick = {
                     viewModel.deleteRule(rule)
                     pendingDeleteRule = null
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    playTap()
+                FilePipeTextButton(onClick = {
                     pendingDeleteRule = null
                 }) { Text("Cancel") }
             },
@@ -700,15 +631,13 @@ fun RulesScreen(
             title = { Text("Delete $count rule${if (count == 1) "" else "s"}?") },
             text = { Text("This will also remove any scheduled runs for the selected rules.") },
             confirmButton = {
-                TextButton(onClick = {
-                    playTap()
+                FilePipeTextButton(onClick = {
                     viewModel.deleteSelected()
                     pendingDeleteSelected = false
                 }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    playTap()
+                FilePipeTextButton(onClick = {
                     pendingDeleteSelected = false
                 }) { Text("Cancel") }
             },
@@ -723,27 +652,24 @@ fun RulesScreen(
                     ruleGroup.results.any { result -> !result.wouldSkip } &&
                         rules.any { rule -> rule.id == ruleGroup.ruleId && rule.isEnabled }
                 }
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.dismissPreview() },
+        val previewTitle =
+            preview.selectedRuleCount?.let { selectedRuleCount ->
+                pluralStringResource(
+                    R.plurals.preview_title_selected_rules,
+                    selectedRuleCount,
+                    selectedRuleCount,
+                )
+            } ?: stringResource(R.string.preview_title_for_rule, preview.ruleName)
+        AppBottomSheet(
+            title = previewTitle,
+            onDismiss = { viewModel.dismissPreview() },
             sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-            dragHandle = { FilePipeBottomSheetDragHandle() },
+            scrollable = false,
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text =
-                        preview.selectedRuleCount?.let { selectedRuleCount ->
-                            pluralStringResource(
-                                R.plurals.preview_title_selected_rules,
-                                selectedRuleCount,
-                                selectedRuleCount,
-                            )
-                        } ?: stringResource(R.string.preview_title_for_rule, preview.ruleName),
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
                 if (preview.isLoading) {
                     CircularProgressIndicator(
                         modifier =
@@ -852,15 +778,12 @@ fun RulesScreen(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = { viewModel.dismissPreview() }) {
+                    FilePipeTextButton(onClick = { viewModel.dismissPreview() }) {
                         Text(stringResource(R.string.cancel))
                     }
                     Spacer(Modifier.width(8.dp))
-                    Button(
-                        onClick = {
-                            playTap()
-                            viewModel.runPreviewedRules()
-                        },
+                    FilePipeButton(
+                        onClick = { viewModel.runPreviewedRules() },
                         enabled = previewRunEnabled,
                     ) {
                         Text(stringResource(R.string.preview_run))
@@ -905,7 +828,7 @@ private fun RulesSortDropdown(
                 } else {
                     sortKey == option.key && sortDirection == option.direction
                 }
-            DropdownMenuItem(
+            FilePipeDropdownMenuItem(
                 text = { Text(stringResource(option.labelRes)) },
                 leadingIcon = { RadioButton(selected = isSelected, onClick = null) },
                 onClick = { onSelect(option.key, option.direction) },
@@ -918,6 +841,7 @@ private fun RulesSortDropdown(
 private fun SwipeToDismissRuleCard(
     rule: Rule,
     isSelected: Boolean,
+    isSelectionMode: Boolean,
     isExpanded: Boolean,
     progress: dev.bikram.filepipe.domain.model.RunProgress?,
     isAnyRuleRunning: Boolean,
@@ -990,6 +914,7 @@ private fun SwipeToDismissRuleCard(
         RuleCard(
             rule = rule,
             isSelected = isSelected,
+            isSelectionMode = isSelectionMode,
             isExpanded = isExpanded,
             progress = progress,
             onClick = onToggleSelectOrExpand,
@@ -1049,7 +974,7 @@ private fun EmptyState(
 ) {
     AnimatedVisibility(
         visible = true,
-        enter = fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 },
+        enter = reducedMotionEnterTransition(fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }),
     ) {
         Column(
             modifier = modifier.fillMaxSize().padding(32.dp),
@@ -1058,20 +983,25 @@ private fun EmptyState(
         ) {
             ThemeColoredEmptyRulesIllustration(Modifier.size(120.dp))
             Spacer(Modifier.height(24.dp))
-            Text(
-                stringResource(R.string.rules_empty_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.rules_empty_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
-                textAlign = TextAlign.Center,
-            )
+            Column(
+                modifier = Modifier.semantics(mergeDescendants = true) { },
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    stringResource(R.string.rules_empty_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.rules_empty_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                    textAlign = TextAlign.Center,
+                )
+            }
             Spacer(Modifier.height(24.dp))
-            Button(
+            FilePipeButton(
                 onClick = onAddRule,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth(0.72f),

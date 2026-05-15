@@ -11,7 +11,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,20 +30,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -60,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -70,9 +64,12 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.ScheduleType
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
+import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
+import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
 
 data class RuleCardAction(
     val icon: ImageVector,
@@ -91,6 +88,7 @@ private val CardShape = RoundedCornerShape(16.dp)
 fun RuleCard(
     rule: Rule,
     isSelected: Boolean,
+    isSelectionMode: Boolean = false,
     isExpanded: Boolean,
     progress: RunProgress?,
     onClick: () -> Unit, // toggles expansion (or selection when in selection mode)
@@ -145,6 +143,8 @@ fun RuleCard(
             if (expanded) {
                 ExpandedContent(
                     rule = rule,
+                    isSelected = isSelected,
+                    isSelectionMode = isSelectionMode,
                     progress = progress,
                     onClick = onClick,
                     onLongClick = onLongClick,
@@ -163,6 +163,8 @@ fun RuleCard(
             } else {
                 CompactContent(
                     rule = rule,
+                    isSelected = isSelected,
+                    isSelectionMode = isSelectionMode,
                     progress = progress,
                     onClick = onClick,
                     onLongClick = onLongClick,
@@ -188,6 +190,8 @@ fun RuleCard(
 @Composable
 private fun CompactContent(
     rule: Rule,
+    isSelected: Boolean,
+    isSelectionMode: Boolean,
     progress: RunProgress?,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -200,7 +204,6 @@ private fun CompactContent(
     reorderLongPressDragModifier: Modifier = Modifier,
     suppressLongClickForReorder: Boolean = false,
 ) {
-    val playTap = rememberPlayTapSound()
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val activeProgress = progress?.takeUnless { progressValue -> progressValue.isComplete }
     val runBlocked = isAnyRuleRunning && progress == null
@@ -210,6 +213,16 @@ private fun CompactContent(
             if (rule.fileExtensions.size > 4) " +${rule.fileExtensions.size - 4}" else ""
     val destText = displayPath(rule.destinationFolderPath, internalStorageDisplayName).takeIf { it.isNotBlank() } ?: ""
     val infoText = listOf(typesText, destText).filter { it.isNotBlank() }.joinToString("  |  ")
+    val clickLabel =
+        if (isSelectionMode) {
+            stringResource(
+                if (isSelected) R.string.rule_card_deselect_cd else R.string.rule_card_select_cd,
+                rule.name,
+            )
+        } else {
+            stringResource(R.string.rule_card_expand_cd, rule.name)
+        }
+    val longClickLabel = stringResource(R.string.rule_card_select_cd, rule.name)
 
     val columnLongClick: (() -> Unit)? =
         when {
@@ -224,6 +237,9 @@ private fun CompactContent(
                 .tapSoundCombinedClickable(
                     onClick = onClick,
                     onLongClick = columnLongClick,
+                    onClickLabel = clickLabel,
+                    onLongClickLabel = longClickLabel,
+                    role = Role.Button,
                 ).then(reorderLongPressDragModifier),
     ) {
         ListItem(
@@ -261,6 +277,9 @@ private fun CompactContent(
                                 Modifier.tapSoundCombinedClickable(
                                     onClick = onClick,
                                     onLongClick = onLeadingLongClick,
+                                    onClickLabel = clickLabel,
+                                    onLongClickLabel = longClickLabel,
+                                    role = Role.Button,
                                 )
                             } else {
                                 Modifier
@@ -288,7 +307,6 @@ private fun CompactContent(
                     FilePipeSwitch(
                         checked = rule.isEnabled,
                         onCheckedChange = { enabled ->
-                            playTap()
                             onToggleEnabled(enabled)
                         },
                     )
@@ -304,11 +322,8 @@ private fun CompactContent(
                                 )
                             }
                             if (showInlineProgressCancel) {
-                                OutlinedButton(
-                                    onClick = {
-                                        playTap()
-                                        onCancelRunClick()
-                                    },
+                                FilePipeOutlinedButton(
+                                    onClick = onCancelRunClick,
                                     shape = RoundedCornerShape(50),
                                     contentPadding =
                                         androidx.compose.foundation.layout.PaddingValues(
@@ -324,11 +339,8 @@ private fun CompactContent(
                             }
                         }
                     } else {
-                        FilledTonalIconButton(
-                            onClick = {
-                                playTap()
-                                onRunClick()
-                            },
+                        FilePipeFilledTonalIconButton(
+                            onClick = onRunClick,
                             enabled = rule.isEnabled && !runBlocked,
                         ) {
                             Icon(
@@ -354,6 +366,8 @@ private fun CompactContent(
 @Composable
 private fun ExpandedContent(
     rule: Rule,
+    isSelected: Boolean,
+    isSelectionMode: Boolean,
     progress: RunProgress?,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
@@ -369,8 +383,17 @@ private fun ExpandedContent(
     reorderLongPressDragModifier: Modifier = Modifier,
     suppressLongClickForReorder: Boolean = false,
 ) {
-    val playTap = rememberPlayTapSound()
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
+    val clickLabel =
+        if (isSelectionMode) {
+            stringResource(
+                if (isSelected) R.string.rule_card_deselect_cd else R.string.rule_card_select_cd,
+                rule.name,
+            )
+        } else {
+            stringResource(R.string.rule_card_collapse_cd, rule.name)
+        }
+    val longClickLabel = stringResource(R.string.rule_card_select_cd, rule.name)
     val expandedColumnLongClick: (() -> Unit)? =
         when {
             suppressLongClickForReorder -> null
@@ -384,6 +407,9 @@ private fun ExpandedContent(
                 .tapSoundCombinedClickable(
                     onClick = onClick,
                     onLongClick = expandedColumnLongClick,
+                    onClickLabel = clickLabel,
+                    onLongClickLabel = longClickLabel,
+                    role = Role.Button,
                 ).then(reorderLongPressDragModifier)
                 .padding(16.dp),
     ) {
@@ -404,6 +430,9 @@ private fun ExpandedContent(
                                 Modifier.tapSoundCombinedClickable(
                                     onClick = onClick,
                                     onLongClick = onLeadingLongClick,
+                                    onClickLabel = clickLabel,
+                                    onLongClickLabel = longClickLabel,
+                                    role = Role.Button,
                                 )
                             } else {
                                 Modifier
@@ -430,7 +459,6 @@ private fun ExpandedContent(
             FilePipeSwitch(
                 checked = rule.isEnabled,
                 onCheckedChange = { enabled ->
-                    playTap()
                     onToggleEnabled(enabled)
                 },
                 modifier = Modifier.padding(start = 8.dp),
@@ -452,9 +480,9 @@ private fun ExpandedContent(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     rule.fileExtensions.forEach { extension ->
-                        FilterChip(
+                        FilePipeFilterChip(
                             selected = true,
-                            onClick = { playTap() },
+                            onClick = {},
                             label = { Text(extension, style = MaterialTheme.typography.bodyMedium) },
                             colors =
                                 FilterChipDefaults.filterChipColors(
@@ -505,10 +533,11 @@ private fun ExpandedContent(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clickable {
-                                playTap()
-                                onStaleWarningClick()
-                            }.padding(vertical = 4.dp),
+                            .tapSoundClickable(
+                                onClickLabel = stringResource(R.string.edit_rule),
+                                role = Role.Button,
+                                onClick = onStaleWarningClick,
+                            ).padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
@@ -553,7 +582,8 @@ private fun ExpandedContent(
 
             AnimatedVisibility(
                 visible = progress != null,
-                enter = expandVertically() + fadeIn(),
+                enter = reducedMotionEnterTransition(expandVertically() + fadeIn()),
+                exit = reducedMotionExitTransition(shrinkVertically() + fadeOut()),
             ) {
                 progress?.let { runProgress ->
                     Column(
@@ -606,7 +636,7 @@ private fun ExpandedContent(
                             val progressSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
                             val animatedProgress by animateFloatAsState(
                                 targetValue = runProgress.progress,
-                                animationSpec = progressSpec,
+                                animationSpec = reducedMotionAwareSpec(progressSpec),
                                 label = "progress",
                             )
                             Row(
@@ -666,21 +696,15 @@ private fun ExpandedContent(
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 cardActions.forEach { action ->
-                    TooltipBox(
-                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                        tooltip = { PlainTooltip { CenteredTooltipText(action.label) } },
-                        state = rememberTooltipState(),
+                    FilePipeIconButton(
+                        onClick = action.onClick,
+                        tooltipLabel = action.label,
                     ) {
-                        IconButton(onClick = {
-                            playTap()
-                            action.onClick()
-                        }) {
-                            Icon(
-                                imageVector = action.icon,
-                                contentDescription = action.label,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
+                        Icon(
+                            imageVector = action.icon,
+                            contentDescription = action.label,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
             }
@@ -692,11 +716,8 @@ private fun ExpandedContent(
                     tooltip = { PlainTooltip { CenteredTooltipText(stringResource(R.string.cancel)) } },
                     state = rememberTooltipState(),
                 ) {
-                    OutlinedButton(
-                        onClick = {
-                            playTap()
-                            onCancelRunClick()
-                        },
+                    FilePipeOutlinedButton(
+                        onClick = onCancelRunClick,
                         shape = RoundedCornerShape(50),
                     ) {
                         Text(text = stringResource(R.string.cancel))
@@ -708,14 +729,10 @@ private fun ExpandedContent(
                     tooltip = { PlainTooltip { CenteredTooltipText(stringResource(R.string.run_now)) } },
                     state = rememberTooltipState(),
                 ) {
-                    FilledTonalButton(
-                        onClick = {
-                            playTap()
-                            onRunClick()
-                        },
+                    FilePipeFilledTonalButton(
+                        onClick = onRunClick,
                         enabled = rule.isEnabled && !runBlocked,
                         shape = RoundedCornerShape(50),
-                        colors = ButtonDefaults.filledTonalButtonColors(),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     ) {
                         Icon(

@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import dev.bikram.filepipe.ui.feedback.performSwipeThresholdHaptic
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -54,6 +55,13 @@ fun DeliberateSwipeRevealCard(
     val scope = rememberCoroutineScope()
     var offsetX by remember { mutableFloatStateOf(0f) }
     var laidOutWidthPx by remember { mutableFloatStateOf(0f) }
+    val settleAnimationSpec =
+        reducedMotionAwareSpec(
+            spring<Float>(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = Spring.StiffnessMedium,
+            ),
+        )
 
     BoxWithConstraints(modifier = modifier.clip(cardShape)) {
         val constraintWidthPx =
@@ -121,11 +129,7 @@ fun DeliberateSwipeRevealCard(
                                                     val anim = Animatable(start)
                                                     anim.animateTo(
                                                         targetValue = 0f,
-                                                        animationSpec =
-                                                            spring(
-                                                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                                                stiffness = Spring.StiffnessMedium,
-                                                            ),
+                                                        animationSpec = settleAnimationSpec,
                                                     ) {
                                                         offsetX = value
                                                     }

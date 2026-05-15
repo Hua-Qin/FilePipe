@@ -16,6 +16,10 @@
     <string name="rule_card_from_none">No sources</string>
     <string name="rule_card_destination_not_set">Not set</string>
     <string name="rule_card_to">To</string>
+    <string name="rule_card_expand_cd">Expand %1$s</string>
+    <string name="rule_card_collapse_cd">Collapse %1$s</string>
+    <string name="rule_card_select_cd">Select %1$s</string>
+    <string name="rule_card_deselect_cd">Deselect %1$s</string>
     <string name="rule_card_stale_folder_warning">One or more folders need attention</string>
     <string name="rule_card_progress_moving_file">Moving %1$s (%2$d / %3$d)</string>
     <string name="rule_card_progress_copying_file">Copying %1$s (%2$d / %3$d)</string>
@@ -114,6 +118,7 @@
     <string name="rule_icon_apply_emoji_cd">Apply custom emoji</string>
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
+    <string name="close">Close</string>
     <string name="delete">Delete</string>
     <string name="action_edit">Edit</string>
     <string name="action_duplicate">Duplicate</string>
