@@ -1,9 +1,12 @@
 package dev.bikram.filepipe.domain.usecase
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
@@ -23,6 +26,7 @@ import javax.inject.Inject
 class ExecuteRulesUseCase
     @Inject
     constructor(
+        @param:ApplicationContext private val context: Context,
         private val fileOperationRepository: FileOperationRepository,
         private val runHistoryRepository: RunHistoryRepository,
         private val userPreferencesRepository: UserPreferencesRepository,
@@ -159,6 +163,11 @@ class ExecuteRulesUseCase
                         copyCreatedDestFolderUris = copyCreatedDestFolders.toList(),
                     )
                 runHistoryRepository.completeRun(result)
+                DiagnosticLog.record(
+                    context,
+                    "Rule execution failed: ruleId=${rule.id}, trigger=$triggerType, planned=$totalPlanned, completed=${allFiles.size}",
+                    e,
+                )
                 onProgress(
                     RunProgress(rule.id, rule.name, 1f, isComplete = true, error = e.message),
                 )
@@ -177,6 +186,12 @@ class ExecuteRulesUseCase
                     copyCreatedDestFolderUris = copyCreatedDestFolders.toList(),
                 )
             runHistoryRepository.completeRun(result)
+            if (result.totalFailed > 0) {
+                DiagnosticLog.record(
+                    context,
+                    "Rule execution completed with file failures: ruleId=${rule.id}, trigger=$triggerType, moved=${result.totalMoved}, failed=${result.totalFailed}",
+                )
+            }
 
             onProgress(
                 RunProgress(

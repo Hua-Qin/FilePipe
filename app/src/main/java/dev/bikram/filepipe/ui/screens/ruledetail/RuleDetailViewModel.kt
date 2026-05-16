@@ -505,7 +505,12 @@ class RuleDetailViewModel
         fun loadPreview() =
             viewModelScope.launch {
                 val state = _uiState.value
-                if (state.sourceFolderPaths.isEmpty() || state.fileExtensions.isEmpty()) return@launch
+                if (state.sourceFolderPaths.isEmpty() ||
+                    state.destinationFolderPath.isBlank() ||
+                    state.fileExtensions.isEmpty()
+                ) {
+                    return@launch
+                }
                 _uiState.update { it.copy(isPreviewLoading = true, previewFiles = null) }
                 val rule = buildRuleFromState(state)
                 val files = simulateRuleUseCase(rule)

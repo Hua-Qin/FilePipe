@@ -9,6 +9,7 @@ import dagger.assisted.AssistedInject
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.update.UpdateAvailableNotifier
 import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
 import dev.bikram.filepipe.update.UpdateChecker
@@ -17,7 +18,7 @@ import dev.bikram.filepipe.update.UpdateChecker
 class UpdateCheckWorker
     @AssistedInject
     constructor(
-        @Assisted appContext: Context,
+        @Assisted private val appContext: Context,
         @Assisted workerParams: WorkerParameters,
         private val updateChecker: UpdateChecker,
         private val userPreferencesRepository: UserPreferencesRepository,
@@ -36,9 +37,15 @@ class UpdateCheckWorker
                 updateCheckWorkScheduler.syncFromPreferences()
                 return Result.success()
             }
-            val info = updateChecker.checkForUpdate()
-            if (info != null) {
-                updateAvailableNotifier.notifyIfNewUpdateAvailable(info, prefs)
+            runCatching {
+                val info = updateChecker.checkForUpdate()
+                if (info != null) {
+                    updateAvailableNotifier.notifyIfNewUpdateAvailable(info, prefs)
+                }
+            }.onFailure { error ->
+                DiagnosticLog.record(appContext, "Scheduled update check failed: attempt=$runAttemptCount", error)
+                updateCheckWorkScheduler.syncFromPreferences()
+                return Result.retry()
             }
             updateCheckWorkScheduler.syncFromPreferences()
             return Result.success()

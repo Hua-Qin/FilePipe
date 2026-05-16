@@ -14,6 +14,7 @@ import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
@@ -206,6 +207,12 @@ class UndoRunUseCase
                     }
                 }
 
+                if (failed > 0) {
+                    DiagnosticLog.record(
+                        context,
+                        "Undo completed with failures: historyId=$historyId, reversed=$reversed, failed=$failed",
+                    )
+                }
                 return@withContext UndoResult(reversed, failed, errors, operationMode = operationMode)
             }
 

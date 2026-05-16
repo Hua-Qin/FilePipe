@@ -8,6 +8,15 @@ enum class SwipeAction {
     VIEW_HISTORY,
 }
 
+fun SwipeAction.materialSymbolName(): String =
+    when (this) {
+        SwipeAction.EDIT -> "edit"
+        SwipeAction.DELETE -> "delete"
+        SwipeAction.DUPLICATE -> "content_copy"
+        SwipeAction.PREVIEW -> "visibility"
+        SwipeAction.VIEW_HISTORY -> "history"
+    }
+
 data class AppPreferences(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
     val colorSource: AppColorSource = AppColorSource.MATERIAL_YOU,

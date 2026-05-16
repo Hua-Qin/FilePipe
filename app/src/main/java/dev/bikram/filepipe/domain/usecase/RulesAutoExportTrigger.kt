@@ -1,6 +1,9 @@
 package dev.bikram.filepipe.domain.usecase
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -8,6 +11,7 @@ import javax.inject.Singleton
 class RulesAutoExportTrigger
     @Inject
     constructor(
+        @param:ApplicationContext private val context: Context,
         private val userPreferencesRepository: UserPreferencesRepository,
         private val exportRulesUseCase: ExportRulesUseCase,
     ) {
@@ -37,7 +41,21 @@ class RulesAutoExportTrigger
                     prefs.cloudExportFolderUri,
                 ).filter { it.isNotBlank() }
             if (prefs.autoExportOnRuleChange && backupDestinations.isNotEmpty()) {
-                exportRulesUseCase.exportRulesToTreeUris(backupDestinations)
+                exportRulesUseCase.exportRulesToTreeUris(backupDestinations).fold(
+                    onSuccess = { fileNames ->
+                        DiagnosticLog.record(
+                            context,
+                            "Auto backup export completed: destinations=${backupDestinations.size}, files=${fileNames.size}",
+                        )
+                    },
+                    onFailure = { error ->
+                        DiagnosticLog.record(
+                            context,
+                            "Auto backup export failed: destinations=${backupDestinations.size}",
+                            error,
+                        )
+                    },
+                )
             }
         }
     }

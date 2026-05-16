@@ -15,6 +15,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
@@ -47,9 +48,17 @@ class FileOrganizerWorker
 
         override suspend fun doWork(): Result {
             val ruleId = inputData.getLong(KEY_RULE_ID, -1L)
-            if (ruleId == -1L) return Result.failure()
+            if (ruleId == -1L) {
+                DiagnosticLog.record(appContext, "Scheduled rule worker failed: missing rule id")
+                return Result.failure()
+            }
 
-            val rule = ruleRepository.getRuleById(ruleId) ?: return Result.failure()
+            val rule =
+                ruleRepository.getRuleById(ruleId)
+                    ?: run {
+                        DiagnosticLog.record(appContext, "Scheduled rule worker failed: rule $ruleId not found")
+                        return Result.failure()
+                    }
 
             setForeground(createForegroundInfo(rule.name))
             refreshProgressNotification(rule, RunProgress(rule.id, rule.name, 0f, totalFiles = 0))
@@ -65,12 +74,23 @@ class FileOrganizerWorker
                         result.filesMoved
                             .filter { it.success && !it.skipped }
                             .map { it.fileName }
+                    if (result.totalFailed > 0) {
+                        DiagnosticLog.record(
+                            appContext,
+                            "Scheduled rule completed with failures: ruleId=${rule.id}, moved=${result.totalMoved}, failed=${result.totalFailed}",
+                        )
+                    }
                     postSummaryNotification(rule.name, result.totalMoved, result.totalFailed, rule.operationMode, result.historyId, movedFileNames)
                 }
                 Result.success()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                DiagnosticLog.record(
+                    appContext,
+                    "Scheduled rule worker threw: ruleId=${rule.id}, attempt=$runAttemptCount",
+                    e,
+                )
                 if (runAttemptCount < 2) Result.retry() else Result.failure()
             }
         }

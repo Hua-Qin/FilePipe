@@ -26,18 +26,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -77,6 +68,7 @@ import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.HistoryStatusFilter
 import dev.bikram.filepipe.domain.model.RunHistory
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
 import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
@@ -212,7 +204,11 @@ fun HistoryScreen(
                         onClick = onNavigateBack,
                         tooltipLabel = backLabel,
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, backLabel)
+                        FilePipeMaterialRoundedSymbol(
+                            name = "arrow_back",
+                            contentDescription = backLabel,
+                            autoMirror = true,
+                        )
                     }
                 }
             }
@@ -240,13 +236,14 @@ fun HistoryScreen(
                             ) {
                                 val groupIcon =
                                     when (uiState.viewMode) {
-                                        HistoryViewMode.BY_DATE -> Icons.Default.DateRange
-                                        HistoryViewMode.BY_RULE -> Icons.AutoMirrored.Filled.List
-                                        HistoryViewMode.BY_STATUS -> Icons.Default.Category
+                                        HistoryViewMode.BY_DATE -> "calendar_month"
+                                        HistoryViewMode.BY_RULE -> "list"
+                                        HistoryViewMode.BY_STATUS -> "category"
                                     }
-                                Icon(
-                                    imageVector = groupIcon,
+                                FilePipeMaterialRoundedSymbol(
+                                    name = groupIcon,
                                     contentDescription = groupMenuLabel,
+                                    autoMirror = uiState.viewMode == HistoryViewMode.BY_RULE,
                                 )
                             }
                             DropdownMenu(
@@ -286,9 +283,10 @@ fun HistoryScreen(
                                 onClick = { sortMenuExpanded = true },
                                 tooltipLabel = sortMenuLabel,
                             ) {
-                                Icon(
-                                    Icons.AutoMirrored.Filled.Sort,
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "sort",
                                     contentDescription = sortMenuLabel,
+                                    autoMirror = true,
                                 )
                             }
                             DropdownMenu(
@@ -353,7 +351,14 @@ fun HistoryScreen(
                             label = { Text(label) },
                             leadingIcon =
                                 if (uiState.statusFilter == filter) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    {
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "check",
+                                            contentDescription = null,
+                                            size = 16.dp,
+                                            modifier = Modifier.size(16.dp),
+                                        )
+                                    }
                                 } else {
                                     null
                                 },
@@ -601,9 +606,10 @@ private fun SwipeToDismissHistoryCard(
                         .padding(end = 24.dp),
                     contentAlignment = Alignment.CenterEnd,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Delete,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "delete",
                         contentDescription = stringResource(R.string.delete),
+                        size = 28.dp,
                         tint = SwipeAction.DELETE.semanticSwipeIconTint(),
                         modifier = Modifier.size(28.dp),
                     )

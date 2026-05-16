@@ -33,22 +33,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.Archive
-import androidx.compose.material.icons.filled.AudioFile
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -66,7 +54,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -87,6 +74,7 @@ import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.TriggerType
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import dev.bikram.filepipe.domain.model.isNoChangesRun
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.StatusChip
@@ -246,7 +234,11 @@ fun HistoryDetailScreen(
             },
             navigationIcon = {
                 FilePipeIconButton(onClick = onNavigateBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    FilePipeMaterialRoundedSymbol(
+                        name = "arrow_back",
+                        contentDescription = "Back",
+                        autoMirror = true,
+                    )
                 }
             },
             colors = gradientOverlayTopAppBarColors(),
@@ -340,7 +332,11 @@ private fun RunSummaryCard(
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         ),
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null)
+                    FilePipeMaterialRoundedSymbol(
+                        name = "undo",
+                        contentDescription = null,
+                        autoMirror = true,
+                    )
                     Text("  ${stringResource(R.string.history_detail_undo_files, history.totalFilesMoved)}")
                 }
             }
@@ -437,9 +433,10 @@ private fun FileMovedCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
-                    Icon(
-                        imageVector = if (isSuccess) Icons.Default.CheckCircle else Icons.Default.Warning,
+                    FilePipeMaterialRoundedSymbol(
+                        name = if (isSuccess) "check_circle" else "warning",
                         contentDescription = null,
+                        size = 16.dp,
                         tint = iconColor,
                         modifier = Modifier.size(16.dp).padding(start = 4.dp),
                     )
@@ -534,8 +531,8 @@ private fun FileThumbnailOrIcon(
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            Icon(
-                imageVector = fileTypeIcon(file.fileName),
+            FilePipeMaterialRoundedSymbol(
+                name = fileTypeSymbolName(file.fileName),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.padding(8.dp),
@@ -891,14 +888,14 @@ private fun openFileWithDefaultApp(
     }
 }
 
-private fun fileTypeIcon(fileName: String): ImageVector {
+private fun fileTypeSymbolName(fileName: String): String {
     val ext = fileName.substringAfterLast('.', "").lowercase()
     return when (ext) {
-        "jpg", "jpeg", "png", "gif", "heic", "webp", "bmp", "svg" -> Icons.Default.Image
-        "mp4", "mkv", "avi", "mov", "m4v", "webm" -> Icons.Default.Movie
-        "mp3", "flac", "aac", "ogg", "m4a", "wav" -> Icons.Default.AudioFile
-        "pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "txt", "odt" -> Icons.Default.Description
-        "zip", "rar", "7z", "tar", "gz" -> Icons.Default.Archive
-        else -> Icons.AutoMirrored.Filled.InsertDriveFile
+        "jpg", "jpeg", "png", "gif", "heic", "webp", "bmp", "svg" -> "image"
+        "mp4", "mkv", "avi", "mov", "m4v", "webm" -> "movie"
+        "mp3", "flac", "aac", "ogg", "m4a", "wav" -> "audio_file"
+        "pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "txt", "odt" -> "description"
+        "zip", "rar", "7z", "tar", "gz" -> "archive"
+        else -> "draft"
     }
 }

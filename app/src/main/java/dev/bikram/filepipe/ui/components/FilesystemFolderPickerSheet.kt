@@ -17,12 +17,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathAllowedForRules
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -339,9 +337,10 @@ fun FilesystemFolderPickerSheetContent(
                             )
                         },
                         leadingContent = {
-                            Icon(
-                                imageVector = Icons.Filled.Folder,
+                            FilePipeMaterialRoundedSymbol(
+                                name = "folder",
                                 contentDescription = null,
+                                size = 24.dp,
                                 modifier = Modifier.size(24.dp),
                                 tint = MaterialTheme.colorScheme.primary,
                             )

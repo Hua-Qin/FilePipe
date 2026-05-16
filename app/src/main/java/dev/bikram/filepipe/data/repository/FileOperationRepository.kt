@@ -908,6 +908,18 @@ class FileOperationRepository
                         sourceEntry.name,
                     )
 
+                if (destFolderUriString.isBlank()) {
+                    return@withContext PreviewFileResult(
+                        fileName = sourceEntry.name,
+                        sourcePath = sourceEntry.uri.toString(),
+                        simulatedDestPath = simulatedRootPath,
+                        wouldSkip = false,
+                        wouldOverwrite = false,
+                        renamedTo = null,
+                        sizeBytes = sourceEntry.size,
+                    )
+                }
+
                 if (isFilesystemFolderPathString(destFolderUriString)) {
                     if (!filesystemAccessEnabled) {
                         return@withContext PreviewFileResult(
@@ -1019,7 +1031,14 @@ class FileOperationRepository
                     }
                 }
 
-                val destTree = DocumentFile.fromTreeUri(context, Uri.parse(destFolderUriString))
+                val destTree =
+                    try {
+                        DocumentFile.fromTreeUri(context, Uri.parse(destFolderUriString))
+                    } catch (_: IllegalArgumentException) {
+                        null
+                    } catch (_: SecurityException) {
+                        null
+                    }
                 if (destTree == null || !destTree.exists()) {
                     return@withContext PreviewFileResult(
                         fileName = sourceEntry.name,

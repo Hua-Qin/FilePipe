@@ -33,28 +33,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Sort
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Deselect
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material.icons.filled.UnfoldLess
-import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -79,7 +65,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -94,11 +79,13 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.SwipeAction
+import dev.bikram.filepipe.data.preferences.materialSymbolName
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.ui.common.AppBottomSheet
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
@@ -129,7 +116,7 @@ import kotlinx.coroutines.flow.first
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun RulesScreen(
     contentPadding: PaddingValues,
@@ -298,8 +285,8 @@ fun RulesScreen(
                                         modifier = Modifier.align(Alignment.Center),
                                         tooltipLabel = selectAllLabel,
                                     ) {
-                                        Icon(
-                                            Icons.Default.SelectAll,
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "select_all",
                                             contentDescription = selectAllLabel,
                                         )
                                     }
@@ -322,7 +309,7 @@ fun RulesScreen(
                                     onClick = { viewModel.clearSelection() },
                                     tooltipLabel = deselectAllLabel,
                                 ) {
-                                    Icon(Icons.Default.Deselect, contentDescription = deselectAllLabel)
+                                    FilePipeMaterialRoundedSymbol(name = "deselect", contentDescription = deselectAllLabel)
                                 }
                             } else {
                                 Box(modifier = Modifier.size(48.dp)) {
@@ -332,9 +319,10 @@ fun RulesScreen(
                                         modifier = Modifier.align(Alignment.Center),
                                         tooltipLabel = sortLabel,
                                     ) {
-                                        Icon(
-                                            Icons.AutoMirrored.Filled.Sort,
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "sort",
                                             contentDescription = sortLabel,
+                                            autoMirror = true,
                                         )
                                     }
                                     RulesSortDropdown(
@@ -358,8 +346,8 @@ fun RulesScreen(
                                     onClick = { viewModel.toggleGlobalViewMode() },
                                     tooltipLabel = expandCollapseLabel,
                                 ) {
-                                    Icon(
-                                        imageVector = if (isCompactMode) Icons.Default.UnfoldMore else Icons.Default.UnfoldLess,
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = if (isCompactMode) "unfold_more" else "unfold_less",
                                         contentDescription = expandCollapseLabel,
                                     )
                                 }
@@ -444,7 +432,7 @@ fun RulesScreen(
                                         onClick = { viewModel.clearSelection() },
                                         tooltipLabel = cancelSelectionLabel,
                                     ) {
-                                        Icon(Icons.Default.Close, contentDescription = cancelSelectionLabel)
+                                        FilePipeMaterialRoundedSymbol(name = "close", contentDescription = cancelSelectionLabel)
                                     }
                                     val deleteLabel = stringResource(R.string.delete)
                                     FilePipeFilledTonalIconButton(
@@ -456,15 +444,15 @@ fun RulesScreen(
                                                 contentColor = MaterialTheme.colorScheme.onErrorContainer,
                                             ),
                                     ) {
-                                        Icon(Icons.Default.Delete, contentDescription = deleteLabel)
+                                        FilePipeMaterialRoundedSymbol(name = "delete", contentDescription = deleteLabel)
                                     }
                                     val previewSelectedLabel = stringResource(R.string.preview_selected_rules)
                                     FilePipeFilledTonalIconButton(
                                         onClick = { viewModel.startPreviewSelected() },
                                         tooltipLabel = previewSelectedLabel,
                                     ) {
-                                        Icon(
-                                            Icons.Default.Visibility,
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "visibility",
                                             contentDescription = previewSelectedLabel,
                                         )
                                     }
@@ -476,7 +464,12 @@ fun RulesScreen(
                                     ) {
                                         Text(stringResource(R.string.run_button))
                                         Spacer(Modifier.width(6.dp))
-                                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "play_arrow",
+                                            contentDescription = null,
+                                            size = 16.dp,
+                                            modifier = Modifier.size(16.dp),
+                                        )
                                     }
                                 }
                             }
@@ -671,11 +664,12 @@ fun RulesScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (preview.isLoading) {
-                    CircularProgressIndicator(
+                    LoadingIndicator(
                         modifier =
                             Modifier
                                 .align(Alignment.CenterHorizontally)
-                                .padding(32.dp),
+                                .padding(32.dp)
+                                .size(48.dp),
                     )
                 } else if (preview.ruleGroups.all { it.results.isEmpty() }) {
                     Text(
@@ -872,7 +866,7 @@ private fun SwipeToDismissRuleCard(
             .filter { it !in swipeAssigned }
             .map { action ->
                 RuleCardAction(
-                    icon = action.icon(),
+                    iconName = action.materialSymbolName(),
                     label = action.label(),
                     onClick = { action.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule) },
                 )
@@ -901,9 +895,10 @@ private fun SwipeToDismissRuleCard(
                     ),
                 contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd,
             ) {
-                Icon(
-                    imageVector = action.icon(),
+                FilePipeMaterialRoundedSymbol(
+                    name = action.materialSymbolName(),
                     contentDescription = null,
+                    size = 32.dp,
                     tint = action.semanticSwipeIconTint(),
                     modifier = Modifier.size(32.dp),
                 )
@@ -947,15 +942,6 @@ private fun SwipeAction.dispatch(
     SwipeAction.PREVIEW -> onPreview()
     SwipeAction.VIEW_HISTORY -> onViewHistory()
 }
-
-private fun SwipeAction.icon(): ImageVector =
-    when (this) {
-        SwipeAction.EDIT -> Icons.Default.Edit
-        SwipeAction.DELETE -> Icons.Default.Delete
-        SwipeAction.DUPLICATE -> Icons.Default.ContentCopy
-        SwipeAction.PREVIEW -> Icons.Default.Visibility
-        SwipeAction.VIEW_HISTORY -> Icons.Default.History
-    }
 
 @Composable
 private fun SwipeAction.label(): String =
@@ -1006,9 +992,10 @@ private fun EmptyState(
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth(0.72f),
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
+                FilePipeMaterialRoundedSymbol(
+                    name = "add",
                     contentDescription = null,
+                    size = 20.dp,
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(8.dp))

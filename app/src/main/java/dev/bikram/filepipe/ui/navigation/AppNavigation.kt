@@ -11,7 +11,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,46 +19,29 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.NewReleases
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
@@ -76,7 +58,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -104,11 +85,11 @@ import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeFloatingActionButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
-import dev.bikram.filepipe.ui.components.SwipeDismissableUpdatePromoBanner
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.screens.help.FaqScreen
 import dev.bikram.filepipe.ui.screens.history.HistoryScreen
@@ -119,7 +100,6 @@ import dev.bikram.filepipe.ui.screens.onboarding.OnboardingRuleWizardScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingTitleScreen
 import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
-import dev.bikram.filepipe.ui.screens.settings.SettingsBringIntoViewSection
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
 import dev.bikram.filepipe.ui.screens.settings.launchAppShareChooser
@@ -131,12 +111,12 @@ import dev.bikram.filepipe.ui.theme.ProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.RoundedPolygonShape
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
+import dev.bikram.filepipe.update.notificationDedupeKey
 
 private data class BottomNavItem(
     val screen: Screen,
     val label: Int,
-    val selectedIcon: @Composable () -> Unit,
-    val unselectedIcon: @Composable () -> Unit,
+    val symbolName: String,
 )
 
 private val bottomNavItems =
@@ -144,22 +124,33 @@ private val bottomNavItems =
         BottomNavItem(
             screen = Screen.Rules,
             label = R.string.nav_rules,
-            selectedIcon = { Icon(Icons.Filled.Tune, contentDescription = null) },
-            unselectedIcon = { Icon(Icons.Outlined.Tune, contentDescription = null) },
+            symbolName = "tune",
         ),
         BottomNavItem(
             screen = Screen.History,
             label = R.string.nav_history,
-            selectedIcon = { Icon(Icons.Filled.History, contentDescription = null) },
-            unselectedIcon = { Icon(Icons.Outlined.History, contentDescription = null) },
+            symbolName = "history",
         ),
         BottomNavItem(
             screen = Screen.Settings,
             label = R.string.nav_settings,
-            selectedIcon = { Icon(Icons.Filled.Settings, contentDescription = null) },
-            unselectedIcon = { Icon(Icons.Outlined.Settings, contentDescription = null) },
+            symbolName = "settings",
         ),
     )
+
+private sealed interface UpdateChromeState {
+    data object Hidden : UpdateChromeState
+
+    data object Available : UpdateChromeState
+
+    data class Downloading(
+        val bytesDownloaded: Long,
+        val totalBytesToDownload: Long,
+        val indeterminateProgress: Boolean,
+    ) : UpdateChromeState
+
+    data object ReadyToInstall : UpdateChromeState
+}
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -206,7 +197,60 @@ fun AppNavigation(
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val floatingBarHeight = 64.dp
-    val scrimHeight = navBarInset + floatingBarHeight + 24.dp
+
+    // Activity-scoped VMs for nav bar FAB actions
+    val historyVm: HistoryViewModel = hiltViewModel()
+    val settingsVm: SettingsViewModel = hiltViewModel()
+    val hasAnyHistory by historyVm.hasAnyHistory.collectAsStateWithLifecycle()
+    val updateInfo by settingsVm.updateInfo.collectAsStateWithLifecycle()
+    val playBannerState by settingsVm.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
+    var dismissedUpdateBarKey by remember { mutableStateOf<String?>(null) }
+    var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
+
+    val updateKey = updateInfo?.notificationDedupeKey()
+    val updateAvailable = BuildConfig.SHOW_UPDATES && updateInfo != null && showFloatingBottomBar
+    val updateFabState =
+        if (!showFloatingBottomBar) {
+            UpdateChromeState.Hidden
+        } else {
+            when (val currentPlayState = playBannerState) {
+                is PlayInAppUpdateBannerUiState.Downloading ->
+                    UpdateChromeState.Downloading(
+                        bytesDownloaded = currentPlayState.bytesDownloaded,
+                        totalBytesToDownload = currentPlayState.totalBytesToDownload,
+                        indeterminateProgress = currentPlayState.indeterminateProgress,
+                    )
+                PlayInAppUpdateBannerUiState.ReadyToInstall -> UpdateChromeState.ReadyToInstall
+                PlayInAppUpdateBannerUiState.Hidden ->
+                    if (updateAvailable) {
+                        UpdateChromeState.Available
+                    } else {
+                        UpdateChromeState.Hidden
+                    }
+            }
+        }
+    val updateBarState =
+        if (!showFloatingBottomBar) {
+            UpdateChromeState.Hidden
+        } else {
+            when (val currentPlayState = playBannerState) {
+                is PlayInAppUpdateBannerUiState.Downloading ->
+                    UpdateChromeState.Downloading(
+                        bytesDownloaded = currentPlayState.bytesDownloaded,
+                        totalBytesToDownload = currentPlayState.totalBytesToDownload,
+                        indeterminateProgress = currentPlayState.indeterminateProgress,
+                    )
+                PlayInAppUpdateBannerUiState.ReadyToInstall -> UpdateChromeState.ReadyToInstall
+                PlayInAppUpdateBannerUiState.Hidden ->
+                    if (updateAvailable && updateKey != dismissedUpdateBarKey) {
+                        UpdateChromeState.Available
+                    } else {
+                        UpdateChromeState.Hidden
+                    }
+            }
+        }
+    val floatingUpdateBarExtraHeight = if (updateBarState != UpdateChromeState.Hidden) 72.dp else 0.dp
+    val scrimHeight = navBarInset + floatingBarHeight + 24.dp + floatingUpdateBarExtraHeight
 
     /** Extra top blur under History filter chips (must match [isHistoryFilterRoute] detection). */
     val historyFilterChipsBand = 96.dp
@@ -229,11 +273,6 @@ fun AppNavigation(
         PaddingValues(bottom = if (showFloatingBottomBar) scrimHeight else navBarInset + 96.dp)
     val density = LocalDensity.current
     val bottomBlurHeightPx = with(density) { bottomBlurHeightDp.toPx() }
-
-    // Activity-scoped VMs for nav bar FAB actions
-    val historyVm: HistoryViewModel = hiltViewModel()
-    val settingsVm: SettingsViewModel = hiltViewModel()
-    val hasAnyHistory by historyVm.hasAnyHistory.collectAsStateWithLifecycle()
 
     var showClearHistoryDialog by remember { mutableStateOf(false) }
     val reducedMotion = LocalReducedMotion.current
@@ -277,9 +316,6 @@ fun AppNavigation(
         pendingShortcutRepository.clearPendingHistoryDetail()
     }
 
-    val updateInfo by settingsVm.updateInfo.collectAsStateWithLifecycle()
-    val updatePromoDismissed by settingsVm.updatePromoBannerDismissedThisSession.collectAsStateWithLifecycle()
-    val playBannerState by settingsVm.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
     val navRoute = navBackStackEntry?.destination?.route
     val primaryTabRoute =
         navRoute != null &&
@@ -288,18 +324,7 @@ fun AppNavigation(
                     navRoute == Screen.History.route ||
                     navRoute == Screen.Settings.route
             )
-    val showGlobalUpdatePromoBanner =
-        BuildConfig.SHOW_UPDATES &&
-            updateInfo != null &&
-            !updatePromoDismissed &&
-            playBannerState is PlayInAppUpdateBannerUiState.Hidden &&
-            primaryTabRoute
-
-    val showPlayUpdateBanner = playBannerState != PlayInAppUpdateBannerUiState.Hidden
-    val primaryTabTopBannerActive =
-        (showPlayUpdateBanner && primaryTabRoute) || showGlobalUpdatePromoBanner
-    val primaryTabTopBannerBlurInsetDp = if (primaryTabTopBannerActive) 100.dp else 0.dp
-    val topBlurSmallChrome = statusBarInset + 96.dp + primaryTabTopBannerBlurInsetDp
+    val topBlurSmallChrome = statusBarInset + 96.dp
     val topBlurHeightDp =
         if (isHistoryFilterRoute) {
             topBlurSmallChrome + historyFilterChipsBand
@@ -385,50 +410,25 @@ fun AppNavigation(
         LocalProgressiveBlurEnabled provides preferences.progressiveBlurEnabled,
         LocalProgressiveBlurStyle provides progressiveBlurStyle,
     ) {
-        val context = LocalContext.current
-        CompositionLocalProvider(LocalPrimaryTabTopBannerActive provides primaryTabTopBannerActive) {
+        CompositionLocalProvider(LocalPrimaryTabTopBannerActive provides false) {
             CompositionLocalProvider(
-                LocalPrimaryTabTopBanner provides {
-                    if (primaryTabTopBannerActive) {
-                        Column(
-                            Modifier
-                                .fillMaxWidth()
-                                .windowInsetsPadding(WindowInsets.statusBars.only(WindowInsetsSides.Top))
-                                .consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top)),
-                        ) {
-                            if (showPlayUpdateBanner && primaryTabRoute) {
-                                PlayStoreGlobalUpdateBanner(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 2.dp),
-                                    state = playBannerState,
-                                    onInstallClick = {
-                                        val activity = context as? Activity
-                                        settingsVm.completePlayFlexibleUpdateIfReady(activity)
-                                    },
-                                )
-                            }
-                            if (showGlobalUpdatePromoBanner) {
-                                SwipeDismissableUpdatePromoBanner(
-                                    onDismiss = { settingsVm.dismissUpdatePromoBanner() },
-                                    onOpenSettingsClick = {
-                                        settingsVm.flagOpenUpdateSheetFromRulesPromo()
-                                        navController.navigate(Screen.Settings.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
-                                            }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
-                },
+                LocalPrimaryTabTopBanner provides {},
             ) {
                 val navigationContent: @Composable () -> Unit = {
+                    val hostContext = LocalContext.current
+                    val openUpdateSheetFromChrome = {
+                        settingsVm.flagOpenUpdateSheetFromRulesPromo()
+                        navController.navigate(Screen.Settings.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
+                    val installReadyUpdate = {
+                        settingsVm.completePlayFlexibleUpdateIfReady(hostContext as? Activity)
+                    }
                     Box(Modifier.fillMaxSize()) {
                         Column(Modifier.fillMaxSize()) {
                             NavHost(
@@ -592,6 +592,8 @@ fun AppNavigation(
                                             navController.navigate(Screen.Faq.createRoute())
                                         },
                                         viewModel = settingsVm,
+                                        highlightSectionKey = settingsHighlightSection,
+                                        onHighlightHandled = { settingsHighlightSection = null },
                                     )
                                 }
                                 composable(
@@ -615,10 +617,7 @@ fun AppNavigation(
                                         }
                                     }
                                     val openFolderAccessInSettings: () -> Unit = {
-                                        settingsVm.requestFolderAccessSectionHighlight()
-                                        settingsVm.requestBringSettingsSectionIntoView(
-                                            SettingsBringIntoViewSection.FolderAccess,
-                                        )
+                                        settingsHighlightSection = "folder_access"
                                         goToSettingsFromFaq()
                                     }
                                     FaqScreen(
@@ -626,10 +625,7 @@ fun AppNavigation(
                                         onNavigateBack = { navController.popBackStack() },
                                         onOpenFolderAccessInSettings = openFolderAccessInSettings,
                                         onOpenSettingsNotifications = {
-                                            settingsVm.requestNotificationsSectionHighlight()
-                                            settingsVm.requestBringSettingsSectionIntoView(
-                                                SettingsBringIntoViewSection.Notifications,
-                                            )
+                                            settingsHighlightSection = "notifications"
                                             goToSettingsFromFaq()
                                         },
                                         onOpenAppNotificationSettings = {
@@ -667,6 +663,20 @@ fun AppNavigation(
                             }
                         }
 
+                        UpdateFloatingBar(
+                            state = updateBarState,
+                            onCheckClick = openUpdateSheetFromChrome,
+                            onDismissAvailable = { dismissedUpdateBarKey = updateKey },
+                            onInstallClick = installReadyUpdate,
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .windowInsetsPadding(WindowInsets.navigationBars)
+                                    .padding(horizontal = 16.dp)
+                                    .padding(bottom = floatingBarHeight + 28.dp),
+                        )
+
                         if (showFloatingBottomBar) {
                             FloatingNavBar(
                                 items = bottomNavItems,
@@ -680,8 +690,24 @@ fun AppNavigation(
                                         restoreState = true
                                     }
                                 },
+                                leadingFab =
+                                    if (updateFabState == UpdateChromeState.Hidden) {
+                                        null
+                                    } else {
+                                        {
+                                            UpdateFloatingFab(
+                                                state = updateFabState,
+                                                onClick = {
+                                                    if (updateFabState == UpdateChromeState.ReadyToInstall) {
+                                                        installReadyUpdate()
+                                                    } else {
+                                                        openUpdateSheetFromChrome()
+                                                    }
+                                                },
+                                            )
+                                        }
+                                    },
                                 fabContent = {
-                                    val hostContext = LocalContext.current
                                     MainNavFabSlot(
                                         currentTab = currentTab,
                                         hasAnyHistory = hasAnyHistory,
@@ -740,7 +766,11 @@ fun AppNavigation(
                                         }
                                     },
                                     icon = {
-                                        if (selected) navItem.selectedIcon() else navItem.unselectedIcon()
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = navItem.symbolName,
+                                            contentDescription = null,
+                                            filled = selected,
+                                        )
                                     },
                                     label = {
                                         Text(
@@ -764,157 +794,199 @@ fun AppNavigation(
 }
 
 @Composable
-private fun PlayStoreGlobalUpdateBanner(
+private fun UpdateFloatingFab(
+    state: UpdateChromeState,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    state: PlayInAppUpdateBannerUiState,
-    onInstallClick: () -> Unit,
 ) {
+    if (state == UpdateChromeState.Hidden) return
+
+    val label = stringResource(R.string.update_fab_label)
+    val shape = remember { RoundedPolygonShape(MaterialShapes.Cookie9Sided) }
+    FilePipeFloatingActionButton(
+        onClick = onClick,
+        modifier = modifier.semantics { contentDescription = label },
+        shape = shape,
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+        tooltipLabel = label,
+    ) {
+        FilePipeMaterialRoundedSymbol(
+            name = if (state == UpdateChromeState.ReadyToInstall) "download_done" else "download",
+            contentDescription = null,
+            size = 28.dp,
+            weight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun UpdateFloatingBar(
+    state: UpdateChromeState,
+    onCheckClick: () -> Unit,
+    onDismissAvailable: () -> Unit,
+    onInstallClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (state == UpdateChromeState.Hidden) return
+
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
-    val expressiveShape = RoundedCornerShape(28.dp)
-    when (state) {
-        is PlayInAppUpdateBannerUiState.Hidden -> Unit
-        is PlayInAppUpdateBannerUiState.Downloading -> {
-            OutlinedCard(
-                modifier = modifier.fillMaxWidth(),
-                shape = expressiveShape,
-                border = BorderStroke(1.dp, scheme.outlineVariant),
-                colors =
-                    CardDefaults.outlinedCardColors(
-                        containerColor = scheme.surfaceContainerHigh,
-                        contentColor = scheme.onSurface,
-                    ),
+    val iconShape = remember { RoundedPolygonShape(MaterialShapes.Cookie9Sided) }
+    val (title, body) =
+        when (state) {
+            UpdateChromeState.Hidden -> return
+            UpdateChromeState.Available ->
+                Pair(
+                    stringResource(R.string.update_banner_available_title),
+                    null,
+                )
+            is UpdateChromeState.Downloading -> {
+                val progressLabel =
+                    if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
+                        stringResource(R.string.play_update_banner_downloading)
+                    } else {
+                        val downloaded = Formatter.formatFileSize(context, state.bytesDownloaded)
+                        val total = Formatter.formatFileSize(context, state.totalBytesToDownload)
+                        stringResource(R.string.play_update_banner_downloading_bytes, downloaded, total)
+                    }
+                Pair(
+                    stringResource(R.string.play_update_banner_downloading_title),
+                    progressLabel,
+                )
+            }
+            UpdateChromeState.ReadyToInstall ->
+                Pair(
+                    stringResource(R.string.play_update_banner_install_title),
+                    stringResource(R.string.play_update_banner_install_subtitle),
+                )
+        }
+
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.extraExtraLarge,
+        color = scheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+        shadowElevation = 3.dp,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .padding(start = 14.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                Surface(
+                    modifier = Modifier.size(34.dp),
+                    shape = iconShape,
+                    color = scheme.primaryContainer,
+                    contentColor = scheme.onPrimaryContainer,
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.SystemUpdate,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = scheme.primary,
+                    Box(contentAlignment = Alignment.Center) {
+                        FilePipeMaterialRoundedSymbol(
+                            name = if (state == UpdateChromeState.ReadyToInstall) "download_done" else "download",
+                            contentDescription = null,
+                            size = 24.dp,
+                            weight = FontWeight.Medium,
+                            tint = scheme.onPrimaryContainer,
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.labelLargeEmphasized,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Column(modifier = Modifier.weight(1f)) {
+                    if (body != null) {
                         Text(
-                            text = stringResource(R.string.play_update_banner_downloading_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        val progressLabel =
-                            if (state.indeterminateProgress) {
-                                stringResource(R.string.play_update_banner_downloading)
-                            } else {
-                                val downloaded = Formatter.formatFileSize(context, state.bytesDownloaded)
-                                val total = Formatter.formatFileSize(context, state.totalBytesToDownload)
-                                stringResource(R.string.play_update_banner_downloading_bytes, downloaded, total)
-                            }
-                        Text(
-                            text = progressLabel,
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = body,
+                            style = MaterialTheme.typography.labelMedium,
                             color = scheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                        Spacer(Modifier.height(12.dp))
-                        if (state.indeterminateProgress) {
-                            LinearProgressIndicator(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(expressiveShape),
-                                color = scheme.primary,
-                                trackColor = scheme.surfaceContainerHighest,
-                            )
-                        } else if (state.totalBytesToDownload > 0L) {
-                            val fraction =
-                                (state.bytesDownloaded.toFloat() / state.totalBytesToDownload.toFloat())
-                                    .coerceIn(0f, 1f)
-                            LinearProgressIndicator(
-                                progress = { fraction },
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(expressiveShape),
-                                color = scheme.primary,
-                                trackColor = scheme.surfaceContainerHighest,
-                            )
-                        } else {
-                            LinearProgressIndicator(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(expressiveShape),
-                                color = scheme.primary,
-                                trackColor = scheme.surfaceContainerHighest,
+                    }
+                }
+
+                when (state) {
+                    UpdateChromeState.Available -> {
+                        FilePipeButton(
+                            onClick = onCheckClick,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = scheme.primary,
+                                    contentColor = scheme.onPrimary,
+                                ),
+                        ) {
+                            Text(stringResource(R.string.update_banner_available_action))
+                        }
+                        val closeLabel = stringResource(R.string.close)
+                        FilePipeIconButton(
+                            onClick = onDismissAvailable,
+                            modifier =
+                                Modifier
+                                    .size(40.dp)
+                                    .semantics { contentDescription = closeLabel },
+                        ) {
+                            FilePipeMaterialRoundedSymbol(
+                                name = "close",
+                                contentDescription = null,
+                                size = 20.dp,
+                                weight = FontWeight.Medium,
                             )
                         }
                     }
+                    is UpdateChromeState.Downloading -> Unit
+                    UpdateChromeState.ReadyToInstall ->
+                        FilePipeButton(
+                            onClick = onInstallClick,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = scheme.primary,
+                                    contentColor = scheme.onPrimary,
+                                ),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.play_update_banner_install_action),
+                                maxLines = 1,
+                            )
+                        }
+                    UpdateChromeState.Hidden -> Unit
                 }
             }
-        }
-        PlayInAppUpdateBannerUiState.ReadyToInstall -> {
-            OutlinedCard(
-                modifier = modifier.fillMaxWidth(),
-                shape = expressiveShape,
-                border = BorderStroke(1.dp, scheme.outlineVariant),
-                colors =
-                    CardDefaults.outlinedCardColors(
-                        containerColor = scheme.surfaceContainerHigh,
-                        contentColor = scheme.onSurface,
-                    ),
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.NewReleases,
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = scheme.primary,
+
+            if (state is UpdateChromeState.Downloading) {
+                if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
+                    LinearWavyProgressIndicator(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(8.dp),
+                        color = scheme.primary,
+                        trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.play_update_banner_install_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(R.string.play_update_banner_install_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = scheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    FilePipeButton(
-                        onClick = onInstallClick,
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = scheme.primary,
-                                contentColor = scheme.onPrimary,
-                            ),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.play_update_banner_install_action),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                } else {
+                    val fraction =
+                        (state.bytesDownloaded.toFloat() / state.totalBytesToDownload.toFloat())
+                            .coerceIn(0f, 1f)
+                    LinearWavyProgressIndicator(
+                        progress = { fraction },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(8.dp),
+                        color = scheme.primary,
+                        trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
+                    )
                 }
             }
         }
@@ -927,16 +999,44 @@ private fun FloatingNavBar(
     items: List<BottomNavItem>,
     currentDestination: NavDestination?,
     onItemClick: (BottomNavItem) -> Unit,
+    leadingFab: (@Composable () -> Unit)? = null,
     fabContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    CenteredPillWithSideFab(
+        pill = {
+            FilePipeFloatingNavPill(
+                items = items,
+                currentDestination = currentDestination,
+                onItemClick = onItemClick,
+            )
+        },
+        leadingFab = leadingFab,
+        fab = fabContent,
+        fabGap = 12.dp,
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
+    )
+}
+
+/**
+ * Pill-only floating nav. The FAB is rendered as a sibling by [CenteredPillWithSideFab]
+ * so the nav pill itself stays centered on screen.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun FilePipeFloatingNavPill(
+    items: List<BottomNavItem>,
+    currentDestination: NavDestination?,
+    onItemClick: (BottomNavItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     HorizontalFloatingToolbar(
         expanded = true,
-        floatingActionButton = fabContent,
-        modifier =
-            modifier
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
+        modifier = modifier,
         colors =
             FloatingToolbarDefaults.vibrantFloatingToolbarColors(
                 toolbarContainerColor = MaterialTheme.colorScheme.primary,
@@ -987,7 +1087,11 @@ private fun FloatingNavBar(
                     modifier = Modifier.padding(horizontal = if (selected) 6.dp else 0.dp),
                 ) {
                     Box(modifier = Modifier.size(24.dp)) {
-                        if (selected) item.selectedIcon() else item.unselectedIcon()
+                        FilePipeMaterialRoundedSymbol(
+                            name = item.symbolName,
+                            contentDescription = null,
+                            filled = selected,
+                        )
                     }
                     if (labelWidth > 4.dp) {
                         Spacer(Modifier.width(6.dp))
@@ -998,6 +1102,63 @@ private fun FloatingNavBar(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Bottom-strip layout: pill horizontally centered against the strip's full width, FAB
+ * placed just to the right of the pill or clamped to the right edge.
+ */
+@Composable
+private fun CenteredPillWithSideFab(
+    pill: @Composable () -> Unit,
+    fab: @Composable () -> Unit,
+    fabGap: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    leadingFab: (@Composable () -> Unit)? = null,
+    fabCoreSize: androidx.compose.ui.unit.Dp = 56.dp,
+) {
+    androidx.compose.ui.layout.Layout(
+        modifier = modifier,
+        content = {
+            Box { pill() }
+            Box { fab() }
+            if (leadingFab != null) {
+                Box { leadingFab() }
+            }
+        },
+    ) { measurables, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val pillPlaceable = measurables[0].measure(loose)
+        val fabPlaceable = measurables[1].measure(loose)
+        val leadingFabPlaceable = measurables.getOrNull(2)?.measure(loose)
+        val gapPx = fabGap.roundToPx()
+        val fabCorePx = fabCoreSize.roundToPx()
+        val width =
+            if (constraints.hasBoundedWidth) {
+                constraints.maxWidth
+            } else {
+                pillPlaceable.width + gapPx + fabPlaceable.width
+            }
+        val stripHeight = maxOf(pillPlaceable.height, fabCorePx)
+
+        layout(width, stripHeight) {
+            val pillX = (width - pillPlaceable.width) / 2
+            val pillY = (stripHeight - pillPlaceable.height) / 2
+            pillPlaceable.place(pillX, pillY)
+
+            val desiredFabRight = pillX + pillPlaceable.width + gapPx + fabCorePx
+            val fabRight = desiredFabRight.coerceAtMost(width)
+            val fabX = (fabRight - fabPlaceable.width).coerceAtLeast(0)
+            val fabY = (stripHeight - fabPlaceable.height) / 2
+            fabPlaceable.place(fabX, fabY)
+
+            leadingFabPlaceable?.let { leadingPlaceable ->
+                val leadingX = (pillX - gapPx - fabCorePx).coerceAtLeast(0)
+                val leadingY = (stripHeight - leadingPlaceable.height) / 2
+                leadingPlaceable.place(leadingX, leadingY)
             }
         }
     }
@@ -1016,8 +1177,8 @@ private fun MainNavFabSlot(
         Screen.Rules ->
             SimpleNavFab(
                 icon = { tint ->
-                    Icon(
-                        Icons.Default.Add,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "add",
                         contentDescription = null,
                         tint = tint,
                     )
@@ -1030,8 +1191,8 @@ private fun MainNavFabSlot(
         Screen.History ->
             SimpleNavFab(
                 icon = { tint ->
-                    Icon(
-                        Icons.Default.DeleteSweep,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "delete_sweep",
                         contentDescription = null,
                         tint = tint,
                     )
@@ -1044,8 +1205,8 @@ private fun MainNavFabSlot(
         Screen.Settings ->
             SimpleNavFab(
                 icon = { tint ->
-                    Icon(
-                        Icons.Default.Share,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "share",
                         contentDescription = null,
                         tint = tint,
                     )
@@ -1069,13 +1230,13 @@ private fun SimpleNavFab(
 ) {
     val containerColor =
         if (enabled) {
-            MaterialTheme.colorScheme.surfaceContainerHighest
+            MaterialTheme.colorScheme.primaryContainer
         } else {
             MaterialTheme.colorScheme.surfaceContainerHigh
         }
     val contentColor =
         if (enabled) {
-            MaterialTheme.colorScheme.primary
+            MaterialTheme.colorScheme.onPrimaryContainer
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
         }
@@ -1086,7 +1247,6 @@ private fun SimpleNavFab(
         enabled = enabled,
         modifier =
             Modifier
-                .size(64.dp)
                 .then(
                     if (enabled) {
                         Modifier

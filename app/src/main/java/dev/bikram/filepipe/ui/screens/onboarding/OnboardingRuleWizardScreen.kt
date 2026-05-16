@@ -16,14 +16,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.RuleTemplate
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeElevatedCard
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
@@ -123,9 +118,11 @@ fun OnboardingRuleWizardScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "arrow_back",
                         contentDescription = null,
+                        size = 24.dp,
+                        autoMirror = true,
                         modifier = Modifier.size(24.dp),
                     )
                     Spacer(Modifier.weight(1f))
@@ -156,9 +153,11 @@ fun OnboardingRuleWizardScreen(
                         fontWeight = FontWeight.SemiBold,
                     )
                     Spacer(Modifier.weight(1f))
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "arrow_forward",
                         contentDescription = null,
+                        size = 24.dp,
+                        autoMirror = true,
                         modifier = Modifier.size(24.dp),
                     )
                 }
@@ -212,9 +211,11 @@ private fun TemplateCard(
                 )
             }
             Spacer(Modifier.width(8.dp))
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            FilePipeMaterialRoundedSymbol(
+                name = "chevron_right",
                 contentDescription = null,
+                size = 24.dp,
+                autoMirror = true,
                 modifier =
                     Modifier
                         .padding(top = 2.dp)
@@ -244,9 +245,10 @@ private fun StartBlankCard(onStartBlank: () -> Unit) {
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.Top,
         ) {
-            Icon(
-                imageVector = Icons.Filled.Edit,
+            FilePipeMaterialRoundedSymbol(
+                name = "edit",
                 contentDescription = null,
+                size = 28.dp,
                 modifier = Modifier.size(28.dp),
                 tint = MaterialTheme.colorScheme.primary,
             )
@@ -265,9 +267,11 @@ private fun StartBlankCard(onStartBlank: () -> Unit) {
                 )
             }
             Spacer(Modifier.width(8.dp))
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            FilePipeMaterialRoundedSymbol(
+                name = "chevron_right",
                 contentDescription = null,
+                size = 24.dp,
+                autoMirror = true,
                 modifier =
                     Modifier
                         .padding(top = 2.dp)

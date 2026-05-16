@@ -4,10 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -17,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 
 /**
  * Outlined info control that opens a short help [DropdownMenu], matching the rule editor toggles.
@@ -35,9 +33,11 @@ fun ToggleLabelHelpDropdown(
             },
             modifier = Modifier.size(40.dp),
         ) {
-            Icon(
-                imageVector = Icons.Outlined.Info,
+            FilePipeMaterialRoundedSymbol(
+                name = "info",
                 contentDescription = contentDescription,
+                filled = false,
+                size = 20.dp,
                 modifier = Modifier.size(20.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )

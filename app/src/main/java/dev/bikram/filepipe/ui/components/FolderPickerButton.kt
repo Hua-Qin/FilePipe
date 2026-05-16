@@ -5,14 +5,12 @@ import android.os.Environment
 import android.provider.DocumentsContract
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.data.storage.absoluteStoragePathToTreeUri
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import java.io.File
 
 @Composable
@@ -26,7 +24,7 @@ fun FolderPickerButton(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
     ) {
-        Icon(Icons.Default.FolderOpen, contentDescription = null)
+        FilePipeMaterialRoundedSymbol(name = "folder_open", contentDescription = null)
         Text("  $label")
     }
 }

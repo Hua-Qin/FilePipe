@@ -4,12 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -21,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -52,9 +48,10 @@ fun FileExtensionChips(
                         selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     ),
                 trailingIcon = {
-                    Icon(
-                        Icons.Default.Close,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "close",
                         contentDescription = "Remove $ext",
+                        size = InputChipDefaults.AvatarSize,
                         modifier = Modifier.size(InputChipDefaults.AvatarSize),
                     )
                 },
@@ -67,9 +64,10 @@ fun FileExtensionChips(
             },
             label = { Text("Add type") },
             leadingIcon = {
-                Icon(
-                    Icons.Default.Add,
+                FilePipeMaterialRoundedSymbol(
+                    name = "add",
                     contentDescription = "Add file type",
+                    size = InputChipDefaults.AvatarSize,
                     modifier = Modifier.size(InputChipDefaults.AvatarSize),
                 )
             },
@@ -79,9 +77,10 @@ fun FileExtensionChips(
             onClick = onUseTemplate,
             label = { Text("Use template") },
             leadingIcon = {
-                Icon(
-                    Icons.Default.AutoAwesome,
+                FilePipeMaterialRoundedSymbol(
+                    name = "auto_awesome",
                     contentDescription = "Use template",
+                    size = InputChipDefaults.AvatarSize,
                     modifier = Modifier.size(InputChipDefaults.AvatarSize),
                 )
             },

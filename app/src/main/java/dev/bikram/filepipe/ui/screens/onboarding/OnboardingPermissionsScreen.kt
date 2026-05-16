@@ -28,14 +28,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
@@ -66,6 +61,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
@@ -313,9 +309,10 @@ fun OnboardingPermissionsScreen(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                FilePipeMaterialRoundedSymbol(
+                    name = "arrow_forward",
                     contentDescription = null,
+                    autoMirror = true,
                 )
             }
         }
@@ -499,9 +496,10 @@ private fun StarGlowIcon(tint: Color) {
                         shape = CircleShape,
                     ),
         )
-        Icon(
-            imageVector = Icons.Filled.Star,
+        FilePipeMaterialRoundedSymbol(
+            name = "star",
             contentDescription = null,
+            size = 26.dp,
             modifier = Modifier.size(26.dp),
             tint = tint,
         )
@@ -570,9 +568,11 @@ private fun SelectFoldersSecondaryCard(
                         .padding(top = 2.dp),
                 contentAlignment = Alignment.TopCenter,
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.FolderOpen,
+                FilePipeMaterialRoundedSymbol(
+                    name = "folder_open",
                     contentDescription = null,
+                    filled = false,
+                    size = 28.dp,
                     modifier = Modifier.size(28.dp),
                     tint = if (selected) scheme.primary else scheme.onSurfaceVariant,
                 )

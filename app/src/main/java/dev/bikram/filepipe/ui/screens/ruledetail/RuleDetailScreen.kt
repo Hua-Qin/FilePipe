@@ -43,35 +43,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.Extension
-import androidx.compose.material.icons.filled.FolderSpecial
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.outlined.Bookmark
-import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
@@ -104,7 +86,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -140,7 +121,9 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
+import dev.bikram.filepipe.domain.model.materialSymbolName
 import dev.bikram.filepipe.ui.common.AppBottomSheet
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.FilePipePredictiveBackHandler
 import dev.bikram.filepipe.ui.components.CenteredTooltipText
 import dev.bikram.filepipe.ui.components.FileExtensionChips
@@ -162,7 +145,6 @@ import dev.bikram.filepipe.ui.components.ScheduleDialog
 import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
 import dev.bikram.filepipe.ui.components.displayPath
-import dev.bikram.filepipe.ui.components.toImageVector
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
@@ -254,10 +236,10 @@ private fun RuleErrorAlertCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Error,
+                FilePipeMaterialRoundedSymbol(
+                    name = "error",
                     contentDescription = null,
-                    modifier = Modifier.size(40.dp),
+                    size = 40.dp,
                     tint = scheme.error,
                 )
                 Column(modifier = Modifier.weight(1f)) {
@@ -305,7 +287,7 @@ private fun ruleIconOptionLabel(icon: RuleIcon): String =
 private fun RuleSectionCard(
     title: String,
     subtitle: String?,
-    icon: ImageVector,
+    iconName: String,
     modifier: Modifier = Modifier,
     titleTrailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -319,10 +301,10 @@ private fun RuleSectionCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Icon(
-                    imageVector = icon,
+                FilePipeMaterialRoundedSymbol(
+                    name = iconName,
                     contentDescription = null,
-                    modifier = Modifier.size(24.dp),
+                    size = 24.dp,
                     tint = MaterialTheme.colorScheme.primary,
                 )
                 Column(modifier = Modifier.weight(1f)) {
@@ -509,7 +491,12 @@ fun RuleDetailScreen(
                 ),
     ) {
         if (state.isLoading) {
-            CircularProgressIndicator(Modifier.align(Alignment.Center))
+            LoadingIndicator(
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(48.dp),
+            )
         } else {
             Box(
                 modifier =
@@ -680,7 +667,7 @@ fun RuleDetailScreen(
                     RuleSectionCard(
                         title = stringResource(R.string.rule_section_extensions_title),
                         subtitle = stringResource(R.string.rule_section_extensions_subtitle),
-                        icon = Icons.Filled.Extension,
+                        iconName = "extension",
                     ) {
                         FileExtensionChips(
                             extensions = state.fileExtensions,
@@ -693,7 +680,7 @@ fun RuleDetailScreen(
                     RuleSectionCard(
                         title = stringResource(R.string.source_folders_label),
                         subtitle = stringResource(R.string.rule_section_source_subtitle),
-                        icon = Icons.Filled.Search,
+                        iconName = "search",
                     ) {
                         state.sourceFolderPaths.forEach { path ->
                             key(path) {
@@ -739,10 +726,11 @@ fun RuleDetailScreen(
                                         state = rememberTooltipState(),
                                     ) {
                                         FilePipeIconButton(onClick = { viewModel.toggleBookmark(path) }) {
-                                            Icon(
-                                                imageVector = if (isSourceBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = "bookmark",
                                                 contentDescription = stringResource(R.string.bookmark_toggle_cd),
-                                                modifier = Modifier.size(22.dp),
+                                                size = 22.dp,
+                                                filled = isSourceBookmarked,
                                                 tint =
                                                     if (isSourceBookmarked) {
                                                         MaterialTheme.colorScheme.primary
@@ -765,10 +753,10 @@ fun RuleDetailScreen(
                                         state = rememberTooltipState(),
                                     ) {
                                         FilePipeIconButton(onClick = { viewModel.removeSourceFolder(path) }) {
-                                            Icon(
-                                                Icons.Default.Close,
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = "close",
                                                 contentDescription = stringResource(R.string.schedule_remove_short),
-                                                modifier = Modifier.size(18.dp),
+                                                size = 18.dp,
                                             )
                                         }
                                     }
@@ -796,10 +784,11 @@ fun RuleDetailScreen(
                                     shape = SectionButtonShape,
                                     enabled = unusedBookmarks.isNotEmpty(),
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Bookmark,
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "bookmark",
                                         contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
+                                        size = 18.dp,
+                                        filled = false,
                                     )
                                     Text("  ${stringResource(R.string.bookmarks_choose)}")
                                 }
@@ -934,7 +923,7 @@ fun RuleDetailScreen(
                     RuleSectionCard(
                         title = stringResource(R.string.destination_label),
                         subtitle = stringResource(R.string.rule_section_destination_subtitle),
-                        icon = Icons.Filled.FolderSpecial,
+                        iconName = "folder_special",
                     ) {
                         if (state.destinationFolderPath.isNotBlank()) {
                             val isDestBookmarked = state.destinationFolderPath in bookmarkedFolders
@@ -986,10 +975,11 @@ fun RuleDetailScreen(
                                     state = rememberTooltipState(),
                                 ) {
                                     FilePipeIconButton(onClick = { viewModel.toggleBookmark(state.destinationFolderPath) }) {
-                                        Icon(
-                                            imageVector = if (isDestBookmarked) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "bookmark",
                                             contentDescription = stringResource(R.string.bookmark_toggle_cd),
-                                            modifier = Modifier.size(22.dp),
+                                            size = 22.dp,
+                                            filled = isDestBookmarked,
                                             tint =
                                                 if (isDestBookmarked) {
                                                     MaterialTheme.colorScheme.primary
@@ -1032,10 +1022,11 @@ fun RuleDetailScreen(
                                     shape = SectionButtonShape,
                                     enabled = unusedDestBookmarks.isNotEmpty(),
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Bookmark,
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "bookmark",
                                         contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
+                                        size = 18.dp,
+                                        filled = false,
                                     )
                                     Text("  ${stringResource(R.string.bookmarks_choose)}")
                                 }
@@ -1082,34 +1073,57 @@ fun RuleDetailScreen(
                     RuleSectionCard(
                         title = stringResource(R.string.rule_section_operation_title),
                         subtitle = null,
-                        icon = Icons.Filled.ContentCopy,
+                        iconName = "content_copy",
                     ) {
                         Text(
                             text = stringResource(R.string.rule_operation_mode_label),
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        @Suppress("DEPRECATION")
-                        ButtonGroup(modifier = Modifier.fillMaxWidth()) {
-                            OperationMode.entries.forEachIndexed { index, mode ->
-                                val shapes =
-                                    when (index) {
-                                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                                        OperationMode.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                                    }
-                                FilePipeToggleButton(
-                                    checked = state.operationMode == mode,
-                                    onCheckedChange = { viewModel.setOperationMode(mode) },
-                                    shapes = shapes,
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    Text(
-                                        when (mode) {
-                                            OperationMode.MOVE -> stringResource(R.string.operation_move)
-                                            OperationMode.COPY -> stringResource(R.string.operation_copy)
-                                        },
-                                    )
+                        val operationModes = OperationMode.entries
+                        val operationLabels =
+                            operationModes.map { mode ->
+                                when (mode) {
+                                    OperationMode.MOVE -> stringResource(R.string.operation_move)
+                                    OperationMode.COPY -> stringResource(R.string.operation_copy)
                                 }
+                            }
+                        val operationShapes =
+                            operationModes.mapIndexed { index, _ ->
+                                when (index) {
+                                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                                    operationModes.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                                }
+                            }
+                        ButtonGroup(
+                            modifier = Modifier.fillMaxWidth(),
+                            overflowIndicator = { menuState ->
+                                ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+                            },
+                        ) {
+                            operationModes.forEachIndexed { index, mode ->
+                                val label = operationLabels[index]
+                                customItem(
+                                    buttonGroupContent = {
+                                        FilePipeToggleButton(
+                                            checked = state.operationMode == mode,
+                                            onCheckedChange = { checked -> if (checked) viewModel.setOperationMode(mode) },
+                                            shapes = operationShapes[index],
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            Text(label)
+                                        }
+                                    },
+                                    menuContent = { menuState ->
+                                        FilePipeDropdownMenuItem(
+                                            text = { Text(label) },
+                                            onClick = {
+                                                viewModel.setOperationMode(mode)
+                                                menuState.dismiss()
+                                            },
+                                        )
+                                    },
+                                )
                             }
                         }
 
@@ -1119,29 +1133,52 @@ fun RuleDetailScreen(
                             text = stringResource(R.string.rule_conflict_policy_label),
                             style = MaterialTheme.typography.bodyMedium,
                         )
-                        @Suppress("DEPRECATION")
-                        ButtonGroup(modifier = Modifier.fillMaxWidth()) {
-                            ConflictPolicy.entries.forEachIndexed { index, policy ->
-                                val shapes =
-                                    when (index) {
-                                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                                        ConflictPolicy.entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                                    }
-                                FilePipeToggleButton(
-                                    checked = state.conflictPolicy == policy,
-                                    onCheckedChange = { viewModel.setConflictPolicy(policy) },
-                                    shapes = shapes,
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    Text(
-                                        when (policy) {
-                                            ConflictPolicy.SKIP -> stringResource(R.string.conflict_skip)
-                                            ConflictPolicy.OVERWRITE -> stringResource(R.string.conflict_overwrite)
-                                            ConflictPolicy.RENAME_SUFFIX -> stringResource(R.string.conflict_rename)
-                                        },
-                                    )
+                        val conflictPolicies = ConflictPolicy.entries
+                        val conflictLabels =
+                            conflictPolicies.map { policy ->
+                                when (policy) {
+                                    ConflictPolicy.SKIP -> stringResource(R.string.conflict_skip)
+                                    ConflictPolicy.OVERWRITE -> stringResource(R.string.conflict_overwrite)
+                                    ConflictPolicy.RENAME_SUFFIX -> stringResource(R.string.conflict_rename)
                                 }
+                            }
+                        val conflictShapes =
+                            conflictPolicies.mapIndexed { index, _ ->
+                                when (index) {
+                                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                                    conflictPolicies.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                                }
+                            }
+                        ButtonGroup(
+                            modifier = Modifier.fillMaxWidth(),
+                            overflowIndicator = { menuState ->
+                                ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+                            },
+                        ) {
+                            conflictPolicies.forEachIndexed { index, policy ->
+                                val label = conflictLabels[index]
+                                customItem(
+                                    buttonGroupContent = {
+                                        FilePipeToggleButton(
+                                            checked = state.conflictPolicy == policy,
+                                            onCheckedChange = { checked -> if (checked) viewModel.setConflictPolicy(policy) },
+                                            shapes = conflictShapes[index],
+                                            modifier = Modifier.weight(1f),
+                                        ) {
+                                            Text(label)
+                                        }
+                                    },
+                                    menuContent = { menuState ->
+                                        FilePipeDropdownMenuItem(
+                                            text = { Text(label) },
+                                            onClick = {
+                                                viewModel.setConflictPolicy(policy)
+                                                menuState.dismiss()
+                                            },
+                                        )
+                                    },
+                                )
                             }
                         }
                     }
@@ -1149,7 +1186,7 @@ fun RuleDetailScreen(
                     RuleSectionCard(
                         title = stringResource(R.string.schedule_label),
                         subtitle = stringResource(R.string.rule_section_schedule_subtitle),
-                        icon = Icons.Default.DateRange,
+                        iconName = "calendar_month",
                     ) {
                         val schedule = state.schedule
                         if (schedule != null) {
@@ -1174,10 +1211,10 @@ fun RuleDetailScreen(
                                     modifier = Modifier.weight(1f),
                                     shape = SectionButtonShape,
                                 ) {
-                                    Icon(
-                                        Icons.Default.DateRange,
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "calendar_month",
                                         contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
+                                        size = 18.dp,
                                     )
                                     Text(text = "  $scheduleText")
                                 }
@@ -1194,8 +1231,8 @@ fun RuleDetailScreen(
                                     state = rememberTooltipState(),
                                 ) {
                                     FilePipeIconButton(onClick = { viewModel.setSchedule(null) }) {
-                                        Icon(
-                                            Icons.Default.Close,
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "close",
                                             contentDescription = stringResource(R.string.remove_schedule),
                                         )
                                     }
@@ -1207,7 +1244,11 @@ fun RuleDetailScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = SectionButtonShape,
                             ) {
-                                Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(18.dp))
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "calendar_month",
+                                    contentDescription = null,
+                                    size = 18.dp,
+                                )
                                 Text(text = "  ${stringResource(R.string.add_schedule_chip)}")
                             }
                         }
@@ -1245,16 +1286,11 @@ fun RuleDetailScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Tune,
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "tune",
                                     contentDescription = null,
-                                    modifier = Modifier.size(24.dp),
-                                    tint =
-                                        if (hasAdvancedFilters) {
-                                            MaterialTheme.colorScheme.primary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
+                                    size = 24.dp,
+                                    tint = MaterialTheme.colorScheme.primary,
                                 )
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
@@ -1278,8 +1314,8 @@ fun RuleDetailScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
-                                Icon(
-                                    imageVector = Icons.Filled.ExpandMore,
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "expand_more",
                                     contentDescription = null,
                                     modifier = Modifier.graphicsLayer { rotationZ = advancedChevronRotation },
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1400,9 +1436,10 @@ fun RuleDetailScreen(
                     state = rememberTooltipState(),
                 ) {
                     FilePipeIconButton(onClick = { tryNavigateBack() }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
+                        FilePipeMaterialRoundedSymbol(
+                            name = "arrow_back",
                             contentDescription = stringResource(R.string.nav_back),
+                            autoMirror = true,
                         )
                     }
                 }
@@ -1422,10 +1459,13 @@ fun RuleDetailScreen(
                 ) {
                     FilePipeIconButton(
                         onClick = { viewModel.loadPreview() },
-                        enabled = state.sourceFolderPaths.isNotEmpty() && state.fileExtensions.isNotEmpty(),
+                        enabled =
+                            state.sourceFolderPaths.isNotEmpty() &&
+                                state.destinationFolderPath.isNotBlank() &&
+                                state.fileExtensions.isNotEmpty(),
                     ) {
-                        Icon(
-                            Icons.Default.Visibility,
+                        FilePipeMaterialRoundedSymbol(
+                            name = "visibility",
                             contentDescription = stringResource(R.string.preview_rule),
                         )
                     }
@@ -1598,10 +1638,10 @@ fun RuleDetailScreen(
                                         contentColor = MaterialTheme.colorScheme.primary,
                                     ),
                             ) {
-                                Icon(
-                                    imageVector = iconOption.toImageVector(),
+                                FilePipeMaterialRoundedSymbol(
+                                    name = iconOption.materialSymbolName(),
                                     contentDescription = ruleIconOptionLabel(iconOption),
-                                    modifier = Modifier.size(34.dp),
+                                    size = 34.dp,
                                     tint = MaterialTheme.colorScheme.primary,
                                 )
                             }
@@ -1701,10 +1741,10 @@ fun RuleDetailScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "check",
                                     contentDescription = stringResource(R.string.rule_icon_apply_emoji_cd),
-                                    modifier = Modifier.size(28.dp),
+                                    size = 28.dp,
                                 )
                             }
                         }
@@ -1748,11 +1788,11 @@ fun RuleDetailScreen(
                                 modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Icon(
-                                    imageVector = template.suggestedIcon.toImageVector(),
+                                FilePipeMaterialRoundedSymbol(
+                                    name = template.suggestedIcon.materialSymbolName(),
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(32.dp),
+                                    size = 32.dp,
                                 )
                             }
                         }
@@ -1782,7 +1822,13 @@ fun RuleDetailScreen(
         ) {
             Column {
                 if (state.isPreviewLoading) {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally).padding(32.dp))
+                    LoadingIndicator(
+                        modifier =
+                            Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(32.dp)
+                                .size(48.dp),
+                    )
                 } else {
                     val files = state.previewFiles ?: emptyList()
                     if (files.isEmpty()) {

@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.SystemClock
 import android.provider.DocumentsContract
 import android.provider.Settings
 import android.widget.Toast
@@ -31,6 +32,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -41,6 +43,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -56,6 +59,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
@@ -63,30 +67,6 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.NewReleases
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Shop
-import androidx.compose.material.icons.filled.SwipeLeft
-import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material.icons.filled.UnfoldLess
-import androidx.compose.material.icons.filled.UnfoldMore
-import androidx.compose.material.icons.filled.Vibration
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -94,7 +74,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
@@ -146,6 +126,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.documentfile.provider.DocumentFile
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -158,14 +139,18 @@ import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
+import dev.bikram.filepipe.data.preferences.materialSymbolName
 import dev.bikram.filepipe.data.storage.safTreeUriToPath
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.ui.common.AppBottomSheet
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.AboutAuthorPhoto
 import dev.bikram.filepipe.ui.components.AppIconImage
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
@@ -186,8 +171,6 @@ import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
-import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
-import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
 import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
 import dev.bikram.filepipe.update.UpdateInfo
 import kotlinx.coroutines.delay
@@ -200,10 +183,19 @@ import kotlinx.coroutines.launch
  */
 private const val SETTINGS_LIST_INDEX_FOLDER_ACCESS = 1
 private const val SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS = 2
+private const val SETTINGS_SECTION_HIGHLIGHT_DURATION_MS = 4_500L
+private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
 
 private enum class BackupFolderTarget {
     Local,
     Cloud,
+}
+
+private enum class SwipeDirectionCue(
+    val iconName: String,
+) {
+    LEFT("arrow_back"),
+    RIGHT("arrow_forward"),
 }
 
 @Composable
@@ -258,6 +250,8 @@ fun SettingsScreen(
     onOpenFaqStorageSection: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
+    highlightSectionKey: String? = null,
+    onHighlightHandled: () -> Unit = {},
 ) {
     val preferences by viewModel.preferencesFlow.collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
@@ -282,6 +276,8 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val settingsLazyListState = rememberLazyListState()
+    val topAppBarState = rememberTopAppBarState()
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     var collapsedSettingsSectionKeys by rememberSaveable { mutableStateOf(emptySet<String>()) }
     val settingsExpandableSectionKeys =
         remember {
@@ -293,47 +289,72 @@ fun SettingsScreen(
                 add("history")
                 add("backup")
                 if (BuildConfig.SHOW_UPDATES) add("updates")
-                if (BuildConfig.BUILD_TYPE == "devRelease") add("dev_release_mocks")
+                if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease") add("dev_release_mocks")
             }
         }
     val allSettingsSectionsCollapsed =
         settingsExpandableSectionKeys.all { sectionKey ->
             sectionKey in collapsedSettingsSectionKeys
         }
-    val bringIntoViewTarget by viewModel.bringIntoViewSection.collectAsStateWithLifecycle()
-    LaunchedEffect(bringIntoViewTarget) {
-        when (bringIntoViewTarget) {
-            SettingsBringIntoViewSection.None -> return@LaunchedEffect
-            SettingsBringIntoViewSection.FolderAccess,
-            SettingsBringIntoViewSection.Notifications,
-            -> {
-                val targetIndex =
-                    when (bringIntoViewTarget) {
-                        SettingsBringIntoViewSection.FolderAccess -> SETTINGS_LIST_INDEX_FOLDER_ACCESS
-                        SettingsBringIntoViewSection.Notifications ->
-                            SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS
-                        else -> return@LaunchedEffect
-                    }
-                delay(220)
-                if (settingsLazyListState.layoutInfo.totalItemsCount > targetIndex) {
-                    settingsLazyListState.animateScrollToItem(targetIndex)
+    var folderAccessHighlight by rememberSaveable { mutableStateOf(false) }
+    var folderAccessHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
+    var notificationsHighlight by rememberSaveable { mutableStateOf(false) }
+    var notificationsHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
+    val highlightSection = highlightSectionKey?.substringBefore(".")
+    LaunchedEffect(highlightSectionKey) {
+        val key = highlightSection ?: return@LaunchedEffect
+        val settingsSectionKey =
+            when (key) {
+                "notifications" -> "touch_sound"
+                else -> key
+            }
+        val wasCollapsed = settingsSectionKey in collapsedSettingsSectionKeys
+        collapsedSettingsSectionKeys = collapsedSettingsSectionKeys - settingsSectionKey
+        if (wasCollapsed) delay(SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS)
+        val targetIndex =
+            when (key) {
+                "folder_access" -> SETTINGS_LIST_INDEX_FOLDER_ACCESS
+                "notifications" -> SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS
+                else -> {
+                    onHighlightHandled()
+                    return@LaunchedEffect
                 }
-                viewModel.clearBringIntoViewSectionRequest()
+            }
+        if (settingsLazyListState.layoutInfo.totalItemsCount > targetIndex) {
+            topAppBarState.heightOffset = topAppBarState.heightOffsetLimit
+            settingsLazyListState.animateScrollToItem(targetIndex)
+            topAppBarState.heightOffset = topAppBarState.heightOffsetLimit
+        }
+        val highlightExpiresAtMillis = SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
+        when (key) {
+            "folder_access" -> {
+                folderAccessHighlight = true
+                folderAccessHighlightExpiresAtMillis = highlightExpiresAtMillis
+            }
+            "notifications" -> {
+                notificationsHighlight = true
+                notificationsHighlightExpiresAtMillis = highlightExpiresAtMillis
             }
         }
+        onHighlightHandled()
     }
-    val folderAccessSectionHighlight by viewModel.folderAccessSectionHighlight.collectAsStateWithLifecycle()
-    LaunchedEffect(folderAccessSectionHighlight) {
-        if (!folderAccessSectionHighlight) return@LaunchedEffect
-        delay(4500)
-        viewModel.clearFolderAccessSectionHighlight()
+    LaunchedEffect(folderAccessHighlight, folderAccessHighlightExpiresAtMillis) {
+        if (!folderAccessHighlight) return@LaunchedEffect
+        val remainingHighlightMillis = folderAccessHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
+        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
+        folderAccessHighlight = false
+        folderAccessHighlightExpiresAtMillis = 0L
     }
-    val notificationsSectionHighlight by viewModel.notificationsSectionHighlight.collectAsStateWithLifecycle()
-    LaunchedEffect(notificationsSectionHighlight) {
-        if (!notificationsSectionHighlight) return@LaunchedEffect
-        delay(4500)
-        viewModel.clearNotificationsSectionHighlight()
+    LaunchedEffect(notificationsHighlight, notificationsHighlightExpiresAtMillis) {
+        if (!notificationsHighlight) return@LaunchedEffect
+        val remainingHighlightMillis = notificationsHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
+        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
+        notificationsHighlight = false
+        notificationsHighlightExpiresAtMillis = 0L
     }
+    val highlightNowMillis = SystemClock.elapsedRealtime()
+    val folderAccessHighlightActive = folderAccessHighlight && folderAccessHighlightExpiresAtMillis > highlightNowMillis
+    val notificationsHighlightActive = notificationsHighlight && notificationsHighlightExpiresAtMillis > highlightNowMillis
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission(),
@@ -401,8 +422,6 @@ fun SettingsScreen(
     val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val configuration = LocalConfiguration.current
     val maxUpdateSheetHeight = (configuration.screenHeightDp * 0.85f).dp
-    val topAppBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     val settingsScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = settingsLazyListState,
@@ -476,7 +495,6 @@ fun SettingsScreen(
     }
 
     var pendingBackupPickAction by remember { mutableStateOf<BackupImportPickAction?>(null) }
-    var showBackupImportRestoreHelp by remember { mutableStateOf(false) }
 
     val importLauncher =
         rememberLauncherForActivityResult(
@@ -642,21 +660,6 @@ fun SettingsScreen(
         )
     }
 
-    if (showBackupImportRestoreHelp) {
-        AlertDialog(
-            onDismissRequest = { showBackupImportRestoreHelp = false },
-            title = { Text(stringResource(R.string.settings_backup_import_restore_help_title)) },
-            text = { Text(stringResource(R.string.settings_backup_import_restore_help_body)) },
-            confirmButton = {
-                FilePipeTextButton(onClick = {
-                    showBackupImportRestoreHelp = false
-                }) {
-                    Text(stringResource(R.string.settings_backup_help_ok))
-                }
-            },
-        )
-    }
-
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
@@ -683,8 +686,11 @@ fun SettingsScreen(
                         ) {
                             Text(
                                 text = "?",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = MaterialTheme.colorScheme.onSurface,
+                                style =
+                                    MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        lineHeight = MaterialTheme.typography.titleLarge.fontSize,
+                                    ),
                             )
                         }
                         val expandCollapseAllLabel =
@@ -706,12 +712,12 @@ fun SettingsScreen(
                             },
                             modifier = Modifier.semantics { contentDescription = expandCollapseAllLabel },
                         ) {
-                            Icon(
-                                imageVector =
+                            FilePipeMaterialRoundedSymbol(
+                                name =
                                     if (allSettingsSectionsCollapsed) {
-                                        Icons.Default.UnfoldMore
+                                        "unfold_more"
                                     } else {
-                                        Icons.Default.UnfoldLess
+                                        "unfold_less"
                                     },
                                 contentDescription = null,
                             )
@@ -747,7 +753,7 @@ fun SettingsScreen(
             item {
                 SettingsExpandableSection(
                     sectionKey = "appearance",
-                    icon = Icons.Default.Palette,
+                    iconName = "palette",
                     title = stringResource(R.string.settings_appearance_section),
                     collapsedSectionKeys = collapsedSettingsSectionKeys,
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
@@ -785,13 +791,13 @@ fun SettingsScreen(
 
             // ── Folder access ─────────────────────────────────────────────────
             item {
-                val folderHighlightPulse = rememberSectionHighlightPulseAlpha(folderAccessSectionHighlight)
+                val folderHighlightPulse = rememberSectionHighlightPulseAlpha(folderAccessHighlightActive)
                 Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .pulsingSectionHighlightOutline(
-                                active = folderAccessSectionHighlight,
+                                active = folderAccessHighlightActive,
                                 outlineColor =
                                     MaterialTheme.colorScheme.primary.copy(
                                         alpha = folderHighlightPulse,
@@ -800,7 +806,7 @@ fun SettingsScreen(
                 ) {
                     SettingsExpandableSection(
                         sectionKey = "folder_access",
-                        icon = Icons.Default.FolderOpen,
+                        iconName = "folder_open",
                         title = stringResource(R.string.settings_folder_access_section),
                         collapsedSectionKeys = collapsedSettingsSectionKeys,
                         onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
@@ -938,13 +944,13 @@ fun SettingsScreen(
             // ── Touch & Sound ────────────────────────────────────────────────
             item {
                 val notificationsHighlightPulse =
-                    rememberSectionHighlightPulseAlpha(notificationsSectionHighlight)
+                    rememberSectionHighlightPulseAlpha(notificationsHighlightActive)
                 Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .pulsingSectionHighlightOutline(
-                                active = notificationsSectionHighlight,
+                                active = notificationsHighlightActive,
                                 outlineColor =
                                     MaterialTheme.colorScheme.primary.copy(
                                         alpha = notificationsHighlightPulse,
@@ -953,7 +959,7 @@ fun SettingsScreen(
                 ) {
                     SettingsExpandableSection(
                         sectionKey = "touch_sound",
-                        icon = Icons.Default.Vibration,
+                        iconName = "vibration",
                         title = stringResource(R.string.settings_touch_sound_section),
                         collapsedSectionKeys = collapsedSettingsSectionKeys,
                         onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
@@ -961,7 +967,7 @@ fun SettingsScreen(
                         GroupedListColumn {
                             GroupedListItem(position = GroupPosition.FIRST) {
                                 SettingsToggleItem(
-                                    icon = Icons.Default.Vibration,
+                                    iconName = "vibration",
                                     title = stringResource(R.string.settings_haptic_feedback),
                                     subtitle = stringResource(R.string.settings_haptic_feedback_desc),
                                     checked = preferences.hapticFeedbackEnabled,
@@ -986,8 +992,8 @@ fun SettingsScreen(
                                         )
                                     },
                                     leadingContent = {
-                                        Icon(
-                                            Icons.Default.Notifications,
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "notifications",
                                             contentDescription = null,
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
@@ -1041,54 +1047,23 @@ fun SettingsScreen(
             item {
                 SettingsExpandableSection(
                     sectionKey = "swipe_actions",
-                    icon = Icons.Default.SwipeLeft,
+                    iconName = "swipe_left",
                     title = stringResource(R.string.settings_swipe_gestures_section),
                     collapsedSectionKeys = collapsedSettingsSectionKeys,
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
                 ) {
                     GroupedListColumn {
-                        GroupedListItem(position = GroupPosition.FIRST) {
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        stringResource(R.string.settings_swipe_right),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                },
-                                trailingContent = {
-                                    SwipeActionDropdown(
-                                        current = preferences.swipeStartToEnd,
-                                        excluded = preferences.swipeEndToStart,
-                                        onSelect = { viewModel.setSwipeStartToEnd(it) },
-                                    )
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            )
-                        }
-                        GroupedListItem(position = GroupPosition.LAST) {
-                            ListItem(
-                                headlineContent = {
-                                    Text(
-                                        stringResource(R.string.settings_swipe_left),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                    )
-                                },
-                                trailingContent = {
-                                    SwipeActionDropdown(
-                                        current = preferences.swipeEndToStart,
-                                        excluded = preferences.swipeStartToEnd,
-                                        onSelect = { viewModel.setSwipeEndToStart(it) },
-                                    )
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        GroupedListItem(position = GroupPosition.ONLY) {
+                            SwipeExecuteOneActionsEditor(
+                                startTitle = stringResource(R.string.settings_swipe_right),
+                                endTitle = stringResource(R.string.settings_swipe_left),
+                                startAction = preferences.swipeStartToEnd,
+                                endAction = preferences.swipeEndToStart,
+                                onStartActionChange = { viewModel.setSwipeStartToEnd(it) },
+                                onEndActionChange = { viewModel.setSwipeEndToStart(it) },
                             )
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
-                    SwipeActionPreviewCard(
-                        swipeStartToEnd = preferences.swipeStartToEnd,
-                        swipeEndToStart = preferences.swipeEndToStart,
-                    )
                 }
             }
 
@@ -1096,7 +1071,7 @@ fun SettingsScreen(
             item {
                 SettingsExpandableSection(
                     sectionKey = "history",
-                    icon = Icons.Default.History,
+                    iconName = "history",
                     title = stringResource(R.string.settings_history_section),
                     collapsedSectionKeys = collapsedSettingsSectionKeys,
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
@@ -1134,7 +1109,7 @@ fun SettingsScreen(
             item {
                 SettingsExpandableSection(
                     sectionKey = "backup",
-                    icon = Icons.Default.Save,
+                    iconName = "save",
                     title = stringResource(R.string.settings_backup_section),
                     collapsedSectionKeys = collapsedSettingsSectionKeys,
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
@@ -1305,17 +1280,14 @@ fun SettingsScreen(
                                             Modifier
                                                 .align(Alignment.CenterEnd)
                                                 .fillMaxHeight()
-                                                .width(40.dp)
-                                                .tapSoundClickable {
-                                                    showBackupImportRestoreHelp = true
-                                                },
+                                                .width(40.dp),
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Info,
+                                        SettingsInfoDropdown(
+                                            title = stringResource(R.string.settings_backup_import_restore_help_title),
+                                            tipText = stringResource(R.string.settings_backup_import_restore_help_body),
                                             contentDescription = stringResource(R.string.settings_backup_help_icon_cd),
-                                            modifier = Modifier.size(20.dp),
-                                            tint = restoreLabelColor.copy(alpha = 0.75f),
+                                            iconTint = restoreLabelColor.copy(alpha = 0.75f),
                                         )
                                     }
                                 }
@@ -1331,7 +1303,7 @@ fun SettingsScreen(
                     Column {
                         SettingsExpandableSection(
                             sectionKey = "updates",
-                            icon = Icons.Default.SystemUpdate,
+                            iconName = "system_update",
                             title = stringResource(R.string.settings_updates_section),
                             collapsedSectionKeys = collapsedSettingsSectionKeys,
                             onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
@@ -1419,8 +1391,8 @@ fun SettingsScreen(
                                             )
                                         },
                                         leadingContent = {
-                                            Icon(
-                                                imageVector = Icons.Default.NewReleases,
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = "new_releases",
                                                 contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.primary,
                                             )
@@ -1440,12 +1412,12 @@ fun SettingsScreen(
                 }
             }
 
-            if (BuildConfig.BUILD_TYPE == "devRelease") {
+            if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease") {
                 item {
                     Column(modifier = Modifier.padding(top = 24.dp)) {
                         SettingsExpandableSection(
                             sectionKey = "dev_release_mocks",
-                            icon = Icons.Filled.BugReport,
+                            iconName = "bug_report",
                             title = stringResource(R.string.settings_dev_release_mocks_section),
                             collapsedSectionKeys = collapsedSettingsSectionKeys,
                             onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
@@ -1501,6 +1473,14 @@ fun SettingsScreen(
                         else -> BuildConfig.BUILD_TYPE
                     }
                 val buildVariantToastText = stringResource(R.string.about_build_variant_format, buildFlavorLabel, buildTypeLabel)
+                val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
+                val diagnosticsTooltip = stringResource(R.string.settings_share_diagnostics)
+                val shareDiagnostics =
+                    rememberDiagnosticsShareAction(
+                        context = aboutContext,
+                        chooserTitle = diagnosticsChooserTitle,
+                        preferences = preferences,
+                    )
                 val copyAboutLinkToClipboard =
                     remember(aboutContext) {
                         { url: String ->
@@ -1518,9 +1498,21 @@ fun SettingsScreen(
                 var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
                 Column(modifier = Modifier.padding(top = 24.dp)) {
                     SettingsSectionHeader(
-                        icon = Icons.Default.Info,
+                        iconName = "info",
                         title = stringResource(R.string.settings_about_section),
-                    )
+                    ) {
+                        FilePipeIconButton(
+                            onClick = shareDiagnostics,
+                            modifier = Modifier.size(40.dp),
+                            tooltipLabel = diagnosticsTooltip,
+                        ) {
+                            FilePipeMaterialRoundedSymbol(
+                                name = "bug_report",
+                                contentDescription = diagnosticsTooltip,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
                     GroupedListColumn {
                         GroupedListItem(position = GroupPosition.ONLY) {
@@ -1528,7 +1520,8 @@ fun SettingsScreen(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 20.dp, vertical = 24.dp),
+                                        .padding(horizontal = 20.dp)
+                                        .padding(top = 24.dp, bottom = 8.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 Text(
@@ -1637,12 +1630,7 @@ fun SettingsScreen(
                                                 verticalAlignment = Alignment.CenterVertically,
                                                 horizontalArrangement = Arrangement.Center,
                                             ) {
-                                                Icon(
-                                                    imageVector = Icons.Filled.Shop,
-                                                    contentDescription = null,
-                                                    modifier = Modifier.size(20.dp),
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                )
+                                                AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primary)
                                                 Spacer(Modifier.width(8.dp))
                                                 Text(
                                                     text = stringResource(R.string.settings_rate_on_play_store),
@@ -1728,12 +1716,7 @@ fun SettingsScreen(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.Center,
                                                 ) {
-                                                    Icon(
-                                                        imageVector = Icons.Filled.Shop,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(20.dp),
-                                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                                    )
+                                                    AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primaryContainer)
                                                     Spacer(Modifier.width(8.dp))
                                                     Text(
                                                         text = stringResource(R.string.settings_rate_on_play_store),
@@ -1771,12 +1754,7 @@ fun SettingsScreen(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.Center,
                                                 ) {
-                                                    Icon(
-                                                        imageVector = Icons.Filled.Shop,
-                                                        contentDescription = null,
-                                                        modifier = Modifier.size(20.dp),
-                                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                                    )
+                                                    AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primaryContainer)
                                                     Spacer(Modifier.width(8.dp))
                                                     Text(
                                                         text = stringResource(R.string.settings_rate_on_play_store),
@@ -1834,12 +1812,213 @@ fun SettingsScreen(
                                         }
                                     }
                                 }
+                                Spacer(Modifier.height(24.dp))
+                                AboutOtherAppsAndLinks(
+                                    context = aboutContext,
+                                    copyLinkToClipboard = copyAboutLinkToClipboard,
+                                )
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun AboutPlayStoreIcon(tint: Color) {
+    Icon(
+        painter = painterResource(R.drawable.ic_google_play_mark),
+        contentDescription = null,
+        modifier = Modifier.size(20.dp),
+        tint = tint,
+    )
+}
+
+@Composable
+private fun AboutOtherAppsAndLinks(
+    context: Context,
+    copyLinkToClipboard: (String) -> Unit,
+) {
+    val rememberStoreUrl =
+        stringResource(
+            if (BuildConfig.FLAVOR == "github") {
+                R.string.settings_about_remember_github_url
+            } else {
+                R.string.settings_about_remember_play_store_url
+            },
+        )
+    val obtainXStoreUrl = stringResource(R.string.settings_about_obtainx_github_url)
+    val websiteUrl = stringResource(R.string.settings_about_filepipe_website_url)
+    val privacyUrl = stringResource(R.string.settings_about_filepipe_privacy_url)
+    val termsUrl = stringResource(R.string.settings_about_filepipe_terms_url)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.settings_about_other_apps),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        AboutAppStoreButton(
+            iconResId = R.drawable.remember_logo,
+            name = stringResource(R.string.settings_about_remember_name),
+            tagline = stringResource(R.string.settings_about_remember_tagline),
+            url = rememberStoreUrl,
+            accentColor = Color(0xFF4F7D43),
+            context = context,
+            copyLinkToClipboard = copyLinkToClipboard,
+        )
+        if (BuildConfig.FLAVOR == "github") {
+            Spacer(Modifier.height(8.dp))
+            AboutAppStoreButton(
+                iconResId = R.drawable.obtainx_logo,
+                name = stringResource(R.string.settings_about_obtainx_name),
+                tagline = stringResource(R.string.settings_about_obtainx_tagline),
+                url = obtainXStoreUrl,
+                accentColor = Color(0xFF7C55D9),
+                context = context,
+                copyLinkToClipboard = copyLinkToClipboard,
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AboutTextLink(
+                label = stringResource(R.string.settings_about_website),
+                url = websiteUrl,
+                context = context,
+                copyLinkToClipboard = copyLinkToClipboard,
+            )
+            AboutLinkSeparator()
+            AboutTextLink(
+                label = stringResource(R.string.settings_about_privacy_policy),
+                url = privacyUrl,
+                context = context,
+                copyLinkToClipboard = copyLinkToClipboard,
+            )
+            AboutLinkSeparator()
+            AboutTextLink(
+                label = stringResource(R.string.settings_about_terms),
+                url = termsUrl,
+                context = context,
+                copyLinkToClipboard = copyLinkToClipboard,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AboutAppStoreButton(
+    iconResId: Int,
+    name: String,
+    tagline: String,
+    url: String,
+    accentColor: Color,
+    context: Context,
+    copyLinkToClipboard: (String) -> Unit,
+) {
+    val shape = RoundedCornerShape(18.dp)
+    Surface(
+        shape = shape,
+        color = accentColor.copy(alpha = 0.13f),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.16f)),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .tapSoundCombinedClickable(
+                    onClick = { openAboutUrl(context, url) },
+                    onLongClick = { copyLinkToClipboard(url) },
+                    role = Role.Button,
+                ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painter = painterResource(iconResId),
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = tagline,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            FilePipeMaterialRoundedSymbol(
+                name = "chevron_right",
+                contentDescription = null,
+                size = 20.dp,
+                tint = accentColor.copy(alpha = 0.86f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AboutLinkSeparator() {
+    Text(
+        text = "•",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+    )
+}
+
+@Composable
+private fun AboutTextLink(
+    label: String,
+    url: String,
+    context: Context,
+    copyLinkToClipboard: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = label,
+        modifier =
+            modifier
+                .tapSoundCombinedClickable(
+                    onClick = { openAboutUrl(context, url) },
+                    onLongClick = { copyLinkToClipboard(url) },
+                    role = Role.Button,
+                ).padding(horizontal = 4.dp, vertical = 2.dp),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+private fun openAboutUrl(
+    context: Context,
+    url: String,
+) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
 }
 
@@ -1878,6 +2057,45 @@ fun launchAppShareChooser(context: Context) {
         )
     }
 }
+
+@Composable
+private fun rememberDiagnosticsShareAction(
+    context: Context,
+    chooserTitle: String,
+    preferences: AppPreferences,
+): () -> Unit =
+    remember(context, chooserTitle, preferences) {
+        {
+            runCatching {
+                DiagnosticLog.record(context, "Diagnostic log shared from Settings")
+                val diagnosticsFile = DiagnosticLog.createShareFile(context, preferences)
+                val uri =
+                    FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        diagnosticsFile,
+                    )
+                val sendIntent =
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.settings_share_diagnostics_subject))
+                        putExtra(Intent.EXTRA_TITLE, context.getString(R.string.settings_share_diagnostics))
+                        clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, uri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                context.startActivity(Intent.createChooser(sendIntent, chooserTitle))
+            }.onFailure { error ->
+                DiagnosticLog.record(context, "Diagnostic log share failed", error)
+                Toast
+                    .makeText(
+                        context,
+                        context.getString(R.string.settings_share_diagnostics_failed),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+            }
+        }
+    }
 
 @Composable
 private fun UpdateCheckScheduleDropdown(
@@ -1984,10 +2202,10 @@ private fun UpdateCheckBottomSheetContent(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.SystemUpdate,
+                        FilePipeMaterialRoundedSymbol(
+                            name = "system_update",
                             contentDescription = null,
-                            modifier = Modifier.size(40.dp),
+                            size = 40.dp,
                             tint = MaterialTheme.colorScheme.primary,
                         )
                         Spacer(Modifier.height(8.dp))
@@ -2178,10 +2396,11 @@ private fun UpdateCheckBottomSheetContent(
                                             ),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "arrow_back",
                                         contentDescription = stringResource(R.string.settings_changelog_previous),
-                                        modifier = Modifier.size(20.dp),
+                                        size = 20.dp,
+                                        autoMirror = true,
                                         tint =
                                             if (canGoBack) {
                                                 scheme.primary
@@ -2224,10 +2443,11 @@ private fun UpdateCheckBottomSheetContent(
                                             ),
                                     contentAlignment = Alignment.Center,
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "arrow_forward",
                                         contentDescription = stringResource(R.string.settings_changelog_next),
-                                        modifier = Modifier.size(20.dp),
+                                        size = 20.dp,
+                                        autoMirror = true,
                                         tint =
                                             if (canGoForward) {
                                                 scheme.primary
@@ -2304,20 +2524,21 @@ private fun UpToDatePhoneIcon() {
         modifier = Modifier.size(56.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = Icons.Outlined.Smartphone,
+        FilePipeMaterialRoundedSymbol(
+            name = "smartphone",
             contentDescription = null,
-            modifier = Modifier.size(40.dp),
+            size = 40.dp,
+            filled = false,
             tint = primary,
         )
-        Icon(
-            imageVector = Icons.Filled.CheckCircle,
+        FilePipeMaterialRoundedSymbol(
+            name = "check_circle",
             contentDescription = null,
             modifier =
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .size(22.dp)
                     .offset(x = 2.dp, y = 2.dp),
+            size = 22.dp,
             tint = primary,
         )
     }
@@ -2370,7 +2591,7 @@ private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
             }
         }
         if (downloadProgress == -1f || downloadProgress == -2f) {
-            LinearProgressIndicator(
+            LinearWavyProgressIndicator(
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -2393,7 +2614,7 @@ private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun SettingsExpandableSection(
     sectionKey: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconName: String,
     title: String,
     collapsedSectionKeys: Set<String>,
     onCollapsedSectionKeysChange: (Set<String>) -> Unit,
@@ -2406,7 +2627,7 @@ private fun SettingsExpandableSection(
     val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     Column(modifier = modifier) {
         SettingsExpandableSectionHeader(
-            icon = icon,
+            iconName = iconName,
             title = title,
             collapsed = collapsed,
             onToggle = {
@@ -2443,7 +2664,7 @@ private fun SettingsExpandableSection(
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 private fun SettingsExpandableSectionHeader(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconName: String,
     title: String,
     collapsed: Boolean,
     onToggle: () -> Unit,
@@ -2539,10 +2760,10 @@ private fun SettingsExpandableSectionHeader(
                     .background(iconContainerColor),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = icon,
+            FilePipeMaterialRoundedSymbol(
+                name = iconName,
                 contentDescription = null,
-                modifier = Modifier.size(iconSize),
+                size = iconSize,
                 tint = MaterialTheme.colorScheme.primary,
             )
         }
@@ -2562,13 +2783,14 @@ private fun SettingsExpandableSectionHeader(
                     .background(chevronContainerColor),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            FilePipeMaterialRoundedSymbol(
+                name = "chevron_right",
                 contentDescription = null,
                 modifier =
                     Modifier
-                        .size(chevronSize)
                         .graphicsLayer { rotationZ = rotation },
+                size = chevronSize,
+                autoMirror = true,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -2577,17 +2799,19 @@ private fun SettingsExpandableSectionHeader(
 
 @Composable
 private fun SettingsSectionHeader(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    iconName: String,
     title: String,
+    trailingContent: (@Composable RowScope.() -> Unit)? = null,
 ) {
     Row(
+        modifier = if (trailingContent != null) Modifier.fillMaxWidth() else Modifier,
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(
-            imageVector = icon,
+        FilePipeMaterialRoundedSymbol(
+            name = iconName,
             contentDescription = null,
-            modifier = Modifier.size(18.dp),
+            size = 18.dp,
             tint = MaterialTheme.colorScheme.primary,
         )
         Text(
@@ -2595,6 +2819,10 @@ private fun SettingsSectionHeader(
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
         )
+        if (trailingContent != null) {
+            Spacer(Modifier.weight(1f))
+            trailingContent()
+        }
     }
 }
 
@@ -2604,7 +2832,7 @@ private fun SettingsToggleItem(
     subtitle: String? = null,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    iconName: String? = null,
     switchEnabled: Boolean = true,
     onDisabledInteraction: (() -> Unit)? = null,
 ) {
@@ -2621,8 +2849,12 @@ private fun SettingsToggleItem(
                 }.padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (icon != null) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (iconName != null) {
+            FilePipeMaterialRoundedSymbol(
+                name = iconName,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             Spacer(Modifier.width(16.dp))
         }
         Column(
@@ -2692,7 +2924,11 @@ private fun BackupFolderPickerItem(
                 onClick()
             },
         ) {
-            Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+            FilePipeMaterialRoundedSymbol(
+                name = "folder_open",
+                contentDescription = null,
+                size = 18.dp,
+            )
         }
     }
 }
@@ -2774,31 +3010,186 @@ private fun LogRetentionDropdown(
 private fun swipeActionLabel(action: SwipeAction): String =
     when (action) {
         SwipeAction.EDIT -> stringResource(R.string.action_edit)
-        SwipeAction.DELETE -> stringResource(R.string.delete)
+        SwipeAction.DELETE -> stringResource(R.string.settings_swipe_action_trash)
         SwipeAction.DUPLICATE -> stringResource(R.string.action_duplicate)
         SwipeAction.PREVIEW -> stringResource(R.string.preview_title)
         SwipeAction.VIEW_HISTORY -> stringResource(R.string.view_history)
     }
 
 @Composable
-private fun SwipeActionDropdown(
-    current: SwipeAction,
-    excluded: SwipeAction,
-    onSelect: (SwipeAction) -> Unit,
+private fun SwipeExecuteOneActionsEditor(
+    startTitle: String,
+    endTitle: String,
+    startAction: SwipeAction,
+    endAction: SwipeAction,
+    onStartActionChange: (SwipeAction) -> Unit,
+    onEndActionChange: (SwipeAction) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SwipeExecuteDirectionColumn(
+                title = startTitle,
+                direction = SwipeDirectionCue.RIGHT,
+                action = startAction,
+                availableActions = SwipeAction.entries.filter { it != endAction },
+                onActionChange = onStartActionChange,
+                modifier = Modifier.weight(1f),
+            )
+            SwipeExecuteDirectionColumn(
+                title = endTitle,
+                direction = SwipeDirectionCue.LEFT,
+                action = endAction,
+                availableActions = SwipeAction.entries.filter { it != startAction },
+                onActionChange = onEndActionChange,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        SwipePanelDivider()
+        SwipeHintText(text = stringResource(R.string.settings_swipe_execute_hint))
+    }
+}
+
+@Composable
+private fun SwipeExecuteDirectionColumn(
+    title: String,
+    direction: SwipeDirectionCue,
+    action: SwipeAction,
+    availableActions: List<SwipeAction>,
+    onActionChange: (SwipeAction) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        SwipeExecuteDirectionHeader(
+            title = title,
+            direction = direction,
+        )
+        SwipeExecuteActionPicker(
+            action = action,
+            availableActions = availableActions,
+            onActionChange = onActionChange,
+        )
+    }
+}
+
+@Composable
+private fun SwipeExecuteDirectionHeader(
+    title: String,
+    direction: SwipeDirectionCue,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement =
+            if (direction == SwipeDirectionCue.LEFT) {
+                Arrangement.End
+            } else {
+                Arrangement.Start
+            },
+    ) {
+        if (direction == SwipeDirectionCue.RIGHT) {
+            SwipeDirectionIcon(direction = direction)
+            Spacer(Modifier.size(7.dp))
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        if (direction == SwipeDirectionCue.LEFT) {
+            Spacer(Modifier.size(7.dp))
+            SwipeDirectionIcon(direction = direction)
+        }
+    }
+}
+
+@Composable
+private fun SwipeDirectionIcon(direction: SwipeDirectionCue) {
+    Box(
+        modifier =
+            Modifier
+                .size(28.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        FilePipeMaterialRoundedSymbol(
+            name = direction.iconName,
+            size = 15.dp,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            weight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun SwipeExecuteActionPicker(
+    action: SwipeAction,
+    availableActions: List<SwipeAction>,
+    onActionChange: (SwipeAction) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    FilePipeOutlinedButton(onClick = { expanded = true }) {
-        Text(swipeActionLabel(current))
+    val shape = MaterialTheme.shapes.medium
+    val actionAccent = action.settingsSwipeAccent()
+    Box {
+        Surface(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .clip(shape)
+                    .tapSoundClickable(role = Role.Button) { expanded = true },
+            shape = shape,
+            color = action.settingsSwipeTileColor(),
+            border = BorderStroke(1.dp, actionAccent.copy(alpha = 0.55f)),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                SwipeActionIcon(action = action)
+                Text(
+                    text = swipeActionLabel(action),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                FilePipeMaterialRoundedSymbol(
+                    name = "expand_more",
+                    size = 17.dp,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
-            SwipeAction.entries.filter { it != excluded }.forEach { action ->
+            availableActions.forEach { action ->
                 FilePipeDropdownMenuItem(
                     text = { Text(swipeActionLabel(action)) },
+                    leadingIcon = { SwipeActionIcon(action = action) },
                     onClick = {
-                        onSelect(action)
+                        onActionChange(action)
                         expanded = false
                     },
                 )
@@ -2808,120 +3199,110 @@ private fun SwipeActionDropdown(
 }
 
 @Composable
-private fun SwipeActionPreviewCard(
-    swipeStartToEnd: SwipeAction,
-    swipeEndToStart: SwipeAction,
-) {
-    val leftBg by animateColorAsState(
-        targetValue = swipeStartToEnd.semanticSwipeBackground(),
-        animationSpec = reducedMotionAwareSpec(tween(300)),
-        label = "leftBg",
-    )
-    val rightBg by animateColorAsState(
-        targetValue = swipeEndToStart.semanticSwipeBackground(),
-        animationSpec = reducedMotionAwareSpec(tween(300)),
-        label = "rightBg",
-    )
+private fun SwipeActionIcon(action: SwipeAction) {
+    Box(
+        modifier =
+            Modifier
+                .size(28.dp)
+                .clip(MaterialTheme.shapes.medium)
+                .background(action.settingsSwipeIconContainerColor()),
+        contentAlignment = Alignment.Center,
+    ) {
+        FilePipeMaterialRoundedSymbol(
+            name = action.materialSymbolName(),
+            size = 15.dp,
+            tint = action.settingsSwipeIconColor(),
+            weight = FontWeight.Medium,
+        )
+    }
+}
 
+private fun SwipeAction.settingsSwipeTileColor(): Color = settingsSwipeAccent().copy(alpha = 0.14f)
+
+private fun SwipeAction.settingsSwipeAccent(): Color =
+    when (this) {
+        SwipeAction.EDIT -> Color(0xFF3F7AF6)
+        SwipeAction.DELETE -> Color(0xFFE53935)
+        SwipeAction.DUPLICATE -> Color(0xFF64748B)
+        SwipeAction.PREVIEW -> Color(0xFF2E7D32)
+        SwipeAction.VIEW_HISTORY -> Color(0xFF5F6F82)
+    }
+
+private fun SwipeAction.settingsSwipeIconContainerColor(): Color = settingsSwipeAccent()
+
+private fun SwipeAction.settingsSwipeIconColor(): Color = Color.White
+
+@Composable
+private fun SwipePanelDivider() {
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(56.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
-        // Left action background (swipe right reveals this)
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.5f)
-                    .background(leftBg)
-                    .align(Alignment.CenterStart)
-                    .padding(start = 16.dp),
-            contentAlignment = Alignment.CenterStart,
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f)),
+    )
+}
+
+@Composable
+private fun SwipeHintText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+}
+
+@Composable
+private fun SettingsInfoDropdown(
+    tipText: String,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    Box(modifier = modifier) {
+        FilePipeIconButton(
+            onClick = { menuExpanded = true },
+            modifier = Modifier.size(32.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    tint = swipeStartToEnd.semanticSwipeIconTint(),
-                    modifier = Modifier.size(16.dp),
-                )
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    imageVector = swipeStartToEnd.previewIcon(),
-                    contentDescription = null,
-                    tint = swipeStartToEnd.semanticSwipeIconTint(),
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    swipeActionLabel(swipeStartToEnd),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = swipeStartToEnd.semanticSwipeIconTint(),
-                )
-            }
-        }
-        // Right action background (swipe left reveals this)
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.5f)
-                    .background(rightBg)
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 16.dp),
-            contentAlignment = Alignment.CenterEnd,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    swipeActionLabel(swipeEndToStart),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = swipeEndToStart.semanticSwipeIconTint(),
-                )
-                Spacer(Modifier.width(6.dp))
-                Icon(
-                    imageVector = swipeEndToStart.previewIcon(),
-                    contentDescription = null,
-                    tint = swipeEndToStart.semanticSwipeIconTint(),
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = null,
-                    tint = swipeEndToStart.semanticSwipeIconTint(),
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-        }
-        // Center rule card placeholder
-        Box(
-            modifier =
-                Modifier
-                    .align(Alignment.Center)
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.42f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                "Rule",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            FilePipeMaterialRoundedSymbol(
+                name = "info",
+                size = 20.dp,
+                tint = iconTint,
+                weight = FontWeight.Medium,
+                filled = false,
+                modifier = Modifier.semantics { this.contentDescription = contentDescription },
             )
+        }
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false },
+            modifier = Modifier.widthIn(max = 260.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ) {
+            Column(
+                modifier =
+                    Modifier
+                        .widthIn(max = 236.dp)
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (title != null) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Text(
+                    text = tipText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
         }
     }
 }
-
-private fun SwipeAction.previewIcon(): androidx.compose.ui.graphics.vector.ImageVector =
-    when (this) {
-        SwipeAction.EDIT -> Icons.Default.Edit
-        SwipeAction.DELETE -> Icons.Default.Delete
-        SwipeAction.DUPLICATE -> Icons.Default.ContentCopy
-        SwipeAction.PREVIEW -> Icons.Default.Visibility
-        SwipeAction.VIEW_HISTORY -> Icons.Default.History
-    }

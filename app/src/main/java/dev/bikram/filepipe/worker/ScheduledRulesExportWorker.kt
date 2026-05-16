@@ -7,13 +7,14 @@ import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
 
 @HiltWorker
 class ScheduledRulesExportWorker
     @AssistedInject
     constructor(
-        @Assisted context: Context,
+        @Assisted private val context: Context,
         @Assisted params: WorkerParameters,
         private val userPreferencesRepository: UserPreferencesRepository,
         private val exportRulesUseCase: ExportRulesUseCase,
@@ -29,8 +30,21 @@ class ScheduledRulesExportWorker
                 return Result.success()
             }
             return exportRulesUseCase.exportRulesToTreeUris(backupDestinations).fold(
-                onSuccess = { Result.success() },
-                onFailure = { Result.retry() },
+                onSuccess = { fileNames ->
+                    DiagnosticLog.record(
+                        context,
+                        "Scheduled backup export completed: destinations=${backupDestinations.size}, files=${fileNames.size}",
+                    )
+                    Result.success()
+                },
+                onFailure = { error ->
+                    DiagnosticLog.record(
+                        context,
+                        "Scheduled backup export failed: destinations=${backupDestinations.size}, attempt=$runAttemptCount",
+                        error,
+                    )
+                    Result.retry()
+                },
             )
         }
     }

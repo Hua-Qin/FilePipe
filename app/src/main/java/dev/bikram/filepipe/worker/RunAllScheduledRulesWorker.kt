@@ -15,6 +15,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
@@ -47,7 +48,12 @@ class RunAllScheduledRulesWorker
         private val completedRuleIdsInBatch = mutableSetOf<Long>()
 
         override suspend fun doWork(): Result {
-            val ruleIds = inputData.getLongArray(KEY_RULE_IDS) ?: return Result.failure()
+            val ruleIds =
+                inputData.getLongArray(KEY_RULE_IDS)
+                    ?: run {
+                        DiagnosticLog.record(appContext, "Scheduled batch worker failed: missing rule ids")
+                        return Result.failure()
+                    }
             val rules =
                 buildList {
                     for (id in ruleIds) {
@@ -87,11 +93,22 @@ class RunAllScheduledRulesWorker
                         historyId = result.historyId,
                         movedFileNames = movedFileNames,
                     )
+                    if (result.totalFailed > 0) {
+                        DiagnosticLog.record(
+                            appContext,
+                            "Scheduled batch rule completed with failures: ruleId=${rule.id}, moved=${result.totalMoved}, failed=${result.totalFailed}",
+                        )
+                    }
                 }
                 Result.success()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                DiagnosticLog.record(
+                    appContext,
+                    "Scheduled batch worker threw: ruleCount=${rules.size}, attempt=$runAttemptCount",
+                    e,
+                )
                 if (runAttemptCount < 2) Result.retry() else Result.failure()
             }
         }

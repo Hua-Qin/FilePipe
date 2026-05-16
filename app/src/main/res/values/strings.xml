@@ -378,7 +378,25 @@
     <string name="settings_rate_on_play_store">Rate on Play Store</string>
     <string name="settings_star_on_github">Star on GitHub</string>
     <string name="settings_share_app">Share</string>
-    <string name="about_share_text">Finally found a solid way to auto-organize my phone\'s storage. %1$s. Check it out: %2$s</string>
+    <string name="settings_about_other_apps">More from Bikram</string>
+    <string name="settings_about_remember_name">Remember</string>
+    <string name="settings_about_remember_tagline">Notes, tasks, reminders - done right</string>
+    <string name="settings_about_obtainx_name">ObtainX</string>
+    <string name="settings_about_obtainx_tagline">Get app updates straight from the source</string>
+    <string name="settings_about_website">Website</string>
+    <string name="settings_about_privacy_policy">Privacy policy</string>
+    <string name="settings_about_terms">Terms</string>
+    <string name="settings_about_filepipe_website_url" translatable="false">https://bikram-agarwal.github.io/filepipe/</string>
+    <string name="settings_about_filepipe_privacy_url" translatable="false">https://bikram-agarwal.github.io/filepipe/privacy/</string>
+    <string name="settings_about_filepipe_terms_url" translatable="false">https://bikram-agarwal.github.io/filepipe/terms/</string>
+    <string name="settings_about_remember_play_store_url" translatable="false">https://play.google.com/store/apps/details?id=dev.bikram.remember</string>
+    <string name="settings_about_remember_github_url" translatable="false">https://github.com/bikram-agarwal/Remember/releases/latest</string>
+    <string name="settings_about_obtainx_github_url" translatable="false">https://github.com/bikram-agarwal/ObtainX/releases/latest</string>
+    <string name="settings_share_diagnostics">Share diagnostic log</string>
+    <string name="settings_share_diagnostics_chooser">Share diagnostic log</string>
+    <string name="settings_share_diagnostics_subject">FilePipe diagnostic log</string>
+    <string name="settings_share_diagnostics_failed">Couldn\'t share diagnostic log</string>
+    <string name="about_share_text">Finally found a solid app to auto-organize my phone\'s storage. %1$s. Check it out: %2$s</string>
     <string name="toast_about_link_copied">Link copied</string>
     <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
 
@@ -389,8 +407,10 @@
     <!-- Feedback / new settings -->
     <string name="settings_touch_sound_section">Touch &amp; Sound</string>
     <string name="settings_swipe_gestures_section">Swipe gestures</string>
-    <string name="settings_swipe_right">Swipe right →</string>
-    <string name="settings_swipe_left">← Swipe left</string>
+    <string name="settings_swipe_right">Swipe right</string>
+    <string name="settings_swipe_left">Swipe left</string>
+    <string name="settings_swipe_action_trash">Trash</string>
+    <string name="settings_swipe_execute_hint">Each swipe runs one action. Tap to change the action.</string>
     <string name="settings_haptic_feedback">Haptic feedback</string>
     <string name="settings_haptic_feedback_desc">Tap sounds and swipe vibrations</string>
     <string name="settings_progressive_blur">Progressive blur</string>
@@ -418,6 +438,7 @@
     <string name="notification_update_available_text">Version %1$s is ready to install</string>
     <string name="settings_save_update_apk_to_downloads">Save update APK to Download folder</string>
     <string name="settings_update_apk_save_to_downloads_failed">Update downloaded, but saving a copy to Download failed</string>
+    <string name="settings_update_check_failed">Couldn\'t check for updates</string>
     <string name="settings_see_whats_new">See what\'s new?</string>
     <string name="settings_check_for_updates">Check for updates</string>
     <string name="settings_download_install">Download update (v%1$s)</string>
@@ -433,16 +454,17 @@
     <string name="settings_changelog_page_indicator">%1$d of %2$d</string>
     <string name="settings_play_in_app_update_failed">Could not start the update. Try \"Check for updates\" again.</string>
     <string name="settings_play_in_app_update_canceled">Update was canceled. You can try again from Updates in Settings.</string>
-    <string name="rules_update_promo_title">Update available</string>
-    <string name="rules_update_promo_message">A newer version is available</string>
-    <string name="rules_update_promo_action">Check update</string>
+    <string name="update_banner_available_title">Update available</string>
+    <string name="update_banner_available_message">A new version is available</string>
+    <string name="update_banner_available_action">Check</string>
+    <string name="update_fab_label">Update</string>
     <string name="settings_dev_release_mocks_section">Dev release mocks</string>
     <string name="settings_dev_release_mock_rules_banner">Arm update promo banner</string>
     <string name="settings_dev_release_mock_play_banner">Play update banner (download then install)</string>
-    <string name="play_update_banner_downloading_title">Play update</string>
-    <string name="play_update_banner_downloading">Downloading update…</string>
-    <string name="play_update_banner_downloading_bytes">Downloading update %1$s / %2$s</string>
-    <string name="play_update_banner_install_title">Update ready to install</string>
+    <string name="play_update_banner_downloading_title">Downloading update</string>
+    <string name="play_update_banner_downloading">from Play Store…</string>
+    <string name="play_update_banner_downloading_bytes">%1$s of %2$s</string>
+    <string name="play_update_banner_install_title">Ready to install</string>
     <string name="play_update_banner_install_subtitle">Restart to use the new version</string>
     <string name="play_update_banner_install_action">Install &amp; restart</string>
     <string name="settings_update_play_in_progress_body">An update from Google Play is already in progress. Continue to open Play and finish downloading or installing.</string>
@@ -544,42 +566,6 @@
     <string name="faq_no_results_body">Try a simpler search, or browse the sections below without a filter</string>
     <string name="faq_action_switch_full_access">Switch mode in Settings</string>
     <string name="faq_action_notification_settings">Open notification settings</string>
-    <string name="faq_section_fix_common_issues">Fix common issues</string>
-    <string name="faq_section_storage_access_modes">Storage access modes</string>
-    <string name="faq_section_managing_rules">Managing rules</string>
-    <string name="faq_section_automation_scheduling">Automation &amp; scheduling</string>
-    <string name="faq_section_privacy_permissions">Privacy &amp; permissions</string>
-    <string name="faq_section_backup_restore">Backup &amp; restore</string>
-    <string name="faq_question_rule_not_working">Fix a rule that isn\'t working</string>
-    <string name="faq_question_folder_access_denied">Fix \"Folders need attention\" errors</string>
-    <string name="faq_question_cant_add_downloads_folder">Can\'t add the Download folder?</string>
-    <string name="faq_question_files_not_moving_automatically">Files not moving?</string>
-    <string name="faq_question_create_rule">How do I create a rule?</string>
-    <string name="faq_question_rule_skipping_files">Why is my rule skipping files?</string>
-    <string name="faq_question_what_preview_does">What does preview do?</string>
-    <string name="faq_question_scheduled_rules">How do scheduled rules work?</string>
-    <string name="faq_question_schedule_notifications">Not getting scheduled run notifications?</string>
-    <string name="faq_question_rule_did_not_run">Why did my rule not run?</string>
-    <string name="faq_question_data_privacy">Is my data private?</string>
-    <string name="faq_question_why_storage_access">Why does FilePipe need storage access?</string>
-    <string name="faq_question_backup_contents">What gets backed up?</string>
-    <string name="faq_question_permissions_after_restore">What do I fix after restore?</string>
-
-    <!-- FAQ answers: \\n between bullets; use ** only for mode names worth scanning. -->
-    <string name="faq_answer_rule_not_working">Give the rule a name, source folders, destination folder, and file types.\nTap any red folder path on the edit screen and grant access again.\nIf the rule uses Download folder or a storage root, switch to **All files access** in Settings.</string>
-    <string name="faq_answer_folder_access_denied">Common after changing **Selective access** vs **All files access**, restoring a backup, or revoking a folder grant.\nOpen \"Edit rule\", tap the highlighted path, and pick the folder again in the folder picker.\nDownload folder and storage roots need **All files access**.</string>
-    <string name="faq_answer_cant_add_downloads_folder">In **Selective access**, Android often blocks the Download folder and some storage roots.\nTurn on **All files access** in Settings, then add the folder, or pick a subfolder inside Download with the picker.</string>
-    <string name="faq_answer_files_not_moving_automatically">Confirm the rule is enabled.\nFor automatic runs, set a schedule and keep the rule enabled.\nCheck folder access, battery restrictions for FilePipe, and advanced filters so files still match.</string>
-    <string name="faq_answer_create_rule">Tap + on the Rules tab to start a new rule.\nPick source folders, file types, and a destination folder.\nChoose operation mode (move or copy) and how to handle duplicate files in the destination.\nAdd a schedule on the edit screen if you want background runs.\nUse advanced filters for filename patterns, size or age limits, and exclude patterns.\nSave, then run preview to see which files would be affected.</string>
-    <string name="faq_answer_rule_skipping_files">The file may not match the extensions or advanced filters.\nIf the destination already has that name, your conflict setting may skip or rename instead of replacing.\nLost folder access can also hide files until you grant again.</string>
-    <string name="faq_answer_what_preview_does">Preview lists files the rule would act on and shows the intended destination path.\nNothing is moved or copied until you run the rule for real.\nUse it to check filters, destination, and access before you rely on the rule.</string>
-    <string name="faq_answer_scheduled_rules">Scheduled rules run in the background at the times you configure.\nThey still need valid folder access and files that match the rule.\nUse **Preview** after changes so automation matches what you expect.</string>
-    <string name="faq_answer_rule_did_not_run">Confirm the schedule and the rule are both enabled.\nAndroid battery limits and notification settings can block or delay background work.\nRecheck folder access and that matching files still exist.</string>
-    <string name="faq_answer_schedule_notifications">FilePipe doesn\'t send a notification after every scheduled run. Check run history to see what happened.\nTo get alerts, enable run notifications in Settings and allow app notifications in Android settings.\nBattery saver and background restrictions can delay runs — exclude FilePipe in battery settings if needed.</string>
-    <string name="faq_answer_data_privacy">FilePipe works on your device.\nYour files are not uploaded or tracked.\nThe app only runs the rules you configure.</string>
-    <string name="faq_answer_why_storage_access">FilePipe needs access to the folders your rules use to scan, move, or copy files.\n**Selective access** only sees folders you pick in the system dialog.\n**All files access** is needed for Download, storage roots, and plain file paths.</string>
-    <string name="faq_answer_backup_contents">Backups include rules, run history, and settings.\nAndroid does not restore folder grants from a backup.\nAfter restore, revisit rules with highlighted paths and grant again.</string>
-    <string name="faq_answer_permissions_after_restore">For **Selective access**, tap each affected folder and grant again.\nIf rules used **All files access**, turn that back on in Android settings.\nHighlights on the edit screen show which folders still need attention.</string>
 
     <string-array name="days_of_week">
         <item>Monday</item>

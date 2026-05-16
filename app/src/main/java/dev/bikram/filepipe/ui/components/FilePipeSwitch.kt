@@ -2,14 +2,12 @@ package dev.bikram.filepipe.ui.components
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchColors
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 
 @Composable
@@ -37,9 +35,10 @@ fun FilePipeSwitch(
         thumbContent =
             if (checked) {
                 {
-                    Icon(
-                        imageVector = Icons.Default.Check,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "check",
                         contentDescription = null,
+                        size = SwitchDefaults.IconSize,
                         modifier = Modifier.size(SwitchDefaults.IconSize),
                     )
                 }

@@ -13,11 +13,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
@@ -33,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import kotlin.math.absoluteValue
 import kotlin.math.roundToInt
 
@@ -61,21 +59,22 @@ fun UpdateAvailablePromoCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Icon(
-                imageVector = Icons.Default.NewReleases,
+            FilePipeMaterialRoundedSymbol(
+                name = "new_releases",
                 contentDescription = null,
+                size = 40.dp,
                 modifier = Modifier.size(40.dp),
                 tint = scheme.primary,
             )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = stringResource(R.string.rules_update_promo_title),
+                    text = stringResource(R.string.update_banner_available_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = stringResource(R.string.rules_update_promo_message),
+                    text = stringResource(R.string.update_banner_available_message),
                     style = MaterialTheme.typography.bodyMedium,
                     color = scheme.onSurfaceVariant,
                 )
@@ -88,7 +87,7 @@ fun UpdateAvailablePromoCard(
                         contentColor = scheme.onPrimary,
                     ),
             ) {
-                Text(stringResource(R.string.rules_update_promo_action))
+                Text(stringResource(R.string.update_banner_available_action))
             }
         }
     }

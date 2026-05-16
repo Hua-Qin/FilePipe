@@ -1,26 +1,17 @@
 package dev.bikram.filepipe.ui.components
 
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TextSnippet
-import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.FolderSpecial
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Movie
-import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Screenshot
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import dev.bikram.filepipe.domain.model.RuleIcon
+import dev.bikram.filepipe.domain.model.materialSymbolName
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 
 /** Curated emoji shortcuts for rule icons (Unicode only, no assets). Twelve presets; custom slot + apply in the rule sheet. */
 val RuleIconEmojiPresets: List<String> =
@@ -66,23 +57,12 @@ fun RuleIconOrEmoji(
             modifier = semanticsModifier,
         )
     } else {
-        Icon(
-            imageVector = icon.toImageVector(),
+        FilePipeMaterialRoundedSymbol(
+            name = icon.materialSymbolName(),
+            size = vectorSize,
             contentDescription = contentDescription,
             modifier = semanticsModifier.size(vectorSize),
             tint = tint,
         )
     }
 }
-
-fun RuleIcon.toImageVector(): ImageVector =
-    when (this) {
-        RuleIcon.DEFAULT -> Icons.Filled.FolderSpecial
-        RuleIcon.IMAGE -> Icons.Filled.Image
-        RuleIcon.SCREENSHOT -> Icons.Filled.Screenshot
-        RuleIcon.VIDEO -> Icons.Filled.Movie
-        RuleIcon.MUSIC -> Icons.Filled.MusicNote
-        RuleIcon.DOWNLOAD -> Icons.Filled.Download
-        RuleIcon.DOCUMENT -> Icons.AutoMirrored.Filled.TextSnippet
-        RuleIcon.INSTALLABLE -> Icons.Filled.Android
-    }

@@ -28,19 +28,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BlurOn
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -90,6 +83,8 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
 import dev.bikram.filepipe.ui.components.FilePipeFilterChip
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
@@ -239,16 +234,17 @@ fun ThemeAccentRow(
                         ).semantics { role = Role.Button },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector =
+                FilePipeMaterialRoundedSymbol(
+                    name =
                         if (customPickerExpanded) {
-                            Icons.Default.KeyboardArrowDown
+                            "expand_more"
                         } else {
-                            Icons.Outlined.Add
+                            "add"
                         },
                     contentDescription = stringResource(R.string.settings_custom_seed_dialog_title),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(26.dp),
+                    size = 26.dp,
+                    filled = customPickerExpanded,
                 )
             }
         }
@@ -276,11 +272,11 @@ private fun ThemeAccentCircleContent(source: AppColorSource) {
                         ),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Default.Palette,
+                FilePipeMaterialRoundedSymbol(
+                    name = "palette",
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.92f),
-                    modifier = Modifier.size(22.dp),
+                    size = 22.dp,
                 )
             }
         else -> {
@@ -458,7 +454,7 @@ fun AppearanceSection(
                 title = stringResource(R.string.settings_progressive_blur),
                 subtitle = stringResource(R.string.settings_progressive_blur_desc),
                 checked = progressiveBlurEnabled,
-                leadingIcon = Icons.Default.BlurOn,
+                leadingIconName = "blur_on",
                 onCheckedChange = onProgressiveBlurEnabled,
             )
         }
@@ -642,11 +638,11 @@ private fun CustomColorSlider(
                     onClick = { onSaveColor(commitHexEditing()) },
                     modifier = Modifier.size(40.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "check",
                         contentDescription = saveColorLabel,
                         tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                        modifier = Modifier.size(22.dp),
+                        size = 22.dp,
                     )
                 }
             }
@@ -854,35 +850,55 @@ private fun ThemeModeSegmentedRow(
             checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
             checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
         )
-    @Suppress("DEPRECATION")
+    val labels = themePickerOrder.map { mode -> themeModeLabel(mode) }
+    val shapes =
+        themePickerOrder.mapIndexed { index, _ ->
+            when (index) {
+                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+            }
+        }
     ButtonGroup(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
     ) {
         themePickerOrder.forEachIndexed { index, mode ->
-            FilePipeToggleButton(
-                checked = selected == mode,
-                onCheckedChange = { checked -> if (checked) onSelect(mode) },
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .semantics { role = Role.RadioButton },
-                shapes =
-                    when (index) {
-                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                    },
-                colors = colors,
-            ) {
-                Text(
-                    text = themeModeLabel(mode),
-                    style = MaterialTheme.typography.labelMedium,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
+            val label = labels[index]
+            customItem(
+                buttonGroupContent = {
+                    FilePipeToggleButton(
+                        checked = selected == mode,
+                        onCheckedChange = { checked -> if (checked) onSelect(mode) },
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .semantics { role = Role.RadioButton },
+                        shapes = shapes[index],
+                        colors = colors,
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+                menuContent = { menuState ->
+                    FilePipeDropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onSelect(mode)
+                            menuState.dismiss()
+                        },
+                    )
+                },
+            )
         }
     }
 }
@@ -911,7 +927,7 @@ private fun AppearanceToggleItem(
     checked: Boolean,
     enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
-    leadingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    leadingIconName: String? = null,
     onDisabledClick: (() -> Unit)? = null,
 ) {
     val alpha = if (enabled) 1f else 0.38f
@@ -929,9 +945,9 @@ private fun AppearanceToggleItem(
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (leadingIcon != null) {
-            Icon(
-                imageVector = leadingIcon,
+        if (leadingIconName != null) {
+            FilePipeMaterialRoundedSymbol(
+                name = leadingIconName,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
             )

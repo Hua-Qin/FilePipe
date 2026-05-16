@@ -28,6 +28,7 @@ import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.treeUriFromDocumentUri
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
@@ -72,13 +73,6 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-/** Used from Help to scroll the settings list to a section after navigation. */
-enum class SettingsBringIntoViewSection {
-    None,
-    FolderAccess,
-    Notifications,
-}
-
 @HiltViewModel
 class SettingsViewModel
     @Inject
@@ -98,10 +92,11 @@ class SettingsViewModel
         private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
         private val ruleRepository: RuleRepository,
     ) : ViewModel() {
-        private val isDevReleaseBuild = BuildConfig.BUILD_TYPE == "devRelease"
+        private val updateMocksAvailable = BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease"
 
         private enum class DevReleasePlayBannerMockStage {
             OFF,
+            STARTING,
             DOWNLOADING,
             READY,
         }
@@ -149,7 +144,7 @@ class SettingsViewModel
             _updatePromoBannerDismissedThisSession.asStateFlow()
 
         val playInAppUpdateBannerUiState: StateFlow<PlayInAppUpdateBannerUiState> =
-            if (isDevReleaseBuild) {
+            if (updateMocksAvailable) {
                 combine(
                     playInAppUpdateProgressController.bannerUiState,
                     devReleasePlayBannerMockStage,
@@ -174,41 +169,6 @@ class SettingsViewModel
                 onBufferOverflow = BufferOverflow.DROP_OLDEST,
             )
         val manualExportPickerRequested = _manualExportPickerRequested.asSharedFlow()
-
-        private val _bringIntoViewSection = MutableStateFlow(SettingsBringIntoViewSection.None)
-        val bringIntoViewSection: StateFlow<SettingsBringIntoViewSection> = _bringIntoViewSection.asStateFlow()
-
-        private val _folderAccessSectionHighlight = MutableStateFlow(false)
-        val folderAccessSectionHighlight: StateFlow<Boolean> = _folderAccessSectionHighlight.asStateFlow()
-
-        private val _notificationsSectionHighlight = MutableStateFlow(false)
-        val notificationsSectionHighlight: StateFlow<Boolean> = _notificationsSectionHighlight.asStateFlow()
-
-        fun requestBringSettingsSectionIntoView(section: SettingsBringIntoViewSection) {
-            if (section != SettingsBringIntoViewSection.None) {
-                _bringIntoViewSection.value = section
-            }
-        }
-
-        fun clearBringIntoViewSectionRequest() {
-            _bringIntoViewSection.value = SettingsBringIntoViewSection.None
-        }
-
-        fun requestFolderAccessSectionHighlight() {
-            _folderAccessSectionHighlight.value = true
-        }
-
-        fun clearFolderAccessSectionHighlight() {
-            _folderAccessSectionHighlight.value = false
-        }
-
-        fun requestNotificationsSectionHighlight() {
-            _notificationsSectionHighlight.value = true
-        }
-
-        fun clearNotificationsSectionHighlight() {
-            _notificationsSectionHighlight.value = false
-        }
 
         init {
             viewModelScope.launch {
@@ -469,7 +429,7 @@ class SettingsViewModel
          * Dev release: arms the global update promo (Rules / History / Settings). Swipe the card to dismiss.
          */
         fun devReleaseMockArmRulesUpdatePromoForRulesTab() {
-            if (!isDevReleaseBuild || !BuildConfig.SHOW_UPDATES) return
+            if (!updateMocksAvailable || !BuildConfig.SHOW_UPDATES) return
             _updateInfo.value =
                 UpdateInfo(
                     versionName = "9.9.9",
@@ -490,10 +450,13 @@ class SettingsViewModel
          * Dev release: global Play-style banner as downloading, then ready to install (all flavors; GitHub uses no-op real).
          */
         fun devReleaseMockStartPlayUpdateBannerSequence() {
-            if (!isDevReleaseBuild) return
+            if (!updateMocksAvailable) return
             devReleasePlayBannerMockSequenceJob?.cancel()
             devReleasePlayBannerMockSequenceJob =
                 viewModelScope.launch {
+                    devReleasePlayBannerMockStage.value = DevReleasePlayBannerMockStage.STARTING
+                    delay(1_200L)
+                    if (!isActive) return@launch
                     devReleasePlayBannerMockStage.value = DevReleasePlayBannerMockStage.DOWNLOADING
                     delay(2_500L)
                     if (!isActive) return@launch
@@ -506,11 +469,15 @@ class SettingsViewModel
         }
 
         fun completePlayFlexibleUpdateIfReady(activity: Activity?) {
-            if (isDevReleaseBuild &&
+            if (updateMocksAvailable &&
                 devReleasePlayBannerMockStage.value == DevReleasePlayBannerMockStage.READY
             ) {
                 devReleasePlayBannerMockSequenceJob?.cancel()
                 devReleasePlayBannerMockStage.value = DevReleasePlayBannerMockStage.OFF
+                if (_updateInfo.value?.isDevReleaseMock == true) {
+                    _updateInfo.value = null
+                    _updatePromoBannerDismissedThisSession.value = false
+                }
                 return
             }
             if (activity == null) return
@@ -570,6 +537,7 @@ class SettingsViewModel
                         _userMessage.value = context.getString(R.string.settings_export_success, displayName)
                     },
                     onFailure = { err ->
+                        DiagnosticLog.record(context, "Manual backup export failed", err)
                         _userMessage.value = "Export failed: ${err.message}"
                     },
                 )
@@ -590,6 +558,7 @@ class SettingsViewModel
                             }
                     },
                     onFailure = { err ->
+                        DiagnosticLog.record(context, "Cloud backup export failed", err)
                         _userMessage.value =
                             context.getString(
                                 R.string.settings_backup_export_failed,
@@ -634,6 +603,10 @@ class SettingsViewModel
                 }
                 exportRulesUseCase.exportRulesToTreeUris(backupDestinations).fold(
                     onSuccess = { fileNames ->
+                        DiagnosticLog.record(
+                            context,
+                            "Configured backup export completed: destinations=${backupDestinations.size}, files=${fileNames.size}",
+                        )
                         _userMessage.value =
                             context.resources.getQuantityString(
                                 R.plurals.settings_backup_exported_to_destinations,
@@ -643,6 +616,7 @@ class SettingsViewModel
                     },
                     onFailure = { error ->
                         _userMessage.value = context.getString(R.string.settings_backup_export_failed, error.message.orEmpty())
+                        DiagnosticLog.record(context, "Configured backup export failed: destinations=${backupDestinations.size}", error)
                     },
                 )
             }
@@ -653,10 +627,14 @@ class SettingsViewModel
         ) = viewModelScope.launch {
             val text =
                 withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        stream.readBytes().decodeToString()
+                    runCatching {
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            stream.readBytes().decodeToString()
+                        }
                     }
-                } ?: run {
+                }.onFailure { error ->
+                    DiagnosticLog.record(context, "Backup file read failed for $action", error)
+                }.getOrNull() ?: run {
                     _userMessage.value = "Could not read file"
                     return@launch
                 }
@@ -671,7 +649,10 @@ class SettingsViewModel
                                     result.rulesUpdated,
                                 )
                         },
-                        onFailure = { _userMessage.value = "Import failed: ${it.message}" },
+                        onFailure = {
+                            DiagnosticLog.record(context, "Backup merge import failed", it)
+                            _userMessage.value = "Import failed: ${it.message}"
+                        },
                     )
                 BackupImportPickAction.RestoreFull ->
                     importRulesUseCase.restoreFromBackupJson(text).fold(
@@ -690,7 +671,10 @@ class SettingsViewModel
                                     parts.joinToString(", "),
                                 )
                         },
-                        onFailure = { _userMessage.value = "Restore failed: ${it.message}" },
+                        onFailure = {
+                            DiagnosticLog.record(context, "Full backup restore failed", it)
+                            _userMessage.value = "Restore failed: ${it.message}"
+                        },
                     )
             }
         }
@@ -699,8 +683,17 @@ class SettingsViewModel
             viewModelScope.launch {
                 _isCheckingUpdate.value = true
                 _downloadProgress.value = null
-                val info = updateChecker.checkForUpdate()
+                val checked = runCatching { updateChecker.checkForUpdate() }
                 _isCheckingUpdate.value = false
+                val info =
+                    checked
+                        .onFailure { error ->
+                            DiagnosticLog.record(context, "Manual update check failed", error)
+                            if (!silent) {
+                                _userMessage.value = error.message ?: context.getString(R.string.settings_update_check_failed)
+                            }
+                        }.getOrNull()
+                if (checked.isFailure) return@launch
                 if (info != null) {
                     _updateInfo.value = info
                     _updatePromoBannerDismissedThisSession.value = false
@@ -730,8 +723,15 @@ class SettingsViewModel
             _downloadProgress.value = null
             _manualUpdateNoResult.value = false
             viewModelScope.launch {
-                val info = updateChecker.checkForUpdate()
+                val checked = runCatching { updateChecker.checkForUpdate() }
                 _isCheckingUpdate.value = false
+                val info =
+                    checked
+                        .onFailure { error ->
+                            DiagnosticLog.record(context, "Update sheet check failed", error)
+                            _manualUpdateNoResult.value = true
+                        }.getOrNull()
+                if (checked.isFailure) return@launch
                 if (info != null) {
                     _updateInfo.value = info
                     _updatePromoBannerDismissedThisSession.value = false
@@ -767,6 +767,7 @@ class SettingsViewModel
                     loaded.fold(
                         onSuccess = { ChangelogUiState.Ready(it) },
                         onFailure = {
+                            DiagnosticLog.record(context, "Update changelog load failed", it)
                             ChangelogUiState.Failed(
                                 it.message ?: context.getString(R.string.settings_changelog_load_failed),
                             )
@@ -846,6 +847,11 @@ class SettingsViewModel
                                                 updateInfo.remoteApkFileName,
                                             )
                                         if (copyResult.isFailure) {
+                                            DiagnosticLog.record(
+                                                context,
+                                                "Update APK copy to Downloads failed",
+                                                copyResult.exceptionOrNull(),
+                                            )
                                             withContext(Dispatchers.Main) {
                                                 _userMessage.value =
                                                     context.getString(
@@ -884,6 +890,7 @@ class SettingsViewModel
                         }
                     }
                 result.onFailure {
+                    DiagnosticLog.record(context, "Update APK download/install failed", it)
                     _userMessage.value = "Download failed: ${it.message}"
                 }
                 _downloadProgress.value = null
@@ -911,7 +918,8 @@ class SettingsViewModel
             val repo = BuildConfig.CHANGELOG_GITHUB_REPO
             val branch = BuildConfig.CHANGELOG_GITHUB_BRANCH
             val connection =
-                URL("https://raw.githubusercontent.com/$repo/$branch/CHANGELOG.md").openConnection() as HttpURLConnection
+                URL("https://raw.githubusercontent.com/$repo/$branch/docs/CHANGELOG.md").openConnection() as
+                    HttpURLConnection
             connection.instanceFollowRedirects = true
             connection.connectTimeout = 15_000
             connection.readTimeout = 20_000
@@ -929,6 +937,12 @@ class SettingsViewModel
         ): PlayInAppUpdateBannerUiState =
             when (mockStage) {
                 DevReleasePlayBannerMockStage.OFF -> realState
+                DevReleasePlayBannerMockStage.STARTING ->
+                    PlayInAppUpdateBannerUiState.Downloading(
+                        bytesDownloaded = 0L,
+                        totalBytesToDownload = 0L,
+                        indeterminateProgress = true,
+                    )
                 DevReleasePlayBannerMockStage.DOWNLOADING ->
                     PlayInAppUpdateBannerUiState.Downloading(
                         bytesDownloaded = MOCK_PLAY_UPDATE_BYTES_DOWNLOADED,
@@ -939,7 +953,7 @@ class SettingsViewModel
             }
 
         private fun resolvePlayBannerUiStateForSessionLogic(): PlayInAppUpdateBannerUiState {
-            if (!isDevReleaseBuild) {
+            if (!updateMocksAvailable) {
                 return playInAppUpdateProgressController.bannerUiState.value
             }
             return mergeDevReleasePlayBannerMock(

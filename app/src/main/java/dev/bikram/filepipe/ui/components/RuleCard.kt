@@ -26,15 +26,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -51,7 +46,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
@@ -64,6 +58,7 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.ScheduleType
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
@@ -72,7 +67,7 @@ import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
 import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
 
 data class RuleCardAction(
-    val icon: ImageVector,
+    val iconName: String,
     val label: String,
     val onClick: () -> Unit,
 )
@@ -343,9 +338,10 @@ private fun CompactContent(
                             onClick = onRunClick,
                             enabled = rule.isEnabled && !runBlocked,
                         ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
+                            FilePipeMaterialRoundedSymbol(
+                                name = "play_arrow",
                                 contentDescription = stringResource(R.string.run_now),
+                                size = 20.dp,
                                 modifier = Modifier.size(20.dp),
                             )
                         }
@@ -541,9 +537,10 @@ private fun ExpandedContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Warning,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "warning",
                         contentDescription = null,
+                        size = 16.dp,
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(16.dp),
                     )
@@ -553,9 +550,10 @@ private fun ExpandedContent(
                         color = MaterialTheme.colorScheme.error,
                         modifier = Modifier.weight(1f),
                     )
-                    Icon(
-                        imageVector = Icons.Default.Edit,
+                    FilePipeMaterialRoundedSymbol(
+                        name = "edit",
                         contentDescription = stringResource(R.string.edit_rule),
+                        size = 14.dp,
                         tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(14.dp),
                     )
@@ -700,8 +698,8 @@ private fun ExpandedContent(
                         onClick = action.onClick,
                         tooltipLabel = action.label,
                     ) {
-                        Icon(
-                            imageVector = action.icon,
+                        FilePipeMaterialRoundedSymbol(
+                            name = action.iconName,
                             contentDescription = action.label,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -735,9 +733,10 @@ private fun ExpandedContent(
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     ) {
-                        Icon(
-                            Icons.Default.PlayArrow,
+                        FilePipeMaterialRoundedSymbol(
+                            name = "play_arrow",
                             contentDescription = null,
+                            size = 20.dp,
                             modifier = Modifier.size(20.dp),
                         )
                         Spacer(Modifier.width(6.dp))

@@ -11,15 +11,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
@@ -48,6 +44,7 @@ import androidx.compose.ui.window.DialogProperties
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.ScheduleType
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -403,8 +400,8 @@ private fun ScheduleTimePickerDialog(
                             FilePipeIconButton(
                                 onClick = { showDial = !showDial },
                             ) {
-                                Icon(
-                                    imageVector = if (showDial) Icons.Filled.Keyboard else Icons.Filled.Schedule,
+                                FilePipeMaterialRoundedSymbol(
+                                    name = if (showDial) "keyboard" else "schedule",
                                     contentDescription =
                                         if (showDial) {
                                             stringResource(R.string.schedule_time_input_mode_cd)
