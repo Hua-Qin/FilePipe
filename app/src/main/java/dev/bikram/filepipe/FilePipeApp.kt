@@ -14,6 +14,7 @@ import dev.bikram.filepipe.update.UpdateApkCacheMaintenance
 import dev.bikram.filepipe.update.UpdateAvailableNotifier
 import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
 import dev.bikram.filepipe.worker.LogPruneWorker
+import dev.bikram.filepipe.worker.RuleTrashSweepWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -70,12 +71,22 @@ class FilePipeApp :
         updateAvailableNotifier.ensureNotificationChannel()
         updateApkCacheMaintenance.enqueueStartupCleanup(preferencesMigrationScope)
         scheduleLogPruneWorker()
+        scheduleRuleTrashSweepWorker()
     }
 
     private fun scheduleLogPruneWorker() {
         val request = PeriodicWorkRequestBuilder<LogPruneWorker>(1, TimeUnit.DAYS).build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             LogPruneWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            request,
+        )
+    }
+
+    private fun scheduleRuleTrashSweepWorker() {
+        val request = PeriodicWorkRequestBuilder<RuleTrashSweepWorker>(1, TimeUnit.DAYS).build()
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            RuleTrashSweepWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
             request,
         )

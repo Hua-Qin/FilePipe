@@ -2,11 +2,11 @@
 Walk app/src/main/java and extract every Material Symbols ligature name we use.
 
 Sources of truth (any one match is enough to keep the glyph):
-- `FilePipeMaterialRoundedSymbol(name = "xxx", ...)` literal calls.
+- `*MaterialRoundedSymbol(name = "xxx", ...)` literal calls.
 - `iconName = "xxx"` / `leadingIconName = "xxx"` wrapper parameters.
-- `materialSymbolName = "xxx"` (data class / enum property assignments).
+- `materialSymbolName = "xxx"` / `leadingMaterialSymbolName = "xxx"` wrapper parameters.
 - `symbolName = "xxx"` field assignments.
-- String literals returned from `SwipeAction.materialSymbolName()`-style helper functions.
+- String literals returned from `*.materialSymbolName()`-style helper functions.
 
 We err on the side of including extras: ligatures are cheap (~50-200 bytes
 each), but a missing one ships as an invisible icon in production.
@@ -27,10 +27,10 @@ OUTPUT_REPORT = Path(__file__).with_name("ligatures_report.json")
 LIGATURE = r'"([a-z][a-z0-9_]+)"'
 
 PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("FilePipeMaterialRoundedSymbol", re.compile(rf'FilePipeMaterialRoundedSymbol\s*\(\s*(?:name\s*=\s*)?{LIGATURE}', re.MULTILINE)),
+    ("MaterialRoundedSymbol", re.compile(rf'\b[A-Za-z0-9_]*MaterialRoundedSymbol\s*\(\s*(?:name\s*=\s*)?{LIGATURE}', re.MULTILINE)),
     # Do not use [^)]* here: modifier args often contain `)` (e.g. Modifier.size(24.dp)).
-    ("FilePipeMaterialRoundedSymbol_multiline", re.compile(
-        rf'FilePipeMaterialRoundedSymbol\s*\(\s*.*?\bname\s*=\s*{LIGATURE}',
+    ("MaterialRoundedSymbol_multiline", re.compile(
+        rf'\b[A-Za-z0-9_]*MaterialRoundedSymbol\s*\(\s*.*?\bname\s*=\s*{LIGATURE}',
         re.DOTALL,
     )),
     ("materialSymbolName_assign", re.compile(rf'materialSymbolName\s*=\s*{LIGATURE}')),
@@ -41,10 +41,11 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("leadingIconName_param", re.compile(rf'\bleadingIconName\s*:\s*String\??\s*=\s*{LIGATURE}')),
     ("leadingMaterialSymbolName", re.compile(rf'leadingMaterialSymbolName\s*=\s*{LIGATURE}')),
     ("symbolName_field", re.compile(rf'symbolName\s*=\s*{LIGATURE}')),
-    # `name = if (cond) "icon_a" else "icon_b"` on FilePipeMaterialRoundedSymbol rows
-    # (the simpler `name = "x"` patterns stop at the first `)` inside the condition).
-    ("material_symbol_name_if_else", re.compile(
-        r'\bname\s*=\s*if\s*\([^)]*\)\s*(?:\{\s*)?"([a-z][a-z0-9_]+)"\s*(?:\}\s*)?else\s*(?:\{\s*)?"([a-z][a-z0-9_]+)"',
+    # `name = if (cond) "icon_a" else "icon_b"` or wrapper variants like
+    # `iconName = if (...) "restore_from_trash" else "delete_forever"`.
+    # The simpler `name = "x"` patterns stop at the first `)` inside the condition.
+    ("symbol_name_if_else", re.compile(
+        r'\b(?:name|iconName|leadingIconName|materialSymbolName|leadingMaterialSymbolName|symbolName)\s*=\s*if\s*\([^)]*\)\s*(?:\{\s*)?"([a-z][a-z0-9_]+)"\s*(?:\}\s*)?else\s*(?:\{\s*)?"([a-z][a-z0-9_]+)"',
         re.DOTALL,
     )),
     # `EnumType.FOO -> "icon"` in `fun EnumType.materialSymbolName()`-style maps.
@@ -52,10 +53,20 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         r'\b[A-Z][A-Za-z0-9_]*\.\w+\s*->\s*"([a-z][a-z0-9_]+)"',
         re.MULTILINE,
     )),
+    # Enum constructor entries like `ARCHIVE("archive")`.
+    ("enum_entry_first_string_arg", re.compile(
+        r'^\s*[A-Z][A-Z0-9_]*\(\s*"([a-z][a-z0-9_]+)"\s*\)\s*,?',
+        re.MULTILINE,
+    )),
+    # Enum constructor entries like `Notes(R.string.main_tab_notes, "notes")`.
+    ("enum_entry_second_string_arg", re.compile(
+        r'^\s*[A-Z][A-Za-z0-9_]*\(\s*R\.string\.\w+\s*,\s*"([a-z][a-z0-9_]+)"',
+        re.MULTILINE,
+    )),
 ]
 
 ENABLED_FILES_HINT = {
-    "FilePipeMaterialRoundedSymbol",
+    "MaterialRoundedSymbol",
     "iconName",
     "leadingIconName",
     "materialSymbolName",

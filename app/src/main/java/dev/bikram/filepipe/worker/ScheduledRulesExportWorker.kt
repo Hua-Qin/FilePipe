@@ -47,4 +47,8 @@ class ScheduledRulesExportWorker
                 },
             )
         }
+
+        companion object {
+            const val WORK_NAME = "scheduled_rules_export"
+        }
     }

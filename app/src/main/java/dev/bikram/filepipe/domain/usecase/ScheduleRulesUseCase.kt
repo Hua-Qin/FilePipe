@@ -6,7 +6,6 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import dev.bikram.filepipe.domain.model.Rule
-import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.worker.FileOrganizerWorker
 import dev.bikram.filepipe.worker.RunAllScheduledRulesWorker
@@ -96,10 +95,9 @@ class ScheduleRulesUseCase
 
             val constraints = Constraints.Builder().setRequiresBatteryNotLow(true).build()
 
-            enabled
-                .groupBy { scheduleKey(it.schedule!!) }
-                .forEach { (_, group) ->
-                    val schedule = group.first().schedule!!
+            coalescedRuleScheduleGroups(rules)
+                .forEach { group ->
+                    val schedule = group.schedule
                     val delayMs =
                         when (schedule.type) {
                             ScheduleType.EVERY_N_HOURS -> 0L
@@ -110,7 +108,7 @@ class ScheduleRulesUseCase
                                     if (schedule.type == ScheduleType.WEEKLY) schedule.dayOfWeek else null,
                                 )
                         }
-                    val ruleIds = group.map { it.id }.toLongArray()
+                    val ruleIds = group.ruleIds.toLongArray()
                     val inputData = workDataOf(RunAllScheduledRulesWorker.KEY_RULE_IDS to ruleIds)
                     val batchTag = batchTagFor(ruleIds)
 
@@ -138,9 +136,7 @@ class ScheduleRulesUseCase
 
         private fun workTagFor(ruleId: Long) = "rule_$ruleId"
 
-        private fun batchTagFor(ruleIds: LongArray) = "batch_${ruleIds.sorted().joinToString("_")}"
-
-        private fun scheduleKey(schedule: RuleSchedule): String = "${schedule.type}_${schedule.hour}_${schedule.minute}_${schedule.dayOfWeek}_${schedule.intervalHours}"
+        private fun batchTagFor(ruleIds: LongArray) = batchTagForRuleIds(ruleIds)
 
         private fun calculateDelayUntilNextRun(
             hour: Int,

@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.ui.screens.history
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -21,22 +22,25 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
@@ -45,12 +49,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -67,6 +76,7 @@ import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.HistoryStatusFilter
+import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.DeliberateSwipeRevealCard
@@ -75,22 +85,30 @@ import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
 import dev.bikram.filepipe.ui.components.FilePipeFilterChip
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
+import dev.bikram.filepipe.ui.components.FilePipeToggleButton
 import dev.bikram.filepipe.ui.components.HistoryCard
+import dev.bikram.filepipe.ui.components.RuleCard
 import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyHistoryIllustration
+import dev.bikram.filepipe.ui.components.ThemeColoredEmptyTrashIllustration
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalSnackbarHostState
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
 import dev.bikram.filepipe.ui.theme.semanticSwipeBackground
 import dev.bikram.filepipe.ui.theme.semanticSwipeIconTint
+import kotlin.math.ceil
 
-@OptIn(ExperimentalMaterial3Api::class)
+private const val TRASH_RETENTION_MILLIS = 30L * 24L * 60L * 60L * 1000L
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun HistoryScreen(
     contentPadding: PaddingValues = PaddingValues(),
@@ -99,14 +117,18 @@ fun HistoryScreen(
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val section by viewModel.section.collectAsStateWithLifecycle()
     val availableStatusFilters by viewModel.availableStatusFilters.collectAsStateWithLifecycle()
+    val trashedRules by viewModel.trashedRules.collectAsStateWithLifecycle()
     val pagingItems = viewModel.historyPagingFlow.collectAsLazyPagingItems()
     val filteredItems by viewModel.filteredHistoryItems.collectAsStateWithLifecycle()
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
     var showClearConfirm by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
+    var pendingDeleteForeverRule by remember { mutableStateOf<Rule?>(null) }
+    var expandedTrashRuleIds by rememberSaveable { mutableStateOf(emptySet<Long>()) }
+    val snackbarHostState = LocalSnackbarHostState.current
     val isFiltered = viewModel.filterRuleId != null
 
     var sortMenuExpanded by remember { mutableStateOf(false) }
@@ -115,13 +137,16 @@ fun HistoryScreen(
     val isInitialLoad = pagingItems.loadState.refresh is LoadState.Loading
     val isUsingPaging = !uiState.isFilterActive
     val isEmpty =
-        if (isUsingPaging) {
+        if (section == HistorySection.TRASH) {
+            trashedRules.isEmpty()
+        } else if (isUsingPaging) {
             !isInitialLoad && pagingItems.itemCount == 0
         } else {
             filteredItems.isEmpty()
         }
     val pagingListState = rememberLazyListState()
     val filteredListState = rememberLazyListState()
+    val trashListState = rememberLazyListState()
     val headerCollapsed = topAppBarState.collapsedFraction > 0f
     val pagingListScrollEnabled =
         rememberContentOverflowScrollEnabled(
@@ -131,6 +156,11 @@ fun HistoryScreen(
     val filteredListScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = filteredListState,
+            additionalScrollEnabled = headerCollapsed,
+        )
+    val trashListScrollEnabled =
+        rememberContentOverflowScrollEnabled(
+            listState = trashListState,
             additionalScrollEnabled = headerCollapsed,
         )
 
@@ -192,6 +222,33 @@ fun HistoryScreen(
             },
         )
     }
+    pendingDeleteForeverRule?.let { rule ->
+        AlertDialog(
+            onDismissRequest = { pendingDeleteForeverRule = null },
+            title = { Text(stringResource(R.string.history_trash_delete_forever_confirm_title)) },
+            text = { Text(stringResource(R.string.history_trash_delete_forever_confirm_message, rule.name)) },
+            confirmButton = {
+                FilePipeTextButton(
+                    onClick = {
+                        pendingDeleteForeverRule = null
+                        viewModel.deleteRuleForever(rule.id)
+                    },
+                ) {
+                    Text(
+                        text = stringResource(R.string.delete_forever),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                FilePipeTextButton(onClick = {
+                    pendingDeleteForeverRule = null
+                }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -228,153 +285,165 @@ fun HistoryScreen(
                     colors = gradientOverlayTopAppBarColors(),
                     navigationIcon = navigationIcon,
                     actions = {
-                        Box {
-                            val groupMenuLabel = stringResource(R.string.history_group_menu)
-                            FilePipeFilledTonalIconButton(
-                                onClick = { groupMenuExpanded = true },
-                                tooltipLabel = groupMenuLabel,
-                            ) {
-                                val groupIcon =
-                                    when (uiState.viewMode) {
-                                        HistoryViewMode.BY_DATE -> "calendar_month"
-                                        HistoryViewMode.BY_RULE -> "list"
-                                        HistoryViewMode.BY_STATUS -> "category"
-                                    }
-                                FilePipeMaterialRoundedSymbol(
-                                    name = groupIcon,
-                                    contentDescription = groupMenuLabel,
-                                    autoMirror = uiState.viewMode == HistoryViewMode.BY_RULE,
-                                )
+                        if (section == HistorySection.RUNS) {
+                            Box {
+                                val groupMenuLabel = stringResource(R.string.history_group_menu)
+                                FilePipeFilledTonalIconButton(
+                                    onClick = { groupMenuExpanded = true },
+                                    tooltipLabel = groupMenuLabel,
+                                ) {
+                                    val groupIcon =
+                                        when (uiState.viewMode) {
+                                            HistoryViewMode.BY_DATE -> "calendar_month"
+                                            HistoryViewMode.BY_RULE -> "list"
+                                            HistoryViewMode.BY_STATUS -> "category"
+                                        }
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = groupIcon,
+                                        contentDescription = groupMenuLabel,
+                                        autoMirror = uiState.viewMode == HistoryViewMode.BY_RULE,
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = groupMenuExpanded,
+                                    onDismissRequest = { groupMenuExpanded = false },
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                ) {
+                                    FilePipeDropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_group_by_date)) },
+                                        leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_DATE, onClick = null) },
+                                        onClick = {
+                                            viewModel.setViewMode(HistoryViewMode.BY_DATE)
+                                            groupMenuExpanded = false
+                                        },
+                                    )
+                                    FilePipeDropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_group_by_rule)) },
+                                        leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_RULE, onClick = null) },
+                                        onClick = {
+                                            viewModel.setViewMode(HistoryViewMode.BY_RULE)
+                                            groupMenuExpanded = false
+                                        },
+                                    )
+                                    FilePipeDropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_group_by_status)) },
+                                        leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_STATUS, onClick = null) },
+                                        onClick = {
+                                            viewModel.setViewMode(HistoryViewMode.BY_STATUS)
+                                            groupMenuExpanded = false
+                                        },
+                                    )
+                                }
                             }
-                            DropdownMenu(
-                                expanded = groupMenuExpanded,
-                                onDismissRequest = { groupMenuExpanded = false },
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            ) {
-                                FilePipeDropdownMenuItem(
-                                    text = { Text(stringResource(R.string.history_group_by_date)) },
-                                    leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_DATE, onClick = null) },
-                                    onClick = {
-                                        viewModel.setViewMode(HistoryViewMode.BY_DATE)
-                                        groupMenuExpanded = false
-                                    },
-                                )
-                                FilePipeDropdownMenuItem(
-                                    text = { Text(stringResource(R.string.history_group_by_rule)) },
-                                    leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_RULE, onClick = null) },
-                                    onClick = {
-                                        viewModel.setViewMode(HistoryViewMode.BY_RULE)
-                                        groupMenuExpanded = false
-                                    },
-                                )
-                                FilePipeDropdownMenuItem(
-                                    text = { Text(stringResource(R.string.history_group_by_status)) },
-                                    leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_STATUS, onClick = null) },
-                                    onClick = {
-                                        viewModel.setViewMode(HistoryViewMode.BY_STATUS)
-                                        groupMenuExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                        Box {
-                            val sortMenuLabel = stringResource(R.string.history_sort_menu)
-                            FilePipeFilledTonalIconButton(
-                                onClick = { sortMenuExpanded = true },
-                                tooltipLabel = sortMenuLabel,
-                            ) {
-                                FilePipeMaterialRoundedSymbol(
-                                    name = "sort",
-                                    contentDescription = sortMenuLabel,
-                                    autoMirror = true,
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = sortMenuExpanded,
-                                onDismissRequest = { sortMenuExpanded = false },
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            ) {
-                                FilePipeDropdownMenuItem(
-                                    text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
-                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
-                                    onClick = {
-                                        viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
-                                        sortMenuExpanded = false
-                                    },
-                                )
-                                FilePipeDropdownMenuItem(
-                                    text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
-                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
-                                    onClick = {
-                                        viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
-                                        sortMenuExpanded = false
-                                    },
-                                )
-                                FilePipeDropdownMenuItem(
-                                    text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
-                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
-                                    onClick = {
-                                        viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
-                                        sortMenuExpanded = false
-                                    },
-                                )
-                                FilePipeDropdownMenuItem(
-                                    text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
-                                    leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
-                                    onClick = {
-                                        viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)
-                                        sortMenuExpanded = false
-                                    },
-                                )
+                            Box {
+                                val sortMenuLabel = stringResource(R.string.history_sort_menu)
+                                FilePipeFilledTonalIconButton(
+                                    onClick = { sortMenuExpanded = true },
+                                    tooltipLabel = sortMenuLabel,
+                                ) {
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "sort",
+                                        contentDescription = sortMenuLabel,
+                                        autoMirror = true,
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = sortMenuExpanded,
+                                    onDismissRequest = { sortMenuExpanded = false },
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                ) {
+                                    FilePipeDropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
+                                        leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
+                                        onClick = {
+                                            viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
+                                            sortMenuExpanded = false
+                                        },
+                                    )
+                                    FilePipeDropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
+                                        leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
+                                        onClick = {
+                                            viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
+                                            sortMenuExpanded = false
+                                        },
+                                    )
+                                    FilePipeDropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
+                                        leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
+                                        onClick = {
+                                            viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
+                                            sortMenuExpanded = false
+                                        },
+                                    )
+                                    FilePipeDropdownMenuItem(
+                                        text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
+                                        leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
+                                        onClick = {
+                                            viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)
+                                            sortMenuExpanded = false
+                                        },
+                                    )
+                                }
                             }
                         }
                     },
                 )
-                LazyRow(
+                HistorySectionSegmentedRow(
+                    selected = section,
+                    onSelect = { nextSection ->
+                        viewModel.setSection(nextSection)
+                    },
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(
-                        items = filterChipsData,
-                        key = { (filter, _) -> filter.ordinal },
-                    ) { (filter, label) ->
-                        val filterEnabled = filter in availableStatusFilters
-                        FilePipeFilterChip(
-                            selected = uiState.statusFilter == filter,
-                            onClick = {
-                                viewModel.setStatusFilter(filter)
-                            },
-                            enabled = filterEnabled,
-                            label = { Text(label) },
-                            leadingIcon =
-                                if (uiState.statusFilter == filter) {
-                                    {
-                                        FilePipeMaterialRoundedSymbol(
-                                            name = "check",
-                                            contentDescription = null,
-                                            size = 16.dp,
-                                            modifier = Modifier.size(16.dp),
-                                        )
-                                    }
-                                } else {
-                                    null
+                            .padding(horizontal = 16.dp),
+                )
+                if (section == HistorySection.RUNS) {
+                    LazyRow(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(
+                            items = filterChipsData,
+                            key = { (filter, _) -> filter.ordinal },
+                        ) { (filter, label) ->
+                            val filterEnabled = filter in availableStatusFilters
+                            FilePipeFilterChip(
+                                selected = uiState.statusFilter == filter,
+                                onClick = {
+                                    viewModel.setStatusFilter(filter)
                                 },
-                        )
+                                enabled = filterEnabled,
+                                label = { Text(label) },
+                                leadingIcon =
+                                    if (uiState.statusFilter == filter) {
+                                        {
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = "check",
+                                                contentDescription = null,
+                                                size = 16.dp,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        }
+                                    } else {
+                                        null
+                                    },
+                            )
+                        }
                     }
+                } else if (trashedRules.isNotEmpty()) {
+                    RetentionNotice(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
                 }
             }
-        },
-        snackbarHost = {
-            SnackbarHost(
-                snackbarHostState,
-                modifier =
-                    Modifier.padding(
-                        bottom = if (onNavigateBack == null) 80.dp else 16.dp,
-                    ),
-            )
         },
     ) { innerPadding ->
         val scrollBlurModifier =
@@ -397,25 +466,82 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    ThemeColoredEmptyHistoryIllustration(Modifier.size(120.dp))
+                    if (section == HistorySection.TRASH) {
+                        ThemeColoredEmptyTrashIllustration()
+                    } else {
+                        ThemeColoredEmptyHistoryIllustration(Modifier.size(120.dp))
+                    }
                     Spacer(Modifier.height(24.dp))
                     Column(
                         modifier = Modifier.semantics(mergeDescendants = true) { },
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
-                            text = stringResource(R.string.history_empty_title),
+                            text =
+                                stringResource(
+                                    if (section == HistorySection.TRASH) {
+                                        R.string.history_trash_empty_title
+                                    } else {
+                                        R.string.history_empty_title
+                                    },
+                                ),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = stringResource(R.string.history_empty_subtitle),
+                            text =
+                                stringResource(
+                                    if (section == HistorySection.TRASH) {
+                                        R.string.history_trash_empty_subtitle
+                                    } else {
+                                        R.string.history_empty_subtitle
+                                    },
+                                ),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
                             textAlign = TextAlign.Center,
                         )
                     }
+                }
+            }
+        } else if (section == HistorySection.TRASH) {
+            LazyColumn(
+                state = trashListState,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(scrollBlurModifier),
+                contentPadding =
+                    PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = innerPadding.calculateTopPadding() + 8.dp,
+                        bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
+                    ),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                userScrollEnabled = trashListScrollEnabled,
+            ) {
+                items(
+                    items = trashedRules,
+                    key = { rule -> "trash_rule_${rule.id}" },
+                ) { rule ->
+                    val isExpanded = rule.id in expandedTrashRuleIds
+                    SwipeToDismissTrashRuleCard(
+                        rule = rule,
+                        isExpanded = isExpanded,
+                        onToggleExpanded = {
+                            expandedTrashRuleIds =
+                                if (isExpanded) {
+                                    expandedTrashRuleIds - rule.id
+                                } else {
+                                    expandedTrashRuleIds + rule.id
+                                }
+                        },
+                        onRestore = { viewModel.restoreRule(rule.id) },
+                        onDeleteForever = { pendingDeleteForeverRule = rule },
+                        modifier = Modifier.animateItem(),
+                    )
                 }
             }
         } else if (isUsingPaging) {
@@ -438,7 +564,7 @@ fun HistoryScreen(
                 if (isFiltered) {
                     item(key = "filter_header") {
                         Text(
-                            text = "Showing runs for this rule only",
+                            text = stringResource(R.string.history_filter_rule_header),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.secondary,
                             modifier = Modifier.padding(bottom = 4.dp),
@@ -569,6 +695,268 @@ fun HistoryScreen(
 }
 
 @Composable
+private fun HistorySectionSegmentedRow(
+    selected: HistorySection,
+    onSelect: (HistorySection) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val colors =
+        ToggleButtonDefaults.toggleButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    val entries = HistorySection.entries
+    val labels =
+        entries.map { section ->
+            when (section) {
+                HistorySection.RUNS -> stringResource(R.string.history_section_runs)
+                HistorySection.TRASH -> stringResource(R.string.history_section_trash)
+            }
+        }
+    val shapes =
+        entries.mapIndexed { index, _ ->
+            when (index) {
+                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+            }
+        }
+    ButtonGroup(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        overflowIndicator = { menuState -> ButtonGroupDefaults.OverflowIndicator(menuState = menuState) },
+    ) {
+        entries.forEachIndexed { index, entry ->
+            val label = labels[index]
+            customItem(
+                buttonGroupContent = {
+                    FilePipeToggleButton(
+                        checked = selected == entry,
+                        onCheckedChange = { checked -> if (checked) onSelect(entry) },
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .semantics { role = Role.RadioButton },
+                        shapes = shapes[index],
+                        colors = colors,
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+                menuContent = { menuState ->
+                    FilePipeDropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onSelect(entry)
+                            menuState.dismiss()
+                        },
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun RetentionNotice(modifier: Modifier = Modifier) {
+    Row(
+        modifier =
+            modifier
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                    RoundedCornerShape(16.dp),
+                ).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilePipeMaterialRoundedSymbol(
+            name = "schedule",
+            contentDescription = null,
+            size = 18.dp,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+        Spacer(Modifier.size(10.dp))
+        Text(
+            text = stringResource(R.string.history_trash_retention_notice),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SwipeToDismissTrashRuleCard(
+    rule: Rule,
+    isExpanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    onRestore: () -> Unit,
+    onDeleteForever: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val hapticEnabled = LocalHapticEnabled.current
+    val cardShape = RoundedCornerShape(16.dp)
+    DeliberateSwipeRevealCard(
+        commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
+        cardShape = cardShape,
+        onSwipeStartToEnd = onRestore,
+        onSwipeEndToStart = onDeleteForever,
+        hapticEnabled = hapticEnabled,
+        backgroundContent = { fromStart, revealProgress ->
+            val action = if (fromStart) SwipeAction.PREVIEW else SwipeAction.DELETE
+            val background by animateColorAsState(
+                targetValue = action.semanticSwipeBackground(),
+                animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec()),
+                label = "trashSwipeBg",
+            )
+            val iconTint = action.semanticSwipeIconTint()
+            val iconName = if (fromStart) "restore_from_trash" else "delete_forever"
+            val visualLabel = stringResource(if (fromStart) R.string.restore else R.string.delete_forever)
+            val contentDescription = stringResource(if (fromStart) R.string.history_trash_restore_rule else R.string.delete_forever)
+            val contentScale = 0.88f + 0.12f * revealProgress
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(background, cardShape)
+                    .padding(
+                        start = if (fromStart) 16.dp else 0.dp,
+                        end = if (fromStart) 0.dp else 16.dp,
+                    ),
+                contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd,
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier =
+                        Modifier.graphicsLayer {
+                            alpha = revealProgress
+                            scaleX = contentScale
+                            scaleY = contentScale
+                        },
+                ) {
+                    if (fromStart) {
+                        FilePipeMaterialRoundedSymbol(
+                            name = iconName,
+                            contentDescription = contentDescription,
+                            size = 20.dp,
+                            tint = iconTint,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = visualLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = iconTint,
+                        )
+                    } else {
+                        Text(
+                            text = visualLabel,
+                            style = MaterialTheme.typography.labelMedium,
+                            color = iconTint,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        FilePipeMaterialRoundedSymbol(
+                            name = iconName,
+                            contentDescription = contentDescription,
+                            size = 20.dp,
+                            tint = iconTint,
+                        )
+                    }
+                }
+            }
+        },
+        modifier = modifier,
+    ) {
+        TrashRuleCard(
+            rule = rule,
+            isExpanded = isExpanded,
+            onToggleExpanded = onToggleExpanded,
+            daysLeft = daysLeftInTrash(rule),
+        )
+    }
+}
+
+@Composable
+private fun TrashRuleCard(
+    rule: Rule,
+    isExpanded: Boolean,
+    onToggleExpanded: () -> Unit,
+    daysLeft: Int?,
+) {
+    Box(Modifier.fillMaxWidth()) {
+        RuleCard(
+            rule = rule,
+            isSelected = false,
+            isSelectionMode = false,
+            isExpanded = isExpanded,
+            progress = null,
+            onClick = onToggleExpanded,
+            onLongClick = {},
+            cardActions = emptyList(),
+            onToggleEnabled = {},
+            onRunClick = {},
+            onCancelRunClick = {},
+            isAnyRuleRunning = false,
+            suppressLongClickForReorder = true,
+            showOperationalControls = false,
+        )
+        daysLeft?.let { value ->
+            TrashDaysLeftBadge(
+                daysLeft = value,
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 10.dp, end = 10.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TrashDaysLeftBadge(
+    daysLeft: Int,
+    modifier: Modifier = Modifier,
+) {
+    val label =
+        if (daysLeft <= 0) {
+            stringResource(R.string.history_expires_today)
+        } else {
+            pluralStringResource(R.plurals.history_days_left, daysLeft, daysLeft)
+        }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color =
+            if (daysLeft <= 3) {
+                MaterialTheme.colorScheme.onErrorContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
+        modifier =
+            modifier
+                .background(
+                    if (daysLeft <= 3) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                    MaterialTheme.shapes.extraExtraLarge,
+                ).padding(horizontal = 10.dp, vertical = 4.dp),
+    )
+}
+
+private fun daysLeftInTrash(rule: Rule): Int? {
+    val trashedAt = rule.trashedAt ?: return null
+    val remaining = trashedAt + TRASH_RETENTION_MILLIS - System.currentTimeMillis()
+    return ceil(remaining.toDouble() / 86_400_000.0).toInt().coerceAtLeast(0)
+}
+
+@Composable
 private fun historyStatusSectionTitle(section: HistoryStatusSection): String =
     when (section) {
         HistoryStatusSection.SUCCESS -> stringResource(R.string.status_success)
@@ -597,22 +985,39 @@ private fun SwipeToDismissHistoryCard(
         hapticEnabled = hapticEnabled,
         allowSwipeStartToEnd = false,
         allowSwipeEndToStart = true,
-        backgroundContent = { fromStart ->
+        backgroundContent = { fromStart, revealProgress ->
             if (!fromStart) {
+                val contentScale = 0.88f + 0.12f * revealProgress
                 Box(
                     Modifier
                         .fillMaxSize()
                         .background(SwipeAction.DELETE.semanticSwipeBackground(), cardShape)
-                        .padding(end = 24.dp),
+                        .padding(end = 16.dp),
                     contentAlignment = Alignment.CenterEnd,
                 ) {
-                    FilePipeMaterialRoundedSymbol(
-                        name = "delete",
-                        contentDescription = stringResource(R.string.delete),
-                        size = 28.dp,
-                        tint = SwipeAction.DELETE.semanticSwipeIconTint(),
-                        modifier = Modifier.size(28.dp),
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier =
+                            Modifier
+                                .graphicsLayer {
+                                    alpha = revealProgress
+                                    scaleX = contentScale
+                                    scaleY = contentScale
+                                },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.delete_forever),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = SwipeAction.DELETE.semanticSwipeIconTint(),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        FilePipeMaterialRoundedSymbol(
+                            name = "delete_forever",
+                            contentDescription = stringResource(R.string.delete_forever),
+                            size = 20.dp,
+                            tint = SwipeAction.DELETE.semanticSwipeIconTint(),
+                        )
+                    }
                 }
             }
         },

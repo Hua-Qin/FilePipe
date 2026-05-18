@@ -10,6 +10,8 @@ import androidx.paging.insertSeparators
 import androidx.paging.map
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.R
+import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
@@ -18,6 +20,8 @@ import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import dev.bikram.filepipe.domain.model.isNoChangesRun
+import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
+import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
 import dev.bikram.filepipe.domain.usecase.UndoRunUseCase
 import dev.bikram.filepipe.ui.feedback.toUserMessage
 import dev.bikram.filepipe.ui.navigation.Screen
@@ -72,6 +76,8 @@ sealed interface HistoryItem {
 
 enum class HistoryViewMode { BY_DATE, BY_RULE, BY_STATUS }
 
+enum class HistorySection { RUNS, TRASH }
+
 data class HistoryUiState(
     val statusFilter: HistoryStatusFilter = HistoryStatusFilter.ALL,
     val viewMode: HistoryViewMode = HistoryViewMode.BY_DATE,
@@ -89,6 +95,9 @@ class HistoryViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
         private val runHistoryRepository: RunHistoryRepository,
+        private val ruleRepository: RuleRepository,
+        private val scheduleRulesUseCase: ScheduleRulesUseCase,
+        private val rulesAutoExportTrigger: RulesAutoExportTrigger,
         private val undoRunUseCase: UndoRunUseCase,
         @param:ApplicationContext private val appContext: Context,
     ) : ViewModel() {
@@ -108,6 +117,8 @@ class HistoryViewModel
         private val _viewMode = MutableStateFlow(HistoryViewMode.BY_DATE)
         private val _sortKey = MutableStateFlow(HistorySortKey.LAST_RAN)
         private val _sortDirection = MutableStateFlow(HistorySortDirection.DESCENDING)
+        private val _section = MutableStateFlow(HistorySection.RUNS)
+        val section: StateFlow<HistorySection> = _section.asStateFlow()
 
         val uiState: StateFlow<HistoryUiState> =
             combine(
@@ -128,6 +139,11 @@ class HistoryViewModel
             runHistoryRepository
                 .observeHasAnyHistory()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+        val trashedRules =
+            ruleRepository
+                .getTrashedRules()
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
         val availableStatusFilters: StateFlow<Set<HistoryStatusFilter>> =
             historySourceFlow
@@ -220,6 +236,10 @@ class HistoryViewModel
             _sortDirection.value = direction
         }
 
+        fun setSection(section: HistorySection) {
+            _section.value = section
+        }
+
         fun clearFilters() {
             _statusFilter.value = HistoryStatusFilter.ALL
             _viewMode.value = HistoryViewMode.BY_DATE
@@ -233,6 +253,28 @@ class HistoryViewModel
         fun deleteHistoryEntry(historyId: Long) =
             viewModelScope.launch {
                 runHistoryRepository.deleteHistoryById(historyId)
+            }
+
+        fun restoreRule(ruleId: Long) =
+            viewModelScope.launch {
+                val rule = trashedRules.value.firstOrNull { it.id == ruleId }
+                ruleRepository.restoreRuleFromTrash(ruleId)
+                if (rule?.isEnabled == true && rule.schedule != null) {
+                    scheduleRulesUseCase.scheduleRule(rule)
+                }
+                rulesAutoExportTrigger.maybeExportAfterRuleChange()
+            }
+
+        fun deleteRuleForever(ruleId: Long) =
+            viewModelScope.launch {
+                ruleRepository.deleteRuleForever(ruleId)
+                rulesAutoExportTrigger.maybeExportAfterRuleChange()
+            }
+
+        fun emptyTrashForever() =
+            viewModelScope.launch {
+                ruleRepository.emptyTrashForever()
+                rulesAutoExportTrigger.maybeExportAfterRuleChange()
             }
 
         fun undoRun(historyId: Long) =
@@ -339,8 +381,8 @@ class HistoryViewModel
             val day = Instant.ofEpochMilli(timestampMs).atZone(zone).toLocalDate()
             val today = LocalDate.now(zone)
             return when (day) {
-                today -> "Today"
-                today.minusDays(1) -> "Yesterday"
+                today -> appContext.getString(R.string.history_date_today)
+                today.minusDays(1) -> appContext.getString(R.string.history_date_yesterday)
                 else -> day.format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM))
             }
         }

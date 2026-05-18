@@ -106,6 +106,7 @@ class SettingsViewModel
         private var devReleasePlayBannerMockSequenceJob: Job? = null
 
         val preferencesFlow = userPreferencesRepository.preferencesFlow
+        val developerOptionsEnabledFlow = userPreferencesRepository.developerOptionsEnabledFlow
 
         private val _userMessage = MutableStateFlow<String?>(null)
         val userMessage: StateFlow<String?> = _userMessage.asStateFlow()
@@ -292,7 +293,7 @@ class SettingsViewModel
             if (backupDestinations.isEmpty()) {
                 userPreferencesRepository.setAutoExportOnRuleChange(false)
                 userPreferencesRepository.setScheduledExportEnabled(false)
-                workManager.cancelUniqueWork(SCHEDULED_EXPORT_WORK_NAME)
+                workManager.cancelUniqueWork(ScheduledRulesExportWorker.WORK_NAME)
             }
         }
 
@@ -330,7 +331,7 @@ class SettingsViewModel
                 if (enabled) {
                     enqueueScheduledExportWork()
                 } else {
-                    workManager.cancelUniqueWork(SCHEDULED_EXPORT_WORK_NAME)
+                    workManager.cancelUniqueWork(ScheduledRulesExportWorker.WORK_NAME)
                 }
             }
 
@@ -339,10 +340,16 @@ class SettingsViewModel
                 PeriodicWorkRequestBuilder<ScheduledRulesExportWorker>(1, TimeUnit.DAYS)
                     .build()
             workManager.enqueueUniquePeriodicWork(
-                SCHEDULED_EXPORT_WORK_NAME,
+                ScheduledRulesExportWorker.WORK_NAME,
                 ExistingPeriodicWorkPolicy.UPDATE,
                 request,
             )
+        }
+
+        fun setDeveloperOptionsEnabled(enabled: Boolean) {
+            viewModelScope.launch {
+                userPreferencesRepository.setDeveloperOptionsEnabled(enabled)
+            }
         }
 
         fun setLogRetentionDays(days: Int) =
@@ -968,7 +975,6 @@ class SettingsViewModel
         }
 
         companion object {
-            private const val SCHEDULED_EXPORT_WORK_NAME = "scheduled_rules_export"
             private const val MOCK_PLAY_UPDATE_BYTES_DOWNLOADED: Long = 3_000_000L
             private const val MOCK_PLAY_UPDATE_BYTES_TOTAL: Long = 10_000_000L
 

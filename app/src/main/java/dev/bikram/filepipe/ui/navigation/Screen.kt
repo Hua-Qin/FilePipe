@@ -9,6 +9,8 @@ sealed class Screen(
 
     data object Settings : Screen("settings")
 
+    data object DevOptions : Screen("dev_options")
+
     data object Faq : Screen("faq?focusSection={focusSection}") {
         const val ARG_FOCUS_SECTION = "focusSection"
         const val FOCUS_STORAGE_ACCESS = "storage"

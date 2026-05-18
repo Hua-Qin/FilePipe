@@ -30,6 +30,7 @@ import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -101,6 +102,7 @@ fun RuleCard(
     /** Long-press drag to reorder (My order); must be built inside [ReorderableItem]. */
     reorderLongPressDragModifier: Modifier = Modifier,
     suppressLongClickForReorder: Boolean = false,
+    showOperationalControls: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val cardColors = elevatedCardColors()
@@ -154,6 +156,7 @@ fun RuleCard(
                     onLeadingLongClick = onLeadingLongClick,
                     reorderLongPressDragModifier = reorderLongPressDragModifier,
                     suppressLongClickForReorder = suppressLongClickForReorder,
+                    showOperationalControls = showOperationalControls,
                 )
             } else {
                 CompactContent(
@@ -171,6 +174,7 @@ fun RuleCard(
                     onLeadingLongClick = onLeadingLongClick,
                     reorderLongPressDragModifier = reorderLongPressDragModifier,
                     suppressLongClickForReorder = suppressLongClickForReorder,
+                    showOperationalControls = showOperationalControls,
                 )
             }
         }
@@ -198,6 +202,7 @@ private fun CompactContent(
     onLeadingLongClick: (() -> Unit)? = null,
     reorderLongPressDragModifier: Modifier = Modifier,
     suppressLongClickForReorder: Boolean = false,
+    showOperationalControls: Boolean = true,
 ) {
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val activeProgress = progress?.takeUnless { progressValue -> progressValue.isComplete }
@@ -294,60 +299,64 @@ private fun CompactContent(
                     )
                 }
             },
-            trailingContent = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    FilePipeSwitch(
-                        checked = rule.isEnabled,
-                        onCheckedChange = { enabled ->
-                            onToggleEnabled(enabled)
-                        },
-                    )
-                    if (activeProgress != null) {
+            trailingContent =
+                if (showOperationalControls) {
+                    {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-                                CircularWavyProgressIndicator(
-                                    progress = { if (activeProgress.totalFiles > 0) activeProgress.progress else 0f },
-                                    modifier = Modifier.size(26.dp),
-                                )
-                            }
-                            if (showInlineProgressCancel) {
-                                FilePipeOutlinedButton(
-                                    onClick = onCancelRunClick,
-                                    shape = RoundedCornerShape(50),
-                                    contentPadding =
-                                        androidx.compose.foundation.layout.PaddingValues(
-                                            horizontal = 10.dp,
-                                            vertical = 6.dp,
-                                        ),
+                            FilePipeSwitch(
+                                checked = rule.isEnabled,
+                                onCheckedChange = { enabled ->
+                                    onToggleEnabled(enabled)
+                                },
+                            )
+                            if (activeProgress != null) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
-                                    Text(
-                                        text = stringResource(R.string.cancel),
-                                        style = MaterialTheme.typography.labelLarge,
+                                    Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                                        CircularWavyProgressIndicator(
+                                            progress = { if (activeProgress.totalFiles > 0) activeProgress.progress else 0f },
+                                            modifier = Modifier.size(26.dp),
+                                        )
+                                    }
+                                    if (showInlineProgressCancel) {
+                                        FilePipeOutlinedButton(
+                                            onClick = onCancelRunClick,
+                                            shape = RoundedCornerShape(50),
+                                            contentPadding =
+                                                androidx.compose.foundation.layout.PaddingValues(
+                                                    horizontal = 10.dp,
+                                                    vertical = 6.dp,
+                                                ),
+                                        ) {
+                                            Text(
+                                                text = stringResource(R.string.cancel),
+                                                style = MaterialTheme.typography.labelLarge,
+                                            )
+                                        }
+                                    }
+                                }
+                            } else {
+                                FilePipeFilledTonalIconButton(
+                                    onClick = onRunClick,
+                                    enabled = rule.isEnabled && !runBlocked,
+                                ) {
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "play_arrow",
+                                        contentDescription = stringResource(R.string.run_now),
+                                        size = 20.dp,
                                     )
                                 }
                             }
                         }
-                    } else {
-                        FilePipeFilledTonalIconButton(
-                            onClick = onRunClick,
-                            enabled = rule.isEnabled && !runBlocked,
-                        ) {
-                            FilePipeMaterialRoundedSymbol(
-                                name = "play_arrow",
-                                contentDescription = stringResource(R.string.run_now),
-                                size = 20.dp,
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
                     }
-                }
-            },
+                } else {
+                    null
+                },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         )
     }
@@ -378,6 +387,7 @@ private fun ExpandedContent(
     onLeadingLongClick: (() -> Unit)? = null,
     reorderLongPressDragModifier: Modifier = Modifier,
     suppressLongClickForReorder: Boolean = false,
+    showOperationalControls: Boolean = true,
 ) {
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val clickLabel =
@@ -452,13 +462,15 @@ private fun ExpandedContent(
                     modifier = Modifier.weight(1f, fill = false),
                 )
             }
-            FilePipeSwitch(
-                checked = rule.isEnabled,
-                onCheckedChange = { enabled ->
-                    onToggleEnabled(enabled)
-                },
-                modifier = Modifier.padding(start = 8.dp),
-            )
+            if (showOperationalControls) {
+                FilePipeSwitch(
+                    checked = rule.isEnabled,
+                    onCheckedChange = { enabled ->
+                        onToggleEnabled(enabled)
+                    },
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
         }
 
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -591,8 +603,8 @@ private fun ExpandedContent(
                         if (runProgress.isComplete) {
                             val summary =
                                 when {
-                                    runProgress.error != null -> "Error: ${runProgress.error}"
-                                    runProgress.totalFiles == 0 -> "No matching files found"
+                                    runProgress.error != null -> stringResource(R.string.rule_card_progress_error, runProgress.error)
+                                    runProgress.totalFiles == 0 -> stringResource(R.string.rule_card_progress_no_matching_files)
                                     else ->
                                         when (rule.operationMode) {
                                             OperationMode.COPY ->
@@ -637,14 +649,19 @@ private fun ExpandedContent(
                                 animationSpec = reducedMotionAwareSpec(progressSpec),
                                 label = "progress",
                             )
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-                                CircularWavyProgressIndicator(
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                val currentFileName =
+                                    runProgress.currentFileName.ifBlank {
+                                        stringResource(R.string.rule_card_progress_unknown_file)
+                                    }
+                                LinearWavyProgressIndicator(
                                     progress = { animatedProgress },
-                                    modifier = Modifier.size(28.dp),
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
                                 )
                                 Text(
                                     text =
@@ -652,14 +669,14 @@ private fun ExpandedContent(
                                             OperationMode.COPY ->
                                                 stringResource(
                                                     R.string.rule_card_progress_copying_file,
-                                                    runProgress.currentFileName.ifBlank { "…" },
+                                                    currentFileName,
                                                     runProgress.filesMoved + 1,
                                                     runProgress.totalFiles,
                                                 )
                                             OperationMode.MOVE ->
                                                 stringResource(
                                                     R.string.rule_card_progress_moving_file,
-                                                    runProgress.currentFileName.ifBlank { "…" },
+                                                    currentFileName,
                                                     runProgress.filesMoved + 1,
                                                     runProgress.totalFiles,
                                                 )
@@ -668,17 +685,23 @@ private fun ExpandedContent(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f),
                                 )
                             }
                         } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-                                CircularWavyProgressIndicator(modifier = Modifier.size(28.dp))
-                                Text("Scanning…", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                LinearWavyProgressIndicator(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
+                                )
+                                Text(
+                                    text = stringResource(R.string.rule_card_progress_scanning),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
                             }
                         }
                     }
@@ -686,61 +709,64 @@ private fun ExpandedContent(
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                cardActions.forEach { action ->
-                    FilePipeIconButton(
-                        onClick = action.onClick,
-                        tooltipLabel = action.label,
-                    ) {
-                        FilePipeMaterialRoundedSymbol(
-                            name = action.iconName,
-                            contentDescription = action.label,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+        if (showOperationalControls || cardActions.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    cardActions.forEach { action ->
+                        FilePipeIconButton(
+                            onClick = action.onClick,
+                            tooltipLabel = action.label,
+                        ) {
+                            FilePipeMaterialRoundedSymbol(
+                                name = action.iconName,
+                                contentDescription = action.label,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
-            }
-            val runInProgress = progress != null && !progress.isComplete
-            val runBlocked = isAnyRuleRunning && progress == null
-            if (runInProgress && showInlineProgressCancel) {
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                    tooltip = { PlainTooltip { CenteredTooltipText(stringResource(R.string.cancel)) } },
-                    state = rememberTooltipState(),
-                ) {
-                    FilePipeOutlinedButton(
-                        onClick = onCancelRunClick,
-                        shape = RoundedCornerShape(50),
-                    ) {
-                        Text(text = stringResource(R.string.cancel))
-                    }
-                }
-            } else if (!runInProgress) {
-                TooltipBox(
-                    positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-                    tooltip = { PlainTooltip { CenteredTooltipText(stringResource(R.string.run_now)) } },
-                    state = rememberTooltipState(),
-                ) {
-                    FilePipeFilledTonalButton(
-                        onClick = onRunClick,
-                        enabled = rule.isEnabled && !runBlocked,
-                        shape = RoundedCornerShape(50),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    ) {
-                        FilePipeMaterialRoundedSymbol(
-                            name = "play_arrow",
-                            contentDescription = null,
-                            size = 20.dp,
-                            modifier = Modifier.size(20.dp),
-                        )
-                        Spacer(Modifier.width(6.dp))
-                        Text(text = stringResource(R.string.run_now))
+                if (showOperationalControls) {
+                    val runInProgress = progress != null && !progress.isComplete
+                    val runBlocked = isAnyRuleRunning && progress == null
+                    if (runInProgress && showInlineProgressCancel) {
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                            tooltip = { PlainTooltip { CenteredTooltipText(stringResource(R.string.cancel)) } },
+                            state = rememberTooltipState(),
+                        ) {
+                            FilePipeOutlinedButton(
+                                onClick = onCancelRunClick,
+                                shape = RoundedCornerShape(50),
+                            ) {
+                                Text(text = stringResource(R.string.cancel))
+                            }
+                        }
+                    } else if (!runInProgress) {
+                        TooltipBox(
+                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+                            tooltip = { PlainTooltip { CenteredTooltipText(stringResource(R.string.run_now)) } },
+                            state = rememberTooltipState(),
+                        ) {
+                            FilePipeFilledTonalButton(
+                                onClick = onRunClick,
+                                enabled = rule.isEnabled && !runBlocked,
+                                shape = RoundedCornerShape(50),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                            ) {
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "play_arrow",
+                                    contentDescription = null,
+                                    size = 20.dp,
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(text = stringResource(R.string.run_now))
+                            }
+                        }
                     }
                 }
             }

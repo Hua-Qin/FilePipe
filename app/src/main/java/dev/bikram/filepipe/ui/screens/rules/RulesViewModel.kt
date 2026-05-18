@@ -14,6 +14,8 @@ import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
+import dev.bikram.filepipe.devtools.DevMockFileMove
+import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
@@ -21,6 +23,7 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
+import dev.bikram.filepipe.domain.model.RunResult
 import dev.bikram.filepipe.domain.model.TriggerType
 import dev.bikram.filepipe.domain.usecase.ExecuteRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
@@ -34,6 +37,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -47,6 +51,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -273,6 +278,24 @@ class RulesViewModel
 
         fun startPreview(rule: Rule) =
             viewModelScope.launch {
+                if (DevMockFileMove.isMockRule(rule)) {
+                    _previewState.value =
+                        PreviewState(
+                            ruleName = rule.name,
+                            isLoading = false,
+                            results = mockFileMovePreviewResults(),
+                            ruleGroups =
+                                listOf(
+                                    PreviewRuleGroup(
+                                        ruleId = rule.id,
+                                        ruleName = rule.name,
+                                        operationMode = OperationMode.MOVE,
+                                        results = mockFileMovePreviewResults(),
+                                    ),
+                                ),
+                        )
+                    return@launch
+                }
                 _previewState.value = PreviewState(ruleName = rule.name, isLoading = true)
                 val results = simulateRuleUseCase(rule)
                 _previewState.value =
@@ -304,11 +327,17 @@ class RulesViewModel
                     )
                 val ruleGroups =
                     selectedRules.map { rule ->
+                        val results =
+                            if (DevMockFileMove.isMockRule(rule)) {
+                                mockFileMovePreviewResults()
+                            } else {
+                                simulateRuleUseCase(rule)
+                            }
                         PreviewRuleGroup(
                             ruleId = rule.id,
                             ruleName = rule.name,
                             operationMode = rule.operationMode,
-                            results = simulateRuleUseCase(rule),
+                            results = results,
                         )
                     }
                 _previewState.value =
@@ -336,13 +365,19 @@ class RulesViewModel
             if (rulesToRun.isEmpty()) return
 
             _previewState.value = null
+            if (rulesToRun.size == 1 && DevMockFileMove.isMockRule(rulesToRun.first())) {
+                enqueueMockFileMoveRun(rulesToRun.first())
+                return
+            }
+            val realRulesToRun = rulesToRun.filterNot(DevMockFileMove::isMockRule)
+            if (realRulesToRun.isEmpty()) return
             val anchor =
-                if (rulesToRun.size == 1) {
-                    ManualRunCancelAnchor.SingleRule(rulesToRun.first().id)
+                if (realRulesToRun.size == 1) {
+                    ManualRunCancelAnchor.SingleRule(realRulesToRun.first().id)
                 } else {
                     ManualRunCancelAnchor.RunSelectedBar
                 }
-            enqueueManualRun(rulesToRun, anchor)
+            enqueueManualRun(realRulesToRun, anchor)
         }
 
         fun isCardExpanded(
@@ -387,7 +422,7 @@ class RulesViewModel
                 val toDelete = _rules.value.filter { it.id in _selectedRuleIds.value }
                 toDelete.forEach { rule ->
                     scheduleRulesUseCase.cancelRule(rule)
-                    ruleRepository.deleteRule(rule.id)
+                    ruleRepository.moveRuleToTrash(rule.id)
                 }
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
                 clearSelection()
@@ -420,7 +455,7 @@ class RulesViewModel
         fun deleteRule(rule: Rule) =
             viewModelScope.launch {
                 scheduleRulesUseCase.cancelRule(rule)
-                ruleRepository.deleteRule(rule.id)
+                ruleRepository.moveRuleToTrash(rule.id)
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
                 _deleteUndoEvent.emit(DeleteUndoEvent(listOf(rule)))
             }
@@ -428,7 +463,7 @@ class RulesViewModel
         fun undoDelete(rules: List<Rule>) =
             viewModelScope.launch {
                 rules.forEach { rule ->
-                    ruleRepository.saveRule(rule)
+                    ruleRepository.restoreRuleFromTrash(rule.id)
                     if (rule.isEnabled && rule.schedule != null) {
                         scheduleRulesUseCase.scheduleRule(rule)
                     }
@@ -438,11 +473,19 @@ class RulesViewModel
 
         fun runSelected() {
             val selected = _rules.value.filter { it.id in _selectedRuleIds.value && it.isEnabled }
+            if (selected.size == 1 && DevMockFileMove.isMockRule(selected.first())) {
+                enqueueMockFileMoveRun(selected.first())
+                return
+            }
             enqueueManualRunAfterPreview(selected, ManualRunCancelAnchor.RunSelectedBar)
         }
 
         fun runRule(rule: Rule) {
             if (!rule.isEnabled) return
+            if (DevMockFileMove.isMockRule(rule)) {
+                enqueueMockFileMoveRun(rule)
+                return
+            }
             enqueueManualRunAfterPreview(listOf(rule), ManualRunCancelAnchor.SingleRule(rule.id))
         }
 
@@ -450,10 +493,11 @@ class RulesViewModel
             rules: List<Rule>,
             anchor: ManualRunCancelAnchor,
         ) {
-            if (rules.isEmpty()) return
+            val realRules = rules.filterNot(DevMockFileMove::isMockRule)
+            if (realRules.isEmpty()) return
             viewModelScope.launch {
                 val rulesWithAffectedFiles =
-                    rules.filter { rule ->
+                    realRules.filter { rule ->
                         simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
                     }
                 if (rulesWithAffectedFiles.isEmpty()) {
@@ -529,8 +573,115 @@ class RulesViewModel
             }
         }
 
+        private fun enqueueMockFileMoveRun(rule: Rule) {
+            viewModelScope.launch {
+                val newJob =
+                    viewModelScope.launch(start = CoroutineStart.LAZY) {
+                        val selfJob = coroutineContext[Job]!!
+                        val fileNames = mockLargeFileNames()
+                        manualRunForegroundCoordinator.setManualRunActive(true)
+                        _manualRunCancelAnchor.value = ManualRunCancelAnchor.SingleRule(rule.id)
+                        _progressMap.value =
+                            mapOf(
+                                rule.id to
+                                    RunProgress(
+                                        ruleId = rule.id,
+                                        ruleName = rule.name,
+                                        progress = 0f,
+                                        totalFiles = fileNames.size,
+                                    ),
+                            )
+                        try {
+                            val startedAt = System.currentTimeMillis()
+                            fileNames.forEachIndexed { index, fileName ->
+                                if (!isActive) throw CancellationException("User cancelled")
+                                _progressMap.update { current ->
+                                    current + (
+                                        rule.id to
+                                            RunProgress(
+                                                ruleId = rule.id,
+                                                ruleName = rule.name,
+                                                progress = index.toFloat() / fileNames.size.toFloat(),
+                                                currentFileName = fileName,
+                                                filesMoved = index,
+                                                totalFiles = fileNames.size,
+                                            )
+                                    )
+                                }
+                                delay(450L)
+                            }
+                            _progressMap.update { current ->
+                                current + (
+                                    rule.id to
+                                        RunProgress(
+                                            ruleId = rule.id,
+                                            ruleName = rule.name,
+                                            progress = 1f,
+                                            currentFileName = fileNames.lastOrNull().orEmpty(),
+                                            filesMoved = fileNames.size,
+                                            totalFiles = fileNames.size,
+                                            isComplete = true,
+                                        )
+                                )
+                            }
+                            val historyId =
+                                runHistoryRepository.startRun(
+                                    ruleId = rule.id,
+                                    ruleName = rule.name,
+                                    triggerType = TriggerType.MANUAL,
+                                    operationMode = OperationMode.MOVE,
+                                )
+                            val completedAt = System.currentTimeMillis()
+                            val movedFiles =
+                                fileNames.mapIndexed { index, fileName ->
+                                    FileMoved(
+                                        fileName = fileName,
+                                        sourceUri = DevMockFileMove.sourceUri(fileName),
+                                        destinationUri = DevMockFileMove.destinationUri(fileName),
+                                        fileSizeBytes = DevMockFileMove.FILE_SIZE_BYTES,
+                                        movedAt = startedAt + ((completedAt - startedAt) * (index + 1) / fileNames.size),
+                                        success = true,
+                                    )
+                                }
+                            runHistoryRepository.completeRun(
+                                RunResult(
+                                    ruleId = rule.id,
+                                    ruleName = rule.name,
+                                    historyId = historyId,
+                                    filesMoved = movedFiles,
+                                    startedAt = startedAt,
+                                    completedAt = completedAt,
+                                ),
+                            )
+                            _navigateAfterRun.emit(RulesRunNavigation.HistoryDetail(historyId))
+                        } catch (_: CancellationException) {
+                            // The mock run never touches storage, so cancellation only clears UI progress.
+                        } finally {
+                            manualRunForegroundCoordinator.setManualRunActive(false)
+                            synchronized(manualRunJobLock) {
+                                if (manualRunJob === selfJob) {
+                                    manualRunJob = null
+                                }
+                            }
+                            _manualRunCancelAnchor.value = ManualRunCancelAnchor.None
+                            clearProgress()
+                        }
+                    }
+                val previousJob =
+                    synchronized(manualRunJobLock) {
+                        val old = manualRunJob
+                        manualRunJob = newJob
+                        old
+                    }
+                previousJob?.cancel()
+                previousJob?.cancelAndJoin()
+                newJob.start()
+            }
+        }
+
         fun duplicateRule(rule: Rule) =
             viewModelScope.launch {
+                if (DevMockFileMove.isMockRule(rule)) return@launch
                 val copy =
                     rule.copy(
                         id = 0,
@@ -541,6 +692,24 @@ class RulesViewModel
                 ruleRepository.saveRule(copy)
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
                 _userMessage.value = "\"${copy.name}\" created"
+            }
+
+        private fun mockLargeFileNames(): List<String> =
+            appContext.resources
+                .getStringArray(R.array.dev_options_mock_large_file_names)
+                .toList()
+
+        private fun mockFileMovePreviewResults(): List<PreviewFileResult> =
+            mockLargeFileNames().map { fileName ->
+                PreviewFileResult(
+                    fileName = fileName,
+                    sourcePath = DevMockFileMove.sourceUri(fileName),
+                    simulatedDestPath = DevMockFileMove.destinationUri(fileName),
+                    wouldSkip = false,
+                    wouldOverwrite = false,
+                    renamedTo = null,
+                    sizeBytes = DevMockFileMove.FILE_SIZE_BYTES,
+                )
             }
 
         private data class FolderSignature(
@@ -585,6 +754,7 @@ class RulesViewModel
             rule: Rule,
             filesystemAccessEnabled: Boolean,
         ): Boolean {
+            if (DevMockFileMove.isMockRule(rule)) return false
             var sourcePermissionDenied = false
             var sourceHasUnavailable = false
             for (path in rule.sourceFolderPaths) {

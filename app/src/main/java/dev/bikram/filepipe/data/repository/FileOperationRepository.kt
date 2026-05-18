@@ -14,6 +14,7 @@ import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
+import dev.bikram.filepipe.domain.model.resolveRenameSuffixName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -882,17 +883,7 @@ class FileOperationRepository
         private fun resolveDestNameFile(
             parent: File,
             name: String,
-        ): String {
-            if (!File(parent, name).exists()) return name
-            val ext = name.substringAfterLast('.', "")
-            val base = if (ext.isNotEmpty()) name.dropLast(ext.length + 1) else name
-            var index = 1
-            while (true) {
-                val candidate = if (ext.isNotEmpty()) "$base($index).$ext" else "$base($index)"
-                if (!File(parent, candidate).exists()) return candidate
-                index++
-            }
-        }
+        ): String = resolveRenameSuffixName(name) { candidate -> File(parent, candidate).exists() }
 
         suspend fun simulateMove(
             sourceEntry: FileEntry,
@@ -1288,17 +1279,7 @@ class FileOperationRepository
         private fun resolveDestName(
             name: String,
             destTree: DocumentFile,
-        ): String {
-            if (destTree.findFile(name) == null) return name
-            val ext = name.substringAfterLast('.', "")
-            val base = if (ext.isNotEmpty()) name.dropLast(ext.length + 1) else name
-            var n = 1
-            while (true) {
-                val candidate = if (ext.isNotEmpty()) "$base($n).$ext" else "$base($n)"
-                if (destTree.findFile(candidate) == null) return candidate
-                n++
-            }
-        }
+        ): String = resolveRenameSuffixName(name) { candidate -> destTree.findFile(candidate) != null }
 
         private fun mimeTypeFromName(name: String): String {
             val ext = name.substringAfterLast('.', "").lowercase()

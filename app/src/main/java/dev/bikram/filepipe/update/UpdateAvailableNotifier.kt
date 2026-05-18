@@ -44,6 +44,18 @@ class UpdateAvailableNotifier
             prefs: AppPreferences,
         ) {
             if (!prefs.notifyOnNewUpdates) return
+            postUpdateNotification(info, updateDedupe = true, currentDedupeKey = prefs.updateLastNotifiedDedupeKey)
+        }
+
+        suspend fun notifyDevMockUpdateAvailable(info: UpdateInfo) {
+            postUpdateNotification(info, updateDedupe = false, currentDedupeKey = "")
+        }
+
+        private suspend fun postUpdateNotification(
+            info: UpdateInfo,
+            updateDedupe: Boolean,
+            currentDedupeKey: String,
+        ) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val granted =
                     ContextCompat.checkSelfPermission(
@@ -53,13 +65,13 @@ class UpdateAvailableNotifier
                 if (!granted) return
             }
             val dedupeKey = info.notificationDedupeKey()
-            if (dedupeKey == prefs.updateLastNotifiedDedupeKey) return
+            if (updateDedupe && dedupeKey == currentDedupeKey) return
 
             ensureNotificationChannel()
 
             val openIntent =
                 Intent(context, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
                     putExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES, true)
                 }
             val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -85,7 +97,9 @@ class UpdateAvailableNotifier
 
             runCatching {
                 NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
-                userPreferencesRepository.setUpdateLastNotifiedDedupeKey(dedupeKey)
+                if (updateDedupe) {
+                    userPreferencesRepository.setUpdateLastNotifiedDedupeKey(dedupeKey)
+                }
             }
         }
 

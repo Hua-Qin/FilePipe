@@ -11,6 +11,7 @@ import android.os.SystemClock
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import dev.bikram.filepipe.BuildConfig
+import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import java.io.File
 import java.io.PrintWriter
@@ -34,7 +35,11 @@ object DiagnosticLog {
         val appContext = context.applicationContext
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            record(appContext, "Uncaught exception on ${thread.name}", throwable)
+            record(
+                appContext,
+                appContext.getString(R.string.diagnostics_uncaught_exception_format, thread.name),
+                throwable,
+            )
             if (previousHandler != null) {
                 previousHandler.uncaughtException(thread, throwable)
             } else {
@@ -77,25 +82,33 @@ object DiagnosticLog {
         val logText = runCatching { logFile(context).readText() }.getOrDefault("")
         shareFile.writeText(
             buildString {
-                appendLine("FilePipe diagnostics")
-                appendLine("Generated: ${Instant.now()}")
-                appendLine("Package: ${context.packageName}")
-                appendLine("Version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
-                appendLine("Flavor: ${BuildConfig.FLAVOR}")
-                appendLine("Build type: ${BuildConfig.BUILD_TYPE}")
-                appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
-                appendLine("Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+                appendLine(context.getString(R.string.diagnostics_title))
+                appendLine(context.getString(R.string.diagnostics_generated_format, Instant.now().toString()))
+                appendLine(context.getString(R.string.diagnostics_package_format, context.packageName))
+                appendLine(context.getString(R.string.diagnostics_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
+                appendLine(context.getString(R.string.diagnostics_flavor_format, BuildConfig.FLAVOR))
+                appendLine(context.getString(R.string.diagnostics_build_type_format, BuildConfig.BUILD_TYPE))
+                appendLine(context.getString(R.string.diagnostics_device_format, Build.MANUFACTURER, Build.MODEL))
+                appendLine(context.getString(R.string.diagnostics_android_format, Build.VERSION.RELEASE, Build.VERSION.SDK_INT))
                 appendLine()
                 appendSystemSnapshot(context)
                 appendLine()
-                appendPreferencesSnapshot(preferences)
+                appendPreferencesSnapshot(context, preferences)
                 appendLine()
-                appendLine("App log")
-                appendLine("=======")
-                append(logText.ifBlank { "No app log entries captured yet.\n" })
+                appendDiagnosticSection(context.getString(R.string.diagnostics_section_app_log))
+                append(logText.ifBlank { context.getString(R.string.diagnostics_no_app_log_entries) })
             },
         )
         return shareFile
+    }
+
+    fun clear(context: Context) {
+        runCatching {
+            val logFile = logFile(context)
+            if (logFile.exists()) {
+                logFile.writeText("")
+            }
+        }
     }
 
     private fun logFile(context: Context): File = File(File(context.filesDir, DIAGNOSTICS_DIR), LOG_FILE_NAME)
@@ -110,62 +123,77 @@ object DiagnosticLog {
         val notificationManagerCompat = NotificationManagerCompat.from(context)
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
 
-        appendLine("Environment")
-        appendLine("===========")
-        appendLine("Locale: ${Locale.getDefault()}")
-        appendLine("Timezone: ${TimeZone.getDefault().id}")
-        appendLine("Uptime: ${SystemClock.uptimeMillis()} ms")
-        appendLine("Elapsed realtime: ${SystemClock.elapsedRealtime()} ms")
-        appendLine("Target SDK: ${appInfo?.targetSdkVersion ?: "unknown"}")
-        appendLine("First install: ${packageInfo?.firstInstallTime?.let(Instant::ofEpochMilli) ?: "unknown"}")
-        appendLine("Last update: ${packageInfo?.lastUpdateTime?.let(Instant::ofEpochMilli) ?: "unknown"}")
-        appendLine("Installer: ${installerPackageName(context)}")
-        appendLine("Files dir usable space: ${context.filesDir.usableSpace} bytes")
-        appendLine("Cache dir usable space: ${context.cacheDir.usableSpace} bytes")
-        appendLine("External storage state: ${Environment.getExternalStorageState()}")
+        appendDiagnosticSection(context.getString(R.string.diagnostics_section_environment))
+        appendLine(context.getString(R.string.diagnostics_locale_format, Locale.getDefault().toString()))
+        appendLine(context.getString(R.string.diagnostics_timezone_format, TimeZone.getDefault().id))
+        appendLine(context.getString(R.string.diagnostics_uptime_format, SystemClock.uptimeMillis()))
+        appendLine(context.getString(R.string.diagnostics_elapsed_realtime_format, SystemClock.elapsedRealtime()))
+        appendLine(context.getString(R.string.diagnostics_target_sdk_format, appInfo?.targetSdkVersion?.toString() ?: unknownValue(context)))
+        appendLine(
+            context.getString(
+                R.string.diagnostics_first_install_format,
+                packageInfo?.firstInstallTime?.let(Instant::ofEpochMilli)?.toString() ?: unknownValue(context),
+            ),
+        )
+        appendLine(
+            context.getString(
+                R.string.diagnostics_last_update_format,
+                packageInfo?.lastUpdateTime?.let(Instant::ofEpochMilli)?.toString() ?: unknownValue(context),
+            ),
+        )
+        appendLine(context.getString(R.string.diagnostics_installer_format, installerPackageName(context)))
+        appendLine(context.getString(R.string.diagnostics_files_dir_space_format, context.filesDir.usableSpace))
+        appendLine(context.getString(R.string.diagnostics_cache_dir_space_format, context.cacheDir.usableSpace))
+        appendLine(context.getString(R.string.diagnostics_external_storage_state_format, Environment.getExternalStorageState()))
         appendLine()
-        appendLine("Permissions and app access")
-        appendLine("==========================")
-        appendLine("Notifications enabled: ${notificationManagerCompat.areNotificationsEnabled()}")
-        appendLine("POST_NOTIFICATIONS granted: ${postNotificationsGranted(context)}")
-        appendLine("All files access granted: ${allFilesAccessGranted()}")
-        appendLine("Ignoring battery optimizations: ${powerManager.isIgnoringBatteryOptimizations(context.packageName)}")
+        appendDiagnosticSection(context.getString(R.string.diagnostics_section_permissions_app_access))
+        appendLine(context.getString(R.string.diagnostics_notifications_enabled_format, notificationManagerCompat.areNotificationsEnabled().toString()))
+        appendLine(context.getString(R.string.diagnostics_post_notifications_granted_format, postNotificationsGranted(context)))
+        appendLine(context.getString(R.string.diagnostics_all_files_access_granted_format, allFilesAccessGranted(context)))
+        appendLine(
+            context.getString(
+                R.string.diagnostics_ignoring_battery_optimizations_format,
+                powerManager.isIgnoringBatteryOptimizations(context.packageName).toString(),
+            ),
+        )
         appendPersistedUriPermissions(context)
         appendLine()
         appendNotificationChannels(context)
     }
 
-    private fun StringBuilder.appendPreferencesSnapshot(preferences: AppPreferences?) {
-        appendLine("FilePipe settings")
-        appendLine("=================")
+    private fun StringBuilder.appendPreferencesSnapshot(
+        context: Context,
+        preferences: AppPreferences?,
+    ) {
+        appendDiagnosticSection(context.getString(R.string.diagnostics_section_settings))
         if (preferences == null) {
-            appendLine("Settings snapshot unavailable.")
+            appendLine(context.getString(R.string.diagnostics_settings_snapshot_unavailable))
             return
         }
-        appendLine("Theme mode: ${preferences.themeMode}")
-        appendLine("Color source: ${preferences.colorSource}")
-        appendLine("Palette style: ${preferences.themePaletteStyle}")
-        appendLine("Saved custom seeds: ${preferences.savedCustomSeedHexes.size}")
-        appendLine("Active custom seed set: ${preferences.activeCustomSeedHex.isNotBlank()}")
-        appendLine("Gradient background: ${preferences.useGradientBackground}")
-        appendLine("Enhanced shading: ${preferences.useEnhancedShading}")
-        appendLine("Folder access mode: ${preferences.folderAccessMode}")
-        appendLine("Log retention days: ${preferences.logRetentionDays}")
-        appendLine("Auto export on rule change: ${preferences.autoExportOnRuleChange}")
-        appendLine("Scheduled export enabled: ${preferences.scheduledExportEnabled}")
-        appendLine("Local backup folder: ${redactedLocation(preferences.exportFolderUri)}")
-        appendLine("Cloud backup folder: ${redactedLocation(preferences.cloudExportFolderUri)}")
-        appendLine("Update check schedule: ${preferences.updateCheckSchedule}")
-        appendLine("Notify on new updates: ${preferences.notifyOnNewUpdates}")
-        appendLine("Save GitHub APK to Downloads: ${preferences.saveUpdateApkToDownloads}")
-        appendLine("APK Downloads copy succeeded: ${preferences.updateApkDownloadsCopySucceeded}")
-        appendLine("Haptics enabled: ${preferences.hapticFeedbackEnabled}")
-        appendLine("Progressive blur enabled: ${preferences.progressiveBlurEnabled}")
-        appendLine("Swipe start-to-end: ${preferences.swipeStartToEnd}")
-        appendLine("Swipe end-to-start: ${preferences.swipeEndToStart}")
-        appendLine("Bookmarked folders: ${preferences.bookmarkedFolders.size}")
-        appendLine("Intro seen: ${preferences.hasSeenIntro}")
-        appendLine("In-app review never ask again: ${preferences.inAppReviewAutoNeverAskAgain}")
+        appendLine(context.getString(R.string.diagnostics_theme_mode_format, preferences.themeMode.toString()))
+        appendLine(context.getString(R.string.diagnostics_color_source_format, preferences.colorSource.toString()))
+        appendLine(context.getString(R.string.diagnostics_palette_style_format, preferences.themePaletteStyle.toString()))
+        appendLine(context.getString(R.string.diagnostics_saved_custom_seeds_format, preferences.savedCustomSeedHexes.size))
+        appendLine(context.getString(R.string.diagnostics_active_custom_seed_format, preferences.activeCustomSeedHex.isNotBlank().toString()))
+        appendLine(context.getString(R.string.diagnostics_gradient_background_format, preferences.useGradientBackground.toString()))
+        appendLine(context.getString(R.string.diagnostics_enhanced_shading_format, preferences.useEnhancedShading.toString()))
+        appendLine(context.getString(R.string.diagnostics_folder_access_mode_format, preferences.folderAccessMode.toString()))
+        appendLine(context.getString(R.string.diagnostics_log_retention_days_format, preferences.logRetentionDays))
+        appendLine(context.getString(R.string.diagnostics_auto_export_rule_change_format, preferences.autoExportOnRuleChange.toString()))
+        appendLine(context.getString(R.string.diagnostics_scheduled_export_enabled_format, preferences.scheduledExportEnabled.toString()))
+        appendLine(context.getString(R.string.diagnostics_local_backup_folder_format, redactedLocation(context, preferences.exportFolderUri)))
+        appendLine(context.getString(R.string.diagnostics_cloud_backup_folder_format, redactedLocation(context, preferences.cloudExportFolderUri)))
+        appendLine(context.getString(R.string.diagnostics_update_check_schedule_format, preferences.updateCheckSchedule.toString()))
+        appendLine(context.getString(R.string.diagnostics_notify_new_updates_format, preferences.notifyOnNewUpdates.toString()))
+        appendLine(context.getString(R.string.diagnostics_save_apk_downloads_format, preferences.saveUpdateApkToDownloads.toString()))
+        appendLine(context.getString(R.string.diagnostics_apk_downloads_copy_succeeded_format, preferences.updateApkDownloadsCopySucceeded.toString()))
+        appendLine(context.getString(R.string.diagnostics_haptics_enabled_format, preferences.hapticFeedbackEnabled.toString()))
+        appendLine(context.getString(R.string.diagnostics_progressive_blur_enabled_format, preferences.progressiveBlurEnabled.toString()))
+        appendLine(context.getString(R.string.diagnostics_swipe_start_to_end_format, preferences.swipeStartToEnd.toString()))
+        appendLine(context.getString(R.string.diagnostics_swipe_end_to_start_format, preferences.swipeEndToStart.toString()))
+        appendLine(context.getString(R.string.diagnostics_bookmarked_folders_format, preferences.bookmarkedFolders.size))
+        appendLine(context.getString(R.string.diagnostics_intro_seen_format, preferences.hasSeenIntro.toString()))
+        appendLine(context.getString(R.string.diagnostics_in_app_review_never_ask_again_format, preferences.inAppReviewAutoNeverAskAgain.toString()))
     }
 
     private fun StringBuilder.appendPersistedUriPermissions(context: Context) {
@@ -173,10 +201,10 @@ object DiagnosticLog {
         val readCount = permissions.count { it.isReadPermission }
         val writeCount = permissions.count { it.isWritePermission }
         val treeCount = permissions.count { it.uri.toString().contains("/tree/") }
-        appendLine("Persisted URI permissions: ${permissions.size}")
-        appendLine("Persisted URI read grants: $readCount")
-        appendLine("Persisted URI write grants: $writeCount")
-        appendLine("Persisted tree grants: $treeCount")
+        appendLine(context.getString(R.string.diagnostics_persisted_uri_permissions_format, permissions.size))
+        appendLine(context.getString(R.string.diagnostics_persisted_uri_read_grants_format, readCount))
+        appendLine(context.getString(R.string.diagnostics_persisted_uri_write_grants_format, writeCount))
+        appendLine(context.getString(R.string.diagnostics_persisted_tree_grants_format, treeCount))
     }
 
     private fun StringBuilder.appendNotificationChannels(context: Context) {
@@ -186,29 +214,23 @@ object DiagnosticLog {
             runCatching {
                 notificationManager.notificationChannels.sortedBy { channel -> channel.id }
             }.getOrDefault(emptyList())
-        appendLine("Notification channels")
-        appendLine("=====================")
+        appendDiagnosticSection(context.getString(R.string.diagnostics_section_notification_channels))
         if (channels.isEmpty()) {
-            appendLine("No channels registered.")
+            appendLine(context.getString(R.string.diagnostics_no_channels_registered))
             return
         }
         channels.forEach { channel ->
             appendLine(
-                buildString {
-                    append(channel.id)
-                    append(": importance=")
-                    append(channel.importance)
-                    append(", sound=")
-                    append(channel.sound != null)
-                    append(", vibrate=")
-                    append(channel.shouldVibrate())
-                    append(", lights=")
-                    append(channel.shouldShowLights())
-                    append(", bypassDnd=")
-                    append(channel.canBypassDnd())
-                    append(", lockscreenVisibility=")
-                    append(channel.lockscreenVisibility)
-                },
+                context.getString(
+                    R.string.diagnostics_notification_channel_format,
+                    channel.id,
+                    channel.importance,
+                    (channel.sound != null).toString(),
+                    channel.shouldVibrate().toString(),
+                    channel.shouldShowLights().toString(),
+                    channel.canBypassDnd().toString(),
+                    channel.lockscreenVisibility,
+                ),
             )
         }
     }
@@ -220,14 +242,14 @@ object DiagnosticLog {
                     PackageManager.PERMISSION_GRANTED
             ).toString()
         } else {
-            "not required"
+            context.getString(R.string.diagnostics_value_not_required)
         }
 
-    private fun allFilesAccessGranted(): String =
+    private fun allFilesAccessGranted(context: Context): String =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             Environment.isExternalStorageManager().toString()
         } else {
-            "not supported"
+            context.getString(R.string.diagnostics_value_not_supported)
         }
 
     @Suppress("DEPRECATION")
@@ -237,16 +259,30 @@ object DiagnosticLog {
                 context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
             } else {
                 context.packageManager.getInstallerPackageName(context.packageName)
-            }.orEmpty().ifBlank { "unknown" }
-        }.getOrDefault("unknown")
+            }.orEmpty().ifBlank { unknownValue(context) }
+        }.getOrDefault(unknownValue(context))
 
-    private fun redactedLocation(value: String): String =
+    private fun redactedLocation(
+        context: Context,
+        value: String,
+    ): String =
         when {
-            value.isBlank() -> "not configured"
-            value.startsWith("content://") -> "configured: content URI"
-            value.startsWith("/") -> "configured: filesystem path"
-            else -> "configured: ${value.substringBefore(':', missingDelimiterValue = "unknown")} reference"
+            value.isBlank() -> context.getString(R.string.diagnostics_value_not_configured)
+            value.startsWith("content://") -> context.getString(R.string.diagnostics_value_configured_content_uri)
+            value.startsWith("/") -> context.getString(R.string.diagnostics_value_configured_filesystem_path)
+            else ->
+                context.getString(
+                    R.string.diagnostics_value_configured_reference_format,
+                    value.substringBefore(':', missingDelimiterValue = unknownValue(context)),
+                )
         }
+
+    private fun unknownValue(context: Context): String = context.getString(R.string.diagnostics_value_unknown)
+
+    private fun StringBuilder.appendDiagnosticSection(title: String) {
+        appendLine(title)
+        appendLine("=".repeat(title.length))
+    }
 
     private fun trimIfNeeded(logFile: File) {
         if (!logFile.exists() || logFile.length() <= MAX_LOG_BYTES) return

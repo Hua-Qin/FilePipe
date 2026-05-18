@@ -22,6 +22,12 @@ interface RunHistoryDao {
     @Query("SELECT COUNT(*) FROM run_history")
     fun observeHistoryCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM run_history")
+    suspend fun countHistory(): Int
+
+    @Query("SELECT COUNT(*) FROM run_history WHERE status = :status")
+    suspend fun countHistoryByStatus(status: String): Int
+
     @Query(
         """
         SELECT ruleId AS ruleId, MAX(startedAt) AS lastStartedAt

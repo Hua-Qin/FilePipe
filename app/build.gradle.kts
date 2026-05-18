@@ -228,6 +228,9 @@ dependencies {
 
     implementation(libs.material.kolor)
 
+    testImplementation(libs.junit)
+    testImplementation(libs.coroutines.test)
+
     // Play in-app update AARs merge extra manifest entries. App info may list permissions under the
     // "Nearby devices" group on Android 12+ even though FilePipe does not declare them in src manifests.
     // Inspect merged output: ./gradlew :app:processPlaystoreReleaseMainManifest

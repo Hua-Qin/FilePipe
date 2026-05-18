@@ -15,7 +15,13 @@ class RuleRepository
     constructor(
         private val ruleDao: RuleDao,
     ) {
+        companion object {
+            const val TRASH_RETENTION_MILLIS: Long = 30L * 24L * 60L * 60L * 1000L
+        }
+
         fun getAllRules(): Flow<List<Rule>> = ruleDao.getAllRules().map { it.map { entity -> entity.toDomain() } }
+
+        fun getTrashedRules(): Flow<List<Rule>> = ruleDao.getTrashedRules().map { it.map { entity -> entity.toDomain() } }
 
         suspend fun getRuleById(id: Long): Rule? = ruleDao.getRuleById(id)?.toDomain()
 
@@ -45,7 +51,17 @@ class RuleRepository
             ruleDao.updateRulesSortOrders(entities)
         }
 
-        suspend fun deleteRule(ruleId: Long) = ruleDao.deleteRuleById(ruleId)
+        suspend fun moveRuleToTrash(ruleId: Long) = ruleDao.moveRuleToTrash(ruleId, System.currentTimeMillis())
+
+        suspend fun restoreRuleFromTrash(ruleId: Long) = ruleDao.restoreRuleFromTrash(ruleId, System.currentTimeMillis())
+
+        suspend fun deleteRuleForever(ruleId: Long) = ruleDao.deleteRuleById(ruleId)
+
+        suspend fun autoEmptyTrashOlderThan(cutoffMillis: Long) = ruleDao.deleteTrashedRulesOlderThan(cutoffMillis)
+
+        suspend fun emptyTrashForever() = ruleDao.deleteAllTrashedRules()
+
+        suspend fun deleteRule(ruleId: Long) = deleteRuleForever(ruleId)
 
         suspend fun getAllRuleIds(): List<Long> = ruleDao.getAllRuleIds()
 

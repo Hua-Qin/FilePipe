@@ -2,6 +2,7 @@ package dev.bikram.filepipe.ui.screens.rules
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -45,8 +46,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -65,7 +64,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -80,6 +81,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.materialSymbolName
+import dev.bikram.filepipe.devtools.DevMockFileMove
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -105,6 +107,7 @@ import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
 import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalSnackbarHostState
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
@@ -141,12 +144,12 @@ fun RulesScreen(
     val staleRuleIds = uiState.staleRuleIds
     val previewState = uiState.previewState
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val topAppBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
-    var pendingDeleteRule by remember { mutableStateOf<Rule?>(null) }
     var pendingDeleteSelected by remember { mutableStateOf(false) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarHostState = LocalSnackbarHostState.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
 
@@ -215,11 +218,16 @@ fun RulesScreen(
     LaunchedEffect(viewModel) {
         viewModel.deleteUndoEvent.collect { event ->
             val count = event.rules.size
-            val label = if (count == 1) "\"${event.rules.first().name}\" deleted" else "$count rules deleted"
+            val label =
+                if (count == 1) {
+                    context.getString(R.string.rule_moved_to_trash, event.rules.first().name)
+                } else {
+                    context.resources.getQuantityString(R.plurals.rules_moved_to_trash, count, count)
+                }
             val result =
                 snackbarHostState.showSnackbar(
                     message = label,
-                    actionLabel = "Undo",
+                    actionLabel = context.getString(R.string.undo),
                     duration = SnackbarDuration.Long,
                 )
             if (result == SnackbarResult.ActionPerformed) {
@@ -356,18 +364,6 @@ fun RulesScreen(
                     },
                 )
             }
-        },
-        snackbarHost = {
-            val snackbarBottomPadding =
-                if (hasSelection && !isRunning) {
-                    8.dp
-                } else {
-                    80.dp
-                }
-            SnackbarHost(
-                snackbarHostState,
-                modifier = Modifier.padding(bottom = snackbarBottomPadding),
-            )
         },
         bottomBar = {
             when {
@@ -575,7 +571,7 @@ fun RulesScreen(
                                 viewModel.toggleSelection(rule.id)
                             },
                             onEdit = { onEditRule(rule.id) },
-                            onDelete = { pendingDeleteRule = rule },
+                            onDelete = { viewModel.deleteRule(rule) },
                             onDuplicate = { viewModel.duplicateRule(rule) },
                             onRunRule = { viewModel.runRule(rule) },
                             onCancelManualRun = { viewModel.cancelManualRun() },
@@ -598,41 +594,30 @@ fun RulesScreen(
         }
     }
 
-    pendingDeleteRule?.let { rule ->
-        AlertDialog(
-            onDismissRequest = { pendingDeleteRule = null },
-            title = { Text("Delete rule?") },
-            text = { Text("\"${rule.name}\" and its schedule will be removed.") },
-            confirmButton = {
-                FilePipeTextButton(onClick = {
-                    viewModel.deleteRule(rule)
-                    pendingDeleteRule = null
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                FilePipeTextButton(onClick = {
-                    pendingDeleteRule = null
-                }) { Text("Cancel") }
-            },
-        )
-    }
-
     if (pendingDeleteSelected) {
         val count = selectedRuleIds.size
         AlertDialog(
             onDismissRequest = { pendingDeleteSelected = false },
-            title = { Text("Delete $count rule${if (count == 1) "" else "s"}?") },
-            text = { Text("This will also remove any scheduled runs for the selected rules.") },
+            title = {
+                Text(
+                    pluralStringResource(
+                        R.plurals.rules_move_to_trash_confirm_title,
+                        count,
+                        count,
+                    ),
+                )
+            },
+            text = { Text(stringResource(R.string.rules_move_to_trash_confirm_message)) },
             confirmButton = {
                 FilePipeTextButton(onClick = {
                     viewModel.deleteSelected()
                     pendingDeleteSelected = false
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text(stringResource(R.string.move_to_trash), color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = {
                 FilePipeTextButton(onClick = {
                     pendingDeleteSelected = false
-                }) { Text("Cancel") }
+                }) { Text(stringResource(R.string.cancel)) }
             },
         )
     }
@@ -860,10 +845,12 @@ private fun SwipeToDismissRuleCard(
     modifier: Modifier = Modifier,
 ) {
     val cardShape = RoundedCornerShape(16.dp)
+    val isMockRule = DevMockFileMove.isMockRule(rule)
     val swipeAssigned = setOf(swipeStartToEnd, swipeEndToStart)
     val cardIconPairs: List<RuleCardAction> =
         SwipeAction.entries
             .filter { it !in swipeAssigned }
+            .filterNot { action -> isMockRule && action.isBlockedForMockRule() }
             .map { action ->
                 RuleCardAction(
                     iconName = action.materialSymbolName(),
@@ -877,31 +864,74 @@ private fun SwipeToDismissRuleCard(
         commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
         cardShape = cardShape,
         onSwipeStartToEnd = {
-            swipeStartToEnd.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
+            if (!isMockRule || !swipeStartToEnd.isBlockedForMockRule()) {
+                swipeStartToEnd.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
+            }
         },
         onSwipeEndToStart = {
-            swipeEndToStart.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
+            if (!isMockRule || !swipeEndToStart.isBlockedForMockRule()) {
+                swipeEndToStart.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
+            }
         },
         hapticEnabled = hapticEnabled,
-        backgroundContent = { fromStart ->
+        allowSwipeStartToEnd = !isMockRule || !swipeStartToEnd.isBlockedForMockRule(),
+        allowSwipeEndToStart = !isMockRule || !swipeEndToStart.isBlockedForMockRule(),
+        backgroundContent = { fromStart, revealProgress ->
             val action = if (fromStart) swipeStartToEnd else swipeEndToStart
+            val backgroundColor by animateColorAsState(
+                targetValue = action.semanticSwipeBackground(),
+                animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec()),
+                label = "ruleSwipeBg",
+            )
+            val iconTint = action.semanticSwipeIconTint()
+            val contentScale = 0.88f + 0.12f * revealProgress
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(action.semanticSwipeBackground(), cardShape)
+                    .background(backgroundColor, cardShape)
                     .padding(
-                        start = if (fromStart) 24.dp else 0.dp,
-                        end = if (fromStart) 0.dp else 24.dp,
+                        start = if (fromStart) 16.dp else 0.dp,
+                        end = if (fromStart) 0.dp else 16.dp,
                     ),
                 contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd,
             ) {
-                FilePipeMaterialRoundedSymbol(
-                    name = action.materialSymbolName(),
-                    contentDescription = null,
-                    size = 32.dp,
-                    tint = action.semanticSwipeIconTint(),
-                    modifier = Modifier.size(32.dp),
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier =
+                        Modifier.graphicsLayer {
+                            alpha = revealProgress
+                            scaleX = contentScale
+                            scaleY = contentScale
+                        },
+                ) {
+                    if (fromStart) {
+                        FilePipeMaterialRoundedSymbol(
+                            name = action.materialSymbolName(),
+                            contentDescription = null,
+                            size = 20.dp,
+                            tint = iconTint,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = action.shortLabel(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = iconTint,
+                        )
+                    } else {
+                        Text(
+                            text = action.shortLabel(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = iconTint,
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        FilePipeMaterialRoundedSymbol(
+                            name = action.materialSymbolName(),
+                            contentDescription = null,
+                            size = 20.dp,
+                            tint = iconTint,
+                        )
+                    }
+                }
             }
         },
         modifier = modifier,
@@ -929,6 +959,8 @@ private fun SwipeToDismissRuleCard(
     }
 }
 
+private fun SwipeAction.isBlockedForMockRule(): Boolean = this == SwipeAction.EDIT || this == SwipeAction.DUPLICATE
+
 private fun SwipeAction.dispatch(
     onDelete: () -> Unit,
     onEdit: () -> Unit,
@@ -951,6 +983,16 @@ private fun SwipeAction.label(): String =
         SwipeAction.DUPLICATE -> stringResource(R.string.duplicate_rule)
         SwipeAction.PREVIEW -> stringResource(R.string.preview_rule)
         SwipeAction.VIEW_HISTORY -> stringResource(R.string.view_history)
+    }
+
+@Composable
+private fun SwipeAction.shortLabel(): String =
+    when (this) {
+        SwipeAction.EDIT -> stringResource(R.string.action_edit)
+        SwipeAction.DELETE -> stringResource(R.string.settings_swipe_action_trash)
+        SwipeAction.DUPLICATE -> stringResource(R.string.action_duplicate)
+        SwipeAction.PREVIEW -> stringResource(R.string.preview_title)
+        SwipeAction.VIEW_HISTORY -> stringResource(R.string.settings_swipe_action_history)
     }
 
 @Composable

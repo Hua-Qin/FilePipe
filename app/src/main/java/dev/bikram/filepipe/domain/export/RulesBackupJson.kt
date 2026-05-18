@@ -22,7 +22,7 @@ import kotlinx.serialization.json.JsonNames
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
  * (`@Database`); Room KSP does not allow that annotation to reference this constant.
  */
-const val APP_DATABASE_SCHEMA_VERSION = 6
+const val APP_DATABASE_SCHEMA_VERSION = 7
 
 /**
  * Root object for `filepipe_backup_*.json`.

@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleShortcutIntent(intent)
+        handleOpenHistoryIntent(intent)
         handleOpenHistoryDetailIntent(intent)
         handleOpenSettingsUpdatesIntent(intent)
 
@@ -114,6 +115,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleShortcutIntent(intent)
+        handleOpenHistoryIntent(intent)
         handleOpenHistoryDetailIntent(intent)
         handleOpenSettingsUpdatesIntent(intent)
     }
@@ -144,6 +146,14 @@ class MainActivity : ComponentActivity() {
         if (historyId != -1L) {
             pendingShortcutRepository.requestOpenHistoryDetail(historyId)
             sourceIntent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID)
+        }
+    }
+
+    private fun handleOpenHistoryIntent(intent: Intent?) {
+        val sourceIntent = intent ?: return
+        if (sourceIntent.getBooleanExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY, false)) {
+            pendingShortcutRepository.requestOpenHistory()
+            sourceIntent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY)
         }
     }
 

@@ -1,8 +1,6 @@
 package dev.bikram.filepipe.ui.components
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -10,6 +8,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,7 +44,7 @@ fun DeliberateSwipeRevealCard(
     onSwipeStartToEnd: () -> Unit,
     onSwipeEndToStart: () -> Unit,
     hapticEnabled: Boolean,
-    backgroundContent: @Composable BoxScope.(draggingFromStart: Boolean) -> Unit,
+    backgroundContent: @Composable BoxScope.(draggingFromStart: Boolean, revealProgress: Float) -> Unit,
     modifier: Modifier = Modifier,
     allowSwipeStartToEnd: Boolean = true,
     allowSwipeEndToStart: Boolean = true,
@@ -55,13 +54,7 @@ fun DeliberateSwipeRevealCard(
     val scope = rememberCoroutineScope()
     var offsetX by remember { mutableFloatStateOf(0f) }
     var laidOutWidthPx by remember { mutableFloatStateOf(0f) }
-    val settleAnimationSpec =
-        reducedMotionAwareSpec(
-            spring<Float>(
-                dampingRatio = Spring.DampingRatioNoBouncy,
-                stiffness = Spring.StiffnessMedium,
-            ),
-        )
+    val settleAnimationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
 
     BoxWithConstraints(modifier = modifier.clip(cardShape)) {
         val constraintWidthPx =
@@ -149,10 +142,16 @@ fun DeliberateSwipeRevealCard(
             val fixed = Constraints.fixed(cardWidth, cardHeight)
             val backgroundMeasurable =
                 subcompose("background") {
+                    val revealProgress =
+                        if (thresholdPx.isFinite() && thresholdPx > 0f) {
+                            (abs(offsetX) / thresholdPx).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
                     Box(Modifier.fillMaxSize()) {
                         when {
-                            offsetX > 4f -> backgroundContent(true)
-                            offsetX < -4f -> backgroundContent(false)
+                            offsetX > 4f -> backgroundContent(true, revealProgress)
+                            offsetX < -4f -> backgroundContent(false, revealProgress)
                         }
                     }
                 }.first()

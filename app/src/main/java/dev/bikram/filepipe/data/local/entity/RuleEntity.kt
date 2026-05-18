@@ -22,6 +22,7 @@ data class RuleEntity(
     val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
+    val trashedAt: Long? = null,
     val scheduleType: ScheduleType? = null,
     val scheduleDayOfWeek: Int? = null,
     val scheduleHour: Int? = null,
@@ -58,6 +59,7 @@ fun RuleEntity.toDomain(): Rule =
         sortOrder = sortOrder,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        trashedAt = trashedAt,
         schedule =
             when {
                 scheduleType == ScheduleType.EVERY_N_HOURS && scheduleIntervalHours != null ->
@@ -104,6 +106,7 @@ fun Rule.toEntity(): RuleEntity =
         sortOrder = sortOrder,
         createdAt = createdAt,
         updatedAt = updatedAt,
+        trashedAt = trashedAt,
         scheduleType = schedule?.type,
         scheduleDayOfWeek = schedule?.dayOfWeek,
         scheduleHour = schedule?.hour,

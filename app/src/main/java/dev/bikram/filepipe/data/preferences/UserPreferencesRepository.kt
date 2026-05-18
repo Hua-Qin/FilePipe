@@ -84,6 +84,7 @@ private object PrefKeys {
     val IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN = booleanPreferencesKey("in_app_review_auto_never_ask_again")
     val PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME =
         longPreferencesKey("play_auto_review_prompted_for_last_update_time")
+    val DEVELOPER_OPTIONS_ENABLED = booleanPreferencesKey("developer_options_enabled")
 }
 
 @Singleton
@@ -191,7 +192,14 @@ class UserPreferencesRepository
                 )
             }
 
+        val developerOptionsEnabledFlow: Flow<Boolean> =
+            dataStore.data.map { prefs -> prefs[PrefKeys.DEVELOPER_OPTIONS_ENABLED] ?: false }
+
         suspend fun getPreferencesSnapshot(): AppPreferences = preferencesFlow.first()
+
+        suspend fun setDeveloperOptionsEnabled(enabled: Boolean) {
+            dataStore.edit { it[PrefKeys.DEVELOPER_OPTIONS_ENABLED] = enabled }
+        }
 
         suspend fun setThemeMode(mode: AppThemeMode) {
             dataStore.edit { it[PrefKeys.THEME_MODE] = mode.name }
@@ -256,6 +264,10 @@ class UserPreferencesRepository
             dataStore.edit { it[PrefKeys.HAS_SEEN_INTRO] = true }
         }
 
+        suspend fun resetFirstLaunchFlag() {
+            dataStore.edit { it[PrefKeys.HAS_SEEN_INTRO] = false }
+        }
+
         suspend fun setHapticFeedbackEnabled(enabled: Boolean) {
             dataStore.edit { it[PrefKeys.HAPTIC_FEEDBACK] = enabled }
         }
@@ -279,6 +291,10 @@ class UserPreferencesRepository
             dataStore.edit { it[PrefKeys.UPDATE_LAST_NOTIFIED_DEDUPE_KEY] = key }
         }
 
+        suspend fun clearUpdateLastNotifiedDedupeKey() {
+            dataStore.edit { it.remove(PrefKeys.UPDATE_LAST_NOTIFIED_DEDUPE_KEY) }
+        }
+
         suspend fun readGithubReleaseAck(): GithubReleaseAckState {
             val prefs = dataStore.data.first()
             return GithubReleaseAckState(
@@ -294,6 +310,13 @@ class UserPreferencesRepository
             dataStore.edit { prefs ->
                 prefs[PrefKeys.GITHUB_ACK_FINGERPRINT] = fingerprint
                 prefs[PrefKeys.GITHUB_ACK_INSTALLED_VERSION] = installedVersionName
+            }
+        }
+
+        suspend fun clearGithubReleaseAck() {
+            dataStore.edit { prefs ->
+                prefs.remove(PrefKeys.GITHUB_ACK_FINGERPRINT)
+                prefs.remove(PrefKeys.GITHUB_ACK_INSTALLED_VERSION)
             }
         }
 
@@ -406,6 +429,35 @@ class UserPreferencesRepository
                         customSeedHexListJson.encodeToString(emptyList<String>())
                 }
                 prefs.remove(PrefKeys.CUSTOM_SEED_HEX)
+            }
+        }
+
+        suspend fun resetAppSettingsPreferencesToDefaults() {
+            dataStore.edit { prefs ->
+                prefs.remove(PrefKeys.THEME_MODE)
+                prefs.remove(PrefKeys.USE_MATERIAL_YOU)
+                prefs.remove(PrefKeys.COLOR_SOURCE)
+                prefs.remove(PrefKeys.THEME_PALETTE_STYLE)
+                prefs.remove(PrefKeys.CUSTOM_SEED_HEX)
+                prefs.remove(PrefKeys.CUSTOM_SEED_HEX_LIST)
+                prefs.remove(PrefKeys.ACTIVE_CUSTOM_SEED_HEX)
+                prefs.remove(PrefKeys.USE_GRADIENT_BACKGROUND)
+                prefs.remove(PrefKeys.ENHANCED_SHADING)
+                prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
+                prefs.remove(PrefKeys.PROGRESSIVE_BLUR)
+                prefs.remove(PrefKeys.HAPTIC_FEEDBACK)
+                prefs.remove(PrefKeys.SWIPE_START_TO_END)
+                prefs.remove(PrefKeys.SWIPE_END_TO_START)
+                prefs.remove(PrefKeys.LOG_RETENTION_DAYS)
+                prefs.remove(PrefKeys.EXPORT_FOLDER_URI)
+                prefs.remove(PrefKeys.CLOUD_EXPORT_FOLDER_URI)
+                prefs.remove(PrefKeys.AUTO_EXPORT_ON_CHANGE)
+                prefs.remove(PrefKeys.SCHEDULED_EXPORT)
+                prefs.remove(PrefKeys.AUTO_CHECK_UPDATES)
+                prefs.remove(PrefKeys.UPDATE_CHECK_SCHEDULE)
+                prefs.remove(PrefKeys.NOTIFY_ON_NEW_UPDATES)
+                prefs.remove(PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS)
+                prefs.remove(PrefKeys.DEVELOPER_OPTIONS_ENABLED)
             }
         }
 

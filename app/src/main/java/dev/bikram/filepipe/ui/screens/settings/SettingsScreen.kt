@@ -18,6 +18,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -33,7 +34,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -82,8 +82,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -164,13 +162,18 @@ import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
+import dev.bikram.filepipe.ui.navigation.DEV_OPTIONS_SHARED_BOUNDS_KEY
+import dev.bikram.filepipe.ui.navigation.LocalNavAnimatedVisibilityScope
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
 import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
+import dev.bikram.filepipe.ui.navigation.LocalSharedTransitionScope
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalSnackbarHostState
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
+import dev.bikram.filepipe.ui.theme.swipeActionAccent
 import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
 import dev.bikram.filepipe.update.UpdateInfo
 import kotlinx.coroutines.delay
@@ -185,6 +188,7 @@ private const val SETTINGS_LIST_INDEX_FOLDER_ACCESS = 1
 private const val SETTINGS_LIST_INDEX_TOUCH_SOUND_NOTIFICATIONS = 2
 private const val SETTINGS_SECTION_HIGHLIGHT_DURATION_MS = 4_500L
 private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
+private const val DEVELOPER_OPTIONS_UNLOCK_TAPS = 7
 
 private enum class BackupFolderTarget {
     Local,
@@ -242,6 +246,7 @@ private fun Modifier.pulsingSectionHighlightOutline(
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalFoundationApi::class,
+    ExperimentalSharedTransitionApi::class,
 )
 @Composable
 fun SettingsScreen(
@@ -249,11 +254,13 @@ fun SettingsScreen(
     onOpenIntro: () -> Unit = {},
     onOpenFaqStorageSection: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
+    onOpenDevOptions: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
     highlightSectionKey: String? = null,
     onHighlightHandled: () -> Unit = {},
 ) {
     val preferences by viewModel.preferencesFlow.collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
+    val developerOptionsEnabled by viewModel.developerOptionsEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
     val playInAppUpdateBannerUiState by viewModel.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
@@ -273,7 +280,7 @@ fun SettingsScreen(
     var allFilesAccessGranted by remember { mutableStateOf(Environment.isExternalStorageManager()) }
     var pendingFolderAccessSwitch by remember { mutableStateOf<FolderAccessMode?>(null) }
     var pendingEnableUpdateNotificationsAfterPermission by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarHostState = LocalSnackbarHostState.current
     val coroutineScope = rememberCoroutineScope()
     val settingsLazyListState = rememberLazyListState()
     val topAppBarState = rememberTopAppBarState()
@@ -289,7 +296,6 @@ fun SettingsScreen(
                 add("history")
                 add("backup")
                 if (BuildConfig.SHOW_UPDATES) add("updates")
-                if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease") add("dev_release_mocks")
             }
         }
     val allSettingsSectionsCollapsed =
@@ -725,12 +731,6 @@ fun SettingsScreen(
                     },
                 )
             }
-        },
-        snackbarHost = {
-            SnackbarHost(
-                snackbarHostState,
-                modifier = Modifier.padding(bottom = 80.dp),
-            )
         },
     ) { innerPadding ->
         LazyColumn(
@@ -1412,42 +1412,13 @@ fun SettingsScreen(
                 }
             }
 
-            if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease") {
+            if (developerOptionsEnabled) {
                 item {
-                    Column(modifier = Modifier.padding(top = 24.dp)) {
-                        SettingsExpandableSection(
-                            sectionKey = "dev_release_mocks",
-                            iconName = "bug_report",
-                            title = stringResource(R.string.settings_dev_release_mocks_section),
-                            collapsedSectionKeys = collapsedSettingsSectionKeys,
-                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                        ) {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                FilePipeOutlinedButton(
-                                    onClick = {
-                                        viewModel.devReleaseMockArmRulesUpdatePromoForRulesTab()
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(stringResource(R.string.settings_dev_release_mock_rules_banner))
-                                }
-                                FilePipeOutlinedButton(
-                                    onClick = {
-                                        viewModel.devReleaseMockStartPlayUpdateBannerSequence()
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(stringResource(R.string.settings_dev_release_mock_play_banner))
-                                }
-                            }
-                        }
-                    }
+                    SettingsStandaloneNavigationRow(
+                        iconName = "developer_board",
+                        title = stringResource(R.string.settings_developer_options_section),
+                        onClick = onOpenDevOptions,
+                    )
                 }
             }
 
@@ -1473,6 +1444,8 @@ fun SettingsScreen(
                         else -> BuildConfig.BUILD_TYPE
                     }
                 val buildVariantToastText = stringResource(R.string.about_build_variant_format, buildFlavorLabel, buildTypeLabel)
+                val developerOptionsUnlockedToast = stringResource(R.string.settings_developer_options_unlocked)
+                val developerOptionsTapsRemainingToast = stringResource(R.string.settings_developer_options_taps_remaining)
                 val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
                 val diagnosticsTooltip = stringResource(R.string.settings_share_diagnostics)
                 val shareDiagnostics =
@@ -1496,7 +1469,8 @@ fun SettingsScreen(
                         }
                     }
                 var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
-                Column(modifier = Modifier.padding(top = 24.dp)) {
+                var developerOptionsTapCount by rememberSaveable { mutableStateOf(0) }
+                Column(modifier = Modifier.padding(top = if (developerOptionsEnabled) 0.dp else 24.dp)) {
                     SettingsSectionHeader(
                         iconName = "info",
                         title = stringResource(R.string.settings_about_section),
@@ -1535,7 +1509,32 @@ fun SettingsScreen(
                                         Modifier.combinedClickable(
                                             interactionSource = remember { MutableInteractionSource() },
                                             indication = null,
-                                            onClick = {},
+                                            onClick = {
+                                                if (developerOptionsEnabled) {
+                                                    onOpenDevOptions()
+                                                    return@combinedClickable
+                                                }
+                                                developerOptionsTapCount += 1
+                                                val remaining = DEVELOPER_OPTIONS_UNLOCK_TAPS - developerOptionsTapCount
+                                                if (remaining > 0) {
+                                                    Toast
+                                                        .makeText(
+                                                            aboutContext,
+                                                            developerOptionsTapsRemainingToast.format(remaining),
+                                                            Toast.LENGTH_SHORT,
+                                                        ).show()
+                                                } else {
+                                                    developerOptionsTapCount = 0
+                                                    viewModel.setDeveloperOptionsEnabled(true)
+                                                    Toast
+                                                        .makeText(
+                                                            aboutContext,
+                                                            developerOptionsUnlockedToast,
+                                                            Toast.LENGTH_SHORT,
+                                                        ).show()
+                                                    onOpenDevOptions()
+                                                }
+                                            },
                                             onLongClick = {
                                                 Toast
                                                     .makeText(aboutContext, buildVariantToastText, Toast.LENGTH_SHORT)
@@ -2743,7 +2742,7 @@ private fun SettingsExpandableSectionHeader(
                 .semantics { contentDescription = if (collapsed) cdExpand else cdCollapse }
                 .tapSoundClickable(
                     onClick = onToggle,
-                    indication = LocalIndication.current,
+                    indication = null,
                     interactionSource = interactionSource,
                 ).padding(
                     horizontal = horizontalPadding.coerceAtLeast(0.dp),
@@ -2791,6 +2790,81 @@ private fun SettingsExpandableSectionHeader(
                         .graphicsLayer { rotationZ = rotation },
                 size = chevronSize,
                 autoMirror = true,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+@OptIn(ExperimentalSharedTransitionApi::class)
+private fun SettingsStandaloneNavigationRow(
+    iconName: String,
+    title: String,
+    onClick: () -> Unit,
+) {
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+    val sharedBoundsModifier =
+        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+            with(sharedTransitionScope) {
+                Modifier.sharedBounds(
+                    sharedContentState = rememberSharedContentState(DEV_OPTIONS_SHARED_BOUNDS_KEY),
+                    animatedVisibilityScope = animatedVisibilityScope,
+                )
+            }
+        } else {
+            Modifier
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .then(sharedBoundsModifier)
+                .clip(RoundedCornerShape(28.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .tapSoundClickable(
+                    onClick = onClick,
+                    indication = null,
+                ).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(36.dp)
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            FilePipeMaterialRoundedSymbol(
+                name = iconName,
+                contentDescription = null,
+                size = 21.dp,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center,
+        ) {
+            FilePipeMaterialRoundedSymbol(
+                name = "arrow_outward",
+                contentDescription = null,
+                size = 20.dp,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -3013,7 +3087,7 @@ private fun swipeActionLabel(action: SwipeAction): String =
         SwipeAction.DELETE -> stringResource(R.string.settings_swipe_action_trash)
         SwipeAction.DUPLICATE -> stringResource(R.string.action_duplicate)
         SwipeAction.PREVIEW -> stringResource(R.string.preview_title)
-        SwipeAction.VIEW_HISTORY -> stringResource(R.string.view_history)
+        SwipeAction.VIEW_HISTORY -> stringResource(R.string.settings_swipe_action_history)
     }
 
 @Composable
@@ -3219,14 +3293,7 @@ private fun SwipeActionIcon(action: SwipeAction) {
 
 private fun SwipeAction.settingsSwipeTileColor(): Color = settingsSwipeAccent().copy(alpha = 0.14f)
 
-private fun SwipeAction.settingsSwipeAccent(): Color =
-    when (this) {
-        SwipeAction.EDIT -> Color(0xFF3F7AF6)
-        SwipeAction.DELETE -> Color(0xFFE53935)
-        SwipeAction.DUPLICATE -> Color(0xFF64748B)
-        SwipeAction.PREVIEW -> Color(0xFF2E7D32)
-        SwipeAction.VIEW_HISTORY -> Color(0xFF5F6F82)
-    }
+private fun SwipeAction.settingsSwipeAccent(): Color = swipeActionAccent()
 
 private fun SwipeAction.settingsSwipeIconContainerColor(): Color = settingsSwipeAccent()
 

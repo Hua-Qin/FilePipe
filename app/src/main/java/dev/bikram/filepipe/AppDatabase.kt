@@ -12,12 +12,15 @@ import dev.bikram.filepipe.data.local.entity.FileMovedEntity
 import dev.bikram.filepipe.data.local.entity.RuleEntity
 import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
 
+const val APP_DATABASE_NAME = "filepipe.db"
+const val LEGACY_APP_DATABASE_NAME = "media_organizer.db"
+
 @Database(
     entities = [RuleEntity::class, RunHistoryEntity::class, FileMovedEntity::class],
     // Literal required by Room KSP. Keep in sync with [dev.bikram.filepipe.domain.export.APP_DATABASE_SCHEMA_VERSION].
-    version = 6,
+    version = 7,
     exportSchema = true,
-    // 2 -> 3 and 5 -> 6 are manual migrations in [dev.bikram.filepipe.di.DatabaseModule].
+    // 2 -> 3, 5 -> 6, and 6 -> 7 are manual migrations in [dev.bikram.filepipe.di.DatabaseModule].
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 3, to = 4),

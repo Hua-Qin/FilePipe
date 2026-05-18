@@ -3,6 +3,11 @@ package dev.bikram.filepipe.ui.navigation
 import android.app.Activity
 import android.os.Build
 import android.text.format.Formatter
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -41,6 +46,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -70,6 +77,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -91,8 +99,10 @@ import dev.bikram.filepipe.ui.components.FilePipeFloatingActionButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+import dev.bikram.filepipe.ui.screens.devoptions.DevOptionsScreen
 import dev.bikram.filepipe.ui.screens.help.FaqScreen
 import dev.bikram.filepipe.ui.screens.history.HistoryScreen
+import dev.bikram.filepipe.ui.screens.history.HistorySection
 import dev.bikram.filepipe.ui.screens.history.HistoryViewModel
 import dev.bikram.filepipe.ui.screens.historydetail.HistoryDetailScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingPermissionsScreen
@@ -106,6 +116,7 @@ import dev.bikram.filepipe.ui.screens.settings.launchAppShareChooser
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalReducedMotion
+import dev.bikram.filepipe.ui.theme.LocalSnackbarHostState
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.ProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.RoundedPolygonShape
@@ -138,6 +149,9 @@ private val bottomNavItems =
         ),
     )
 
+private val mainTabRouteOrdinals: Map<String, Int> =
+    bottomNavItems.mapIndexed { index, item -> item.screen.route to index }.toMap()
+
 private sealed interface UpdateChromeState {
     data object Hidden : UpdateChromeState
 
@@ -156,6 +170,7 @@ private sealed interface UpdateChromeState {
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalMaterial3AdaptiveNavigationSuiteApi::class,
+    ExperimentalSharedTransitionApi::class,
 )
 @Composable
 fun AppNavigation(
@@ -166,6 +181,7 @@ fun AppNavigation(
 ) {
     val playTap = rememberPlayTapSound()
     val navController = rememberNavController()
+    val pendingOpenHistory by pendingShortcutRepository.pendingOpenHistory.collectAsStateWithLifecycle()
     val pendingHistoryId by pendingShortcutRepository.pendingHistoryDetailId.collectAsStateWithLifecycle()
     val pendingOpenSettingsUpdates by pendingShortcutRepository.pendingOpenSettingsForUpdates.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -202,7 +218,11 @@ fun AppNavigation(
     val historyVm: HistoryViewModel = hiltViewModel()
     val settingsVm: SettingsViewModel = hiltViewModel()
     val hasAnyHistory by historyVm.hasAnyHistory.collectAsStateWithLifecycle()
+    val historySection by historyVm.section.collectAsStateWithLifecycle()
+    val trashedRules by historyVm.trashedRules.collectAsStateWithLifecycle()
+    val hasAnyTrashedRules = trashedRules.isNotEmpty()
     val updateInfo by settingsVm.updateInfo.collectAsStateWithLifecycle()
+    val openUpdateSheetFromNotification by settingsVm.openUpdateSheetFromNotification.collectAsStateWithLifecycle()
     val playBannerState by settingsVm.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
     var dismissedUpdateBarKey by remember { mutableStateOf<String?>(null) }
     var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
@@ -275,7 +295,22 @@ fun AppNavigation(
     val bottomBlurHeightPx = with(density) { bottomBlurHeightDp.toPx() }
 
     var showClearHistoryDialog by remember { mutableStateOf(false) }
+    var showEmptyTrashDialog by remember { mutableStateOf(false) }
     val reducedMotion = LocalReducedMotion.current
+
+    val openSettingsRoot: () -> Unit = {
+        if (navController.currentDestination?.route != Screen.Settings.route) {
+            val poppedToSettings = navController.popBackStack(Screen.Settings.route, inclusive = false)
+            if (!poppedToSettings) {
+                navController.navigate(Screen.Settings.route) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
 
     // Lock from disk-backed snapshot (MainActivity) so the first frame does not use
     // AppPreferences.DEFAULT.hasSeenIntro (false) and force onboarding on every cold start.
@@ -296,15 +331,26 @@ fun AppNavigation(
 
     LaunchedEffect(hasSeenIntro, pendingOpenSettingsUpdates, navController) {
         if (!pendingOpenSettingsUpdates || !hasSeenIntro) return@LaunchedEffect
-        navController.navigate(Screen.Settings.route) {
+        openSettingsRoot()
+        settingsVm.flagOpenUpdateSheetFromNotification()
+        pendingShortcutRepository.clearPendingOpenSettingsForUpdates()
+    }
+
+    LaunchedEffect(hasSeenIntro, openUpdateSheetFromNotification, navController, currentDestination?.route) {
+        if (!openUpdateSheetFromNotification || !hasSeenIntro) return@LaunchedEffect
+        openSettingsRoot()
+    }
+
+    LaunchedEffect(hasSeenIntro, pendingOpenHistory, navController) {
+        if (!pendingOpenHistory || !hasSeenIntro) return@LaunchedEffect
+        navController.navigate(Screen.History.route) {
             popUpTo(navController.graph.findStartDestination().id) {
                 saveState = true
             }
             launchSingleTop = true
             restoreState = true
         }
-        settingsVm.flagOpenUpdateSheetFromNotification()
-        pendingShortcutRepository.clearPendingOpenSettingsForUpdates()
+        pendingShortcutRepository.clearPendingOpenHistory()
     }
 
     LaunchedEffect(hasSeenIntro, pendingHistoryId, navController) {
@@ -402,10 +448,35 @@ fun AppNavigation(
             },
         )
     }
+    if (showEmptyTrashDialog && hasAnyTrashedRules) {
+        AlertDialog(
+            onDismissRequest = { showEmptyTrashDialog = false },
+            title = { Text(stringResource(R.string.history_trash_empty_confirm_title)) },
+            text = { Text(stringResource(R.string.history_trash_empty_confirm_message)) },
+            confirmButton = {
+                FilePipeTextButton(onClick = {
+                    showEmptyTrashDialog = false
+                    historyVm.emptyTrashForever()
+                }) {
+                    Text(
+                        text = stringResource(R.string.delete_forever),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                FilePipeTextButton(onClick = {
+                    showEmptyTrashDialog = false
+                }) { Text(stringResource(R.string.cancel)) }
+            },
+        )
+    }
 
+    val snackbarHostState = remember { SnackbarHostState() }
     val effectiveUseGradientBackground =
         preferences.useGradientBackground && preferences.themeMode != AppThemeMode.BLACK
     CompositionLocalProvider(
+        LocalSnackbarHostState provides snackbarHostState,
         LocalUseGradientBackground provides effectiveUseGradientBackground,
         LocalProgressiveBlurEnabled provides preferences.progressiveBlurEnabled,
         LocalProgressiveBlurStyle provides progressiveBlurStyle,
@@ -431,234 +502,272 @@ fun AppNavigation(
                     }
                     Box(Modifier.fillMaxSize()) {
                         Column(Modifier.fillMaxSize()) {
-                            NavHost(
+                            SharedTransitionLayout(
                                 modifier =
                                     Modifier
                                         .weight(1f)
-                                        .fillMaxWidth()
-                                        .background(Color.Transparent),
-                                navController = navController,
-                                startDestination = lockedNavStartDestination,
-                                enterTransition = {
-                                    if (reducedMotion) {
-                                        fadeIn(animationSpec = tween(durationMillis = 0))
-                                    } else {
-                                        slideInHorizontally { it } + fadeIn()
-                                    }
-                                },
-                                exitTransition = {
-                                    if (reducedMotion) {
-                                        fadeOut(animationSpec = tween(durationMillis = 0))
-                                    } else {
-                                        slideOutHorizontally { -it / 3 } + fadeOut()
-                                    }
-                                },
-                                popEnterTransition = {
-                                    if (reducedMotion) {
-                                        fadeIn(animationSpec = tween(durationMillis = 0))
-                                    } else {
-                                        slideInHorizontally { -it } + fadeIn()
-                                    }
-                                },
-                                popExitTransition = {
-                                    if (reducedMotion) {
-                                        fadeOut(animationSpec = tween(durationMillis = 0))
-                                    } else {
-                                        slideOutHorizontally { it } + fadeOut()
-                                    }
-                                },
+                                        .fillMaxWidth(),
                             ) {
-                                composable(
-                                    route = Screen.OnboardingTitle.route,
+                                NavHost(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxSize()
+                                            .background(Color.Transparent),
+                                    navController = navController,
+                                    startDestination = lockedNavStartDestination,
+                                    enterTransition = {
+                                        primaryTabEnterTransition(reducedMotion)
+                                            ?: if (reducedMotion) {
+                                                fadeIn(animationSpec = tween(durationMillis = 0))
+                                            } else {
+                                                slideInHorizontally { it } + fadeIn()
+                                            }
+                                    },
+                                    exitTransition = {
+                                        primaryTabExitTransition(reducedMotion)
+                                            ?: if (reducedMotion) {
+                                                fadeOut(animationSpec = tween(durationMillis = 0))
+                                            } else {
+                                                slideOutHorizontally { -it / 3 } + fadeOut()
+                                            }
+                                    },
+                                    popEnterTransition = {
+                                        if (reducedMotion) {
+                                            fadeIn(animationSpec = tween(durationMillis = 0))
+                                        } else {
+                                            slideInHorizontally { -it } + fadeIn()
+                                        }
+                                    },
+                                    popExitTransition = {
+                                        if (reducedMotion) {
+                                            fadeOut(animationSpec = tween(durationMillis = 0))
+                                        } else {
+                                            slideOutHorizontally { it } + fadeOut()
+                                        }
+                                    },
                                 ) {
-                                    OnboardingTitleScreen(
-                                        onLetsBegan = {
-                                            navController.navigate(Screen.OnboardingPermissions.route)
-                                        },
-                                    )
-                                }
+                                    val sharedTransitionScope = this@SharedTransitionLayout
+                                    composable(
+                                        route = Screen.OnboardingTitle.route,
+                                    ) {
+                                        OnboardingTitleScreen(
+                                            onLetsBegan = {
+                                                navController.navigate(Screen.OnboardingPermissions.route)
+                                            },
+                                        )
+                                    }
 
-                                composable(Screen.OnboardingPermissions.route) {
-                                    OnboardingPermissionsScreen(
-                                        onContinue = {
-                                            navController.navigate(Screen.OnboardingRuleWizard.route) {
-                                                launchSingleTop = true
-                                            }
-                                        },
-                                        onOpenStorageAccessFaq = {
-                                            navController.navigate(Screen.Faq.createRoute(Screen.Faq.FOCUS_STORAGE_ACCESS))
-                                        },
-                                    )
-                                }
-
-                                composable(Screen.OnboardingRuleWizard.route) {
-                                    OnboardingRuleWizardScreen(
-                                        onBackToPermissions = {
-                                            navController.popBackStack()
-                                        },
-                                        onUseTemplate = { templateIndex ->
-                                            navController.navigate(Screen.Rules.route) {
-                                                popUpTo(navController.graph.id) { inclusive = true }
-                                            }
-                                            navController.navigate(
-                                                Screen.RuleDetail.createRoute(
-                                                    templateIndex = templateIndex,
-                                                    skipTemplatePicker = true,
-                                                ),
-                                            )
-                                            settingsVm.markIntroSeen()
-                                        },
-                                        onStartBlank = {
-                                            navController.navigate(Screen.Rules.route) {
-                                                popUpTo(navController.graph.id) { inclusive = true }
-                                            }
-                                            navController.navigate(
-                                                Screen.RuleDetail.createRoute(skipTemplatePicker = true),
-                                            )
-                                            settingsVm.markIntroSeen()
-                                        },
-                                        onSkip = {
-                                            navController.navigate(Screen.Rules.route) {
-                                                popUpTo(navController.graph.id) { inclusive = true }
-                                            }
-                                            settingsVm.markIntroSeen()
-                                        },
-                                    )
-                                }
-
-                                composable(Screen.Rules.route) {
-                                    RulesScreen(
-                                        contentPadding = primaryTabContentPadding,
-                                        onEditRule = { ruleId -> navController.navigate(Screen.RuleDetail.createRoute(ruleId)) },
-                                        onNavigateToHistoryDetail = { historyId ->
-                                            navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
-                                                launchSingleTop = true
-                                            }
-                                        },
-                                        onNavigateToHistoryList = {
-                                            navController.navigate(Screen.History.route) {
-                                                popUpTo(navController.graph.findStartDestination().id) {
-                                                    saveState = true
+                                    composable(Screen.OnboardingPermissions.route) {
+                                        OnboardingPermissionsScreen(
+                                            onContinue = {
+                                                navController.navigate(Screen.OnboardingRuleWizard.route) {
+                                                    launchSingleTop = true
                                                 }
-                                                launchSingleTop = true
-                                                restoreState = true
-                                            }
-                                        },
-                                        onNavigateToRuleHistory = { ruleId ->
-                                            navController.navigate(Screen.HistoryForRule.createRoute(ruleId))
-                                        },
-                                    )
-                                }
-                                composable(
-                                    route = Screen.RuleDetail.route,
-                                    arguments =
-                                        listOf(
-                                            navArgument(Screen.RuleDetail.ARG_RULE_ID) {
-                                                type = NavType.LongType
                                             },
-                                            navArgument(Screen.RuleDetail.ARG_TEMPLATE_INDEX) {
-                                                type = NavType.IntType
-                                                defaultValue = -1
+                                            onOpenStorageAccessFaq = {
+                                                navController.navigate(Screen.Faq.createRoute(Screen.Faq.FOCUS_STORAGE_ACCESS))
                                             },
-                                            navArgument(Screen.RuleDetail.ARG_SKIP_TEMPLATE_PICKER) {
-                                                type = NavType.BoolType
-                                                defaultValue = false
+                                        )
+                                    }
+
+                                    composable(Screen.OnboardingRuleWizard.route) {
+                                        OnboardingRuleWizardScreen(
+                                            onBackToPermissions = {
+                                                navController.popBackStack()
                                             },
-                                        ),
-                                ) {
-                                    RuleDetailScreen(
-                                        onNavigateBack = { navController.popBackStack() },
-                                        onOpenFaq = { navController.navigate(Screen.Faq.createRoute()) },
-                                    )
-                                }
-                                composable(Screen.History.route) {
-                                    HistoryScreen(
-                                        contentPadding = primaryTabContentPadding,
-                                        onHistoryClick = { historyId ->
-                                            navController.navigate(Screen.HistoryDetail.createRoute(historyId))
-                                        },
-                                    )
-                                }
-                                composable(Screen.Settings.route) {
-                                    SettingsScreen(
-                                        contentPadding = primaryTabContentPadding,
-                                        onOpenIntro = {
-                                            navController.navigate(Screen.OnboardingTitle.route)
-                                        },
-                                        onOpenFaqStorageSection = {
-                                            navController.navigate(Screen.Faq.createRoute(Screen.Faq.FOCUS_STORAGE_ACCESS))
-                                        },
-                                        onOpenHelp = {
-                                            navController.navigate(Screen.Faq.createRoute())
-                                        },
-                                        viewModel = settingsVm,
-                                        highlightSectionKey = settingsHighlightSection,
-                                        onHighlightHandled = { settingsHighlightSection = null },
-                                    )
-                                }
-                                composable(
-                                    route = Screen.Faq.route,
-                                    arguments =
-                                        listOf(
-                                            navArgument(Screen.Faq.ARG_FOCUS_SECTION) {
-                                                type = NavType.StringType
-                                                defaultValue = ""
+                                            onUseTemplate = { templateIndex ->
+                                                navController.navigate(Screen.Rules.route) {
+                                                    popUpTo(navController.graph.id) { inclusive = true }
+                                                }
+                                                navController.navigate(
+                                                    Screen.RuleDetail.createRoute(
+                                                        templateIndex = templateIndex,
+                                                        skipTemplatePicker = true,
+                                                    ),
+                                                )
+                                                settingsVm.markIntroSeen()
                                             },
-                                        ),
-                                ) { backStackEntry ->
-                                    val focusSection =
-                                        backStackEntry.arguments?.getString(Screen.Faq.ARG_FOCUS_SECTION).orEmpty()
-                                    val goToSettingsFromFaq: () -> Unit = {
-                                        val poppedToExistingSettings =
-                                            navController.popBackStack(Screen.Settings.route, inclusive = false)
-                                        if (!poppedToExistingSettings) {
-                                            navController.popBackStack()
-                                            navController.navigate(Screen.Settings.route) { launchSingleTop = true }
+                                            onStartBlank = {
+                                                navController.navigate(Screen.Rules.route) {
+                                                    popUpTo(navController.graph.id) { inclusive = true }
+                                                }
+                                                navController.navigate(
+                                                    Screen.RuleDetail.createRoute(skipTemplatePicker = true),
+                                                )
+                                                settingsVm.markIntroSeen()
+                                            },
+                                            onSkip = {
+                                                navController.navigate(Screen.Rules.route) {
+                                                    popUpTo(navController.graph.id) { inclusive = true }
+                                                }
+                                                settingsVm.markIntroSeen()
+                                            },
+                                        )
+                                    }
+
+                                    composable(Screen.Rules.route) {
+                                        RulesScreen(
+                                            contentPadding = primaryTabContentPadding,
+                                            onEditRule = { ruleId -> navController.navigate(Screen.RuleDetail.createRoute(ruleId)) },
+                                            onNavigateToHistoryDetail = { historyId ->
+                                                navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
+                                                    launchSingleTop = true
+                                                }
+                                            },
+                                            onNavigateToHistoryList = {
+                                                navController.navigate(Screen.History.route) {
+                                                    popUpTo(navController.graph.findStartDestination().id) {
+                                                        saveState = true
+                                                    }
+                                                    launchSingleTop = true
+                                                    restoreState = true
+                                                }
+                                            },
+                                            onNavigateToRuleHistory = { ruleId ->
+                                                navController.navigate(Screen.HistoryForRule.createRoute(ruleId))
+                                            },
+                                        )
+                                    }
+                                    composable(
+                                        route = Screen.RuleDetail.route,
+                                        arguments =
+                                            listOf(
+                                                navArgument(Screen.RuleDetail.ARG_RULE_ID) {
+                                                    type = NavType.LongType
+                                                },
+                                                navArgument(Screen.RuleDetail.ARG_TEMPLATE_INDEX) {
+                                                    type = NavType.IntType
+                                                    defaultValue = -1
+                                                },
+                                                navArgument(Screen.RuleDetail.ARG_SKIP_TEMPLATE_PICKER) {
+                                                    type = NavType.BoolType
+                                                    defaultValue = false
+                                                },
+                                            ),
+                                    ) {
+                                        RuleDetailScreen(
+                                            onNavigateBack = { navController.popBackStack() },
+                                            onOpenFaq = { navController.navigate(Screen.Faq.createRoute()) },
+                                        )
+                                    }
+                                    composable(Screen.History.route) {
+                                        HistoryScreen(
+                                            contentPadding = primaryTabContentPadding,
+                                            onHistoryClick = { historyId ->
+                                                navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                                            },
+                                            viewModel = historyVm,
+                                        )
+                                    }
+                                    composable(Screen.Settings.route) {
+                                        CompositionLocalProvider(
+                                            LocalSharedTransitionScope provides sharedTransitionScope,
+                                            LocalNavAnimatedVisibilityScope provides this,
+                                        ) {
+                                            SettingsScreen(
+                                                contentPadding = primaryTabContentPadding,
+                                                onOpenIntro = {
+                                                    navController.navigate(Screen.OnboardingTitle.route)
+                                                },
+                                                onOpenFaqStorageSection = {
+                                                    navController.navigate(Screen.Faq.createRoute(Screen.Faq.FOCUS_STORAGE_ACCESS))
+                                                },
+                                                onOpenHelp = {
+                                                    navController.navigate(Screen.Faq.createRoute())
+                                                },
+                                                onOpenDevOptions = {
+                                                    navController.navigate(Screen.DevOptions.route) {
+                                                        launchSingleTop = true
+                                                    }
+                                                },
+                                                viewModel = settingsVm,
+                                                highlightSectionKey = settingsHighlightSection,
+                                                onHighlightHandled = { settingsHighlightSection = null },
+                                            )
                                         }
                                     }
-                                    val openFolderAccessInSettings: () -> Unit = {
-                                        settingsHighlightSection = "folder_access"
-                                        goToSettingsFromFaq()
+                                    composable(
+                                        route = Screen.DevOptions.route,
+                                        enterTransition = { fadeIn(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 90)) },
+                                        exitTransition = { fadeOut(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 90)) },
+                                        popEnterTransition = { fadeIn(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 90)) },
+                                        popExitTransition = { fadeOut(animationSpec = tween(durationMillis = if (reducedMotion) 0 else 90)) },
+                                    ) {
+                                        CompositionLocalProvider(
+                                            LocalSharedTransitionScope provides sharedTransitionScope,
+                                            LocalNavAnimatedVisibilityScope provides this,
+                                        ) {
+                                            DevOptionsScreen(
+                                                contentPadding = primaryTabContentPadding,
+                                                onNavigateBack = { navController.popBackStack() },
+                                                settingsViewModel = settingsVm,
+                                            )
+                                        }
                                     }
-                                    FaqScreen(
-                                        initialFocusSectionId = focusSection,
-                                        onNavigateBack = { navController.popBackStack() },
-                                        onOpenFolderAccessInSettings = openFolderAccessInSettings,
-                                        onOpenSettingsNotifications = {
-                                            settingsHighlightSection = "notifications"
+                                    composable(
+                                        route = Screen.Faq.route,
+                                        arguments =
+                                            listOf(
+                                                navArgument(Screen.Faq.ARG_FOCUS_SECTION) {
+                                                    type = NavType.StringType
+                                                    defaultValue = ""
+                                                },
+                                            ),
+                                    ) { backStackEntry ->
+                                        val focusSection =
+                                            backStackEntry.arguments?.getString(Screen.Faq.ARG_FOCUS_SECTION).orEmpty()
+                                        val goToSettingsFromFaq: () -> Unit = {
+                                            val poppedToExistingSettings =
+                                                navController.popBackStack(Screen.Settings.route, inclusive = false)
+                                            if (!poppedToExistingSettings) {
+                                                navController.popBackStack()
+                                                navController.navigate(Screen.Settings.route) { launchSingleTop = true }
+                                            }
+                                        }
+                                        val openFolderAccessInSettings: () -> Unit = {
+                                            settingsHighlightSection = "folder_access"
                                             goToSettingsFromFaq()
-                                        },
-                                        onOpenAppNotificationSettings = {
-                                            settingsVm.openAppNotificationSettings()
-                                        },
-                                    )
-                                }
-                                composable(
-                                    route = Screen.HistoryDetail.route,
-                                    arguments =
-                                        listOf(
-                                            navArgument(Screen.HistoryDetail.ARG_HISTORY_ID) {
-                                                type = NavType.LongType
+                                        }
+                                        FaqScreen(
+                                            initialFocusSectionId = focusSection,
+                                            onNavigateBack = { navController.popBackStack() },
+                                            onOpenFolderAccessInSettings = openFolderAccessInSettings,
+                                            onOpenSettingsNotifications = {
+                                                settingsHighlightSection = "notifications"
+                                                goToSettingsFromFaq()
                                             },
-                                        ),
-                                ) {
-                                    HistoryDetailScreen(onNavigateBack = { navController.popBackStack() })
-                                }
-                                composable(
-                                    route = Screen.HistoryForRule.route,
-                                    arguments =
-                                        listOf(
-                                            navArgument(Screen.HistoryForRule.ARG_RULE_ID) {
-                                                type = NavType.LongType
+                                            onOpenAppNotificationSettings = {
+                                                settingsVm.openAppNotificationSettings()
                                             },
-                                        ),
-                                ) {
-                                    HistoryScreen(
-                                        onHistoryClick = { historyId ->
-                                            navController.navigate(Screen.HistoryDetail.createRoute(historyId))
-                                        },
-                                        onNavigateBack = { navController.popBackStack() },
-                                    )
+                                        )
+                                    }
+                                    composable(
+                                        route = Screen.HistoryDetail.route,
+                                        arguments =
+                                            listOf(
+                                                navArgument(Screen.HistoryDetail.ARG_HISTORY_ID) {
+                                                    type = NavType.LongType
+                                                },
+                                            ),
+                                    ) {
+                                        HistoryDetailScreen(onNavigateBack = { navController.popBackStack() })
+                                    }
+                                    composable(
+                                        route = Screen.HistoryForRule.route,
+                                        arguments =
+                                            listOf(
+                                                navArgument(Screen.HistoryForRule.ARG_RULE_ID) {
+                                                    type = NavType.LongType
+                                                },
+                                            ),
+                                    ) {
+                                        HistoryScreen(
+                                            onHistoryClick = { historyId ->
+                                                navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                                            },
+                                            onNavigateBack = { navController.popBackStack() },
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -711,10 +820,13 @@ fun AppNavigation(
                                     MainNavFabSlot(
                                         currentTab = currentTab,
                                         hasAnyHistory = hasAnyHistory,
+                                        historySection = historySection,
+                                        hasAnyTrashedRules = hasAnyTrashedRules,
                                         onAddRule = {
                                             navController.navigate(Screen.RuleDetail.createRoute())
                                         },
                                         onClearHistory = { showClearHistoryDialog = true },
+                                        onEmptyTrash = { showEmptyTrashDialog = true },
                                         onShareApp = { launchAppShareChooser(hostContext) },
                                     )
                                 },
@@ -733,14 +845,26 @@ fun AppNavigation(
                                 MainNavFabSlot(
                                     currentTab = currentTab,
                                     hasAnyHistory = hasAnyHistory,
+                                    historySection = historySection,
+                                    hasAnyTrashedRules = hasAnyTrashedRules,
                                     onAddRule = {
                                         navController.navigate(Screen.RuleDetail.createRoute())
                                     },
                                     onClearHistory = { showClearHistoryDialog = true },
+                                    onEmptyTrash = { showEmptyTrashDialog = true },
                                     onShareApp = { launchAppShareChooser(hostContext) },
                                 )
                             }
                         }
+
+                        SnackbarHost(
+                            hostState = snackbarHostState,
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .windowInsetsPadding(WindowInsets.navigationBars)
+                                    .padding(bottom = 80.dp),
+                        )
                     }
                 }
                 if (showBottomBar && useAdaptiveNavigationRail) {
@@ -1169,8 +1293,11 @@ private fun CenteredPillWithSideFab(
 private fun MainNavFabSlot(
     currentTab: Screen?,
     hasAnyHistory: Boolean,
+    historySection: HistorySection,
+    hasAnyTrashedRules: Boolean,
     onAddRule: () -> Unit,
     onClearHistory: () -> Unit,
+    onEmptyTrash: () -> Unit,
     onShareApp: () -> Unit,
 ) {
     when (currentTab) {
@@ -1189,18 +1316,29 @@ private fun MainNavFabSlot(
             )
 
         Screen.History ->
-            SimpleNavFab(
-                icon = { tint ->
-                    FilePipeMaterialRoundedSymbol(
-                        name = "delete_sweep",
-                        contentDescription = null,
-                        tint = tint,
+            {
+                val inTrash = historySection == HistorySection.TRASH
+                val description =
+                    stringResource(
+                        if (inTrash) {
+                            R.string.history_trash_empty_action
+                        } else {
+                            R.string.history_clear
+                        },
                     )
-                },
-                description = stringResource(R.string.history_clear),
-                enabled = hasAnyHistory,
-                onClick = onClearHistory,
-            )
+                SimpleNavFab(
+                    icon = { tint ->
+                        FilePipeMaterialRoundedSymbol(
+                            name = "delete_forever",
+                            contentDescription = null,
+                            tint = tint,
+                        )
+                    },
+                    description = description,
+                    enabled = if (inTrash) hasAnyTrashedRules else hasAnyHistory,
+                    onClick = if (inTrash) onEmptyTrash else onClearHistory,
+                )
+            }
 
         Screen.Settings ->
             SimpleNavFab(
@@ -1265,5 +1403,33 @@ private fun SimpleNavFab(
         Box(modifier = Modifier.semantics { contentDescription = description }) {
             icon(contentColor)
         }
+    }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryTabEnterTransition(
+    reducedMotion: Boolean,
+): EnterTransition? {
+    val initialOrdinal = mainTabRouteOrdinals[initialState.destination.route] ?: return null
+    val targetOrdinal = mainTabRouteOrdinals[targetState.destination.route] ?: return null
+    return if (reducedMotion) {
+        fadeIn(animationSpec = tween(durationMillis = 0))
+    } else if (targetOrdinal > initialOrdinal) {
+        slideInHorizontally { it } + fadeIn()
+    } else {
+        slideInHorizontally { -it } + fadeIn()
+    }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryTabExitTransition(
+    reducedMotion: Boolean,
+): ExitTransition? {
+    val initialOrdinal = mainTabRouteOrdinals[initialState.destination.route] ?: return null
+    val targetOrdinal = mainTabRouteOrdinals[targetState.destination.route] ?: return null
+    return if (reducedMotion) {
+        fadeOut(animationSpec = tween(durationMillis = 0))
+    } else if (targetOrdinal > initialOrdinal) {
+        slideOutHorizontally { -it / 3 } + fadeOut()
+    } else {
+        slideOutHorizontally { it } + fadeOut()
     }
 }

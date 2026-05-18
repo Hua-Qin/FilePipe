@@ -20,11 +20,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
@@ -37,6 +42,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 private const val ARTBOARD = 120f
+private const val TRASH_ARTBOARD = 220f
 
 /**
  * History empty state: clock + timeline bars (120×120 artboard proportions).
@@ -233,6 +239,122 @@ fun ThemeColoredEmptyRulesIllustration(modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ThemeColoredEmptyTrashIllustration(modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    Box(modifier.size(width = 132.dp, height = 132.dp).clearAndSetSemantics { }) {
+        ExpressiveEmptyBackdrop(
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .size(56.dp),
+            polygon = MaterialShapes.Sunny,
+            morphTo = MaterialShapes.Cookie9Sided,
+            color = scheme.errorContainer.copy(alpha = 0.42f),
+        )
+        ExpressiveEmptyBackdrop(
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .size(46.dp),
+            polygon = MaterialShapes.Cookie9Sided,
+            morphTo = MaterialShapes.Sunny,
+            color = scheme.tertiaryContainer.copy(alpha = 0.52f),
+        )
+        Canvas(Modifier.matchParentSize()) {
+            val scaleX = size.width / TRASH_ARTBOARD
+            val scaleY = size.height / TRASH_ARTBOARD
+            val strokeWidth = 1.4.dp.toPx()
+            val outlineColor = scheme.outline.copy(alpha = 0.55f)
+            val ribColor = scheme.onSurfaceVariant.copy(alpha = 0.30f)
+            val shadowColor = scheme.scrim.copy(alpha = 0.10f)
+
+            val binPath =
+                Path().apply {
+                    moveTo(52f * scaleX, 66f * scaleY)
+                    lineTo(168f * scaleX, 66f * scaleY)
+                    lineTo(162f * scaleX, 184f * scaleY)
+                    quadraticTo(160f * scaleX, 192f * scaleY, 154f * scaleX, 192f * scaleY)
+                    lineTo(66f * scaleX, 192f * scaleY)
+                    quadraticTo(60f * scaleX, 192f * scaleY, 58f * scaleX, 184f * scaleY)
+                    close()
+                }
+            translate(left = 4f * scaleX, top = 6f * scaleY) {
+                drawPath(binPath, color = shadowColor, style = Fill)
+            }
+            drawPath(binPath, color = scheme.surfaceContainerHigh, style = Fill)
+            drawPath(binPath, color = outlineColor, style = Stroke(width = strokeWidth))
+
+            drawLine(
+                color = ribColor,
+                start = Offset(86f * scaleX, 82f * scaleY),
+                end = Offset(88f * scaleX, 180f * scaleY),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = ribColor,
+                start = Offset(110f * scaleX, 80f * scaleY),
+                end = Offset(110f * scaleX, 182f * scaleY),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+            drawLine(
+                color = ribColor,
+                start = Offset(134f * scaleX, 82f * scaleY),
+                end = Offset(132f * scaleX, 180f * scaleY),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+
+            drawRoundRect(
+                color = scheme.errorContainer.copy(alpha = 0.78f),
+                topLeft = Offset(44f * scaleX, 52f * scaleY),
+                size = Size(132f * scaleX, 14f * scaleY),
+                cornerRadius = CornerRadius(7f * scaleX, 7f * scaleY),
+                style = Fill,
+            )
+            drawRoundRect(
+                color = outlineColor,
+                topLeft = Offset(44f * scaleX, 52f * scaleY),
+                size = Size(132f * scaleX, 14f * scaleY),
+                cornerRadius = CornerRadius(7f * scaleX, 7f * scaleY),
+                style = Stroke(width = strokeWidth),
+            )
+            drawRoundRect(
+                color = scheme.onErrorContainer.copy(alpha = 0.55f),
+                topLeft = Offset(98f * scaleX, 42f * scaleY),
+                size = Size(24f * scaleX, 10f * scaleY),
+                cornerRadius = CornerRadius(5f * scaleX, 5f * scaleY),
+                style = Fill,
+            )
+
+            drawSparkle(Offset(192f * scaleX, 56f * scaleY), 9f * scaleX, scheme.tertiary)
+            drawSparkle(Offset(28f * scaleX, 78f * scaleY), 6f * scaleX, scheme.primary.copy(alpha = 0.78f))
+            drawSparkle(Offset(200f * scaleX, 138f * scaleY), 5f * scaleX, scheme.tertiary.copy(alpha = 0.70f))
+        }
+    }
+}
+
+private fun DrawScope.drawSparkle(
+    center: Offset,
+    radius: Float,
+    color: Color,
+) {
+    val waist = radius * 0.32f
+    val sparkle =
+        Path().apply {
+            moveTo(center.x, center.y - radius)
+            quadraticTo(center.x + waist, center.y - waist, center.x + radius, center.y)
+            quadraticTo(center.x + waist, center.y + waist, center.x, center.y + radius)
+            quadraticTo(center.x - waist, center.y + waist, center.x - radius, center.y)
+            quadraticTo(center.x - waist, center.y - waist, center.x, center.y - radius)
+            close()
+        }
+    drawPath(sparkle, color = color, style = Fill)
 }
 
 @Composable
