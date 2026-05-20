@@ -346,8 +346,16 @@ fun DevOptionsScreen(
                                     onClick = { viewModel.addMockLargeFileMoveRule() },
                                 ),
                                 DevAction(
-                                    label = stringResource(R.string.dev_options_action_remove_mock_large_file_move_rule),
-                                    onClick = { viewModel.removeMockLargeFileMoveRuleAndHistory() },
+                                    label = stringResource(R.string.dev_options_action_add_mock_saf_permission_lost_rule),
+                                    onClick = { viewModel.addMockSafPermissionLostRule() },
+                                ),
+                                DevAction(
+                                    label = stringResource(R.string.dev_options_action_add_mock_saf_download_rule),
+                                    onClick = { viewModel.addMockSafDownloadAccessRule() },
+                                ),
+                                DevAction(
+                                    label = stringResource(R.string.dev_options_action_remove_mock_rules),
+                                    onClick = { viewModel.removeMockRulesAndHistory() },
                                 ),
                                 DevAction(
                                     label = stringResource(R.string.dev_options_action_arm_update_promo),
@@ -358,7 +366,7 @@ fun DevOptionsScreen(
                                     },
                                 ),
                                 DevAction(
-                                    label = stringResource(R.string.dev_options_action_start_play_banner),
+                                    label = stringResource(R.string.dev_options_action_start_play_bar),
                                     enabled = state.updateMocksAvailable,
                                     onClick = {
                                         settingsViewModel.devReleaseMockStartPlayUpdateBannerSequence()

@@ -7,6 +7,8 @@ Sources of truth (any one match is enough to keep the glyph):
 - `materialSymbolName = "xxx"` / `leadingMaterialSymbolName = "xxx"` wrapper parameters.
 - `symbolName = "xxx"` field assignments.
 - String literals returned from `*.materialSymbolName()`-style helper functions.
+- String literals returned from file-extension `when` branches such as
+  `"mp3", "wav" -> "audio_file"` and `else -> "draft"`.
 
 We err on the side of including extras: ligatures are cheap (~50-200 bytes
 each), but a missing one ships as an invisible icon in production.
@@ -51,6 +53,17 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # `EnumType.FOO -> "icon"` in `fun EnumType.materialSymbolName()`-style maps.
     ("enum_icon_arrow", re.compile(
         r'\b[A-Z][A-Za-z0-9_]*\.\w+\s*->\s*"([a-z][a-z0-9_]+)"',
+        re.MULTILINE,
+    )),
+    # Kotlin when branches that map string literals to icon ligatures, e.g.
+    # `"mp3", "wav" -> "audio_file"` in file type helpers.
+    ("string_when_icon_arrow", re.compile(
+        r'(?:"[^"]+"\s*,\s*)*"[^"]+"\s*->\s*"([a-z][a-z0-9_]+)"',
+        re.MULTILINE,
+    )),
+    # Fallback branches in icon-name helper functions, e.g. `else -> "draft"`.
+    ("else_icon_arrow", re.compile(
+        r'\belse\s*->\s*"([a-z][a-z0-9_]+)"',
         re.MULTILINE,
     )),
     # Enum constructor entries like `ARCHIVE("archive")`.

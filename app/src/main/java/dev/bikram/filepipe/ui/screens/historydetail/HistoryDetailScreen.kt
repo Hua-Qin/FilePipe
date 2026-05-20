@@ -32,7 +32,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -84,8 +83,10 @@ import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.compactControlShape
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.theme.pillShape
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -325,7 +326,7 @@ private fun RunSummaryCard(
                 FilePipeButton(
                     onClick = onUndo,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(50),
+                    shape = pillShape,
                     colors =
                         ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -335,9 +336,11 @@ private fun RunSummaryCard(
                     FilePipeMaterialRoundedSymbol(
                         name = "undo",
                         contentDescription = null,
+                        size = 20.dp,
                         autoMirror = true,
                     )
-                    Text("  ${stringResource(R.string.history_detail_undo_files, history.totalFilesMoved)}")
+                    Spacer(Modifier.size(6.dp))
+                    Text(stringResource(R.string.history_detail_undo_files, history.totalFilesMoved))
                 }
             }
         }
@@ -408,7 +411,7 @@ private fun FileMovedCard(
                         Modifier
                     },
                 ),
-        shape = RoundedCornerShape(12.dp),
+        shape = compactControlShape,
         color = containerColor,
         contentColor = rowContentColor,
         tonalElevation = 1.dp,
@@ -438,7 +441,6 @@ private fun FileMovedCard(
                         contentDescription = null,
                         size = 16.dp,
                         tint = iconColor,
-                        modifier = Modifier.size(16.dp).padding(start = 4.dp),
                     )
                 }
 
@@ -517,25 +519,36 @@ private fun FileThumbnailOrIcon(
             }
     }
 
-    Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
-        modifier = Modifier.size(thumbnailSize),
-    ) {
-        val bitmap = thumbnailBitmap
-        if (bitmap != null) {
+    val bitmap = thumbnailBitmap
+    if (bitmap != null) {
+        Surface(
+            shape = MaterialTheme.shapes.small,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.size(thumbnailSize),
+        ) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
             )
-        } else {
+        }
+    } else {
+        Box(
+            modifier =
+                Modifier
+                    .size(thumbnailSize)
+                    .background(
+                        color = MaterialTheme.colorScheme.secondaryContainer,
+                        shape = MaterialTheme.shapes.small,
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
             FilePipeMaterialRoundedSymbol(
                 name = fileTypeSymbolName(file.fileName),
                 contentDescription = null,
+                size = 24.dp,
                 tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.padding(8.dp),
             )
         }
     }
@@ -895,7 +908,7 @@ private fun fileTypeSymbolName(fileName: String): String {
         "mp4", "mkv", "avi", "mov", "m4v", "webm" -> "movie"
         "mp3", "flac", "aac", "ogg", "m4a", "wav" -> "audio_file"
         "pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt", "txt", "odt" -> "description"
-        "zip", "rar", "7z", "tar", "gz" -> "archive"
+        "zip", "rar", "7z", "tar", "gz" -> "folder_zip"
         else -> "draft"
     }
 }

@@ -45,19 +45,14 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -65,6 +60,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -164,14 +160,14 @@ import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.DEV_OPTIONS_SHARED_BOUNDS_KEY
 import dev.bikram.filepipe.ui.navigation.LocalNavAnimatedVisibilityScope
-import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
-import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
 import dev.bikram.filepipe.ui.navigation.LocalSharedTransitionScope
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalSnackbarHostState
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.compactControlShape
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.theme.pillShape
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import dev.bikram.filepipe.ui.theme.swipeActionAccent
 import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
@@ -671,16 +667,7 @@ fun SettingsScreen(
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             Column(Modifier.fillMaxWidth()) {
-                LocalPrimaryTabTopBanner.current()
                 LargeTopAppBar(
-                    modifier =
-                        Modifier.then(
-                            if (LocalPrimaryTabTopBannerActive.current) {
-                                Modifier.consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
-                            } else {
-                                Modifier
-                            },
-                        ),
                     title = { Text(stringResource(R.string.settings_title)) },
                     scrollBehavior = scrollBehavior,
                     colors = gradientOverlayTopAppBarColors(),
@@ -1598,7 +1585,7 @@ fun SettingsScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     val hostActivity = context as? ComponentActivity
-                                    val aboutPillShape = RoundedCornerShape(50)
+                                    val aboutPillShape = pillShape
                                     if (BuildConfig.FLAVOR == "github") {
                                         Surface(
                                             shape = aboutPillShape,
@@ -1922,7 +1909,7 @@ private fun AboutAppStoreButton(
     context: Context,
     copyLinkToClipboard: (String) -> Unit,
 ) {
-    val shape = RoundedCornerShape(18.dp)
+    val shape = MaterialTheme.shapes.large
     Surface(
         shape = shape,
         color = accentColor.copy(alpha = 0.13f),
@@ -1947,7 +1934,7 @@ private fun AboutAppStoreButton(
                 modifier =
                     Modifier
                         .size(40.dp)
-                        .clip(RoundedCornerShape(12.dp)),
+                        .clip(compactControlShape),
             )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -2259,7 +2246,7 @@ private fun UpdateCheckBottomSheetContent(
                                 Modifier
                                     .fillMaxWidth()
                                     .height(48.dp),
-                            shape = RoundedCornerShape(24.dp),
+                            shape = pillShape,
                         ) {
                             Text(
                                 text =
@@ -2309,7 +2296,7 @@ private fun UpdateCheckBottomSheetContent(
             ChangelogUiState.Loading -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     color = scheme.surfaceContainerHigh,
                     contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
@@ -2321,7 +2308,7 @@ private fun UpdateCheckBottomSheetContent(
                                 .fillMaxWidth()
                                 .height(120.dp)
                                 .padding(8.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = compactControlShape,
                         color = scheme.surfaceContainerLow,
                         contentColor = scheme.onSurface,
                     ) {
@@ -2341,7 +2328,7 @@ private fun UpdateCheckBottomSheetContent(
                 val changelogPagerMaxHeight = maxSheetHeight * 0.68f
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     color = scheme.surfaceContainerHigh,
                     contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
@@ -2353,7 +2340,7 @@ private fun UpdateCheckBottomSheetContent(
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(8.dp),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = compactControlShape,
                             color = scheme.surfaceContainerLow,
                             contentColor = scheme.onSurface,
                         ) {
@@ -2382,7 +2369,7 @@ private fun UpdateCheckBottomSheetContent(
                                     modifier =
                                         Modifier
                                             .size(32.dp)
-                                            .clip(RoundedCornerShape(50))
+                                            .clip(CircleShape)
                                             .tapSoundClickable(
                                                 enabled = canGoBack,
                                                 onClick = {
@@ -2429,7 +2416,7 @@ private fun UpdateCheckBottomSheetContent(
                                     modifier =
                                         Modifier
                                             .size(32.dp)
-                                            .clip(RoundedCornerShape(50))
+                                            .clip(CircleShape)
                                             .tapSoundClickable(
                                                 enabled = canGoForward,
                                                 onClick = {
@@ -2462,7 +2449,7 @@ private fun UpdateCheckBottomSheetContent(
                                         .fillMaxWidth()
                                         .height(changelogPagerMaxHeight)
                                         .padding(horizontal = 8.dp, vertical = 2.dp),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = compactControlShape,
                                 color = scheme.surfaceContainerLow,
                                 contentColor = scheme.onSurface,
                             ) {
@@ -2487,7 +2474,7 @@ private fun UpdateCheckBottomSheetContent(
             is ChangelogUiState.Failed -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     color = scheme.surfaceContainerHigh,
                     contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
@@ -2498,7 +2485,7 @@ private fun UpdateCheckBottomSheetContent(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(8.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = compactControlShape,
                         color = scheme.surfaceContainerLow,
                         contentColor = scheme.onSurface,
                     ) {
@@ -2548,7 +2535,7 @@ private fun UpToDatePhoneIcon() {
 private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
     val scheme = MaterialTheme.colorScheme
     val buttonHeight = 48.dp
-    val shape = RoundedCornerShape(24.dp)
+    val shape = pillShape
     val label =
         when {
             downloadProgress == -1f -> stringResource(R.string.settings_installing)

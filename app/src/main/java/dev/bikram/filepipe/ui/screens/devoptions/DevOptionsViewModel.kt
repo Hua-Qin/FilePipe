@@ -209,14 +209,14 @@ class DevOptionsViewModel
                         name = context.getString(R.string.dev_options_mock_large_file_rule_name),
                         sourceFolderPaths = listOf(DevMockFileMove.SOURCE_FOLDER_URI),
                         destinationFolderPath = DevMockFileMove.DESTINATION_FOLDER_URI,
-                        fileExtensions = listOf("mp4", "mov", "mkv"),
+                        fileExtensions = listOf("mp4", "mov", "jpg", "png", "mp3", "flac", "pdf", "docx", "zip", "dat"),
                         isEnabled = true,
                         createdAt = now,
                         updatedAt = now,
                         conflictPolicy = ConflictPolicy.RENAME_SUFFIX,
                         operationMode = OperationMode.MOVE,
                         suppressMissingSourceFolderCardWarning = true,
-                        icon = RuleIcon.VIDEO,
+                        icon = RuleIcon.DEFAULT,
                     ),
                 )
                 _events.emit(context.getString(R.string.dev_options_event_mock_large_file_rule_added))
@@ -224,16 +224,44 @@ class DevOptionsViewModel
             }
         }
 
-        fun removeMockLargeFileMoveRuleAndHistory() {
+        fun addMockSafPermissionLostRule() {
             viewModelScope.launch {
-                val mockRuleIds =
-                    withContext(Dispatchers.IO) {
+                addMockFolderIssueRule(
+                    ruleName = context.getString(R.string.dev_options_mock_saf_permission_lost_rule_name),
+                    sourceFolderPaths = listOf(MOCK_LOST_SAF_SOURCE_URI),
+                    destinationFolderPath = MOCK_LOST_SAF_DESTINATION_URI,
+                    addedMessageRes = R.string.dev_options_event_mock_saf_permission_lost_rule_added,
+                    existsMessageRes = R.string.dev_options_event_mock_folder_issue_rule_exists,
+                )
+            }
+        }
+
+        fun addMockSafDownloadAccessRule() {
+            viewModelScope.launch {
+                addMockFolderIssueRule(
+                    ruleName = context.getString(R.string.dev_options_mock_saf_download_rule_name),
+                    sourceFolderPaths = listOf(MOCK_SAF_DOWNLOAD_URI),
+                    destinationFolderPath = MOCK_LOST_SAF_DESTINATION_URI,
+                    addedMessageRes = R.string.dev_options_event_mock_saf_download_rule_added,
+                    existsMessageRes = R.string.dev_options_event_mock_folder_issue_rule_exists,
+                )
+            }
+        }
+
+        fun removeMockRulesAndHistory() {
+            viewModelScope.launch {
+                val mockFolderIssueNames =
+                    setOf(
+                        context.getString(R.string.dev_options_mock_saf_permission_lost_rule_name),
+                        context.getString(R.string.dev_options_mock_saf_download_rule_name),
+                    )
+                withContext(Dispatchers.IO) {
+                    val mockRuleIds =
                         ruleRepository
                             .getAllRulesOrderedBySortOrder()
-                            .filter(DevMockFileMove::isMockRule)
-                            .map { rule -> rule.id }
-                    }
-                withContext(Dispatchers.IO) {
+                            .filter { rule ->
+                                DevMockFileMove.isMockRule(rule) || rule.name in mockFolderIssueNames
+                            }.map { rule -> rule.id }
                     val mockHistoryRows =
                         runHistoryDao.getAllHistoryOnce().filter { history ->
                             history.ruleId in mockRuleIds ||
@@ -247,9 +275,44 @@ class DevOptionsViewModel
                     mockHistoryRows.forEach { history -> runHistoryDao.deleteHistoryById(history.id) }
                     mockRuleIds.forEach { ruleId -> ruleRepository.deleteRule(ruleId) }
                 }
-                _events.emit(context.getString(R.string.dev_options_event_mock_large_file_rule_removed))
+                _events.emit(context.getString(R.string.dev_options_event_mock_rules_removed))
                 refresh()
             }
+        }
+
+        private suspend fun addMockFolderIssueRule(
+            ruleName: String,
+            sourceFolderPaths: List<String>,
+            destinationFolderPath: String,
+            @StringRes addedMessageRes: Int,
+            @StringRes existsMessageRes: Int,
+        ) {
+            val existingRule =
+                withContext(Dispatchers.IO) {
+                    ruleRepository.getAllRulesOrderedBySortOrder().firstOrNull { rule -> rule.name == ruleName }
+                }
+            if (existingRule != null) {
+                _events.emit(context.getString(existsMessageRes))
+                return
+            }
+            val now = System.currentTimeMillis()
+            ruleRepository.saveRule(
+                Rule(
+                    name = ruleName,
+                    sourceFolderPaths = sourceFolderPaths,
+                    destinationFolderPath = destinationFolderPath,
+                    fileExtensions = listOf("jpg", "png", "pdf"),
+                    isEnabled = true,
+                    createdAt = now,
+                    updatedAt = now,
+                    conflictPolicy = ConflictPolicy.RENAME_SUFFIX,
+                    operationMode = OperationMode.MOVE,
+                    suppressMissingSourceFolderCardWarning = false,
+                    icon = RuleIcon.DEFAULT,
+                ),
+            )
+            _events.emit(context.getString(addedMessageRes))
+            refresh()
         }
 
         fun postMockUpdateNotification() {
@@ -710,5 +773,11 @@ class DevOptionsViewModel
             private const val REQUEST_CODE_OPEN_HISTORY = 1003
             private const val DATABASE_NAME = APP_DATABASE_NAME
             private const val DEV_MOCK_GITHUB_ASSET_UPDATED_AT = "2000-01-01T00:00:00Z"
+            private const val MOCK_LOST_SAF_SOURCE_URI =
+                "content://com.android.externalstorage.documents/tree/primary%3AFilePipeMockLostSource"
+            private const val MOCK_LOST_SAF_DESTINATION_URI =
+                "content://com.android.externalstorage.documents/tree/primary%3AFilePipeMockLostDestination"
+            private const val MOCK_SAF_DOWNLOAD_URI =
+                "content://com.android.externalstorage.documents/tree/primary%3ADownload"
         }
     }

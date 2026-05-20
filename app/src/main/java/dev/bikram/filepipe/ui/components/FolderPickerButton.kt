@@ -4,13 +4,12 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.data.storage.absoluteStoragePathToTreeUri
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.theme.compactControlShape
 import java.io.File
 
 @Composable
@@ -22,7 +21,7 @@ fun FolderPickerButton(
     FilePipeOutlinedButton(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        shape = compactControlShape,
     ) {
         FilePipeMaterialRoundedSymbol(name = "folder_open", contentDescription = null)
         Text("  $label")
@@ -84,6 +83,53 @@ fun displayPath(
     }
     val sdCardPrefix = Regex("^/storage/[A-F0-9]{4}-[A-F0-9]{4}/")
     return path.replace(sdCardPrefix) { "SD Card/" }
+}
+
+fun previewSourceFolderDisplayPath(
+    sourcePath: String,
+    fileName: String,
+    internalStorageRootDisplayName: String,
+): String {
+    val trimmed = sourcePath.trim()
+    if (trimmed.isEmpty()) return trimmed
+
+    if (trimmed.startsWith("content://")) {
+        val parentTreeUri =
+            runCatching {
+                val uri = Uri.parse(trimmed)
+                val authority = uri.authority ?: return@runCatching null
+                val documentId =
+                    when {
+                        "document" in uri.pathSegments -> DocumentsContract.getDocumentId(uri)
+                        "tree" in uri.pathSegments -> DocumentsContract.getTreeDocumentId(uri)
+                        else -> null
+                    } ?: return@runCatching null
+                val parentDocumentId = parentDocumentId(documentId) ?: return@runCatching null
+                DocumentsContract.buildTreeDocumentUri(authority, parentDocumentId).toString()
+            }.getOrNull()
+        if (parentTreeUri != null) {
+            return displayPath(parentTreeUri, internalStorageRootDisplayName)
+        }
+        return displayPath(trimmed.substringBeforeLast("/", missingDelimiterValue = trimmed), internalStorageRootDisplayName)
+    }
+
+    val path =
+        if (trimmed.startsWith("file://")) {
+            Uri.parse(trimmed).path ?: trimmed.removePrefix("file://")
+        } else {
+            trimmed
+        }
+    val parent = File(path).parent ?: path.removeSuffix(fileName).trimEnd('/', File.separatorChar)
+    return displayPath(parent, internalStorageRootDisplayName)
+}
+
+private fun parentDocumentId(documentId: String): String? {
+    val clean = documentId.trimEnd('/')
+    val slashIndex = clean.lastIndexOf('/')
+    if (slashIndex >= 0) return clean.substring(0, slashIndex)
+    val colonIndex = clean.indexOf(':')
+    if (colonIndex >= 0) return clean.substring(0, colonIndex + 1)
+    return null
 }
 
 /**

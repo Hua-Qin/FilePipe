@@ -200,6 +200,11 @@ def main() -> int:
             "--desubroutinize",
             "--recommended-glyphs",
             "--notdef-outline",
+            # Android resolves ligature strings through glyph-name based GSUB
+            # component sequences in this font. Without this, fonttools rewrites
+            # lowercase component glyph names (`a`) to uppercase production names
+            # (`A`), so runtime lowercase ligatures like "archive" stop matching.
+            "--glyph-names",
             "--ignore-missing-glyphs",
             "--ignore-missing-unicodes",
         ]

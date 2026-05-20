@@ -3,7 +3,8 @@ package dev.bikram.filepipe.ui.components.containers
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CornerBasedShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -13,28 +14,25 @@ import dev.bikram.filepipe.ui.theme.elevatedCardColors
 
 enum class GroupPosition { FIRST, MIDDLE, LAST, ONLY }
 
-private val outerRadius = 16.dp
-private val innerRadius = 4.dp
-
-fun groupedItemShape(position: GroupPosition): RoundedCornerShape =
-    when (position) {
+@Composable
+fun groupedItemShape(position: GroupPosition): CornerBasedShape {
+    val outerShape = MaterialTheme.shapes.large
+    val innerShape = MaterialTheme.shapes.extraSmall
+    return when (position) {
         GroupPosition.FIRST ->
-            RoundedCornerShape(
-                topStart = outerRadius,
-                topEnd = outerRadius,
-                bottomStart = innerRadius,
-                bottomEnd = innerRadius,
+            outerShape.copy(
+                bottomStart = innerShape.bottomStart,
+                bottomEnd = innerShape.bottomEnd,
             )
-        GroupPosition.MIDDLE -> RoundedCornerShape(innerRadius)
+        GroupPosition.MIDDLE -> innerShape
         GroupPosition.LAST ->
-            RoundedCornerShape(
-                topStart = innerRadius,
-                topEnd = innerRadius,
-                bottomStart = outerRadius,
-                bottomEnd = outerRadius,
+            outerShape.copy(
+                topStart = innerShape.topStart,
+                topEnd = innerShape.topEnd,
             )
-        GroupPosition.ONLY -> RoundedCornerShape(outerRadius)
+        GroupPosition.ONLY -> outerShape
     }
+}
 
 @Composable
 fun GroupedListItem(

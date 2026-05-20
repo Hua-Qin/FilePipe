@@ -48,11 +48,10 @@
     <string name="rule_detail_folder_access_hint_permission">FilePipe lost access to one or more folders. Tap the highlighted path and pick the folder again.</string>
     <string name="rule_detail_folder_access_hint_filesystem">Internal storage root and Download folder needs All files access. Go to Settings, and select \"All files access\"; or pick a subfolder instead.</string>
     <string name="rule_detail_folder_access_hint_backup_restore">After a backup restore, folder permissions are not restored. Turn \"All files access\" back on in Android settings if you used that mode, or tap each folder and allow access again.</string>
-    <string name="rule_detail_validation_errors_summary">Check the sections below, fix any required fields, then try saving again</string>
-    <string name="rule_detail_folder_access_summary_unavailable">One or more folders are missing or no longer available. \nTap the highlighted paths below to fix them.</string>
-    <string name="rule_detail_folder_access_summary_permission">One or more folders need access again. Tap the highlighted paths below and re-grant access.</string>
-    <string name="rule_detail_folder_access_summary_filesystem">One or more folders need access again or require All files access. \nTap the highlighted paths below or change access mode in Settings.</string>
-    <string name="rule_detail_open_faq">Open FAQ</string>
+    <string name="rule_detail_folder_access_summary_unavailable">One or more folders are missing or no longer available. Tap the highlighted paths above to fix them.</string>
+    <string name="rule_detail_folder_access_summary_permission">One or more folders need access again. Tap the highlighted paths above and re-grant access.</string>
+    <string name="rule_detail_folder_access_summary_filesystem">One or more folders need access again or require \"All files access\". Tap the highlighted paths above or change access mode in Settings.</string>
+    <string name="rule_detail_open_faq">FAQ</string>
     <string name="rule_open_all_files_settings">Open All files access settings</string>
     <string name="filesystem_folder_picker_title">Choose folder</string>
     <string name="filesystem_folder_picker_internal_storage">Internal storage</string>
@@ -69,7 +68,6 @@
     <string name="filesystem_folder_picker_new_folder_error_exists">A folder with that name already exists</string>
     <string name="filesystem_folder_picker_new_folder_error_cannot_write">Cannot create a folder here</string>
     <string name="filesystem_folder_picker_new_folder_error_failed">Could not create the folder</string>
-    <string name="rule_detail_validation_errors_title">Can\'t save this rule</string>
     <string name="source_folders_label">Source folders</string>
     <string name="add_source_folder">Pick folders</string>
     <string name="file_types_label">File types</string>
@@ -397,7 +395,7 @@
     <string name="settings_custom_seed_slider_title">Select a color</string>
     <string name="settings_custom_seed_dialog_title">Add custom accent color</string>
     <string name="settings_custom_seed_remove_title">Remove this color?</string>
-    <string name="settings_custom_seed_remove_message">It will be removed from your saved custom accents</string>
+    <string name="settings_custom_seed_remove_message">It will be removed from your saved custom colors</string>
     <string name="theme_palette_tonal_spot">Tonal spot</string>
     <string name="theme_palette_neutral">Neutral</string>
     <string name="theme_palette_vibrant">Vibrant</string>
@@ -463,9 +461,11 @@
     <string name="dev_options_action_sync_update_checks">Sync update checks</string>
     <string name="dev_options_action_sync_log_pruning">Sync log pruning</string>
     <string name="dev_options_action_add_mock_large_file_move_rule">Add a mock rule</string>
-    <string name="dev_options_action_remove_mock_large_file_move_rule">Remove the mock rule and history</string>
+    <string name="dev_options_action_add_mock_saf_permission_lost_rule">Add SAF permission-lost rule</string>
+    <string name="dev_options_action_add_mock_saf_download_rule">Add SAF Download access rule</string>
+    <string name="dev_options_action_remove_mock_rules">Remove mock rules and history</string>
     <string name="dev_options_action_arm_update_promo">Mock update flow</string>
-    <string name="dev_options_action_start_play_banner">Mock PlayStore update flow</string>
+    <string name="dev_options_action_start_play_bar">Mock PlayStore update flow</string>
     <string name="dev_options_action_post_mock_update_notification">Mock update notification</string>
     <string name="dev_options_action_post_mock_file_operation_notification">Mock file move notification</string>
     <string name="dev_options_action_reset_github_ack">Reset skipped update version</string>
@@ -556,7 +556,10 @@
     <string name="dev_options_event_mock_file_operation_notification_requested">Mock file operation notification requested</string>
     <string name="dev_options_event_mock_large_file_rule_added">Mock rule added</string>
     <string name="dev_options_event_mock_large_file_rule_exists">Mock rule already exists</string>
-    <string name="dev_options_event_mock_large_file_rule_removed">Mock rule and history removed</string>
+    <string name="dev_options_event_mock_saf_permission_lost_rule_added">SAF permission-lost mock rule added</string>
+    <string name="dev_options_event_mock_saf_download_rule_added">SAF Download access mock rule added</string>
+    <string name="dev_options_event_mock_folder_issue_rule_exists">Folder issue mock rule already exists</string>
+    <string name="dev_options_event_mock_rules_removed">Mock rules and history removed</string>
     <string name="dev_options_event_github_ack_reset">Skipped GitHub release acknowledgement reset</string>
     <string name="dev_options_event_update_dedupe_cleared">Update notification dedupe cleared</string>
     <string name="dev_options_event_cached_update_apk_deleted">Cached update APK deleted</string>
@@ -567,6 +570,8 @@
     <string name="dev_options_forced_crash_message">Developer options forced crash</string>
     <string name="dev_options_mock_file_operation_rule_name">Mock file cleanup</string>
     <string name="dev_options_mock_large_file_rule_name">Mock move</string>
+    <string name="dev_options_mock_saf_permission_lost_rule_name">Mock SAF permission lost</string>
+    <string name="dev_options_mock_saf_download_rule_name">Mock SAF Download blocked</string>
     <string name="dev_options_mock_file_operation_large_file_name">archive-video-100mb.mp4</string>
     <string name="dev_options_mock_file_operation_progress">%1$s - %2$d%% of 100 MB</string>
     <string name="dev_options_mock_file_operation_file_1">Screenshot_2026-05-17.png</string>
@@ -574,15 +579,15 @@
     <string name="dev_options_mock_file_operation_file_3">camera-video.mp4</string>
     <string-array name="dev_options_mock_large_file_names">
         <item>conference-recording-01.mp4</item>
-        <item>conference-recording-02.mp4</item>
         <item>camera-roll-raw-01.mov</item>
-        <item>camera-roll-raw-02.mov</item>
-        <item>vacation-footage-4k-01.mkv</item>
-        <item>vacation-footage-4k-02.mkv</item>
-        <item>screen-capture-archive-01.mp4</item>
-        <item>screen-capture-archive-02.mp4</item>
-        <item>project-export-final.mov</item>
-        <item>project-export-backup.mov</item>
+        <item>family-photo-archive.jpg</item>
+        <item>screenshot-home-screen.png</item>
+        <item>podcast-mixdown.mp3</item>
+        <item>ambient-session.flac</item>
+        <item>invoice-march.pdf</item>
+        <item>project-brief.docx</item>
+        <item>backup-bundle.zip</item>
+        <item>unknown-import.dat</item>
     </string-array>
     <string name="diagnostics_title">FilePipe diagnostics</string>
     <string name="diagnostics_generated_format">Generated: %1$s</string>
@@ -711,19 +716,18 @@
     <string name="settings_changelog_page_indicator">%1$d of %2$d</string>
     <string name="settings_play_in_app_update_failed">Could not start the update. Try \"Check for updates\" again.</string>
     <string name="settings_play_in_app_update_canceled">Update was canceled. You can try again from Updates in Settings.</string>
-    <string name="update_banner_available_title">Update available</string>
-    <string name="update_banner_available_message">A new version is available</string>
-    <string name="update_banner_available_action">Check</string>
+    <string name="update_bar_available_title">Update available</string>
+    <string name="update_bar_available_action">Check</string>
     <string name="update_fab_label">Update</string>
     <string name="settings_dev_release_mocks_section">Dev release mocks</string>
-    <string name="settings_dev_release_mock_rules_banner">Arm update promo banner</string>
-    <string name="settings_dev_release_mock_play_banner">Play update banner (download then install)</string>
-    <string name="play_update_banner_downloading_title">Downloading update</string>
-    <string name="play_update_banner_downloading">from Play Store…</string>
-    <string name="play_update_banner_downloading_bytes">%1$s of %2$s</string>
-    <string name="play_update_banner_install_title">Ready to install</string>
-    <string name="play_update_banner_install_subtitle">Restart to use the new version</string>
-    <string name="play_update_banner_install_action">Install &amp; restart</string>
+    <string name="settings_dev_release_mock_rules_bar">Arm update bar</string>
+    <string name="settings_dev_release_mock_play_bar">Play update bar (download then install)</string>
+    <string name="play_update_bar_downloading_title">Downloading update</string>
+    <string name="play_update_bar_downloading">from Play Store…</string>
+    <string name="play_update_bar_downloading_bytes">%1$s of %2$s</string>
+    <string name="play_update_bar_install_title">Ready to install</string>
+    <string name="play_update_bar_install_subtitle">Restart to use the new version</string>
+    <string name="play_update_bar_install_action">Install &amp; restart</string>
     <string name="settings_update_play_in_progress_body">An update from Google Play is already in progress. Continue to open Play and finish downloading or installing.</string>
     <string name="settings_update_resume_play">Continue update</string>
 

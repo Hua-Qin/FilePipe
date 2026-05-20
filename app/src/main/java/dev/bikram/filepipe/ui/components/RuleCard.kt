@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -47,13 +46,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.ColorUtils
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
@@ -63,6 +65,7 @@ import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
+import dev.bikram.filepipe.ui.theme.pillShape
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
 import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
@@ -73,7 +76,43 @@ data class RuleCardAction(
     val onClick: () -> Unit,
 )
 
-private val CardShape = RoundedCornerShape(16.dp)
+enum class RuleCardFolderIssueSeverity {
+    WARNING,
+    ERROR,
+}
+
+private data class RuleCardFolderIssueColors(
+    val container: Color,
+    val content: Color,
+    val accent: Color,
+)
+
+@Composable
+private fun ruleCardFolderIssueColors(severity: RuleCardFolderIssueSeverity): RuleCardFolderIssueColors {
+    val scheme = MaterialTheme.colorScheme
+    if (severity == RuleCardFolderIssueSeverity.ERROR) {
+        return RuleCardFolderIssueColors(
+            container = scheme.errorContainer,
+            content = scheme.onErrorContainer,
+            accent = scheme.error,
+        )
+    }
+
+    val darkUi = ColorUtils.calculateLuminance(scheme.background.toArgb()) < 0.35
+    return if (darkUi) {
+        RuleCardFolderIssueColors(
+            container = Color(0xFF4A3000).copy(alpha = 0.94f),
+            content = Color(0xFFFFDFA3),
+            accent = Color(0xFFFFB300),
+        )
+    } else {
+        RuleCardFolderIssueColors(
+            container = Color(0xFFFFF1CC).copy(alpha = 0.96f),
+            content = Color(0xFF5F3B00),
+            accent = Color(0xFFB26A00),
+        )
+    }
+}
 
 @OptIn(
     ExperimentalFoundationApi::class,
@@ -96,6 +135,7 @@ fun RuleCard(
     showInlineProgressCancel: Boolean = false,
     isAnyRuleRunning: Boolean,
     hasStaleFolder: Boolean = false,
+    folderIssueSeverity: RuleCardFolderIssueSeverity? = null,
     onStaleWarningClick: () -> Unit = {},
     /** When non-null (My order + reorder gesture): long-press on rule icon toggles selection; card body long-press drags. */
     onLeadingLongClick: (() -> Unit)? = null,
@@ -106,21 +146,24 @@ fun RuleCard(
     modifier: Modifier = Modifier,
 ) {
     val cardColors = elevatedCardColors()
-    val spatialSpec = MaterialTheme.motionScheme.slowSpatialSpec<IntSize>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val cardShape = MaterialTheme.shapes.medium
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+    val effectiveFolderIssueSeverity =
+        folderIssueSeverity ?: if (hasStaleFolder) RuleCardFolderIssueSeverity.ERROR else null
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
                 .then(
                     if (isSelected) {
-                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CardShape)
+                        Modifier.border(2.dp, MaterialTheme.colorScheme.primary, cardShape)
                     } else {
                         Modifier
                     },
                 ),
-        shape = CardShape,
+        shape = cardShape,
         color = cardColors.containerColor,
         contentColor = cardColors.contentColor,
         tonalElevation = 1.dp,
@@ -151,7 +194,7 @@ fun RuleCard(
                     onCancelRunClick = onCancelRunClick,
                     showInlineProgressCancel = showInlineProgressCancel,
                     isAnyRuleRunning = isAnyRuleRunning,
-                    hasStaleFolder = hasStaleFolder,
+                    folderIssueSeverity = effectiveFolderIssueSeverity,
                     onStaleWarningClick = onStaleWarningClick,
                     onLeadingLongClick = onLeadingLongClick,
                     reorderLongPressDragModifier = reorderLongPressDragModifier,
@@ -171,6 +214,7 @@ fun RuleCard(
                     onCancelRunClick = onCancelRunClick,
                     showInlineProgressCancel = showInlineProgressCancel,
                     isAnyRuleRunning = isAnyRuleRunning,
+                    folderIssueSeverity = effectiveFolderIssueSeverity,
                     onLeadingLongClick = onLeadingLongClick,
                     reorderLongPressDragModifier = reorderLongPressDragModifier,
                     suppressLongClickForReorder = suppressLongClickForReorder,
@@ -199,6 +243,7 @@ private fun CompactContent(
     onCancelRunClick: () -> Unit,
     showInlineProgressCancel: Boolean,
     isAnyRuleRunning: Boolean,
+    folderIssueSeverity: RuleCardFolderIssueSeverity?,
     onLeadingLongClick: (() -> Unit)? = null,
     reorderLongPressDragModifier: Modifier = Modifier,
     suppressLongClickForReorder: Boolean = false,
@@ -273,6 +318,15 @@ private fun CompactContent(
                             color = MaterialTheme.colorScheme.primaryContainer,
                             shape = CircleShape,
                         ).then(
+                            folderIssueSeverity
+                                ?.let { severity ->
+                                    Modifier.border(
+                                        width = 2.dp,
+                                        color = ruleCardFolderIssueColors(severity).accent,
+                                        shape = CircleShape,
+                                    )
+                                } ?: Modifier,
+                        ).then(
                             if (onLeadingLongClick != null) {
                                 Modifier.tapSoundCombinedClickable(
                                     onClick = onClick,
@@ -326,7 +380,7 @@ private fun CompactContent(
                                     if (showInlineProgressCancel) {
                                         FilePipeOutlinedButton(
                                             onClick = onCancelRunClick,
-                                            shape = RoundedCornerShape(50),
+                                            shape = pillShape,
                                             contentPadding =
                                                 androidx.compose.foundation.layout.PaddingValues(
                                                     horizontal = 10.dp,
@@ -382,7 +436,7 @@ private fun ExpandedContent(
     onCancelRunClick: () -> Unit,
     showInlineProgressCancel: Boolean,
     isAnyRuleRunning: Boolean,
-    hasStaleFolder: Boolean = false,
+    folderIssueSeverity: RuleCardFolderIssueSeverity? = null,
     onStaleWarningClick: () -> Unit = {},
     onLeadingLongClick: (() -> Unit)? = null,
     reorderLongPressDragModifier: Modifier = Modifier,
@@ -390,6 +444,9 @@ private fun ExpandedContent(
     showOperationalControls: Boolean = true,
 ) {
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
+    val progressSpatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<IntSize>())
+    val progressFadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val progressFadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     val clickLabel =
         if (isSelectionMode) {
             stringResource(
@@ -535,9 +592,10 @@ private fun ExpandedContent(
                     },
             )
 
-            if (hasStaleFolder) {
-                Spacer(Modifier.height(6.dp))
-                Row(
+            if (folderIssueSeverity != null) {
+                Spacer(Modifier.height(8.dp))
+                val issueColors = ruleCardFolderIssueColors(folderIssueSeverity)
+                Surface(
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -545,30 +603,40 @@ private fun ExpandedContent(
                                 onClickLabel = stringResource(R.string.edit_rule),
                                 role = Role.Button,
                                 onClick = onStaleWarningClick,
-                            ).padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ),
+                    shape = MaterialTheme.shapes.large,
+                    color = issueColors.container,
+                    contentColor = issueColors.content,
                 ) {
-                    FilePipeMaterialRoundedSymbol(
-                        name = "warning",
-                        contentDescription = null,
-                        size = 16.dp,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        text = stringResource(R.string.rule_card_stale_folder_warning),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.weight(1f),
-                    )
-                    FilePipeMaterialRoundedSymbol(
-                        name = "edit",
-                        contentDescription = stringResource(R.string.edit_rule),
-                        size = 14.dp,
-                        tint = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.size(14.dp),
-                    )
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        FilePipeMaterialRoundedSymbol(
+                            name = "warning",
+                            contentDescription = null,
+                            size = 22.dp,
+                            tint = issueColors.content,
+                            weight = FontWeight.Medium,
+                        )
+                        Text(
+                            text = stringResource(R.string.rule_card_stale_folder_warning),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = issueColors.content,
+                            modifier = Modifier.weight(1f),
+                        )
+                        FilePipeMaterialRoundedSymbol(
+                            name = "edit",
+                            contentDescription = stringResource(R.string.edit_rule),
+                            size = 20.dp,
+                            tint = issueColors.content,
+                            weight = FontWeight.Medium,
+                        )
+                    }
                 }
             }
 
@@ -592,8 +660,14 @@ private fun ExpandedContent(
 
             AnimatedVisibility(
                 visible = progress != null,
-                enter = reducedMotionEnterTransition(expandVertically() + fadeIn()),
-                exit = reducedMotionExitTransition(shrinkVertically() + fadeOut()),
+                enter =
+                    reducedMotionEnterTransition(
+                        expandVertically(animationSpec = progressSpatialSpec) + fadeIn(animationSpec = progressFadeInSpec),
+                    ),
+                exit =
+                    reducedMotionExitTransition(
+                        shrinkVertically(animationSpec = progressSpatialSpec) + fadeOut(animationSpec = progressFadeOutSpec),
+                    ),
             ) {
                 progress?.let { runProgress ->
                     Column(
@@ -741,7 +815,7 @@ private fun ExpandedContent(
                         ) {
                             FilePipeOutlinedButton(
                                 onClick = onCancelRunClick,
-                                shape = RoundedCornerShape(50),
+                                shape = pillShape,
                             ) {
                                 Text(text = stringResource(R.string.cancel))
                             }
@@ -755,7 +829,7 @@ private fun ExpandedContent(
                             FilePipeFilledTonalButton(
                                 onClick = onRunClick,
                                 enabled = rule.isEnabled && !runBlocked,
-                                shape = RoundedCornerShape(50),
+                                shape = pillShape,
                                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                             ) {
                                 FilePipeMaterialRoundedSymbol(

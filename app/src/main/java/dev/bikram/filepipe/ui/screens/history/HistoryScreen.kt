@@ -1,10 +1,17 @@
 package dev.bikram.filepipe.ui.screens.history
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,22 +19,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
@@ -61,7 +62,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -94,9 +97,8 @@ import dev.bikram.filepipe.ui.components.ThemeColoredEmptyTrashIllustration
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
-import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
-import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
+import dev.bikram.filepipe.ui.theme.LocalReducedMotion
 import dev.bikram.filepipe.ui.theme.LocalSnackbarHostState
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
@@ -136,14 +138,7 @@ fun HistoryScreen(
 
     val isInitialLoad = pagingItems.loadState.refresh is LoadState.Loading
     val isUsingPaging = !uiState.isFilterActive
-    val isEmpty =
-        if (section == HistorySection.TRASH) {
-            trashedRules.isEmpty()
-        } else if (isUsingPaging) {
-            !isInitialLoad && pagingItems.itemCount == 0
-        } else {
-            filteredItems.isEmpty()
-        }
+    val reducedMotion = LocalReducedMotion.current
     val pagingListState = rememberLazyListState()
     val filteredListState = rememberLazyListState()
     val trashListState = rememberLazyListState()
@@ -270,16 +265,7 @@ fun HistoryScreen(
                 }
             }
             Column(Modifier.fillMaxWidth()) {
-                LocalPrimaryTabTopBanner.current()
                 LargeTopAppBar(
-                    modifier =
-                        Modifier.then(
-                            if (LocalPrimaryTabTopBannerActive.current) {
-                                Modifier.consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
-                            } else {
-                                Modifier
-                            },
-                        ),
                     title = { Text(stringResource(R.string.history_title)) },
                     scrollBehavior = scrollBehavior,
                     colors = gradientOverlayTopAppBarColors(),
@@ -449,63 +435,108 @@ fun HistoryScreen(
         val scrollBlurModifier =
             LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
 
-        if (isEmpty) {
-            AnimatedVisibility(
-                visible = true,
-                enter = reducedMotionEnterTransition(fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }),
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .then(scrollBlurModifier)
-                            .padding(top = innerPadding.calculateTopPadding())
-                            .padding(bottom = contentPadding.calculateBottomPadding())
-                            .padding(32.dp),
-                    verticalArrangement = Arrangement.Center,
-                    horizontalAlignment = Alignment.CenterHorizontally,
+        val historySectionSpatialSpec =
+            reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+        val historySectionFadeInSpec =
+            reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+        val historySectionFadeOutSpec =
+            reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+
+        AnimatedContent(
+            targetState = section,
+            modifier = Modifier.fillMaxSize(),
+            transitionSpec = {
+                if (reducedMotion) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else {
+                    val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                    (
+                        slideInHorizontally(animationSpec = historySectionSpatialSpec) { fullWidth ->
+                            direction * fullWidth
+                        } + fadeIn(animationSpec = historySectionFadeInSpec)
+                    ) togetherWith (
+                        slideOutHorizontally(animationSpec = historySectionSpatialSpec) { fullWidth ->
+                            -direction * fullWidth / 3
+                        } + fadeOut(animationSpec = historySectionFadeOutSpec)
+                    )
+                }.using(SizeTransform(clip = false))
+            },
+            label = "history_section_content",
+        ) { targetSection ->
+            val targetIsEmpty =
+                if (targetSection == HistorySection.TRASH) {
+                    trashedRules.isEmpty()
+                } else if (isUsingPaging) {
+                    !isInitialLoad && pagingItems.itemCount == 0
+                } else {
+                    filteredItems.isEmpty()
+                }
+
+            if (targetIsEmpty) {
+                val emptyStateSpatialSpec =
+                    reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+                val emptyStateFadeSpec =
+                    reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+                AnimatedVisibility(
+                    visible = true,
+                    enter =
+                        reducedMotionEnterTransition(
+                            fadeIn(animationSpec = emptyStateFadeSpec) +
+                                slideInVertically(animationSpec = emptyStateSpatialSpec) { it / 4 },
+                        ),
+                    modifier = Modifier.fillMaxSize(),
                 ) {
-                    if (section == HistorySection.TRASH) {
-                        ThemeColoredEmptyTrashIllustration()
-                    } else {
-                        ThemeColoredEmptyHistoryIllustration(Modifier.size(120.dp))
-                    }
-                    Spacer(Modifier.height(24.dp))
                     Column(
-                        modifier = Modifier.semantics(mergeDescendants = true) { },
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .then(scrollBlurModifier)
+                                .padding(top = innerPadding.calculateTopPadding())
+                                .padding(bottom = contentPadding.calculateBottomPadding())
+                                .padding(32.dp),
+                        verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(
-                            text =
-                                stringResource(
-                                    if (section == HistorySection.TRASH) {
-                                        R.string.history_trash_empty_title
-                                    } else {
-                                        R.string.history_empty_title
-                                    },
-                                ),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text =
-                                stringResource(
-                                    if (section == HistorySection.TRASH) {
-                                        R.string.history_trash_empty_subtitle
-                                    } else {
-                                        R.string.history_empty_subtitle
-                                    },
-                                ),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
-                            textAlign = TextAlign.Center,
-                        )
+                        if (targetSection == HistorySection.TRASH) {
+                            ThemeColoredEmptyTrashIllustration()
+                        } else {
+                            ThemeColoredEmptyHistoryIllustration(Modifier.size(120.dp))
+                        }
+                        Spacer(Modifier.height(24.dp))
+                        Column(
+                            modifier = Modifier.semantics(mergeDescendants = true) { },
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                text =
+                                    stringResource(
+                                        if (targetSection == HistorySection.TRASH) {
+                                            R.string.history_trash_empty_title
+                                        } else {
+                                            R.string.history_empty_title
+                                        },
+                                    ),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text =
+                                    stringResource(
+                                        if (targetSection == HistorySection.TRASH) {
+                                            R.string.history_trash_empty_subtitle
+                                        } else {
+                                            R.string.history_empty_subtitle
+                                        },
+                                    ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
-            }
-        } else if (section == HistorySection.TRASH) {
+            } else if (targetSection == HistorySection.TRASH) {
             LazyColumn(
                 state = trashListState,
                 modifier =
@@ -693,6 +724,7 @@ fun HistoryScreen(
         }
     }
 }
+}
 
 @Composable
 private fun HistorySectionSegmentedRow(
@@ -772,7 +804,7 @@ private fun RetentionNotice(modifier: Modifier = Modifier) {
             modifier
                 .background(
                     MaterialTheme.colorScheme.surfaceContainerHigh,
-                    RoundedCornerShape(16.dp),
+                    MaterialTheme.shapes.large,
                 ).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -781,9 +813,9 @@ private fun RetentionNotice(modifier: Modifier = Modifier) {
             contentDescription = null,
             size = 18.dp,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
+            weight = FontWeight.Medium,
         )
-        Spacer(Modifier.size(10.dp))
+        Spacer(Modifier.width(10.dp))
         Text(
             text = stringResource(R.string.history_trash_retention_notice),
             style = MaterialTheme.typography.bodySmall,
@@ -802,7 +834,7 @@ private fun SwipeToDismissTrashRuleCard(
     modifier: Modifier = Modifier,
 ) {
     val hapticEnabled = LocalHapticEnabled.current
-    val cardShape = RoundedCornerShape(16.dp)
+    val cardShape = MaterialTheme.shapes.medium
     DeliberateSwipeRevealCard(
         commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
         cardShape = cardShape,
@@ -976,7 +1008,7 @@ private fun SwipeToDismissHistoryCard(
     modifier: Modifier = Modifier,
 ) {
     val hapticEnabled = LocalHapticEnabled.current
-    val cardShape = RoundedCornerShape(12.dp)
+    val cardShape = MaterialTheme.shapes.medium
     DeliberateSwipeRevealCard(
         commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
         cardShape = cardShape,

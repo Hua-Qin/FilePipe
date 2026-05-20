@@ -30,7 +30,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -499,7 +498,7 @@ fun FaqScreen(
                 if (filteredSections.isEmpty()) {
                     item {
                         Surface(
-                            shape = RoundedCornerShape(16.dp),
+                            shape = MaterialTheme.shapes.medium,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                         ) {
                             Column(
@@ -537,7 +536,7 @@ fun FaqScreen(
                         if (sectionContent.showNotSureBanner) {
                             item(key = "not_sure_${sectionContent.sectionId}") {
                                 Surface(
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = MaterialTheme.shapes.medium,
                                     color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.65f),
                                 ) {
                                     Text(
@@ -553,7 +552,7 @@ fun FaqScreen(
                         sectionContent.calloutBody?.let { calloutText ->
                             item(key = "callout_${sectionContent.sectionId}") {
                                 Surface(
-                                    shape = RoundedCornerShape(14.dp),
+                                    shape = MaterialTheme.shapes.medium,
                                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f),
                                 ) {
                                     Text(

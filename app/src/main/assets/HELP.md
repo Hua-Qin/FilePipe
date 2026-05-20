@@ -4,13 +4,20 @@
 
 ### Fix a rule that isn't working
 - Give the rule a name, source folders, destination folder, and file types.
-- Tap any red folder path on the edit screen and grant access again.
+- Tap any highlighted folder path on the edit screen and grant access again.
 - If the rule uses Download folder or a storage root, switch to **All files access** in Settings.
 
 ### Fix "Folders need attention" errors
 - Common after changing **Selective access** vs **All files access**, restoring a backup, or revoking a folder grant.
 - Open **Edit rule**, tap the highlighted path, and pick the folder again in the folder picker.
 - Download folder and storage roots need **All files access**.
+- Red highlights mean the rule cannot run correctly until the folder problem is fixed.
+- Amber highlights mean a source folder is missing or unavailable. The rule can still be saved, but that source will not be scanned.
+
+### Why does my rule icon have an amber/red ring?
+- A ring on a collapsed rule card means one or more folders need attention.
+- Amber means only a source folder is missing or unavailable. Turn on **Hide missing source folder warnings** in the rule editor if you do not want that reminder on the Rules tab.
+- Red means access was lost, the destination has a problem, or the folder cannot be used in the current access mode.
 
 ### Can't add the Download folder?
 - In **Selective access**, Android blocks the Download folder and some storage roots.
@@ -18,7 +25,7 @@
 
 ### Files not moving?
 - Confirm the rule is enabled and has a schedule set.
-- Check folder access — tap any red path in the rule editor and grant again.
+- Check folder access — tap any highlighted path in the rule editor and grant access again or pick a replacement folder.
 - Review advanced filters: size, age, or filename pattern may be excluding files you expect to match.
 - Check battery restrictions for FilePipe in Android settings.
 
@@ -36,7 +43,7 @@
 
 ### What are templates?
 - Templates are pre-built rule starting points for common use cases: screenshots, videos, downloads, documents, and more.
-- On any rule's page, tap the "Use template" button and choose a template to automatically fill extensions and in some cases, sources. 
+- On any rule's page, tap the "Use template" button and choose a template to automatically fill extensions and in some cases, sources.
 - Customise any template just like a regular rule.
 
 ### How do I run a rule manually?
@@ -122,7 +129,8 @@
 ### What do I fix after restore?
 - For **Selective access**, tap each affected folder and grant again.
 - If rules used **All files access**, turn that back on in Android settings.
-- Highlights on the edit screen show which folders still need attention.
+- Red highlights mean access must be restored or the folder choice must change.
+- Amber highlights mean only a source folder is missing or unavailable. Recreate the folder, pick a replacement, or hide that missing-source warning for the rule.
 
 ---
 

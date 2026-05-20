@@ -9,6 +9,8 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -26,7 +28,6 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -51,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -65,6 +67,7 @@ import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
+import dev.bikram.filepipe.ui.theme.pillShape
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
 import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
@@ -90,6 +93,10 @@ fun OnboardingPermissionsScreen(
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val visibilityFadeInSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val visibilityFadeOutSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     val needsAllFilesGrant =
         selected == FolderAccessMode.ALL_FILES_PREFERRED &&
@@ -232,8 +239,8 @@ fun OnboardingPermissionsScreen(
                 }
                 AnimatedVisibility(
                     visible = grantPanelVisible,
-                    enter = reducedMotionEnterTransition(),
-                    exit = reducedMotionExitTransition(),
+                    enter = reducedMotionEnterTransition(fadeIn(animationSpec = visibilityFadeInSpec)),
+                    exit = reducedMotionExitTransition(fadeOut(animationSpec = visibilityFadeOutSpec)),
                 ) {
                     Column(modifier = Modifier.padding(top = 16.dp)) {
                         AllFilesInstructionPanel(
@@ -258,8 +265,8 @@ fun OnboardingPermissionsScreen(
         AnimatedVisibility(
             visible = !hideBottomPrimaryButton,
             modifier = Modifier.align(Alignment.BottomCenter),
-            enter = reducedMotionEnterTransition(),
-            exit = reducedMotionExitTransition(),
+            enter = reducedMotionEnterTransition(fadeIn(animationSpec = visibilityFadeInSpec)),
+            exit = reducedMotionExitTransition(fadeOut(animationSpec = visibilityFadeOutSpec)),
         ) {
             val primaryLabel =
                 when {
@@ -300,7 +307,7 @@ fun OnboardingPermissionsScreen(
                     Modifier
                         .fillMaxWidth()
                         .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
-                shape = RoundedCornerShape(50),
+                shape = pillShape,
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
             ) {
                 Text(
@@ -326,9 +333,13 @@ private fun AllFilesInstructionPanel(
     onOpenSettings: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val visibilityFadeInSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val visibilityFadeOutSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         color = scheme.surfaceContainerHighest,
         border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.5f)),
     ) {
@@ -340,21 +351,21 @@ private fun AllFilesInstructionPanel(
                 color = scheme.onSurface,
             )
             Spacer(Modifier.height(10.dp))
-            Text(
-                text = "• ${stringResource(R.string.onboarding_permissions_instruction_step1)}",
+            PermissionBulletLine(
+                text = stringResource(R.string.onboarding_permissions_instruction_step1),
                 style = MaterialTheme.typography.bodyMedium,
                 color = scheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(6.dp))
-            Text(
-                text = "• ${stringResource(R.string.onboarding_permissions_instruction_step2)}",
+            PermissionBulletLine(
+                text = stringResource(R.string.onboarding_permissions_instruction_step2),
                 style = MaterialTheme.typography.bodyMedium,
                 color = scheme.onSurfaceVariant,
             )
             AnimatedVisibility(
                 visible = showNotGrantedHint,
-                enter = reducedMotionEnterTransition(),
-                exit = reducedMotionExitTransition(),
+                enter = reducedMotionEnterTransition(fadeIn(animationSpec = visibilityFadeInSpec)),
+                exit = reducedMotionExitTransition(fadeOut(animationSpec = visibilityFadeOutSpec)),
             ) {
                 Text(
                     text = stringResource(R.string.onboarding_permissions_access_not_granted),
@@ -365,8 +376,8 @@ private fun AllFilesInstructionPanel(
             }
             AnimatedVisibility(
                 visible = showOpenSettingsButton,
-                enter = reducedMotionEnterTransition(),
-                exit = reducedMotionExitTransition(),
+                enter = reducedMotionEnterTransition(fadeIn(animationSpec = visibilityFadeInSpec)),
+                exit = reducedMotionExitTransition(fadeOut(animationSpec = visibilityFadeOutSpec)),
             ) {
                 FilePipeOutlinedButton(
                     onClick = onOpenSettings,
@@ -374,7 +385,7 @@ private fun AllFilesInstructionPanel(
                         Modifier
                             .fillMaxWidth()
                             .padding(top = 16.dp),
-                    shape = RoundedCornerShape(50),
+                    shape = pillShape,
                 ) {
                     Text(stringResource(R.string.onboarding_permissions_open_settings))
                 }
@@ -415,7 +426,7 @@ private fun FullAccessHighlightCard(
             Modifier
                 .fillMaxWidth()
                 .scale(scale),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.large,
         border = BorderStroke(2.dp, borderColor),
         colors =
             CardDefaults.cardColors(
@@ -456,7 +467,7 @@ private fun FullAccessHighlightCard(
                     color = scheme.onPrimaryContainer,
                 )
                 Spacer(Modifier.height(8.dp))
-                Text(
+                PermissionTextWithBullets(
                     text = body,
                     style = MaterialTheme.typography.bodySmall,
                     color = scheme.onPrimaryContainer.copy(alpha = 0.92f),
@@ -541,7 +552,7 @@ private fun SelectFoldersSecondaryCard(
             Modifier
                 .fillMaxWidth()
                 .scale(scale),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         border = BorderStroke(borderWidth, borderColor),
         colors =
             CardDefaults.cardColors(
@@ -585,7 +596,7 @@ private fun SelectFoldersSecondaryCard(
                     color = scheme.onSurface,
                 )
                 Spacer(Modifier.height(6.dp))
-                Text(
+                PermissionTextWithBullets(
                     text = body,
                     style = MaterialTheme.typography.bodySmall,
                     color = scheme.onSurfaceVariant,
@@ -602,5 +613,63 @@ private fun SelectFoldersSecondaryCard(
                     ),
             )
         }
+    }
+}
+
+@Composable
+private fun PermissionTextWithBullets(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        text.lines().forEach { line ->
+            val trimmed = line.trim()
+            when {
+                trimmed.isEmpty() -> Spacer(Modifier.height(2.dp))
+                trimmed.startsWith("\u2022") ->
+                    PermissionBulletLine(
+                        text = trimmed.removePrefix("\u2022").trimStart(),
+                        style = style,
+                        color = color,
+                    )
+                else ->
+                    Text(
+                        text = line,
+                        style = style,
+                        color = color,
+                    )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionBulletLine(
+    text: String,
+    style: TextStyle,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Text(
+            text = "\u2022",
+            style = style,
+            color = color,
+        )
+        Text(
+            text = text,
+            style = style,
+            color = color,
+            modifier = Modifier.weight(1f),
+        )
     }
 }

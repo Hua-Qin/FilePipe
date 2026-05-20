@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +34,7 @@ import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeElevatedCard
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.RuleIconOrEmoji
+import dev.bikram.filepipe.ui.theme.pillShape
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,7 +111,7 @@ fun OnboardingRuleWizardScreen(
             FilePipeOutlinedButton(
                 onClick = onBackToPermissions,
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(50),
+                shape = pillShape,
                 contentPadding = onboardingCtaPadding,
             ) {
                 Row(
@@ -138,7 +138,7 @@ fun OnboardingRuleWizardScreen(
             FilePipeButton(
                 onClick = onSkip,
                 modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(50),
+                shape = pillShape,
                 contentPadding = onboardingCtaPadding,
             ) {
                 Row(
@@ -175,7 +175,7 @@ private fun TemplateCard(
     FilePipeElevatedCard(
         onClick = onUseTemplate,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         colors =
             CardDefaults.elevatedCardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -205,7 +205,7 @@ private fun TemplateCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = template.extensions.take(4).joinToString(", "),
+                    text = template.extensions.joinToString(", "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -232,7 +232,7 @@ private fun StartBlankCard(onStartBlank: () -> Unit) {
     FilePipeElevatedCard(
         onClick = onStartBlank,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         colors =
             CardDefaults.elevatedCardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,

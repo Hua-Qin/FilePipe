@@ -137,6 +137,25 @@ fun isSafTreeUriPublicDownloadRoot(treeUriString: String): Boolean {
 }
 
 /**
+ * SAF tree locations that Android usually does not grant as usable rule folders.
+ * These should be presented as locations that need All files access or a subfolder,
+ * even when the folder access resolver reports them as unavailable.
+ */
+fun isSafTreeUriBlockedForRules(treeUriString: String): Boolean = isSafTreeUriPrimarySharedStorageRoot(treeUriString) || isSafTreeUriPublicDownloadRoot(treeUriString)
+
+/**
+ * User-facing folder locations that are better represented as "requires All files access"
+ * than as generic missing folders.
+ */
+fun isFolderPathAllFilesAccessLocationForRules(pathOrUri: String): Boolean =
+    if (isFilesystemFolderPathString(pathOrUri)) {
+        isFilesystemPathPrimarySharedStorageRoot(pathOrUri) ||
+            isPublicDownloadsDirectoryOnUserAccessibleVolume(pathOrUri)
+    } else {
+        isSafTreeUriBlockedForRules(pathOrUri)
+    }
+
+/**
  * Typical device Screenshots directory on shared storage.
  */
 fun primaryScreenshotsDirectoryPath(): String =

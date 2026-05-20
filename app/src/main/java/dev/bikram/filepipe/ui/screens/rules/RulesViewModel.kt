@@ -14,6 +14,7 @@ import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
+import dev.bikram.filepipe.data.storage.isFolderPathAllFilesAccessLocationForRules
 import dev.bikram.filepipe.devtools.DevMockFileMove
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FolderAccessResult
@@ -76,6 +77,11 @@ data class PreviewRuleGroup(
     val results: List<PreviewFileResult>,
 )
 
+enum class RuleFolderIssueSeverity {
+    WARNING,
+    ERROR,
+}
+
 sealed interface RulesRunNavigation {
     data class HistoryDetail(
         val historyId: Long,
@@ -98,6 +104,8 @@ sealed interface ManualRunCancelAnchor {
 data class RulesUiState(
     val rules: List<Rule> = emptyList(),
     val staleRuleIds: Set<Long> = emptySet(),
+    val staleRuleWarningIds: Set<Long> = emptySet(),
+    val staleRuleErrorIds: Set<Long> = emptySet(),
     val swipeStartToEnd: SwipeAction = SwipeAction.EDIT,
     val swipeEndToStart: SwipeAction = SwipeAction.DELETE,
     val selectedRuleIds: Set<Long> = emptySet(),
@@ -134,7 +142,7 @@ class RulesViewModel
                 .getAllRules()
                 .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-        private val _staleRuleIds = MutableStateFlow<Set<Long>>(emptySet())
+        private val _staleRuleIssues = MutableStateFlow<Map<Long, RuleFolderIssueSeverity>>(emptyMap())
         private val _selectedRuleIds = MutableStateFlow<Set<Long>>(emptySet())
         private val _progressMap = MutableStateFlow<Map<Long, RunProgress>>(emptyMap())
         private val _previewState = MutableStateFlow<PreviewState?>(null)
@@ -167,15 +175,25 @@ class RulesViewModel
         val uiState: StateFlow<RulesUiState> =
             combine(
                 sortedRulesFlow,
-                _staleRuleIds,
+                _staleRuleIssues,
                 userPreferencesRepository.preferencesFlow,
                 _selectedRuleIds,
                 sortParamsFlow,
-            ) { sortedRules, stale, prefs, selected, sortParams ->
+            ) { sortedRules, staleIssues, prefs, selected, sortParams ->
                 val (sortKey, sortDirection) = sortParams
+                val staleWarningIds =
+                    staleIssues
+                        .filterValues { it == RuleFolderIssueSeverity.WARNING }
+                        .keys
+                val staleErrorIds =
+                    staleIssues
+                        .filterValues { it == RuleFolderIssueSeverity.ERROR }
+                        .keys
                 RulesUiState(
                     rules = sortedRules,
-                    staleRuleIds = stale,
+                    staleRuleIds = staleIssues.keys,
+                    staleRuleWarningIds = staleWarningIds,
+                    staleRuleErrorIds = staleErrorIds,
                     swipeStartToEnd = prefs.swipeStartToEnd,
                     swipeEndToStart = prefs.swipeEndToStart,
                     selectedRuleIds = selected,
@@ -218,7 +236,7 @@ class RulesViewModel
                 fileOperationRepository.invalidateAccessCache()
                 val prefs = userPreferencesRepository.preferencesFlow.first()
                 val filesystemAccessEnabled = isFilesystemAccessEffective(prefs.folderAccessMode)
-                _staleRuleIds.value = computeStaleRuleIds(_rules.value, filesystemAccessEnabled)
+                _staleRuleIssues.value = computeStaleRuleIssues(_rules.value, filesystemAccessEnabled)
             }
         }
 
@@ -252,9 +270,9 @@ class RulesViewModel
                 }.collect { (ruleList, signature, filesystemAccessEnabled) ->
                     if (signature != lastFolderSignature) {
                         lastFolderSignature = signature
-                        _staleRuleIds.value =
+                        _staleRuleIssues.value =
                             withContext(Dispatchers.IO) {
-                                computeStaleRuleIds(ruleList, filesystemAccessEnabled)
+                                computeStaleRuleIssues(ruleList, filesystemAccessEnabled)
                             }
                     }
                 }
@@ -736,31 +754,37 @@ class RulesViewModel
             )
         }
 
-        private fun computeStaleRuleIds(
+        private fun computeStaleRuleIssues(
             ruleList: List<Rule>,
             filesystemAccessEnabled: Boolean,
-        ): Set<Long> =
+        ): Map<Long, RuleFolderIssueSeverity> =
             ruleList
-                .filter { rule -> ruleShowsStaleFolderWarningOnCard(rule, filesystemAccessEnabled) }
-                .map { it.id }
-                .toSet()
+                .mapNotNull { rule ->
+                    ruleFolderIssueSeverity(rule, filesystemAccessEnabled)?.let { severity -> rule.id to severity }
+                }.toMap()
 
         /**
          * Stale banner on the rule list card. Honors [Rule.suppressMissingSourceFolderCardWarning] only
          * when every problem is an [FolderAccessResult.Unavailable] on a **source** path; destination
          * issues and permission denials always show.
          */
-        private fun ruleShowsStaleFolderWarningOnCard(
+        private fun ruleFolderIssueSeverity(
             rule: Rule,
             filesystemAccessEnabled: Boolean,
-        ): Boolean {
-            if (DevMockFileMove.isMockRule(rule)) return false
+        ): RuleFolderIssueSeverity? {
+            if (DevMockFileMove.isMockRule(rule)) return null
             var sourcePermissionDenied = false
             var sourceHasUnavailable = false
+            var sourceHasBlockedLocation = false
             for (path in rule.sourceFolderPaths) {
                 when (fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)) {
                     FolderAccessResult.PermissionDenied -> sourcePermissionDenied = true
-                    FolderAccessResult.Unavailable -> sourceHasUnavailable = true
+                    FolderAccessResult.Unavailable -> {
+                        when {
+                            isFolderPathAllFilesAccessLocationForRules(path) -> sourceHasBlockedLocation = true
+                            else -> sourceHasUnavailable = true
+                        }
+                    }
                     FolderAccessResult.Accessible -> Unit
                 }
             }
@@ -768,17 +792,27 @@ class RulesViewModel
             var destinationShowsStale = false
             destinationPath?.let { path ->
                 when (fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)) {
-                    FolderAccessResult.PermissionDenied -> return true
-                    FolderAccessResult.Unavailable -> destinationShowsStale = true
+                    FolderAccessResult.PermissionDenied -> return RuleFolderIssueSeverity.ERROR
+                    FolderAccessResult.Unavailable ->
+                        if (isFolderPathAllFilesAccessLocationForRules(path)) {
+                            return RuleFolderIssueSeverity.ERROR
+                        } else {
+                            destinationShowsStale = true
+                        }
                     FolderAccessResult.Accessible -> Unit
                 }
             }
-            if (sourcePermissionDenied) return true
-            if (destinationShowsStale) return true
+            if (sourcePermissionDenied) return RuleFolderIssueSeverity.ERROR
+            if (sourceHasBlockedLocation) return RuleFolderIssueSeverity.ERROR
+            if (destinationShowsStale) return RuleFolderIssueSeverity.ERROR
             if (sourceHasUnavailable) {
-                return !rule.suppressMissingSourceFolderCardWarning
+                return if (rule.suppressMissingSourceFolderCardWarning) {
+                    null
+                } else {
+                    RuleFolderIssueSeverity.WARNING
+                }
             }
-            return false
+            return null
         }
 
         private fun sortRulesList(

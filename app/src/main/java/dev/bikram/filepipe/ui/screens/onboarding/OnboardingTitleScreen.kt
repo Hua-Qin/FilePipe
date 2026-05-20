@@ -1,7 +1,6 @@
 package dev.bikram.filepipe.ui.screens.onboarding
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
@@ -38,11 +37,13 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.AppIconImage
 import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.theme.pillShape
 import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
 import kotlinx.coroutines.delay
 
@@ -67,15 +68,18 @@ fun OnboardingTitleScreen(
     }
 
     val scheme = MaterialTheme.colorScheme
+    val motionScheme = MaterialTheme.motionScheme
+    val enterSpatialSpec = motionScheme.defaultSpatialSpec<IntOffset>()
+    val enterFadeSpec = motionScheme.defaultEffectsSpec<Float>()
     val iconEnter =
-        remember {
-            fadeIn(tween(durationMillis = 320)) +
-                slideInVertically(tween(durationMillis = 320)) { fullHeight -> fullHeight / 3 }
+        remember(enterSpatialSpec, enterFadeSpec) {
+            fadeIn(animationSpec = enterFadeSpec) +
+                slideInVertically(animationSpec = enterSpatialSpec) { fullHeight -> fullHeight / 3 }
         }
     val blockEnter =
-        remember {
-            fadeIn(tween(durationMillis = 280)) +
-                slideInVertically(tween(durationMillis = 280)) { fullHeight -> fullHeight / 2 }
+        remember(enterSpatialSpec, enterFadeSpec) {
+            fadeIn(animationSpec = enterFadeSpec) +
+                slideInVertically(animationSpec = enterSpatialSpec) { fullHeight -> fullHeight / 2 }
         }
     Box(
         modifier =
@@ -137,7 +141,7 @@ fun OnboardingTitleScreen(
             enter = reducedMotionEnterTransition(blockEnter),
         ) {
             Surface(
-                shape = RoundedCornerShape(50),
+                shape = pillShape,
                 color = scheme.surfaceContainerHigh,
             ) {
                 Row(
@@ -176,7 +180,7 @@ fun OnboardingTitleScreen(
             FilePipeButton(
                 onClick = onLetsBegan,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(50),
+                shape = pillShape,
                 contentPadding =
                     androidx.compose.foundation.layout.PaddingValues(
                         horizontal = 24.dp,

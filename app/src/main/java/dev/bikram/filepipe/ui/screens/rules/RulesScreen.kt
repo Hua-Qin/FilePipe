@@ -4,7 +4,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -17,23 +16,17 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.DropdownMenu
@@ -72,6 +65,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -97,19 +91,20 @@ import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.RuleCard
 import dev.bikram.filepipe.ui.components.RuleCardAction
+import dev.bikram.filepipe.ui.components.RuleCardFolderIssueSeverity
 import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyRulesIllustration
 import dev.bikram.filepipe.ui.components.displayPath
+import dev.bikram.filepipe.ui.components.previewSourceFolderDisplayPath
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
-import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBanner
-import dev.bikram.filepipe.ui.navigation.LocalPrimaryTabTopBannerActive
 import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalSnackbarHostState
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
+import dev.bikram.filepipe.ui.theme.pillShape
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
 import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
@@ -142,6 +137,8 @@ fun RulesScreen(
     val swipeStartToEnd = uiState.swipeStartToEnd
     val swipeEndToStart = uiState.swipeEndToStart
     val staleRuleIds = uiState.staleRuleIds
+    val staleRuleWarningIds = uiState.staleRuleWarningIds
+    val staleRuleErrorIds = uiState.staleRuleErrorIds
     val previewState = uiState.previewState
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -267,16 +264,7 @@ fun RulesScreen(
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             Column(Modifier.fillMaxWidth()) {
-                LocalPrimaryTabTopBanner.current()
                 LargeTopAppBar(
-                    modifier =
-                        Modifier.then(
-                            if (LocalPrimaryTabTopBannerActive.current) {
-                                Modifier.consumeWindowInsets(WindowInsets.statusBars.only(WindowInsetsSides.Top))
-                            } else {
-                                Modifier
-                            },
-                        ),
                     title = { Text(stringResource(R.string.nav_rules)) },
                     scrollBehavior = scrollBehavior,
                     colors = gradientOverlayTopAppBarColors(),
@@ -381,7 +369,7 @@ fun RulesScreen(
                         contentAlignment = Alignment.Center,
                     ) {
                         Surface(
-                            shape = RoundedCornerShape(50),
+                            shape = pillShape,
                             color = MaterialTheme.colorScheme.surfaceContainerHigh,
                             tonalElevation = 3.dp,
                             shadowElevation = 3.dp,
@@ -389,7 +377,7 @@ fun RulesScreen(
                             FilePipeOutlinedButton(
                                 onClick = { viewModel.cancelManualRun() },
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                shape = RoundedCornerShape(50),
+                                shape = pillShape,
                                 contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
                             ) {
                                 Text(stringResource(R.string.cancel))
@@ -399,10 +387,26 @@ fun RulesScreen(
                 }
                 isRunning -> { }
                 else -> {
+                    val selectionBarSpatialSpec =
+                        reducedMotionAwareSpec(
+                            MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>(),
+                        )
+                    val selectionBarFadeInSpec =
+                        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+                    val selectionBarFadeOutSpec =
+                        reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
                     AnimatedVisibility(
                         visible = hasSelection,
-                        enter = reducedMotionEnterTransition(expandVertically() + fadeIn()),
-                        exit = reducedMotionExitTransition(shrinkVertically() + fadeOut()),
+                        enter =
+                            reducedMotionEnterTransition(
+                                expandVertically(animationSpec = selectionBarSpatialSpec) +
+                                    fadeIn(animationSpec = selectionBarFadeInSpec),
+                            ),
+                        exit =
+                            reducedMotionExitTransition(
+                                shrinkVertically(animationSpec = selectionBarSpatialSpec) +
+                                    fadeOut(animationSpec = selectionBarFadeOutSpec),
+                            ),
                     ) {
                         val enabledSelectedCount = rules.count { it.id in selectedRuleIds && it.isEnabled }
                         Box(
@@ -413,7 +417,7 @@ fun RulesScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             Surface(
-                                shape = RoundedCornerShape(50),
+                                shape = pillShape,
                                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                                 tonalElevation = 3.dp,
                                 shadowElevation = 3.dp,
@@ -455,7 +459,7 @@ fun RulesScreen(
                                     FilePipeFilledTonalButton(
                                         onClick = { viewModel.runSelected() },
                                         enabled = enabledSelectedCount > 0,
-                                        shape = RoundedCornerShape(50),
+                                        shape = pillShape,
                                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                                     ) {
                                         Text(stringResource(R.string.run_button))
@@ -521,7 +525,10 @@ fun RulesScreen(
                     ) { isDragging ->
                         val dragElevation by animateDpAsState(
                             targetValue = if (isDragging) 8.dp else 0.dp,
-                            animationSpec = reducedMotionAwareSpec(tween(220)),
+                            animationSpec =
+                                reducedMotionAwareSpec(
+                                    MaterialTheme.motionScheme.defaultSpatialSpec(),
+                                ),
                             label = "ruleCardReorderShadow",
                         )
                         val reorderLongPressModifier =
@@ -548,6 +555,12 @@ fun RulesScreen(
                         val showInlineProgressCancel =
                             manualRunCancelAnchor is ManualRunCancelAnchor.SingleRule &&
                                 manualRunCancelAnchor.ruleId == rule.id
+                        val folderIssueSeverity =
+                            when (rule.id) {
+                                in staleRuleErrorIds -> RuleCardFolderIssueSeverity.ERROR
+                                in staleRuleWarningIds -> RuleCardFolderIssueSeverity.WARNING
+                                else -> null
+                            }
                         SwipeToDismissRuleCard(
                             rule = rule,
                             isSelected = rule.id in selectedRuleIds,
@@ -556,6 +569,7 @@ fun RulesScreen(
                             progress = progressMap[rule.id],
                             isAnyRuleRunning = isRunning,
                             hasStaleFolder = rule.id in staleRuleIds,
+                            folderIssueSeverity = folderIssueSeverity,
                             onStaleWarningClick = { onEditRule(rule.id) },
                             swipeStartToEnd = swipeStartToEnd,
                             swipeEndToStart = swipeEndToStart,
@@ -586,7 +600,7 @@ fun RulesScreen(
                                 },
                             reorderLongPressDragModifier = reorderLongPressModifier,
                             suppressLongClickForReorder = reorderLongPressActive,
-                            modifier = Modifier.shadow(dragElevation, RoundedCornerShape(16.dp)),
+                            modifier = Modifier.shadow(dragElevation, MaterialTheme.shapes.medium),
                         )
                     }
                 }
@@ -695,58 +709,78 @@ fun RulesScreen(
                                     )
                                 }
                             }
-                            items(
-                                items = ruleGroup.results,
-                                key = { previewItem -> "${ruleGroup.ruleId}_${previewItem.sourcePath}" },
-                            ) { result ->
-                                Row(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            text = displayPath(result.sourcePath, internalStorageDisplayName),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        when {
-                                            result.wouldSkip ->
-                                                Text(
-                                                    text = stringResource(R.string.preview_would_skip),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            result.wouldOverwrite ->
-                                                Text(
-                                                    text = stringResource(R.string.preview_would_overwrite),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                )
-                                            result.renamedTo != null ->
-                                                Text(
-                                                    text =
-                                                        stringResource(
-                                                            R.string.preview_destination_path,
-                                                            displayPath(result.simulatedDestPath, internalStorageDisplayName),
-                                                        ),
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    maxLines = 1,
-                                                    overflow = TextOverflow.Ellipsis,
-                                                )
-                                        }
-                                    }
-                                    val sizeKb = result.sizeBytes / 1024
-                                    Text(
-                                        if (sizeKb > 1024) "${sizeKb / 1024} MB" else "$sizeKb KB",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.outline,
+                            val groupedResults =
+                                ruleGroup.results.groupBy { result ->
+                                    previewSourceFolderDisplayPath(
+                                        sourcePath = result.sourcePath,
+                                        fileName = result.fileName,
+                                        internalStorageRootDisplayName = internalStorageDisplayName,
                                     )
+                                }
+                            groupedResults.forEach { (sourceFolder, sourceFiles) ->
+                                item(key = "source_${ruleGroup.ruleId}_$sourceFolder") {
+                                    Text(
+                                        text = sourceFolder.trimEnd('/') + "/",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                items(
+                                    items = sourceFiles,
+                                    key = { previewItem -> "${ruleGroup.ruleId}_${previewItem.sourcePath}" },
+                                ) { result ->
+                                    Row(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(start = 16.dp, top = 4.dp, bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = result.fileName,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                            when {
+                                                result.wouldSkip ->
+                                                    Text(
+                                                        text = stringResource(R.string.preview_would_skip),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                result.wouldOverwrite ->
+                                                    Text(
+                                                        text = stringResource(R.string.preview_would_overwrite),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    )
+                                                result.renamedTo != null ->
+                                                    Text(
+                                                        text =
+                                                            stringResource(
+                                                                R.string.preview_destination_path,
+                                                                displayPath(result.simulatedDestPath, internalStorageDisplayName),
+                                                            ),
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                    )
+                                            }
+                                        }
+                                        val sizeKb = result.sizeBytes / 1024
+                                        Text(
+                                            if (sizeKb > 1024) "${sizeKb / 1024} MB" else "$sizeKb KB",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.outline,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -825,6 +859,7 @@ private fun SwipeToDismissRuleCard(
     progress: dev.bikram.filepipe.domain.model.RunProgress?,
     isAnyRuleRunning: Boolean,
     hasStaleFolder: Boolean,
+    folderIssueSeverity: RuleCardFolderIssueSeverity?,
     onStaleWarningClick: () -> Unit,
     swipeStartToEnd: SwipeAction,
     swipeEndToStart: SwipeAction,
@@ -844,7 +879,7 @@ private fun SwipeToDismissRuleCard(
     suppressLongClickForReorder: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val cardShape = RoundedCornerShape(16.dp)
+    val cardShape = MaterialTheme.shapes.medium
     val isMockRule = DevMockFileMove.isMockRule(rule)
     val swipeAssigned = setOf(swipeStartToEnd, swipeEndToStart)
     val cardIconPairs: List<RuleCardAction> =
@@ -951,6 +986,7 @@ private fun SwipeToDismissRuleCard(
             showInlineProgressCancel = showInlineProgressCancel,
             isAnyRuleRunning = isAnyRuleRunning,
             hasStaleFolder = hasStaleFolder,
+            folderIssueSeverity = folderIssueSeverity,
             onStaleWarningClick = onStaleWarningClick,
             onLeadingLongClick = onLeadingLongClick,
             reorderLongPressDragModifier = reorderLongPressDragModifier,
@@ -1000,9 +1036,17 @@ private fun EmptyState(
     onAddRule: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val emptyStateSpatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+    val emptyStateFadeSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     AnimatedVisibility(
         visible = true,
-        enter = reducedMotionEnterTransition(fadeIn(tween(400)) + slideInVertically(tween(400)) { it / 4 }),
+        enter =
+            reducedMotionEnterTransition(
+                fadeIn(animationSpec = emptyStateFadeSpec) +
+                    slideInVertically(animationSpec = emptyStateSpatialSpec) { it / 4 },
+            ),
     ) {
         Column(
             modifier = modifier.fillMaxSize().padding(32.dp),
@@ -1031,13 +1075,14 @@ private fun EmptyState(
             Spacer(Modifier.height(24.dp))
             FilePipeButton(
                 onClick = onAddRule,
-                shape = RoundedCornerShape(16.dp),
+                shape = pillShape,
                 modifier = Modifier.fillMaxWidth(0.72f),
             ) {
                 FilePipeMaterialRoundedSymbol(
                     name = "add",
                     contentDescription = null,
                     size = 20.dp,
+                    opticalCenterYOffset = (-2).dp,
                     modifier = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(8.dp))

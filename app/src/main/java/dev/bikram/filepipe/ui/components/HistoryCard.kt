@@ -1,7 +1,6 @@
 package dev.bikram.filepipe.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Surface
@@ -37,8 +35,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val HistoryCardShape = RoundedCornerShape(16.dp)
-
 @Composable
 fun HistoryCard(
     history: RunHistory,
@@ -46,6 +42,7 @@ fun HistoryCard(
     modifier: Modifier = Modifier,
 ) {
     val cardColors = elevatedCardColors()
+    val historyCardShape = MaterialTheme.shapes.medium
     FilePipeSurface(
         onClick = onClick,
         modifier =
@@ -54,7 +51,7 @@ fun HistoryCard(
                 .semantics(mergeDescendants = true) {
                     role = Role.Button
                 },
-        shape = HistoryCardShape,
+        shape = historyCardShape,
         color = cardColors.containerColor,
         contentColor = cardColors.contentColor,
         tonalElevation = 1.dp,
@@ -161,7 +158,7 @@ fun StatusChip(
         }
     val containerColor by animateColorAsState(
         targetValue = targetColor,
-        animationSpec = reducedMotionAwareSpec(tween(300)),
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec()),
         label = "chipColor",
     )
     Surface(
