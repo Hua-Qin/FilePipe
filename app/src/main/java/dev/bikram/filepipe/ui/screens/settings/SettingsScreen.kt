@@ -69,7 +69,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
@@ -80,12 +79,12 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -102,9 +101,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -262,8 +262,9 @@ fun SettingsScreen(
     val playInAppUpdateBannerUiState by viewModel.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
     val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsStateWithLifecycle()
     val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
-    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
     val context = LocalContext.current
+    val resources = LocalResources.current
+    val density = LocalDensity.current
 
     fun computeNotificationsEnabled(): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -279,8 +280,20 @@ fun SettingsScreen(
     val snackbarHostState = LocalSnackbarHostState.current
     val coroutineScope = rememberCoroutineScope()
     val settingsLazyListState = rememberLazyListState()
-    val topAppBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
+
+    val topAlphaMultiplier by remember(settingsLazyListState) {
+        derivedStateOf {
+            if (settingsLazyListState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                val offsetPx = settingsLazyListState.firstVisibleItemScrollOffset.toFloat()
+                val thresholdPx = with(density) { 24.dp.toPx() }
+                (offsetPx / thresholdPx).coerceIn(0f, 1f)
+            }
+        }
+    }
+    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
+
     var collapsedSettingsSectionKeys by rememberSaveable { mutableStateOf(emptySet<String>()) }
     val settingsExpandableSectionKeys =
         remember {
@@ -323,9 +336,7 @@ fun SettingsScreen(
                 }
             }
         if (settingsLazyListState.layoutInfo.totalItemsCount > targetIndex) {
-            topAppBarState.heightOffset = topAppBarState.heightOffsetLimit
             settingsLazyListState.animateScrollToItem(targetIndex)
-            topAppBarState.heightOffset = topAppBarState.heightOffsetLimit
         }
         val highlightExpiresAtMillis = SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
         when (key) {
@@ -368,7 +379,7 @@ fun SettingsScreen(
                     coroutineScope.launch {
                         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
                             snackbarHostState.showSnackbar(
-                                context.getString(R.string.settings_notify_updates_enable_notifications),
+                                resources.getString(R.string.settings_notify_updates_enable_notifications),
                             )
                             viewModel.openAppNotificationSettings()
                             return@launch
@@ -427,7 +438,7 @@ fun SettingsScreen(
     val settingsScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = settingsLazyListState,
-            additionalScrollEnabled = topAppBarState.collapsedFraction > 0f,
+            additionalScrollEnabled = false,
             ignoredBottomPadding = 24.dp,
         )
 
@@ -633,14 +644,14 @@ fun SettingsScreen(
                         val message =
                             when {
                                 affectedRuleCount <= 0 ->
-                                    context.getString(R.string.settings_folder_access_switched_selective_zero_rules)
+                                    resources.getString(R.string.settings_folder_access_switched_selective_zero_rules)
                                 affectedRuleCount == 1 ->
-                                    context.getString(
+                                    resources.getString(
                                         R.string.settings_folder_access_switched_selective_snackbar_one,
                                         affectedRuleCount,
                                     )
                                 else ->
-                                    context.getString(
+                                    resources.getString(
                                         R.string.settings_folder_access_switched_selective_snackbar_other,
                                         affectedRuleCount,
                                     )
@@ -663,13 +674,11 @@ fun SettingsScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             Column(Modifier.fillMaxWidth()) {
-                LargeTopAppBar(
-                    title = { Text(stringResource(R.string.settings_title)) },
-                    scrollBehavior = scrollBehavior,
+                TopAppBar(
+                    title = {},
                     colors = gradientOverlayTopAppBarColors(),
                     actions = {
                         val helpOpenLabel = stringResource(R.string.settings_fab_open_help)
@@ -768,7 +777,7 @@ fun SettingsScreen(
                             coroutineScope.launch {
                                 snackbarHostState.currentSnackbarData?.dismiss()
                                 snackbarHostState.showSnackbar(
-                                    context.getString(R.string.settings_black_theme_effect_disabled),
+                                    resources.getString(R.string.settings_black_theme_effect_disabled),
                                 )
                             }
                         },
@@ -798,13 +807,6 @@ fun SettingsScreen(
                         collapsedSectionKeys = collapsedSettingsSectionKeys,
                         onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
                     ) {
-                        Text(
-                            text = stringResource(R.string.onboarding_permissions_subtitle),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 4.dp),
-                        )
-                        Spacer(Modifier.height(8.dp))
                         GroupedListColumn {
                             GroupedListItem(position = GroupPosition.FIRST) {
                                 ListItem(
@@ -1133,7 +1135,7 @@ fun SettingsScreen(
                                         viewModel.setExportFolderUri("")
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
-                                                message = context.getString(R.string.settings_local_backup_folder_cleared),
+                                                message = resources.getString(R.string.settings_local_backup_folder_cleared),
                                                 duration = SnackbarDuration.Short,
                                             )
                                         }
@@ -1153,7 +1155,7 @@ fun SettingsScreen(
                                         viewModel.setCloudExportFolderUri("")
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar(
-                                                message = context.getString(R.string.settings_cloud_backup_file_cleared),
+                                                message = resources.getString(R.string.settings_cloud_backup_file_cleared),
                                                 duration = SnackbarDuration.Short,
                                             )
                                         }
@@ -1170,7 +1172,7 @@ fun SettingsScreen(
                                 onDisabledInteraction = {
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
-                                            message = context.getString(R.string.settings_export_select_folder_first),
+                                            message = resources.getString(R.string.settings_export_select_folder_first),
                                             duration = SnackbarDuration.Short,
                                         )
                                     }
@@ -1187,7 +1189,7 @@ fun SettingsScreen(
                                 onDisabledInteraction = {
                                     coroutineScope.launch {
                                         snackbarHostState.showSnackbar(
-                                            message = context.getString(R.string.settings_export_select_folder_first),
+                                            message = resources.getString(R.string.settings_export_select_folder_first),
                                             duration = SnackbarDuration.Short,
                                         )
                                     }
@@ -1224,7 +1226,7 @@ fun SettingsScreen(
                                             } else {
                                                 coroutineScope.launch {
                                                     snackbarHostState.showSnackbar(
-                                                        message = context.getString(R.string.settings_export_select_folder_first),
+                                                        message = resources.getString(R.string.settings_export_select_folder_first),
                                                         duration = SnackbarDuration.Short,
                                                     )
                                                 }
@@ -1330,7 +1332,7 @@ fun SettingsScreen(
                                                 preferences.updateCheckSchedule == UpdateCheckSchedule.NEVER -> {
                                                     coroutineScope.launch {
                                                         snackbarHostState.showSnackbar(
-                                                            context.getString(
+                                                            resources.getString(
                                                                 R.string.settings_notify_updates_need_auto_check,
                                                             ),
                                                         )
@@ -1347,7 +1349,7 @@ fun SettingsScreen(
                                                 !NotificationManagerCompat.from(context).areNotificationsEnabled() -> {
                                                     coroutineScope.launch {
                                                         snackbarHostState.showSnackbar(
-                                                            context.getString(
+                                                            resources.getString(
                                                                 R.string.settings_notify_updates_enable_notifications,
                                                             ),
                                                         )
@@ -1435,6 +1437,8 @@ fun SettingsScreen(
                 val developerOptionsTapsRemainingToast = stringResource(R.string.settings_developer_options_taps_remaining)
                 val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
                 val diagnosticsTooltip = stringResource(R.string.settings_share_diagnostics)
+                val aboutLinkCopiedToast = stringResource(R.string.toast_about_link_copied)
+                val authorGithubProfileUrl = stringResource(R.string.about_author_github_profile_url)
                 val shareDiagnostics =
                     rememberDiagnosticsShareAction(
                         context = aboutContext,
@@ -1442,7 +1446,7 @@ fun SettingsScreen(
                         preferences = preferences,
                     )
                 val copyAboutLinkToClipboard =
-                    remember(aboutContext) {
+                    remember(aboutContext, aboutLinkCopiedToast) {
                         { url: String ->
                             val clipboard =
                                 aboutContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -1450,7 +1454,7 @@ fun SettingsScreen(
                             Toast
                                 .makeText(
                                     aboutContext,
-                                    aboutContext.getString(R.string.toast_about_link_copied),
+                                    aboutLinkCopiedToast,
                                     Toast.LENGTH_SHORT,
                                 ).show()
                         }
@@ -1561,11 +1565,9 @@ fun SettingsScreen(
                                                 .size(84.dp)
                                                 .clip(RoundedCornerShape(16.dp))
                                                 .tapSoundClickable {
-                                                    val profileUrl =
-                                                        aboutContext.getString(R.string.about_author_github_profile_url)
                                                     runCatching {
                                                         aboutContext.startActivity(
-                                                            Intent(Intent.ACTION_VIEW, Uri.parse(profileUrl)),
+                                                            Intent(Intent.ACTION_VIEW, Uri.parse(authorGithubProfileUrl)),
                                                         )
                                                     }
                                                 },

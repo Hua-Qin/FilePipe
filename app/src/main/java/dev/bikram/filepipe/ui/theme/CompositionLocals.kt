@@ -54,6 +54,7 @@ data class ProgressiveBlurStyle(
     val overlayAlpha: Float,
     /** Gradient overlay strength at the bottom edge (may exceed [overlayAlpha] for stronger bottom scrim). */
     val overlayAlphaBottom: Float,
+    val topBlurProgressPower: Float = 1.1f,
 )
 
 val LocalProgressiveBlurStyle = compositionLocalOf<ProgressiveBlurStyle?> { null }

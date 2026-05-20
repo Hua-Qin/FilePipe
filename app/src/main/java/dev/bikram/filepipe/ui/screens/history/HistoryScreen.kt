@@ -1,7 +1,7 @@
 package dev.bikram.filepipe.ui.screens.history
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
@@ -35,18 +35,17 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,7 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -125,8 +124,7 @@ fun HistoryScreen(
     val pagingItems = viewModel.historyPagingFlow.collectAsLazyPagingItems()
     val filteredItems by viewModel.filteredHistoryItems.collectAsStateWithLifecycle()
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
-    val topAppBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
+
     var showClearConfirm by remember { mutableStateOf(false) }
     var pendingDeleteForeverRule by remember { mutableStateOf<Rule?>(null) }
     var expandedTrashRuleIds by rememberSaveable { mutableStateOf(emptySet<Long>()) }
@@ -142,21 +140,17 @@ fun HistoryScreen(
     val pagingListState = rememberLazyListState()
     val filteredListState = rememberLazyListState()
     val trashListState = rememberLazyListState()
-    val headerCollapsed = topAppBarState.collapsedFraction > 0f
     val pagingListScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = pagingListState,
-            additionalScrollEnabled = headerCollapsed,
         )
     val filteredListScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = filteredListState,
-            additionalScrollEnabled = headerCollapsed,
         )
     val trashListScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = trashListState,
-            additionalScrollEnabled = headerCollapsed,
         )
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -246,7 +240,6 @@ fun HistoryScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             val navigationIcon: @Composable () -> Unit = {
@@ -265,9 +258,8 @@ fun HistoryScreen(
                 }
             }
             Column(Modifier.fillMaxWidth()) {
-                LargeTopAppBar(
-                    title = { Text(stringResource(R.string.history_title)) },
-                    scrollBehavior = scrollBehavior,
+                TopAppBar(
+                    title = {},
                     colors = gradientOverlayTopAppBarColors(),
                     navigationIcon = navigationIcon,
                     actions = {
@@ -421,19 +413,32 @@ fun HistoryScreen(
                             )
                         }
                     }
-                } else if (trashedRules.isNotEmpty()) {
-                    RetentionNotice(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
                 }
             }
         },
     ) { innerPadding ->
+        val density = LocalDensity.current
+        val activeListState =
+            remember(section, isUsingPaging, trashListState, pagingListState, filteredListState) {
+                when {
+                    section == HistorySection.TRASH -> trashListState
+                    isUsingPaging -> pagingListState
+                    else -> filteredListState
+                }
+            }
+        val topAlphaMultiplier by remember(activeListState) {
+            derivedStateOf {
+                if (activeListState.firstVisibleItemIndex > 0) {
+                    1f
+                } else {
+                    val offsetPx = activeListState.firstVisibleItemScrollOffset.toFloat()
+                    val thresholdPx = with(density) { 24.dp.toPx() }
+                    (offsetPx / thresholdPx).coerceIn(0f, 1f)
+                }
+            }
+        }
         val scrollBlurModifier =
-            LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
+            LocalProgressiveBlurStyle.current?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
 
         val historySectionSpatialSpec =
             reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
@@ -537,75 +542,134 @@ fun HistoryScreen(
                     }
                 }
             } else if (targetSection == HistorySection.TRASH) {
-            LazyColumn(
-                state = trashListState,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .then(scrollBlurModifier),
-                contentPadding =
-                    PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = innerPadding.calculateTopPadding() + 8.dp,
-                        bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
-                    ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                userScrollEnabled = trashListScrollEnabled,
-            ) {
-                items(
-                    items = trashedRules,
-                    key = { rule -> "trash_rule_${rule.id}" },
-                ) { rule ->
-                    val isExpanded = rule.id in expandedTrashRuleIds
-                    SwipeToDismissTrashRuleCard(
-                        rule = rule,
-                        isExpanded = isExpanded,
-                        onToggleExpanded = {
-                            expandedTrashRuleIds =
-                                if (isExpanded) {
-                                    expandedTrashRuleIds - rule.id
-                                } else {
-                                    expandedTrashRuleIds + rule.id
-                                }
-                        },
-                        onRestore = { viewModel.restoreRule(rule.id) },
-                        onDeleteForever = { pendingDeleteForeverRule = rule },
-                        modifier = Modifier.animateItem(),
-                    )
-                }
-            }
-        } else if (isUsingPaging) {
-            LazyColumn(
-                state = pagingListState,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .then(scrollBlurModifier),
-                contentPadding =
-                    PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = innerPadding.calculateTopPadding() + 8.dp,
-                        bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
-                    ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                userScrollEnabled = pagingListScrollEnabled,
-            ) {
-                if (isFiltered) {
-                    item(key = "filter_header") {
-                        Text(
-                            text = stringResource(R.string.history_filter_rule_header),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.secondary,
-                            modifier = Modifier.padding(bottom = 4.dp),
+                LazyColumn(
+                    state = trashListState,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .then(scrollBlurModifier),
+                    contentPadding =
+                        PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = innerPadding.calculateTopPadding() + 8.dp,
+                            bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    userScrollEnabled = trashListScrollEnabled,
+                ) {
+                    item(key = "trash_retention_notice") {
+                        RetentionNotice(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                        )
+                    }
+                    items(
+                        items = trashedRules,
+                        key = { rule -> "trash_rule_${rule.id}" },
+                    ) { rule ->
+                        val isExpanded = rule.id in expandedTrashRuleIds
+                        SwipeToDismissTrashRuleCard(
+                            rule = rule,
+                            isExpanded = isExpanded,
+                            onToggleExpanded = {
+                                expandedTrashRuleIds =
+                                    if (isExpanded) {
+                                        expandedTrashRuleIds - rule.id
+                                    } else {
+                                        expandedTrashRuleIds + rule.id
+                                    }
+                            },
+                            onRestore = { viewModel.restoreRule(rule.id) },
+                            onDeleteForever = { pendingDeleteForeverRule = rule },
+                            modifier = Modifier.animateItem(),
                         )
                     }
                 }
-                items(
-                    count = pagingItems.itemCount,
-                    key =
-                        pagingItems.itemKey { item ->
+            } else if (isUsingPaging) {
+                LazyColumn(
+                    state = pagingListState,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .then(scrollBlurModifier),
+                    contentPadding =
+                        PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = innerPadding.calculateTopPadding() + 8.dp,
+                            bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    userScrollEnabled = pagingListScrollEnabled,
+                ) {
+                    if (isFiltered) {
+                        item(key = "filter_header") {
+                            Text(
+                                text = stringResource(R.string.history_filter_rule_header),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.secondary,
+                                modifier = Modifier.padding(bottom = 4.dp),
+                            )
+                        }
+                    }
+                    items(
+                        count = pagingItems.itemCount,
+                        key =
+                            pagingItems.itemKey { item ->
+                                when (item) {
+                                    is HistoryItem.Entry -> "entry_${item.history.id}"
+                                    is HistoryItem.DateHeader -> "header_${item.label}"
+                                    is HistoryItem.RuleHeader -> "rule_${item.ruleName}"
+                                    is HistoryItem.StatusHeader -> "status_${item.section.name}"
+                                }
+                            },
+                    ) { index ->
+                        when (val item = pagingItems[index]) {
+                            is HistoryItem.DateHeader -> {
+                                Text(
+                                    text = item.label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(vertical = 4.dp),
+                                )
+                            }
+                            is HistoryItem.RuleHeader -> Unit
+                            is HistoryItem.StatusHeader -> Unit
+                            is HistoryItem.Entry -> {
+                                SwipeToDismissHistoryCard(
+                                    history = item.history,
+                                    onClick = { onHistoryClick(item.history.id) },
+                                    onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
+                                    modifier = Modifier.animateItem(),
+                                )
+                            }
+                            null -> Unit
+                        }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    state = filteredListState,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .then(scrollBlurModifier),
+                    contentPadding =
+                        PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = innerPadding.calculateTopPadding() + 8.dp,
+                            bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    userScrollEnabled = filteredListScrollEnabled,
+                ) {
+                    items(
+                        items = filteredItems,
+                        key = { item ->
                             when (item) {
                                 is HistoryItem.Entry -> "entry_${item.history.id}"
                                 is HistoryItem.DateHeader -> "header_${item.label}"
@@ -613,117 +677,66 @@ fun HistoryScreen(
                                 is HistoryItem.StatusHeader -> "status_${item.section.name}"
                             }
                         },
-                ) { index ->
-                    when (val item = pagingItems[index]) {
-                        is HistoryItem.DateHeader -> {
-                            Text(
-                                text = item.label,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(vertical = 4.dp),
-                            )
-                        }
-                        is HistoryItem.RuleHeader -> Unit
-                        is HistoryItem.StatusHeader -> Unit
-                        is HistoryItem.Entry -> {
-                            SwipeToDismissHistoryCard(
-                                history = item.history,
-                                onClick = { onHistoryClick(item.history.id) },
-                                onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
-                                modifier = Modifier.animateItem(),
-                            )
-                        }
-                        null -> Unit
-                    }
-                }
-            }
-        } else {
-            LazyColumn(
-                state = filteredListState,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .then(scrollBlurModifier),
-                contentPadding =
-                    PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = innerPadding.calculateTopPadding() + 8.dp,
-                        bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
-                    ),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                userScrollEnabled = filteredListScrollEnabled,
-            ) {
-                items(
-                    items = filteredItems,
-                    key = { item ->
+                    ) { item ->
                         when (item) {
-                            is HistoryItem.Entry -> "entry_${item.history.id}"
-                            is HistoryItem.DateHeader -> "header_${item.label}"
-                            is HistoryItem.RuleHeader -> "rule_${item.ruleName}"
-                            is HistoryItem.StatusHeader -> "status_${item.section.name}"
-                        }
-                    },
-                ) { item ->
-                    when (item) {
-                        is HistoryItem.DateHeader -> {
-                            Text(
-                                text = item.label,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(vertical = 4.dp).animateItem(),
-                            )
-                        }
-                        is HistoryItem.RuleHeader -> {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).animateItem(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
+                            is HistoryItem.DateHeader -> {
                                 Text(
-                                    text = item.ruleName,
+                                    text = item.label,
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.primary,
-                                )
-                                Text(
-                                    text = "${item.count}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(vertical = 4.dp).animateItem(),
                                 )
                             }
-                        }
-                        is HistoryItem.StatusHeader -> {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).animateItem(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(
-                                    text = historyStatusSectionTitle(item.section),
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                )
-                                Text(
-                                    text = "${item.count}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            is HistoryItem.RuleHeader -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).animateItem(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        text = item.ruleName,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Text(
+                                        text = "${item.count}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            is HistoryItem.StatusHeader -> {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).animateItem(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(
+                                        text = historyStatusSectionTitle(item.section),
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Text(
+                                        text = "${item.count}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                            is HistoryItem.Entry -> {
+                                SwipeToDismissHistoryCard(
+                                    history = item.history,
+                                    onClick = { onHistoryClick(item.history.id) },
+                                    onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
+                                    modifier = Modifier.animateItem(),
                                 )
                             }
-                        }
-                        is HistoryItem.Entry -> {
-                            SwipeToDismissHistoryCard(
-                                history = item.history,
-                                onClick = { onHistoryClick(item.history.id) },
-                                onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
-                                modifier = Modifier.animateItem(),
-                            )
                         }
                     }
                 }
             }
         }
     }
-}
 }
 
 @Composable

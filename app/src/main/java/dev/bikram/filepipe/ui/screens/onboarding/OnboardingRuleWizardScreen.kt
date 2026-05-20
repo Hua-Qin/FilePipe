@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.sp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
-import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeElevatedCard
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.RuleIconOrEmoji
@@ -135,7 +134,7 @@ fun OnboardingRuleWizardScreen(
                     Spacer(Modifier.size(24.dp))
                 }
             }
-            FilePipeButton(
+            FilePipeOutlinedButton(
                 onClick = onSkip,
                 modifier = Modifier.weight(1f),
                 shape = pillShape,

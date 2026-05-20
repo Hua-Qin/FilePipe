@@ -33,7 +33,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -42,12 +41,12 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,8 +57,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -142,20 +142,31 @@ fun RulesScreen(
     val previewState = uiState.previewState
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val topAppBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topAppBarState)
+    val resources = LocalResources.current
+
     var pendingDeleteSelected by remember { mutableStateOf(false) }
     var sortMenuExpanded by remember { mutableStateOf(false) }
     val snackbarHostState = LocalSnackbarHostState.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
-    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList() ?: Modifier
-
     val hasSelection = selectedRuleIds.isNotEmpty()
     val lazyListState = rememberLazyListState()
+    val density = LocalDensity.current
+    val topAlphaMultiplier by remember(lazyListState) {
+        derivedStateOf {
+            if (lazyListState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                val offsetPx = lazyListState.firstVisibleItemScrollOffset.toFloat()
+                val thresholdPx = with(density) { 24.dp.toPx() }
+                (offsetPx / thresholdPx).coerceIn(0f, 1f)
+            }
+        }
+    }
+    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
     val listScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = lazyListState,
-            additionalScrollEnabled = topAppBarState.collapsedFraction > 0f,
+            additionalScrollEnabled = false,
             ignoredBottomPadding = 56.dp,
         )
     var reorderableRules by remember { mutableStateOf(rules) }
@@ -217,14 +228,14 @@ fun RulesScreen(
             val count = event.rules.size
             val label =
                 if (count == 1) {
-                    context.getString(R.string.rule_moved_to_trash, event.rules.first().name)
+                    resources.getString(R.string.rule_moved_to_trash, event.rules.first().name)
                 } else {
-                    context.resources.getQuantityString(R.plurals.rules_moved_to_trash, count, count)
+                    resources.getQuantityString(R.plurals.rules_moved_to_trash, count, count)
                 }
             val result =
                 snackbarHostState.showSnackbar(
                     message = label,
-                    actionLabel = context.getString(R.string.undo),
+                    actionLabel = resources.getString(R.string.undo),
                     duration = SnackbarDuration.Long,
                 )
             if (result == SnackbarResult.ActionPerformed) {
@@ -260,13 +271,11 @@ fun RulesScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
             Column(Modifier.fillMaxWidth()) {
-                LargeTopAppBar(
-                    title = { Text(stringResource(R.string.nav_rules)) },
-                    scrollBehavior = scrollBehavior,
+                TopAppBar(
+                    title = {},
                     colors = gradientOverlayTopAppBarColors(),
                     actions = {
                         Row(

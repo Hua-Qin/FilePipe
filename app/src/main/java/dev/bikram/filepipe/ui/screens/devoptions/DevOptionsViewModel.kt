@@ -1,11 +1,13 @@
 package dev.bikram.filepipe.ui.screens.devoptions
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.UriPermission
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -75,12 +77,30 @@ data class DevOptionsInfoRow(
     val value: String,
 )
 
+data class DevRuleFolderAccessUiItem(
+    val label: String,
+    val uri: String,
+    val accessTypeLabel: String,
+    val accessLabel: String,
+)
+
+data class DevRuleAccessUiItem(
+    val ruleName: String,
+    val folderAccesses: List<DevRuleFolderAccessUiItem>,
+)
+
+data class DevFolderAccessUiState(
+    val rules: List<DevRuleAccessUiItem> = emptyList(),
+    val unassociatedGrants: List<DevRuleFolderAccessUiItem> = emptyList(),
+)
+
 data class DevOptionsUiState(
     val loading: Boolean = true,
     val developerOptionsEnabled: Boolean = false,
     val preferences: AppPreferences = AppPreferences.DEFAULT,
     val overview: List<DevOptionsInfoRow> = emptyList(),
     val permissionsAndStorage: List<DevOptionsInfoRow> = emptyList(),
+    val folderAccess: DevFolderAccessUiState = DevFolderAccessUiState(),
     val database: List<DevOptionsInfoRow> = emptyList(),
     val workers: List<DevOptionsInfoRow> = emptyList(),
     val updateMocksAvailable: Boolean = false,
@@ -326,6 +346,7 @@ class DevOptionsViewModel
             }
         }
 
+        @SuppressLint("MissingPermission")
         fun postMockFileOperationNotification() {
             viewModelScope.launch {
                 if (!notificationsAllowed()) return@launch
@@ -477,6 +498,7 @@ class DevOptionsViewModel
                     runHistoryDao.countHistoryByStatus(status.name)
                 }
             val rules = ruleRepository.getAllRulesOrderedBySortOrder()
+            val folderAccess = buildFolderAccess(uriPermissions, rules)
             val scheduledRules = rules.filter { it.isEnabled && it.schedule != null }
             val ruleWorkerStates =
                 scheduledRules
@@ -548,15 +570,6 @@ class DevOptionsViewModel
                         },
                     ),
                     DevOptionsInfoRow(
-                        R.string.dev_options_info_persisted_uri_grants,
-                        context.getString(
-                            R.string.dev_options_value_persisted_uri_grants_format,
-                            uriPermissions.size,
-                            readGrants,
-                            writeGrants,
-                        ),
-                    ),
-                    DevOptionsInfoRow(
                         R.string.dev_options_info_backup_destinations,
                         context.getString(R.string.dev_options_value_configured_count_format, backupDestinations),
                     ),
@@ -620,6 +633,7 @@ class DevOptionsViewModel
                 preferences = prefs,
                 overview = overview,
                 permissionsAndStorage = permissions,
+                folderAccess = folderAccess,
                 database = database,
                 workers = workers,
                 updateMocksAvailable = BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease",
@@ -730,6 +744,125 @@ class DevOptionsViewModel
                 context.getString(R.string.dev_options_value_not_supported)
             }
 
+        private fun buildFolderAccess(
+            uriPermissions: List<UriPermission>,
+            rules: List<Rule>,
+        ): DevFolderAccessUiState {
+            val permissionByUri = uriPermissions.associateBy { it.uri.toString() }
+            val usedSafUris = mutableSetOf<String>()
+            val ruleAccesses =
+                rules.map { rule ->
+                    DevRuleAccessUiItem(
+                        ruleName = rule.name,
+                        folderAccesses =
+                            buildList {
+                                val sourceCount = rule.sourceFolderPaths.size
+                                rule.sourceFolderPaths.forEachIndexed { sourceIndex, uriString ->
+                                    val sourceLabel =
+                                        if (sourceCount == 1) {
+                                            context.getString(R.string.dev_options_folder_access_source)
+                                        } else {
+                                            context.getString(
+                                                R.string.dev_options_folder_access_source_format,
+                                                sourceIndex + 1,
+                                            )
+                                        }
+                                    add(
+                                        buildRuleFolderAccess(
+                                            label = sourceLabel,
+                                            uriString = uriString,
+                                            permissionByUri = permissionByUri,
+                                        ),
+                                    )
+                                    if (uriString.startsWith(CONTENT_URI_PREFIX) && uriString in permissionByUri) {
+                                        usedSafUris += uriString
+                                    }
+                                }
+                                if (rule.destinationFolderPath.isNotBlank()) {
+                                    add(
+                                        buildRuleFolderAccess(
+                                            label = context.getString(R.string.dev_options_folder_access_target),
+                                            uriString = rule.destinationFolderPath,
+                                            permissionByUri = permissionByUri,
+                                        ),
+                                    )
+                                    if (
+                                        rule.destinationFolderPath.startsWith(CONTENT_URI_PREFIX) &&
+                                        rule.destinationFolderPath in permissionByUri
+                                    ) {
+                                        usedSafUris += rule.destinationFolderPath
+                                    }
+                                }
+                            },
+                    )
+                }
+            val unassociatedGrants =
+                uriPermissions
+                    .filter { uriPermission -> uriPermission.uri.toString() !in usedSafUris }
+                    .sortedBy { it.uri.toString() }
+                    .mapIndexed { grantIndex, uriPermission ->
+                        DevRuleFolderAccessUiItem(
+                            label =
+                                context.getString(
+                                    R.string.dev_options_folder_access_unassociated_grant_format,
+                                    grantIndex + 1,
+                                ),
+                            uri = uriPermission.uri.toString(),
+                            accessTypeLabel = context.getString(R.string.dev_options_folder_access_type_saf),
+                            accessLabel = safAccessLabel(uriPermission),
+                        )
+                    }
+            return DevFolderAccessUiState(rules = ruleAccesses, unassociatedGrants = unassociatedGrants)
+        }
+
+        private fun buildRuleFolderAccess(
+            label: String,
+            uriString: String,
+            permissionByUri: Map<String, UriPermission>,
+        ): DevRuleFolderAccessUiItem {
+            val uriPermission = permissionByUri[uriString]
+            return if (uriString.startsWith(CONTENT_URI_PREFIX)) {
+                DevRuleFolderAccessUiItem(
+                    label = label,
+                    uri = uriString,
+                    accessTypeLabel = context.getString(R.string.dev_options_folder_access_type_saf),
+                    accessLabel =
+                        if (uriPermission == null) {
+                            context.getString(R.string.dev_options_folder_access_missing)
+                        } else {
+                            safAccessLabel(uriPermission)
+                        },
+                )
+            } else {
+                DevRuleFolderAccessUiItem(
+                    label = label,
+                    uri = uriString,
+                    accessTypeLabel = context.getString(R.string.dev_options_folder_access_type_all_files),
+                    accessLabel = allFilesAccessStatusLabel(),
+                )
+            }
+        }
+
+        private fun safAccessLabel(uriPermission: UriPermission): String =
+            when {
+                uriPermission.isReadPermission && uriPermission.isWritePermission ->
+                    context.getString(R.string.dev_options_saf_access_read_write)
+                uriPermission.isReadPermission -> context.getString(R.string.dev_options_saf_access_read)
+                uriPermission.isWritePermission -> context.getString(R.string.dev_options_saf_access_write)
+                else -> context.getString(R.string.dev_options_saf_access_none)
+            }
+
+        private fun allFilesAccessStatusLabel(): String {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                return context.getString(R.string.dev_options_value_not_required)
+            }
+            return if (Environment.isExternalStorageManager()) {
+                context.getString(R.string.dev_options_folder_access_granted)
+            } else {
+                context.getString(R.string.dev_options_folder_access_missing)
+            }
+        }
+
         @Suppress("DEPRECATION")
         private fun installerPackageName(): String =
             runCatching {
@@ -773,6 +906,7 @@ class DevOptionsViewModel
             private const val REQUEST_CODE_OPEN_HISTORY = 1003
             private const val DATABASE_NAME = APP_DATABASE_NAME
             private const val DEV_MOCK_GITHUB_ASSET_UPDATED_AT = "2000-01-01T00:00:00Z"
+            private const val CONTENT_URI_PREFIX = "content://"
             private const val MOCK_LOST_SAF_SOURCE_URI =
                 "content://com.android.externalstorage.documents/tree/primary%3AFilePipeMockLostSource"
             private const val MOCK_LOST_SAF_DESTINATION_URI =

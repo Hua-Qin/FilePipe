@@ -211,6 +211,10 @@ fun AppNavigation(
         currentDestination?.hierarchy?.any { destination ->
             destination.route == Screen.Faq.route
         } == true
+    val isDevOptionsRoute =
+        currentDestination?.hierarchy?.any { destination ->
+            destination.route == Screen.DevOptions.route
+        } == true
 
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -376,22 +380,24 @@ fun AppNavigation(
                     navRoute == Screen.History.route ||
                     navRoute == Screen.Settings.route
             )
-    val topBlurSmallChrome = statusBarInset + 96.dp
+    val topBlurSmallChrome = statusBarInset + 56.dp
     val topBlurHeightDp =
-        if (isHistoryFilterRoute) {
+        if (navRoute == Screen.Rules.route || navRoute == Screen.Settings.route) {
+            0.dp
+        } else if (isDevOptionsRoute) {
+            topBlurSmallChrome + 48.dp
+        } else if (isHistoryFilterRoute) {
             topBlurSmallChrome + historyFilterChipsBand
         } else {
             topBlurSmallChrome
         }
     val topBlurHeightPx = with(density) { topBlurHeightDp.toPx() }
     val progressiveBlurStyle: ProgressiveBlurStyle? =
-        if (!preferences.progressiveBlurEnabled) {
-            null
-        } else {
+        run {
             val blurRadius =
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                if (preferences.progressiveBlurEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     when {
-                        isRuleDetailRoute || isFaqRoute -> 56f
+                        isRuleDetailRoute || isFaqRoute || isDevOptionsRoute -> 56f
                         isHistoryFilterRoute -> 54f
                         else -> 44f
                     }
@@ -402,6 +408,7 @@ fun AppNavigation(
                 when {
                     isRuleDetailRoute -> 0.38f
                     isFaqRoute -> 0.38f
+                    isDevOptionsRoute -> 0.42f
                     isHistoryDetailRoute -> 0.30f
                     isHistoryFilterRoute -> 0.52f
                     navRoute == Screen.Rules.route -> 0.46f
@@ -421,12 +428,26 @@ fun AppNavigation(
                 } else {
                     overlayAlpha
                 }
+
+            val finalOverlayAlpha =
+                if (!preferences.progressiveBlurEnabled) {
+                    (overlayAlpha + 0.15f).coerceAtMost(0.65f)
+                } else {
+                    overlayAlpha
+                }
+            val finalOverlayAlphaBottom =
+                if (!preferences.progressiveBlurEnabled) {
+                    (overlayAlphaBottom + 0.15f).coerceAtMost(0.65f)
+                } else {
+                    overlayAlphaBottom
+                }
+
             ProgressiveBlurStyle(
                 topHeightPx = topBlurHeightPx,
                 bottomHeightPx = bottomBlurHeightPx,
                 blurRadius = blurRadius,
-                overlayAlpha = overlayAlpha,
-                overlayAlphaBottom = overlayAlphaBottom,
+                overlayAlpha = finalOverlayAlpha,
+                overlayAlphaBottom = finalOverlayAlphaBottom,
             )
         }
 

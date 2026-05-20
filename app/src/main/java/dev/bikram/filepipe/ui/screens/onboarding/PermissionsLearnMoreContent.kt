@@ -127,6 +127,7 @@ private fun ColumnScope.FolderAccessLearnMoreArticleBody(scheme: ColorScheme) {
             )
         }
     }
+    Spacer(Modifier.height(10.dp))
 }
 
 @Composable

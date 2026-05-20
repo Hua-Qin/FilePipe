@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -85,16 +83,7 @@ fun OnboardingTitleScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(scheme.surface)
-                .background(
-                    Brush.verticalGradient(
-                        colorStops =
-                            arrayOf(
-                                0f to scheme.primaryContainer.copy(alpha = 0.45f),
-                                0.55f to scheme.surface.copy(alpha = 0f),
-                            ),
-                    ),
-                ).systemBarsPadding(),
+                .systemBarsPadding(),
     ) {
         AnimatedVisibility(
             visible = iconVisible,

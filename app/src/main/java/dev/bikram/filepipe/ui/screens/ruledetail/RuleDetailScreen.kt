@@ -77,6 +77,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
@@ -94,6 +95,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -585,6 +588,7 @@ fun RuleDetailScreen(
     var advancedExpanded by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val resources = LocalResources.current
     val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
 
     var pendingFolderPick by remember { mutableStateOf<FolderPickIntent?>(null) }
@@ -675,7 +679,7 @@ fun RuleDetailScreen(
     LaunchedEffect(state.removedRedundantFolders) {
         if (state.removedRedundantFolders.isNotEmpty()) {
             val names = state.removedRedundantFolders.joinToString(", ") { it.substringAfterLast('/') }
-            snackbarHostState.showSnackbar(context.getString(R.string.rule_detail_redundant_subfolder_removed, names))
+            snackbarHostState.showSnackbar(resources.getString(R.string.rule_detail_redundant_subfolder_removed, names))
             viewModel.dismissRedundantFolderNotice()
         }
     }
@@ -781,7 +785,19 @@ fun RuleDetailScreen(
     val validationErrorOverlayExtraPadding = if (showBottomBar) 72.dp else 0.dp
     val bottomActionOverlayPadding = 88.dp + validationErrorOverlayExtraPadding
     val bottomContentPadding = navBottom + bottomActionOverlayPadding
-    val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer() ?: Modifier
+    val density = LocalDensity.current
+    val topAlphaMultiplier by remember(scrollState) {
+        derivedStateOf {
+            if (scrollState.value <= 0) {
+                0f
+            } else {
+                val offsetPx = scrollState.value.toFloat()
+                val thresholdPx = with(density) { 24.dp.toPx() }
+                (offsetPx / thresholdPx).coerceIn(0f, 1f)
+            }
+        }
+    }
+    val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
     val alertColors = ruleAlertColors(isErrorSeverity = alertIsErrorSeverity)
     val warningColors = ruleWarningColors()
     val blockingHighlightColor = MaterialTheme.colorScheme.error

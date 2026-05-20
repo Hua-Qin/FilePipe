@@ -40,6 +40,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -50,6 +51,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -309,7 +311,19 @@ fun FaqScreen(
             initialFirstVisibleItemIndex = scrollPosition.firstVisibleItemIndex,
             initialFirstVisibleItemScrollOffset = scrollPosition.firstVisibleItemScrollOffset,
         )
-    val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer() ?: Modifier
+    val density = LocalDensity.current
+    val topAlphaMultiplier by remember(listState) {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                val offsetPx = listState.firstVisibleItemScrollOffset.toFloat()
+                val thresholdPx = with(density) { 24.dp.toPx() }
+                (offsetPx / thresholdPx).coerceIn(0f, 1f)
+            }
+        }
+    }
+    val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
     val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<IntSize>())
     val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
@@ -536,6 +550,7 @@ fun FaqScreen(
                         if (sectionContent.showNotSureBanner) {
                             item(key = "not_sure_${sectionContent.sectionId}") {
                                 Surface(
+                                    modifier = Modifier.padding(bottom = 10.dp),
                                     shape = MaterialTheme.shapes.medium,
                                     color = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.65f),
                                 ) {

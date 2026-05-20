@@ -885,6 +885,20 @@ class FileOperationRepository
             name: String,
         ): String = resolveRenameSuffixName(name) { candidate -> File(parent, candidate).exists() }
 
+        private fun unchangedPreviewResult(
+            sourceEntry: FileEntry,
+            simulatedDestPath: String,
+        ): PreviewFileResult =
+            PreviewFileResult(
+                fileName = sourceEntry.name,
+                sourcePath = sourceEntry.uri.toString(),
+                simulatedDestPath = simulatedDestPath,
+                wouldSkip = false,
+                wouldOverwrite = false,
+                renamedTo = null,
+                sizeBytes = sourceEntry.size,
+            )
+
         suspend fun simulateMove(
             sourceEntry: FileEntry,
             destFolderUriString: String,
@@ -900,214 +914,194 @@ class FileOperationRepository
                     )
 
                 if (destFolderUriString.isBlank()) {
-                    return@withContext PreviewFileResult(
-                        fileName = sourceEntry.name,
-                        sourcePath = sourceEntry.uri.toString(),
-                        simulatedDestPath = simulatedRootPath,
-                        wouldSkip = false,
-                        wouldOverwrite = false,
-                        renamedTo = null,
-                        sizeBytes = sourceEntry.size,
-                    )
+                    return@withContext unchangedPreviewResult(sourceEntry, simulatedRootPath)
                 }
 
                 if (isFilesystemFolderPathString(destFolderUriString)) {
-                    if (!filesystemAccessEnabled) {
-                        return@withContext PreviewFileResult(
-                            fileName = sourceEntry.name,
-                            sourcePath = sourceEntry.uri.toString(),
-                            simulatedDestPath = simulatedRootPath,
-                            wouldSkip = false,
-                            wouldOverwrite = false,
-                            renamedTo = null,
-                            sizeBytes = sourceEntry.size,
-                        )
-                    }
-                    val canonical =
-                        normalizeFilesystemFolderPath(destFolderUriString) ?: return@withContext PreviewFileResult(
-                            fileName = sourceEntry.name,
-                            sourcePath = sourceEntry.uri.toString(),
-                            simulatedDestPath = simulatedRootPath,
-                            wouldSkip = false,
-                            wouldOverwrite = false,
-                            renamedTo = null,
-                            sizeBytes = sourceEntry.size,
-                        )
-                    if (!isCanonicalPathUnderAllowedSharedStorage(canonical)) {
-                        return@withContext PreviewFileResult(
-                            fileName = sourceEntry.name,
-                            sourcePath = sourceEntry.uri.toString(),
-                            simulatedDestPath = simulatedRootPath,
-                            wouldSkip = false,
-                            wouldOverwrite = false,
-                            renamedTo = null,
-                            sizeBytes = sourceEntry.size,
-                        )
-                    }
-                    val destRoot = File(canonical)
-                    if (!destRoot.isDirectory) {
-                        return@withContext PreviewFileResult(
-                            fileName = sourceEntry.name,
-                            sourcePath = sourceEntry.uri.toString(),
-                            simulatedDestPath = simulatedRootPath,
-                            wouldSkip = false,
-                            wouldOverwrite = false,
-                            renamedTo = null,
-                            sizeBytes = sourceEntry.size,
-                        )
-                    }
-                    when (val resolution = peekDestParentForPreviewFile(destRoot, sourceEntry.relativeParentSegments)) {
-                        is DestParentFilePreview.Partial, is DestParentFilePreview.BlockedByFile -> {
-                            return@withContext PreviewFileResult(
-                                fileName = sourceEntry.name,
-                                sourcePath = sourceEntry.uri.toString(),
-                                simulatedDestPath = simulatedRootPath,
-                                wouldSkip = false,
-                                wouldOverwrite = false,
-                                renamedTo = null,
-                                sizeBytes = sourceEntry.size,
-                            )
-                        }
-                        is DestParentFilePreview.Resolved -> {
-                            val existing = File(resolution.parent, sourceEntry.name)
-                            if (!existing.exists()) {
-                                return@withContext PreviewFileResult(
-                                    fileName = sourceEntry.name,
-                                    sourcePath = sourceEntry.uri.toString(),
-                                    simulatedDestPath = simulatedRootPath,
-                                    wouldSkip = false,
-                                    wouldOverwrite = false,
-                                    renamedTo = null,
-                                    sizeBytes = sourceEntry.size,
-                                )
-                            }
-                            when (conflictPolicy) {
-                                ConflictPolicy.SKIP -> return@withContext PreviewFileResult(
-                                    fileName = sourceEntry.name,
-                                    sourcePath = sourceEntry.uri.toString(),
-                                    simulatedDestPath = existing.toUri().toString(),
-                                    wouldSkip = true,
-                                    wouldOverwrite = false,
-                                    renamedTo = null,
-                                    sizeBytes = sourceEntry.size,
-                                )
-                                ConflictPolicy.OVERWRITE -> return@withContext PreviewFileResult(
-                                    fileName = sourceEntry.name,
-                                    sourcePath = sourceEntry.uri.toString(),
-                                    simulatedDestPath = existing.toUri().toString(),
-                                    wouldSkip = false,
-                                    wouldOverwrite = true,
-                                    renamedTo = null,
-                                    sizeBytes = sourceEntry.size,
-                                )
-                                ConflictPolicy.RENAME_SUFFIX -> {
-                                    val resolvedName = resolveDestNameFile(resolution.parent, sourceEntry.name)
-                                    return@withContext PreviewFileResult(
-                                        fileName = sourceEntry.name,
-                                        sourcePath = sourceEntry.uri.toString(),
-                                        simulatedDestPath =
-                                            buildSimulatedDestPreviewPath(
-                                                destFolderUriString,
-                                                sourceEntry.relativeParentSegments,
-                                                resolvedName,
-                                            ),
-                                        wouldSkip = false,
-                                        wouldOverwrite = false,
-                                        renamedTo = if (resolvedName != sourceEntry.name) resolvedName else null,
-                                        sizeBytes = sourceEntry.size,
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    return@withContext simulateFilesystemMove(
+                        sourceEntry = sourceEntry,
+                        destFolderUriString = destFolderUriString,
+                        conflictPolicy = conflictPolicy,
+                        filesystemAccessEnabled = filesystemAccessEnabled,
+                        simulatedRootPath = simulatedRootPath,
+                    )
                 }
 
-                val destTree =
-                    try {
-                        DocumentFile.fromTreeUri(context, Uri.parse(destFolderUriString))
-                    } catch (_: IllegalArgumentException) {
-                        null
-                    } catch (_: SecurityException) {
-                        null
+                simulateSafMove(
+                    sourceEntry = sourceEntry,
+                    destFolderUriString = destFolderUriString,
+                    conflictPolicy = conflictPolicy,
+                    simulatedRootPath = simulatedRootPath,
+                )
+            }
+
+        private fun simulateFilesystemMove(
+            sourceEntry: FileEntry,
+            destFolderUriString: String,
+            conflictPolicy: ConflictPolicy,
+            filesystemAccessEnabled: Boolean,
+            simulatedRootPath: String,
+        ): PreviewFileResult {
+            if (!filesystemAccessEnabled) {
+                return unchangedPreviewResult(sourceEntry, simulatedRootPath)
+            }
+            val canonical =
+                normalizeFilesystemFolderPath(destFolderUriString) ?: return unchangedPreviewResult(sourceEntry, simulatedRootPath)
+            if (!isCanonicalPathUnderAllowedSharedStorage(canonical)) {
+                return unchangedPreviewResult(sourceEntry, simulatedRootPath)
+            }
+            val destRoot = File(canonical)
+            if (!destRoot.isDirectory) {
+                return unchangedPreviewResult(sourceEntry, simulatedRootPath)
+            }
+
+            return when (val resolution = peekDestParentForPreviewFile(destRoot, sourceEntry.relativeParentSegments)) {
+                is DestParentFilePreview.Partial, is DestParentFilePreview.BlockedByFile -> unchangedPreviewResult(sourceEntry, simulatedRootPath)
+                is DestParentFilePreview.Resolved -> {
+                    val existing = File(resolution.parent, sourceEntry.name)
+                    if (!existing.exists()) {
+                        unchangedPreviewResult(sourceEntry, simulatedRootPath)
+                    } else {
+                        simulateExistingFilesystemMove(
+                            sourceEntry = sourceEntry,
+                            destFolderUriString = destFolderUriString,
+                            conflictPolicy = conflictPolicy,
+                            existing = existing,
+                            parent = resolution.parent,
+                        )
                     }
-                if (destTree == null || !destTree.exists()) {
-                    return@withContext PreviewFileResult(
+                }
+            }
+        }
+
+        private fun simulateExistingFilesystemMove(
+            sourceEntry: FileEntry,
+            destFolderUriString: String,
+            conflictPolicy: ConflictPolicy,
+            existing: File,
+            parent: File,
+        ): PreviewFileResult =
+            when (conflictPolicy) {
+                ConflictPolicy.SKIP ->
+                    PreviewFileResult(
                         fileName = sourceEntry.name,
                         sourcePath = sourceEntry.uri.toString(),
-                        simulatedDestPath = simulatedRootPath,
-                        wouldSkip = false,
+                        simulatedDestPath = existing.toUri().toString(),
+                        wouldSkip = true,
                         wouldOverwrite = false,
                         renamedTo = null,
                         sizeBytes = sourceEntry.size,
                     )
+                ConflictPolicy.OVERWRITE ->
+                    PreviewFileResult(
+                        fileName = sourceEntry.name,
+                        sourcePath = sourceEntry.uri.toString(),
+                        simulatedDestPath = existing.toUri().toString(),
+                        wouldSkip = false,
+                        wouldOverwrite = true,
+                        renamedTo = null,
+                        sizeBytes = sourceEntry.size,
+                    )
+                ConflictPolicy.RENAME_SUFFIX -> {
+                    val resolvedName = resolveDestNameFile(parent, sourceEntry.name)
+                    PreviewFileResult(
+                        fileName = sourceEntry.name,
+                        sourcePath = sourceEntry.uri.toString(),
+                        simulatedDestPath =
+                            buildSimulatedDestPreviewPath(
+                                destFolderUriString,
+                                sourceEntry.relativeParentSegments,
+                                resolvedName,
+                            ),
+                        wouldSkip = false,
+                        wouldOverwrite = false,
+                        renamedTo = if (resolvedName != sourceEntry.name) resolvedName else null,
+                        sizeBytes = sourceEntry.size,
+                    )
                 }
+            }
 
-                val resolution = peekDestParentForPreview(destTree, sourceEntry.relativeParentSegments)
-                when (resolution) {
-                    is DestParentPreview.Partial, is DestParentPreview.BlockedByFile -> {
-                        PreviewFileResult(
-                            fileName = sourceEntry.name,
-                            sourcePath = sourceEntry.uri.toString(),
-                            simulatedDestPath = simulatedRootPath,
-                            wouldSkip = false,
-                            wouldOverwrite = false,
-                            renamedTo = null,
-                            sizeBytes = sourceEntry.size,
+        private fun simulateSafMove(
+            sourceEntry: FileEntry,
+            destFolderUriString: String,
+            conflictPolicy: ConflictPolicy,
+            simulatedRootPath: String,
+        ): PreviewFileResult {
+            val destTree =
+                try {
+                    DocumentFile.fromTreeUri(context, Uri.parse(destFolderUriString))
+                } catch (_: IllegalArgumentException) {
+                    null
+                } catch (_: SecurityException) {
+                    null
+                }
+            if (destTree == null || !destTree.exists()) {
+                return unchangedPreviewResult(sourceEntry, simulatedRootPath)
+            }
+
+            return when (val resolution = peekDestParentForPreview(destTree, sourceEntry.relativeParentSegments)) {
+                is DestParentPreview.Partial, is DestParentPreview.BlockedByFile -> unchangedPreviewResult(sourceEntry, simulatedRootPath)
+                is DestParentPreview.Resolved -> {
+                    val existing = resolution.parent.findFile(sourceEntry.name)
+                    if (existing == null) {
+                        unchangedPreviewResult(sourceEntry, simulatedRootPath)
+                    } else {
+                        simulateExistingSafMove(
+                            sourceEntry = sourceEntry,
+                            destFolderUriString = destFolderUriString,
+                            conflictPolicy = conflictPolicy,
+                            existing = existing,
+                            parent = resolution.parent,
                         )
                     }
-                    is DestParentPreview.Resolved -> {
-                        val existing = resolution.parent.findFile(sourceEntry.name)
-                        if (existing == null) {
-                            return@withContext PreviewFileResult(
-                                fileName = sourceEntry.name,
-                                sourcePath = sourceEntry.uri.toString(),
-                                simulatedDestPath = simulatedRootPath,
-                                wouldSkip = false,
-                                wouldOverwrite = false,
-                                renamedTo = null,
-                                sizeBytes = sourceEntry.size,
-                            )
-                        }
-                        when (conflictPolicy) {
-                            ConflictPolicy.SKIP ->
-                                PreviewFileResult(
-                                    fileName = sourceEntry.name,
-                                    sourcePath = sourceEntry.uri.toString(),
-                                    simulatedDestPath = existing.uri.toString(),
-                                    wouldSkip = true,
-                                    wouldOverwrite = false,
-                                    renamedTo = null,
-                                    sizeBytes = sourceEntry.size,
-                                )
-                            ConflictPolicy.OVERWRITE ->
-                                PreviewFileResult(
-                                    fileName = sourceEntry.name,
-                                    sourcePath = sourceEntry.uri.toString(),
-                                    simulatedDestPath = existing.uri.toString(),
-                                    wouldSkip = false,
-                                    wouldOverwrite = true,
-                                    renamedTo = null,
-                                    sizeBytes = sourceEntry.size,
-                                )
-                            ConflictPolicy.RENAME_SUFFIX -> {
-                                val resolvedName = resolveDestName(sourceEntry.name, resolution.parent)
-                                PreviewFileResult(
-                                    fileName = sourceEntry.name,
-                                    sourcePath = sourceEntry.uri.toString(),
-                                    simulatedDestPath =
-                                        buildSimulatedDestPreviewPath(
-                                            destFolderUriString,
-                                            sourceEntry.relativeParentSegments,
-                                            resolvedName,
-                                        ),
-                                    wouldSkip = false,
-                                    wouldOverwrite = false,
-                                    renamedTo = if (resolvedName != sourceEntry.name) resolvedName else null,
-                                    sizeBytes = sourceEntry.size,
-                                )
-                            }
-                        }
-                    }
+                }
+            }
+        }
+
+        private fun simulateExistingSafMove(
+            sourceEntry: FileEntry,
+            destFolderUriString: String,
+            conflictPolicy: ConflictPolicy,
+            existing: DocumentFile,
+            parent: DocumentFile,
+        ): PreviewFileResult =
+            when (conflictPolicy) {
+                ConflictPolicy.SKIP ->
+                    PreviewFileResult(
+                        fileName = sourceEntry.name,
+                        sourcePath = sourceEntry.uri.toString(),
+                        simulatedDestPath = existing.uri.toString(),
+                        wouldSkip = true,
+                        wouldOverwrite = false,
+                        renamedTo = null,
+                        sizeBytes = sourceEntry.size,
+                    )
+                ConflictPolicy.OVERWRITE ->
+                    PreviewFileResult(
+                        fileName = sourceEntry.name,
+                        sourcePath = sourceEntry.uri.toString(),
+                        simulatedDestPath = existing.uri.toString(),
+                        wouldSkip = false,
+                        wouldOverwrite = true,
+                        renamedTo = null,
+                        sizeBytes = sourceEntry.size,
+                    )
+                ConflictPolicy.RENAME_SUFFIX -> {
+                    val resolvedName = resolveDestName(sourceEntry.name, parent)
+                    PreviewFileResult(
+                        fileName = sourceEntry.name,
+                        sourcePath = sourceEntry.uri.toString(),
+                        simulatedDestPath =
+                            buildSimulatedDestPreviewPath(
+                                destFolderUriString,
+                                sourceEntry.relativeParentSegments,
+                                resolvedName,
+                            ),
+                        wouldSkip = false,
+                        wouldOverwrite = false,
+                        renamedTo = if (resolvedName != sourceEntry.name) resolvedName else null,
+                        sizeBytes = sourceEntry.size,
+                    )
                 }
             }
 
