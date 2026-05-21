@@ -51,6 +51,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -99,6 +101,7 @@ import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import dev.bikram.filepipe.ui.theme.reducedMotionEnterTransition
 import dev.bikram.filepipe.ui.theme.reducedMotionExitTransition
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val PermissionCardLeadingIconSlotWidth = 44.dp
 
@@ -120,10 +123,17 @@ fun OnboardingPermissionsScreen(
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val coroutineScope = rememberCoroutineScope()
     val visibilityFadeInSpec =
         reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val visibilityFadeOutSpec =
         reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+
+    val currentSelected by rememberUpdatedState(selected)
+    val currentHasEnteredAllFilesGrantFlow by rememberUpdatedState(hasEnteredAllFilesGrantFlow)
+    val currentAwaitingSettingsReturn by rememberUpdatedState(awaitingSettingsReturn)
+    val currentDidAutoAdvanceFromGrant by rememberUpdatedState(didAutoAdvanceFromGrant)
+    val currentOnContinue by rememberUpdatedState(onContinue)
 
     val needsAllFilesGrant =
         selected == FolderAccessMode.ALL_FILES_PREFERRED &&
@@ -155,27 +165,32 @@ fun OnboardingPermissionsScreen(
         }
     }
 
-    DisposableEffect(lifecycleOwner, selected, hasEnteredAllFilesGrantFlow, awaitingSettingsReturn) {
+    DisposableEffect(lifecycleOwner) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event != Lifecycle.Event.ON_RESUME) return@LifecycleEventObserver
-                if (didAutoAdvanceFromGrant) return@LifecycleEventObserver
-                val allFilesSelected = selected == FolderAccessMode.ALL_FILES_PREFERRED
+                if (currentDidAutoAdvanceFromGrant) return@LifecycleEventObserver
+                val allFilesSelected = currentSelected == FolderAccessMode.ALL_FILES_PREFERRED
                 val manager = Environment.isExternalStorageManager()
-                if (allFilesSelected && manager && hasEnteredAllFilesGrantFlow) {
+                if (allFilesSelected && manager && currentHasEnteredAllFilesGrantFlow) {
                     grantPanelVisible = false
                     showOpenSettingsInPanel = false
                     awaitingSettingsReturn = false
                     showAccessNotGrantedHint = false
                     didAutoAdvanceFromGrant = true
                     viewModel.setFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
-                    onContinue()
+                    currentOnContinue()
                     return@LifecycleEventObserver
                 }
-                if (allFilesSelected && !manager && awaitingSettingsReturn) {
-                    showAccessNotGrantedHint = true
-                    grantPanelVisible = true
-                    showOpenSettingsInPanel = true
+                if (allFilesSelected && !manager && currentAwaitingSettingsReturn) {
+                    coroutineScope.launch {
+                        delay(1000)
+                        if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                            showAccessNotGrantedHint = true
+                            grantPanelVisible = true
+                            showOpenSettingsInPanel = true
+                        }
+                    }
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)

@@ -1,7 +1,6 @@
 package dev.bikram.filepipe.ui.components
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchColors
 import androidx.compose.material3.SwitchDefaults
@@ -39,7 +38,6 @@ fun FilePipeSwitch(
                         name = "check",
                         contentDescription = null,
                         size = SwitchDefaults.IconSize,
-                        modifier = Modifier.size(SwitchDefaults.IconSize),
                     )
                 }
             } else {

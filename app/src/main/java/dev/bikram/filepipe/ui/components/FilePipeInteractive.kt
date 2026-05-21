@@ -1,9 +1,6 @@
 package dev.bikram.filepipe.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ColumnScope
@@ -18,6 +15,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CardElevation
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
@@ -45,115 +43,21 @@ import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.TooltipState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.performLongPressHaptic
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-
-private const val TOOLTIP_DISMISS_MILLIS = 5_000L
-
-@Composable
-private fun FilePipeLongPressLabelTooltip(
-    label: String?,
-    enabled: Boolean,
-    content: @Composable () -> Unit,
-) {
-    if (label == null) {
-        content()
-        return
-    }
-
-    val tooltipState = rememberTooltipState(isPersistent = true)
-    val hapticEnabled = LocalHapticEnabled.current
-    val view = LocalView.current
-
-    TooltipBox(
-        positionProvider =
-            TooltipDefaults.rememberTooltipPositionProvider(
-                TooltipAnchorPosition.Above,
-            ),
-        tooltip = {
-            PlainTooltip {
-                Box(
-                    modifier = Modifier.heightIn(min = 24.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(label)
-                }
-            }
-        },
-        state = tooltipState,
-        modifier =
-            Modifier.showLabelTooltipOnLongPress(
-                enabled = enabled,
-                tooltipState = tooltipState,
-                hapticEnabled = hapticEnabled,
-                view = view,
-            ),
-        enableUserInput = false,
-    ) {
-        content()
-    }
-}
-
-private fun Modifier.showLabelTooltipOnLongPress(
-    enabled: Boolean,
-    tooltipState: TooltipState,
-    hapticEnabled: Boolean,
-    view: android.view.View,
-): Modifier {
-    if (!enabled) return this
-
-    return pointerInput(tooltipState, hapticEnabled, view) {
-        coroutineScope {
-            awaitEachGesture {
-                val firstDown = awaitFirstDown(requireUnconsumed = false)
-                val releasedBeforeLongPress =
-                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                        waitForUpOrCancellation(PointerEventPass.Initial)
-                    }
-                if (releasedBeforeLongPress == null) {
-                    if (hapticEnabled) {
-                        view.performLongPressHaptic()
-                    }
-                    launch { tooltipState.show() }
-
-                    var released = false
-                    while (!released) {
-                        val pointerEvent = awaitPointerEvent(PointerEventPass.Initial)
-                        val activePointerChange =
-                            pointerEvent.changes.firstOrNull { pointerChange ->
-                                pointerChange.id == firstDown.id
-                            }
-                        activePointerChange?.consume()
-                        released = activePointerChange?.pressed != true
-                    }
-
-                    launch {
-                        delay(TOOLTIP_DISMISS_MILLIS)
-                        tooltipState.dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun FilePipeIconButton(
@@ -166,12 +70,50 @@ fun FilePipeIconButton(
     content: @Composable () -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
-    FilePipeLongPressLabelTooltip(label = tooltipLabel, enabled = enabled) {
-        IconButton(
-            onClick = {
-                playTap()
-                onClick()
+    val clickAction = {
+        playTap()
+        onClick()
+    }
+    if (tooltipLabel != null) {
+        val tooltipState = rememberTooltipState()
+        val hapticEnabled = LocalHapticEnabled.current
+        val view = LocalView.current
+        val tooltipInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
+
+        TooltipBox(
+            positionProvider =
+                TooltipDefaults.rememberTooltipPositionProvider(
+                    TooltipAnchorPosition.Above,
+                ),
+            tooltip = {
+                PlainTooltip {
+                    Box(
+                        modifier = Modifier.heightIn(min = 24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(tooltipLabel)
+                    }
+                }
             },
+            state = tooltipState,
+        ) {
+            IconButton(
+                onClick = clickAction,
+                modifier = modifier,
+                enabled = enabled,
+                colors = colors,
+                interactionSource = tooltipInteractionSource,
+                content = content,
+            )
+        }
+        LaunchedEffect(tooltipState.isVisible) {
+            if (tooltipState.isVisible && hapticEnabled) {
+                view.performLongPressHaptic()
+            }
+        }
+    } else {
+        IconButton(
+            onClick = clickAction,
             modifier = modifier,
             enabled = enabled,
             colors = colors,
@@ -193,12 +135,51 @@ fun FilePipeFilledIconButton(
     content: @Composable () -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
-    FilePipeLongPressLabelTooltip(label = tooltipLabel, enabled = enabled) {
-        FilledIconButton(
-            onClick = {
-                playTap()
-                onClick()
+    val clickAction = {
+        playTap()
+        onClick()
+    }
+    if (tooltipLabel != null) {
+        val tooltipState = rememberTooltipState()
+        val hapticEnabled = LocalHapticEnabled.current
+        val view = LocalView.current
+        val tooltipInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
+
+        TooltipBox(
+            positionProvider =
+                TooltipDefaults.rememberTooltipPositionProvider(
+                    TooltipAnchorPosition.Above,
+                ),
+            tooltip = {
+                PlainTooltip {
+                    Box(
+                        modifier = Modifier.heightIn(min = 24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(tooltipLabel)
+                    }
+                }
             },
+            state = tooltipState,
+        ) {
+            FilledIconButton(
+                onClick = clickAction,
+                modifier = modifier,
+                enabled = enabled,
+                shape = shape,
+                colors = colors,
+                interactionSource = tooltipInteractionSource,
+                content = content,
+            )
+        }
+        LaunchedEffect(tooltipState.isVisible) {
+            if (tooltipState.isVisible && hapticEnabled) {
+                view.performLongPressHaptic()
+            }
+        }
+    } else {
+        FilledIconButton(
+            onClick = clickAction,
             modifier = modifier,
             enabled = enabled,
             shape = shape,
@@ -221,12 +202,51 @@ fun FilePipeFilledTonalIconButton(
     content: @Composable () -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
-    FilePipeLongPressLabelTooltip(label = tooltipLabel, enabled = enabled) {
-        FilledTonalIconButton(
-            onClick = {
-                playTap()
-                onClick()
+    val clickAction = {
+        playTap()
+        onClick()
+    }
+    if (tooltipLabel != null) {
+        val tooltipState = rememberTooltipState()
+        val hapticEnabled = LocalHapticEnabled.current
+        val view = LocalView.current
+        val tooltipInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
+
+        TooltipBox(
+            positionProvider =
+                TooltipDefaults.rememberTooltipPositionProvider(
+                    TooltipAnchorPosition.Above,
+                ),
+            tooltip = {
+                PlainTooltip {
+                    Box(
+                        modifier = Modifier.heightIn(min = 24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(tooltipLabel)
+                    }
+                }
             },
+            state = tooltipState,
+        ) {
+            FilledTonalIconButton(
+                onClick = clickAction,
+                modifier = modifier,
+                enabled = enabled,
+                shape = shape,
+                colors = colors,
+                interactionSource = tooltipInteractionSource,
+                content = content,
+            )
+        }
+        LaunchedEffect(tooltipState.isVisible) {
+            if (tooltipState.isVisible && hapticEnabled) {
+                view.performLongPressHaptic()
+            }
+        }
+    } else {
+        FilledTonalIconButton(
+            onClick = clickAction,
             modifier = modifier,
             enabled = enabled,
             shape = shape,
@@ -408,14 +428,54 @@ fun FilePipeFloatingActionButton(
     content: @Composable () -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
-    FilePipeLongPressLabelTooltip(label = tooltipLabel, enabled = enabled) {
-        FloatingActionButton(
-            onClick = {
-                if (enabled) {
-                    playTap()
-                    onClick()
+    val clickAction = {
+        if (enabled) {
+            playTap()
+            onClick()
+        }
+    }
+    if (tooltipLabel != null) {
+        val tooltipState = rememberTooltipState()
+        val hapticEnabled = LocalHapticEnabled.current
+        val view = LocalView.current
+        val tooltipInteractionSource = interactionSource ?: remember { MutableInteractionSource() }
+
+        TooltipBox(
+            positionProvider =
+                TooltipDefaults.rememberTooltipPositionProvider(
+                    TooltipAnchorPosition.Above,
+                ),
+            tooltip = {
+                PlainTooltip {
+                    Box(
+                        modifier = Modifier.heightIn(min = 24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(tooltipLabel)
+                    }
                 }
             },
+            state = tooltipState,
+        ) {
+            FloatingActionButton(
+                onClick = clickAction,
+                modifier = modifier,
+                shape = shape,
+                containerColor = containerColor,
+                contentColor = contentColor,
+                elevation = elevation,
+                interactionSource = tooltipInteractionSource,
+                content = content,
+            )
+        }
+        LaunchedEffect(tooltipState.isVisible) {
+            if (tooltipState.isVisible && hapticEnabled) {
+                view.performLongPressHaptic()
+            }
+        }
+    } else {
+        FloatingActionButton(
+            onClick = clickAction,
             modifier = modifier,
             shape = shape,
             containerColor = containerColor,

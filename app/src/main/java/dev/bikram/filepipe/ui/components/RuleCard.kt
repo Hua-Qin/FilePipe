@@ -14,6 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
@@ -113,6 +114,63 @@ private fun ruleCardFolderIssueColors(severity: RuleCardFolderIssueSeverity): Ru
             accent = Color(0xFFB26A00),
         )
     }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.ruleCardBodyGestures(
+    suppressLongClickForReorder: Boolean,
+    reorderModifier: Modifier,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    clickLabel: String,
+    longClickLabel: String,
+): Modifier =
+    then(reorderModifier).then(
+        if (suppressLongClickForReorder) {
+            Modifier.tapSoundClickable(
+                onClick = onClick,
+                onClickLabel = clickLabel,
+                role = Role.Button,
+            )
+        } else {
+            Modifier.tapSoundCombinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                onClickLabel = clickLabel,
+                onLongClickLabel = longClickLabel,
+                role = Role.Button,
+            )
+        },
+    )
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun RuleCardClickableBody(
+    suppressLongClickForReorder: Boolean,
+    reorderModifier: Modifier,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    clickLabel: String,
+    longClickLabel: String,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val widthModifier = Modifier.fillMaxWidth()
+    Column(
+        modifier =
+            widthModifier
+                .then(modifier)
+                .ruleCardBodyGestures(
+                    suppressLongClickForReorder = suppressLongClickForReorder,
+                    reorderModifier = reorderModifier,
+                    onClick = onClick,
+                    onLongClick = onLongClick,
+                    clickLabel = clickLabel,
+                    longClickLabel = longClickLabel,
+                ),
+        content = content,
+    )
 }
 
 @OptIn(
@@ -276,17 +334,13 @@ private fun CompactContent(
             onLeadingLongClick != null -> null
             else -> onLongClick
         }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .tapSoundCombinedClickable(
-                    onClick = onClick,
-                    onLongClick = columnLongClick,
-                    onClickLabel = clickLabel,
-                    onLongClickLabel = longClickLabel,
-                    role = Role.Button,
-                ).then(modifier),
+    RuleCardClickableBody(
+        suppressLongClickForReorder = suppressLongClickForReorder,
+        reorderModifier = modifier,
+        onClick = onClick,
+        onLongClick = columnLongClick,
+        clickLabel = clickLabel,
+        longClickLabel = longClickLabel,
     ) {
         ListItem(
             headlineContent = {
@@ -464,19 +518,15 @@ private fun ExpandedContent(
             onLeadingLongClick != null -> null
             else -> onLongClick
         }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .tapSoundCombinedClickable(
-                    onClick = onClick,
-                    onLongClick = expandedColumnLongClick,
-                    onClickLabel = clickLabel,
-                    onLongClickLabel = longClickLabel,
-                    role = Role.Button,
-                ).then(modifier)
-                .padding(16.dp),
-    ) {
+    Column(modifier = Modifier.padding(16.dp)) {
+        RuleCardClickableBody(
+            suppressLongClickForReorder = suppressLongClickForReorder,
+            reorderModifier = modifier,
+            onClick = onClick,
+            onLongClick = expandedColumnLongClick,
+            clickLabel = clickLabel,
+            longClickLabel = longClickLabel,
+        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -785,12 +835,12 @@ private fun ExpandedContent(
                 }
             }
         }
+        }
 
         if (showOperationalControls || cardActions.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -807,6 +857,20 @@ private fun ExpandedContent(
                         }
                     }
                 }
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .height(48.dp)
+                            .ruleCardBodyGestures(
+                                suppressLongClickForReorder = suppressLongClickForReorder,
+                                reorderModifier = modifier,
+                                onClick = onClick,
+                                onLongClick = expandedColumnLongClick,
+                                clickLabel = clickLabel,
+                                longClickLabel = longClickLabel,
+                            ),
+                )
                 if (showOperationalControls) {
                     val runInProgress = progress != null && !progress.isComplete
                     val runBlocked = isAnyRuleRunning && progress == null

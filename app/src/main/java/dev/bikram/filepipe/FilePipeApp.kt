@@ -60,6 +60,7 @@ class FilePipeApp :
         manualRunProcessLifecycleBinder.ensureRegistered()
         preferencesMigrationScope.launch {
             runCatching {
+                userPreferencesRepository.migrateLegacyEnhancedShadingPreferenceIfNeeded()
                 userPreferencesRepository.migrateLegacyCustomSeedIfNeeded()
                 userPreferencesRepository.migrateLegacyAutoCheckToScheduleIfNeeded()
                 userPreferencesRepository.migrateDeferredFolderAccessIfNeeded()

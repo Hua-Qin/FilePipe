@@ -10,14 +10,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
@@ -48,8 +46,12 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var appReviewLauncher: AppReviewLauncher
 
+    private var isReady = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        splashScreen.setKeepOnScreenCondition { !isReady }
         enableEdgeToEdge()
         handleShortcutIntent(intent)
         handleOpenHistoryIntent(intent)
@@ -57,25 +59,30 @@ class MainActivity : ComponentActivity() {
         handleOpenSettingsUpdatesIntent(intent)
 
         setContent {
-            val preferences by userPreferencesRepository.preferencesFlow
-                .collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
+            val preferencesState by userPreferencesRepository.preferencesFlow
+                .collectAsStateWithLifecycle(initialValue = null)
 
-            var introSeenAtLaunch by remember { mutableStateOf<Boolean?>(null) }
-            LaunchedEffect(Unit) {
-                userPreferencesRepository.migrateLegacyEnhancedShadingPreferenceIfNeeded()
-                introSeenAtLaunch = userPreferencesRepository.getPreferencesSnapshot().hasSeenIntro
+            val introSeenAtLaunch = remember(preferencesState != null) {
+                preferencesState?.hasSeenIntro
+            }
+
+            if (preferencesState != null) {
+                isReady = true
             }
 
             SideEffect {
-                val nightMode =
-                    when (preferences.themeMode) {
-                        AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
-                        AppThemeMode.DARK, AppThemeMode.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
-                        AppThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-                    }
-                AppCompatDelegate.setDefaultNightMode(nightMode)
+                preferencesState?.let { prefs ->
+                    val nightMode =
+                        when (prefs.themeMode) {
+                            AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
+                            AppThemeMode.DARK, AppThemeMode.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
+                            AppThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                        }
+                    AppCompatDelegate.setDefaultNightMode(nightMode)
+                }
             }
 
+            val preferences = preferencesState ?: AppPreferences.DEFAULT
             FilePipeTheme(
                 themeMode = preferences.themeMode,
                 colorSource = preferences.colorSource,
@@ -95,16 +102,17 @@ class MainActivity : ComponentActivity() {
                         Box(Modifier.fillMaxSize())
                     }
                 } else {
+                    val currentPrefs = preferencesState!!
                     InAppRatingAutoPromptHost(
-                        preferences = preferences,
+                        preferences = currentPrefs,
                         activity = this@MainActivity,
                         userPreferencesRepository = userPreferencesRepository,
                         appReviewLauncher = appReviewLauncher,
                     )
                     AppNavigation(
-                        hasSeenIntro = preferences.hasSeenIntro,
-                        introSeenAtLaunch = introSeenAtLaunch!!,
-                        preferences = preferences,
+                        hasSeenIntro = currentPrefs.hasSeenIntro,
+                        introSeenAtLaunch = introSeenAtLaunch,
+                        preferences = currentPrefs,
                         pendingShortcutRepository = pendingShortcutRepository,
                     )
                 }

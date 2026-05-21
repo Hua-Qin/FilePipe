@@ -1,7 +1,9 @@
 package dev.bikram.filepipe.ui.common
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.ui.Alignment
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -79,19 +81,23 @@ fun FilePipeMaterialRoundedSymbol(
             }
         }
 
-    BasicText(
-        text = name,
+    Box(
         modifier = semanticsModifier,
-        style =
-            TextStyle(
-                brush = brush,
-                fontSize = fontSize,
-                lineHeight = fontSize,
-                fontFamily = fontFamily,
-                fontFeatureSettings = "\"rlig\" 1, \"liga\" 1",
-                textAlign = TextAlign.Center,
-                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                lineHeightStyle = FlatLineHeightStyle,
-            ),
-    )
+        contentAlignment = Alignment.Center,
+    ) {
+        BasicText(
+            text = name,
+            style =
+                TextStyle(
+                    brush = brush,
+                    fontSize = fontSize,
+                    lineHeight = fontSize,
+                    fontFamily = fontFamily,
+                    fontFeatureSettings = "\"rlig\" 1, \"liga\" 1",
+                    textAlign = TextAlign.Center,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    lineHeightStyle = FlatLineHeightStyle,
+                ),
+        )
+    }
 }

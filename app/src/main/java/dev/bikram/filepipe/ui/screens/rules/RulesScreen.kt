@@ -536,6 +536,7 @@ fun RulesScreen(
                         rule.id,
                         modifier = Modifier.animateItem(),
                     ) { isDragging ->
+                        var suppressExpandAfterReorderLongPress by remember(rule.id) { mutableStateOf(false) }
                         val dragElevation by animateDpAsState(
                             targetValue = if (isDragging) 8.dp else 0.dp,
                             animationSpec =
@@ -547,7 +548,10 @@ fun RulesScreen(
                         val reorderLongPressModifier =
                             if (reorderLongPressActive) {
                                 Modifier.longPressDraggableHandle(
-                                    onDragStarted = { _ -> dragActuallyMoved = false },
+                                    onDragStarted = { _ ->
+                                        dragActuallyMoved = false
+                                        suppressExpandAfterReorderLongPress = true
+                                    },
                                     onDragStopped = {
                                         if (!dragActuallyMoved) {
                                             viewModel.toggleSelection(rule.id)
@@ -588,7 +592,9 @@ fun RulesScreen(
                             swipeEndToStart = swipeEndToStart,
                             onToggleEnabled = { enabled -> viewModel.toggleEnabled(rule, enabled) },
                             onToggleSelectOrExpand = {
-                                if (hasSelection) {
+                                if (suppressExpandAfterReorderLongPress) {
+                                    suppressExpandAfterReorderLongPress = false
+                                } else if (hasSelection) {
                                     viewModel.toggleSelection(rule.id)
                                 } else {
                                     viewModel.toggleCardExpansion(rule.id)

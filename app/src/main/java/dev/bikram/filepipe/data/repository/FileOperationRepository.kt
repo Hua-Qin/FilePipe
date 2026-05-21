@@ -6,6 +6,7 @@ import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.data.storage.folderPathForFilesystemAccess
 import dev.bikram.filepipe.data.storage.isCanonicalPathUnderAllowedSharedStorage
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
@@ -48,9 +49,11 @@ class FileOperationRepository
             filesystemAccessEnabled: Boolean = false,
         ): List<FileEntry> =
             withContext(Dispatchers.IO) {
-                if (isFilesystemFolderPathString(folderUriString)) {
+                val effectiveFolderUriString =
+                    folderPathForFilesystemAccess(folderUriString, filesystemAccessEnabled)
+                if (isFilesystemFolderPathString(effectiveFolderUriString)) {
                     if (!filesystemAccessEnabled) return@withContext emptyList()
-                    val canonical = normalizeFilesystemFolderPath(folderUriString) ?: return@withContext emptyList()
+                    val canonical = normalizeFilesystemFolderPath(effectiveFolderUriString) ?: return@withContext emptyList()
                     if (!isCanonicalPathUnderAllowedSharedStorage(canonical)) return@withContext emptyList()
                     val rootDir = File(canonical)
                     if (!rootDir.isDirectory || !rootDir.canRead()) return@withContext emptyList()
@@ -68,9 +71,9 @@ class FileOperationRepository
                     )
                 }
 
-                if (!folderUriString.startsWith("content://")) return@withContext emptyList()
+                if (!effectiveFolderUriString.startsWith("content://")) return@withContext emptyList()
 
-                val treeUri = folderUriString.toUri()
+                val treeUri = effectiveFolderUriString.toUri()
                 val folder =
                     try {
                         DocumentFile.fromTreeUri(context, treeUri)
@@ -241,8 +244,10 @@ class FileOperationRepository
             filesystemAccessEnabled: Boolean = false,
         ): FileMoved =
             withContext(Dispatchers.IO + NonCancellable) {
+                val effectiveDestFolder =
+                    folderPathForFilesystemAccess(destFolderUriString, filesystemAccessEnabled)
                 val sourceIsFile = sourceEntry.uri.scheme == "file"
-                val destIsFilesystem = isFilesystemFolderPathString(destFolderUriString)
+                val destIsFilesystem = isFilesystemFolderPathString(effectiveDestFolder)
 
                 if (sourceIsFile && !filesystemAccessEnabled) {
                     return@withContext FileMoved(
@@ -271,7 +276,7 @@ class FileOperationRepository
                     destIsFilesystem && sourceIsFile ->
                         moveFileFilesystemToFilesystem(
                             sourceEntry,
-                            destFolderUriString,
+                            effectiveDestFolder,
                             conflictPolicy,
                             operationMode,
                             destFoldersCreatedCollector,
@@ -279,7 +284,7 @@ class FileOperationRepository
                     destIsFilesystem && !sourceIsFile ->
                         moveFileDocumentToFilesystem(
                             sourceEntry,
-                            destFolderUriString,
+                            effectiveDestFolder,
                             conflictPolicy,
                             operationMode,
                             destFoldersCreatedCollector,
@@ -287,7 +292,7 @@ class FileOperationRepository
                     !destIsFilesystem && sourceIsFile ->
                         moveFileFilesystemToDocument(
                             sourceEntry,
-                            destFolderUriString,
+                            effectiveDestFolder,
                             conflictPolicy,
                             operationMode,
                             destFoldersCreatedCollector,
@@ -295,7 +300,7 @@ class FileOperationRepository
                     else ->
                         moveFileDocumentToDocument(
                             sourceEntry,
-                            destFolderUriString,
+                            effectiveDestFolder,
                             conflictPolicy,
                             operationMode,
                             destFoldersCreatedCollector,
@@ -906,21 +911,23 @@ class FileOperationRepository
             filesystemAccessEnabled: Boolean = false,
         ): PreviewFileResult =
             withContext(Dispatchers.IO) {
+                val effectiveDestFolder =
+                    folderPathForFilesystemAccess(destFolderUriString, filesystemAccessEnabled)
                 val simulatedRootPath =
                     buildSimulatedDestPreviewPath(
-                        destFolderUriString,
+                        effectiveDestFolder,
                         sourceEntry.relativeParentSegments,
                         sourceEntry.name,
                     )
 
-                if (destFolderUriString.isBlank()) {
+                if (effectiveDestFolder.isBlank()) {
                     return@withContext unchangedPreviewResult(sourceEntry, simulatedRootPath)
                 }
 
-                if (isFilesystemFolderPathString(destFolderUriString)) {
+                if (isFilesystemFolderPathString(effectiveDestFolder)) {
                     return@withContext simulateFilesystemMove(
                         sourceEntry = sourceEntry,
-                        destFolderUriString = destFolderUriString,
+                        destFolderUriString = effectiveDestFolder,
                         conflictPolicy = conflictPolicy,
                         filesystemAccessEnabled = filesystemAccessEnabled,
                         simulatedRootPath = simulatedRootPath,
@@ -929,7 +936,7 @@ class FileOperationRepository
 
                 simulateSafMove(
                     sourceEntry = sourceEntry,
-                    destFolderUriString = destFolderUriString,
+                    destFolderUriString = effectiveDestFolder,
                     conflictPolicy = conflictPolicy,
                     simulatedRootPath = simulatedRootPath,
                 )
@@ -1140,6 +1147,8 @@ class FileOperationRepository
             folderPathOrUri: String,
             filesystemAccessEnabled: Boolean = false,
         ): FolderAccessResult {
+            val effectivePath =
+                folderPathForFilesystemAccess(folderPathOrUri, filesystemAccessEnabled)
             val cacheKey = "${folderPathOrUri}\u0000$filesystemAccessEnabled"
             val cached = accessCache[cacheKey]
             if (cached != null && System.currentTimeMillis() - cached.second < accessCacheTtlMs) {
@@ -1147,11 +1156,11 @@ class FileOperationRepository
             }
             val resolved =
                 when {
-                    isFilesystemFolderPathString(folderPathOrUri) -> {
+                    isFilesystemFolderPathString(effectivePath) -> {
                         when {
                             !filesystemAccessEnabled -> FolderAccessResult.PermissionDenied
                             else -> {
-                                val canonical = normalizeFilesystemFolderPath(folderPathOrUri)
+                                val canonical = normalizeFilesystemFolderPath(effectivePath)
                                 when {
                                     canonical == null -> FolderAccessResult.Unavailable
                                     !isCanonicalPathUnderAllowedSharedStorage(canonical) -> FolderAccessResult.Unavailable
@@ -1167,9 +1176,9 @@ class FileOperationRepository
                             }
                         }
                     }
-                    folderPathOrUri.startsWith("content://") ->
+                    effectivePath.startsWith("content://") ->
                         try {
-                            val document = DocumentFile.fromTreeUri(context, folderPathOrUri.toUri())
+                            val document = DocumentFile.fromTreeUri(context, effectivePath.toUri())
                             when {
                                 document == null -> FolderAccessResult.Unavailable
                                 !document.exists() -> FolderAccessResult.Unavailable

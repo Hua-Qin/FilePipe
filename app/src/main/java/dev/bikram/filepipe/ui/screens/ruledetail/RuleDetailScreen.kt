@@ -164,6 +164,8 @@ import dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.compactControlShape
+import dev.bikram.filepipe.ui.theme.cardFilledTonalIconButtonColors
+import dev.bikram.filepipe.ui.theme.cardIconContainerColor
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
 import dev.bikram.filepipe.ui.theme.pillShape
@@ -921,11 +923,7 @@ fun RuleDetailScreen(
                                         .padding(top = 4.dp)
                                         .size(56.dp),
                                 shape = compactControlShape,
-                                colors =
-                                    IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        contentColor = MaterialTheme.colorScheme.primary,
-                                    ),
+                                colors = cardFilledTonalIconButtonColors(),
                             ) {
                                 RuleIconOrEmoji(
                                     iconEmoji = state.iconEmoji,
@@ -1973,11 +1971,7 @@ fun RuleDetailScreen(
                                 },
                                 modifier = Modifier.size(ruleIconGridCell),
                                 shape = compactControlShape,
-                                colors =
-                                    IconButtonDefaults.filledTonalIconButtonColors(
-                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                        contentColor = MaterialTheme.colorScheme.primary,
-                                    ),
+                                colors = cardFilledTonalIconButtonColors(),
                             ) {
                                 FilePipeMaterialRoundedSymbol(
                                     name = iconOption.materialSymbolName(),
@@ -2017,7 +2011,7 @@ fun RuleDetailScreen(
                                 },
                                 modifier = Modifier.size(emojiCellSize),
                                 shape = compactControlShape,
-                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                color = cardIconContainerColor(),
                             ) {
                                 Box(
                                     modifier = Modifier.fillMaxSize(),

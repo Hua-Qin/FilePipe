@@ -9,7 +9,7 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.view.SoundEffectConstants
+
 import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -49,29 +49,7 @@ import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.LocalTapSound
 
-private const val MIN_TAP_SOUND_SPACING_MS = 85L
 
-private class TapSoundPlayer(
-    private val view: View,
-) {
-    private var tapSoundReady = true
-
-    fun play() {
-        if (!tapSoundReady) return
-        tapSoundReady = false
-        if (view.isShown) {
-            view.playSoundEffect(SoundEffectConstants.CLICK)
-        }
-        view.handler?.postDelayed(
-            {
-                tapSoundReady = true
-            },
-            MIN_TAP_SOUND_SPACING_MS,
-        ) ?: run {
-            tapSoundReady = true
-        }
-    }
-}
 
 private val LightColors =
     lightColorScheme(
@@ -184,6 +162,66 @@ private fun ColorScheme.boostContainersForSeedThemes(darkTheme: Boolean): ColorS
     )
 }
 
+private fun colorsTooSimilar(
+    first: Color,
+    second: Color,
+    maxLuminanceDelta: Float = 0.07f,
+): Boolean {
+    val luminanceDelta =
+        kotlin.math.abs(
+            ColorUtils.calculateLuminance(first.toArgb()) - ColorUtils.calculateLuminance(second.toArgb()),
+        )
+    return luminanceDelta < maxLuminanceDelta
+}
+
+/**
+ * Material You often maps [secondaryContainer] near [surfaceContainerHighest], so filled-tonal
+ * controls (e.g. Run now on rule cards) blend into elevated card surfaces.
+ */
+private fun ColorScheme.separateMaterialYouSecondaryContainerWhenNeeded(darkTheme: Boolean): ColorScheme {
+    if (!colorsTooSimilar(secondaryContainer, surfaceContainerHighest)) {
+        return this
+    }
+    val accentTargetArgb =
+        ColorUtils.blendARGB(
+            primaryContainer.toArgb(),
+            primary.toArgb(),
+            if (darkTheme) 0.38f else 0.28f,
+        )
+    val blendAmount = if (darkTheme) 0.50f else 0.40f
+    return copy(
+        secondaryContainer =
+            Color(
+                ColorUtils.blendARGB(secondaryContainer.toArgb(), accentTargetArgb, blendAmount),
+            ),
+        onSecondaryContainer =
+            Color(
+                ColorUtils.blendARGB(
+                    onSecondaryContainer.toArgb(),
+                    onPrimaryContainer.toArgb(),
+                    if (darkTheme) 0.35f else 0.30f,
+                ),
+            ),
+    )
+}
+
+/** Subtle theme hue on the flat page backdrop when the gradient is off. */
+private fun pageBackgroundWithThemeHint(
+    background: Color,
+    primary: Color,
+    primaryContainer: Color,
+    darkTheme: Boolean,
+): Color {
+    val accentArgb =
+        ColorUtils.blendARGB(
+            primary.toArgb(),
+            primaryContainer.toArgb(),
+            if (darkTheme) 0.4f else 0.3f,
+        )
+    val blendAmount = if (darkTheme) 0.08f else 0.06f
+    return Color(ColorUtils.blendARGB(background.toArgb(), accentArgb, blendAmount))
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FilePipeTheme(
@@ -262,17 +300,33 @@ fun FilePipeTheme(
         }
     val oledAdjusted = if (black) baseColorScheme.toOled() else baseColorScheme
     val colorScheme =
-        if (!useEnhancedShading && !black) {
-            oledAdjusted.tintSurfacesTowardPrimary(darkTheme = darkTheme)
-        } else {
-            oledAdjusted
-        }.let { scheme ->
+        (
+            if (!useEnhancedShading && !black) {
+                oledAdjusted.tintSurfacesTowardPrimary(darkTheme = darkTheme)
+            } else {
+                oledAdjusted
+            }
+        ).let { scheme ->
             if (useDynamic) {
-                scheme
+                scheme.separateMaterialYouSecondaryContainerWhenNeeded(darkTheme = darkTheme)
             } else {
                 scheme
                     .boostOutlineForVisibility(darkTheme = darkTheme)
                     .boostContainersForSeedThemes(darkTheme = darkTheme)
+            }
+        }.let { scheme ->
+            if (effectiveUseGradientBackground) {
+                scheme
+            } else {
+                scheme.copy(
+                    background =
+                        pageBackgroundWithThemeHint(
+                            background = scheme.background,
+                            primary = scheme.primary,
+                            primaryContainer = scheme.primaryContainer,
+                            darkTheme = darkTheme,
+                        ),
+                )
             }
         }
 
@@ -296,12 +350,8 @@ fun FilePipeTheme(
             isAppearanceLightNavigationBars = !darkTheme
         }
     }
-    val realTapSoundPlayer =
-        remember(view) {
-            TapSoundPlayer(view)
-        }
     val noopSound = remember { {} }
-    val playTapSound = if (hapticFeedbackEnabled) realTapSoundPlayer::play else noopSound
+    val playTapSound = noopSound
     val wallpaperTint = rememberWallpaperTintColor(context, enabled = effectiveUseGradientBackground)
     val gradientTop =
         wallpaperTint?.let { tint ->
@@ -309,7 +359,7 @@ fun FilePipeTheme(
         } ?: oledAdjusted.primaryContainer
     val gradientBackgroundColors =
         GradientBackgroundColors(
-            pageBackground = oledAdjusted.background,
+            pageBackground = colorScheme.background,
             gradientBase = oledAdjusted.surface,
             gradientTop = gradientTop,
         )
