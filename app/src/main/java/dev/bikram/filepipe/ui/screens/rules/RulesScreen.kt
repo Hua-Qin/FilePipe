@@ -37,12 +37,13 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -97,7 +98,7 @@ import dev.bikram.filepipe.ui.components.ThemeColoredEmptyRulesIllustration
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.previewSourceFolderDisplayPath
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
-import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
+import dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
@@ -162,7 +163,10 @@ fun RulesScreen(
             }
         }
     }
-    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
+    val scrollBlurModifier =
+        LocalProgressiveBlurStyle.current?.let { blurStyle ->
+            Modifier.progressiveBlurScrollableList(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
+        } ?: Modifier
     val listScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = lazyListState,
@@ -607,7 +611,7 @@ fun RulesScreen(
                                 } else {
                                     null
                                 },
-                            reorderLongPressDragModifier = reorderLongPressModifier,
+                            reorderLongPressDrag = { reorderLongPressModifier },
                             suppressLongClickForReorder = reorderLongPressActive,
                             modifier = Modifier.shadow(dragElevation, MaterialTheme.shapes.medium),
                         )
@@ -664,7 +668,11 @@ fun RulesScreen(
         AppBottomSheet(
             title = previewTitle,
             onDismiss = { viewModel.dismissPreview() },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState =
+                rememberBottomSheetState(
+                    initialValue = SheetValue.Hidden,
+                    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+                ),
             scrollable = false,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
         ) {
@@ -883,10 +891,10 @@ private fun SwipeToDismissRuleCard(
     showInlineProgressCancel: Boolean,
     onPreviewRule: () -> Unit,
     onViewHistory: () -> Unit,
-    onLeadingLongClick: (() -> Unit)? = null,
-    reorderLongPressDragModifier: Modifier = Modifier,
-    suppressLongClickForReorder: Boolean = false,
     modifier: Modifier = Modifier,
+    onLeadingLongClick: (() -> Unit)? = null,
+    reorderLongPressDrag: () -> Modifier = { Modifier },
+    suppressLongClickForReorder: Boolean = false,
 ) {
     val cardShape = MaterialTheme.shapes.medium
     val isMockRule = DevMockFileMove.isMockRule(rule)
@@ -998,7 +1006,7 @@ private fun SwipeToDismissRuleCard(
             folderIssueSeverity = folderIssueSeverity,
             onStaleWarningClick = onStaleWarningClick,
             onLeadingLongClick = onLeadingLongClick,
-            reorderLongPressDragModifier = reorderLongPressDragModifier,
+            reorderLongPressDrag = reorderLongPressDrag,
             suppressLongClickForReorder = suppressLongClickForReorder,
         )
     }

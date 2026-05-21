@@ -1,8 +1,8 @@
 package dev.bikram.filepipe.ui.screens.ruledetail
 
-import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
+import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -281,8 +281,8 @@ class RuleDetailViewModel
         ): Boolean {
             if (child.startsWith("content://") && parent.startsWith("content://")) {
                 return try {
-                    val childId = DocumentsContract.getTreeDocumentId(Uri.parse(child))
-                    val parentId = DocumentsContract.getTreeDocumentId(Uri.parse(parent))
+                    val childId = DocumentsContract.getTreeDocumentId(child.toUri())
+                    val parentId = DocumentsContract.getTreeDocumentId(parent.toUri())
                     val childVolume = childId.substringBefore(":")
                     val parentVolume = parentId.substringBefore(":")
                     if (childVolume != parentVolume) return false

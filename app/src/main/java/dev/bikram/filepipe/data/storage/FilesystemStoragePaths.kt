@@ -1,8 +1,8 @@
 package dev.bikram.filepipe.data.storage
 
-import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
+import androidx.core.net.toUri
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.usesAllFilesPaths
 import java.io.File
@@ -84,7 +84,7 @@ fun isSafTreeUriPrimarySharedStorageRoot(treeUriString: String): Boolean {
     if (!treeUriString.startsWith("content://")) return false
     val treeDocumentId =
         runCatching {
-            DocumentsContract.getTreeDocumentId(Uri.parse(treeUriString))
+            DocumentsContract.getTreeDocumentId(treeUriString.toUri())
         }.getOrNull() ?: return false
     if (!treeDocumentId.startsWith("primary", ignoreCase = true)) return false
     val relative = treeDocumentId.substringAfter(":", "").trim().trimEnd('/')
@@ -128,7 +128,7 @@ fun isSafTreeUriPublicDownloadRoot(treeUriString: String): Boolean {
     if (!treeUriString.startsWith("content://")) return false
     val treeDocumentId =
         runCatching {
-            DocumentsContract.getTreeDocumentId(Uri.parse(treeUriString))
+            DocumentsContract.getTreeDocumentId(treeUriString.toUri())
         }.getOrNull() ?: return false
     val colonIndex = treeDocumentId.indexOf(':')
     if (colonIndex < 0) return false

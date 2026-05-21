@@ -76,16 +76,19 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -101,10 +104,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -121,6 +124,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -156,7 +160,7 @@ import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.text.SimpleMarkdown
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
-import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
+import dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.DEV_OPTIONS_SHARED_BOUNDS_KEY
 import dev.bikram.filepipe.ui.navigation.LocalNavAnimatedVisibilityScope
@@ -292,7 +296,10 @@ fun SettingsScreen(
             }
         }
     }
-    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
+    val scrollBlurModifier =
+        LocalProgressiveBlurStyle.current?.let { blurStyle ->
+            Modifier.progressiveBlurScrollableList(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
+        } ?: Modifier
 
     var collapsedSettingsSectionKeys by rememberSaveable { mutableStateOf(emptySet<String>()) }
     val settingsExpandableSectionKeys =
@@ -312,9 +319,9 @@ fun SettingsScreen(
             sectionKey in collapsedSettingsSectionKeys
         }
     var folderAccessHighlight by rememberSaveable { mutableStateOf(false) }
-    var folderAccessHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
+    var folderAccessHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
     var notificationsHighlight by rememberSaveable { mutableStateOf(false) }
-    var notificationsHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
+    var notificationsHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
     val highlightSection = highlightSectionKey?.substringBefore(".")
     LaunchedEffect(highlightSectionKey) {
         val key = highlightSection ?: return@LaunchedEffect
@@ -432,9 +439,17 @@ fun SettingsScreen(
     val manualUpdateNoResult by viewModel.manualUpdateNoResult.collectAsStateWithLifecycle()
     val openUpdateSheetFromNotification by viewModel.openUpdateSheetFromNotification.collectAsStateWithLifecycle()
     var showUpdateSheet by remember { mutableStateOf(false) }
-    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val configuration = LocalConfiguration.current
-    val maxUpdateSheetHeight = (configuration.screenHeightDp * 0.85f).dp
+    val updateSheetState =
+        rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        )
+    val windowHeight =
+        with(density) {
+            LocalWindowInfo.current.containerSize.height
+                .toDp()
+        }
+    val maxUpdateSheetHeight = windowHeight * 0.85f
     val settingsScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = settingsLazyListState,
@@ -645,14 +660,10 @@ fun SettingsScreen(
                             when {
                                 affectedRuleCount <= 0 ->
                                     resources.getString(R.string.settings_folder_access_switched_selective_zero_rules)
-                                affectedRuleCount == 1 ->
-                                    resources.getString(
-                                        R.string.settings_folder_access_switched_selective_snackbar_one,
-                                        affectedRuleCount,
-                                    )
                                 else ->
-                                    resources.getString(
-                                        R.string.settings_folder_access_switched_selective_snackbar_other,
+                                    resources.getQuantityString(
+                                        R.plurals.settings_folder_access_switched_selective_snackbar,
+                                        affectedRuleCount,
                                         affectedRuleCount,
                                     )
                             }
@@ -909,7 +920,7 @@ fun SettingsScreen(
                                 onClick = {
                                     val manageIntent =
                                         Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                            data = Uri.parse("package:${context.packageName}")
+                                            data = "package:${context.packageName}".toUri()
                                         }
                                     context.startActivity(manageIntent)
                                 },
@@ -1414,6 +1425,7 @@ fun SettingsScreen(
             // ── About ─────────────────────────────────────────────────────────
             item {
                 val aboutContext = LocalContext.current
+                val aboutResources = LocalResources.current
                 val githubRepoForSourceLink =
                     BuildConfig.GITHUB_REPO
                         .trim()
@@ -1434,7 +1446,6 @@ fun SettingsScreen(
                     }
                 val buildVariantToastText = stringResource(R.string.about_build_variant_format, buildFlavorLabel, buildTypeLabel)
                 val developerOptionsUnlockedToast = stringResource(R.string.settings_developer_options_unlocked)
-                val developerOptionsTapsRemainingToast = stringResource(R.string.settings_developer_options_taps_remaining)
                 val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
                 val diagnosticsTooltip = stringResource(R.string.settings_share_diagnostics)
                 val aboutLinkCopiedToast = stringResource(R.string.toast_about_link_copied)
@@ -1460,7 +1471,7 @@ fun SettingsScreen(
                         }
                     }
                 var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
-                var developerOptionsTapCount by rememberSaveable { mutableStateOf(0) }
+                var developerOptionsTapCount by rememberSaveable { mutableIntStateOf(0) }
                 Column(modifier = Modifier.padding(top = if (developerOptionsEnabled) 0.dp else 24.dp)) {
                     SettingsSectionHeader(
                         iconName = "info",
@@ -1511,7 +1522,11 @@ fun SettingsScreen(
                                                     Toast
                                                         .makeText(
                                                             aboutContext,
-                                                            developerOptionsTapsRemainingToast.format(remaining),
+                                                            aboutResources.getQuantityString(
+                                                                R.plurals.settings_developer_options_taps_remaining,
+                                                                remaining,
+                                                                remaining,
+                                                            ),
                                                             Toast.LENGTH_SHORT,
                                                         ).show()
                                                 } else {
@@ -1567,7 +1582,7 @@ fun SettingsScreen(
                                                 .tapSoundClickable {
                                                     runCatching {
                                                         aboutContext.startActivity(
-                                                            Intent(Intent.ACTION_VIEW, Uri.parse(authorGithubProfileUrl)),
+                                                            Intent(Intent.ACTION_VIEW, authorGithubProfileUrl.toUri()),
                                                         )
                                                     }
                                                 },
@@ -1602,7 +1617,7 @@ fun SettingsScreen(
                                                                 aboutContext.startActivity(
                                                                     Intent(
                                                                         Intent.ACTION_VIEW,
-                                                                        Uri.parse(playStoreListingUrl),
+                                                                        playStoreListingUrl.toUri(),
                                                                     ),
                                                                 )
                                                             }
@@ -1641,7 +1656,7 @@ fun SettingsScreen(
                                                                 val repoUrl = "https://github.com/$githubRepoForSourceLink"
                                                                 runCatching {
                                                                     aboutContext.startActivity(
-                                                                        Intent(Intent.ACTION_VIEW, Uri.parse(repoUrl)),
+                                                                        Intent(Intent.ACTION_VIEW, repoUrl.toUri()),
                                                                     )
                                                                 }
                                                             },
@@ -1688,7 +1703,7 @@ fun SettingsScreen(
                                                                     aboutContext.startActivity(
                                                                         Intent(
                                                                             Intent.ACTION_VIEW,
-                                                                            Uri.parse(playStoreListingUrl),
+                                                                            playStoreListingUrl.toUri(),
                                                                         ),
                                                                     )
                                                                 }
@@ -1766,7 +1781,7 @@ fun SettingsScreen(
                                                                 val repoUrl = "https://github.com/$githubRepoForSourceLink"
                                                                 runCatching {
                                                                     aboutContext.startActivity(
-                                                                        Intent(Intent.ACTION_VIEW, Uri.parse(repoUrl)),
+                                                                        Intent(Intent.ACTION_VIEW, repoUrl.toUri()),
                                                                     )
                                                                 }
                                                             },
@@ -2006,7 +2021,7 @@ private fun openAboutUrl(
     url: String,
 ) {
     runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
     }
 }
 
@@ -3004,7 +3019,7 @@ private fun backupDestinationDisplayLabel(
     internalStorageRootDisplayName: String,
 ): String {
     if (uriString.isBlank()) return ""
-    val uri = Uri.parse(uriString)
+    val uri = uriString.toUri()
     if (!DocumentsContract.isTreeUri(uri)) {
         providerDisplayName(context, uri.authority)?.let { return it }
     }

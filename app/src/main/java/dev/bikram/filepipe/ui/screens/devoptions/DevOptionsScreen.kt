@@ -57,6 +57,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -92,7 +93,7 @@ import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
-import dev.bikram.filepipe.ui.modifiers.applyToScrollableList
+import dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList
 import dev.bikram.filepipe.ui.navigation.DEV_OPTIONS_SHARED_BOUNDS_KEY
 import dev.bikram.filepipe.ui.navigation.LocalNavAnimatedVisibilityScope
 import dev.bikram.filepipe.ui.navigation.LocalSharedTransitionScope
@@ -132,7 +133,10 @@ fun DevOptionsScreen(
             }
         }
     }
-    val scrollBlurModifier = LocalProgressiveBlurStyle.current?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
+    val scrollBlurModifier =
+        LocalProgressiveBlurStyle.current?.let { blurStyle ->
+            Modifier.progressiveBlurScrollableList(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
+        } ?: Modifier
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
     val sharedBoundsModifier =
@@ -154,7 +158,7 @@ fun DevOptionsScreen(
     var workersCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.workersCollapsed) }
     var diagnosticsCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.diagnosticsCollapsed) }
     var resetPreferencesCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.resetPreferencesCollapsed) }
-    var developerModeHeaderHeightPx by remember { mutableStateOf(0) }
+    var developerModeHeaderHeightPx by remember { mutableIntStateOf(0) }
     val developerModeHeaderHeight = with(density) { developerModeHeaderHeightPx.toDp() }
     val allSectionsCollapsed =
         infoCollapsed &&

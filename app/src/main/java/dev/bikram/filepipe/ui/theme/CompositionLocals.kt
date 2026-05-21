@@ -43,7 +43,7 @@ val LocalBlurBars = compositionLocalOf { true }
 
 /**
  * Edge blur parameters for the current route, or null when progressive blur is off.
- * Apply via [dev.bikram.filepipe.ui.modifiers.applyToScrollableList] or [dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer] so app bars stay sharp.
+ * Apply via [dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList] or [dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer] so app bars stay sharp.
  */
 data class ProgressiveBlurStyle(
     /** Top fade/blur band in px (local to the blurred composable; match app bar + status insets). */

@@ -58,10 +58,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -82,7 +84,7 @@ import dev.bikram.filepipe.ui.components.StatusChip
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.formatTime
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
-import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
+import dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.compactControlShape
@@ -133,7 +135,10 @@ fun HistoryDetailScreen(
             }
         }
     }
-    val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
+    val fullBleedBlurModifier =
+        LocalProgressiveBlurStyle.current?.let { blurStyle ->
+            Modifier.progressiveBlurFullBleedLayer(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
+        } ?: Modifier
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topListPadding = statusTop + 64.dp
@@ -356,7 +361,13 @@ private fun RunSummaryCard(
                         autoMirror = true,
                     )
                     Spacer(Modifier.size(6.dp))
-                    Text(stringResource(R.string.history_detail_undo_files, history.totalFilesMoved))
+                    Text(
+                        pluralStringResource(
+                            R.plurals.history_detail_undo_files,
+                            history.totalFilesMoved,
+                            history.totalFilesMoved,
+                        ),
+                    )
                 }
             }
         }
@@ -606,7 +617,7 @@ private fun loadFileThumbnail(
 
     val uri =
         try {
-            Uri.parse(uriString)
+            uriString.toUri()
         } catch (_: RuntimeException) {
             return null
         }
@@ -868,7 +879,7 @@ private fun openFileWithDefaultApp(
     }
     val intent =
         try {
-            val uri = Uri.parse(uriString)
+            val uri = uriString.toUri()
             val uriForIntent =
                 when {
                     uri.scheme == "file" -> {

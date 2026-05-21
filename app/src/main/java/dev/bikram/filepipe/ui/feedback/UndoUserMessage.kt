@@ -15,15 +15,33 @@ fun UndoResult.toUserMessage(context: Context): String =
         totalFailed == 0 ->
             when (operationMode) {
                 OperationMode.COPY ->
-                    context.getString(R.string.undo_success_deleted_destination, totalReversed)
+                    context.resources.getQuantityString(
+                        R.plurals.undo_success_deleted_destination,
+                        totalReversed,
+                        totalReversed,
+                    )
                 OperationMode.MOVE ->
-                    context.getString(R.string.undo_success_restored, totalReversed)
+                    context.resources.getQuantityString(
+                        R.plurals.undo_success_restored,
+                        totalReversed,
+                        totalReversed,
+                    )
             }
         else ->
             when (operationMode) {
                 OperationMode.COPY ->
-                    context.getString(R.string.undo_partial_deleted_destination, totalReversed, totalFailed)
+                    context.resources.getQuantityString(
+                        R.plurals.undo_partial_deleted_destination,
+                        totalReversed,
+                        totalReversed,
+                        totalFailed,
+                    )
                 OperationMode.MOVE ->
-                    context.getString(R.string.undo_partial_restored, totalReversed, totalFailed)
+                    context.resources.getQuantityString(
+                        R.plurals.undo_partial_restored,
+                        totalReversed,
+                        totalReversed,
+                        totalFailed,
+                    )
             }
     }

@@ -62,6 +62,7 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
@@ -70,7 +71,7 @@ import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
@@ -110,6 +111,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.ColorUtils
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -158,7 +160,7 @@ import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.previewSourceFolderDisplayPath
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
-import dev.bikram.filepipe.ui.modifiers.applyToFullBleedLayer
+import dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.compactControlShape
@@ -583,7 +585,11 @@ fun RuleDetailScreen(
     var showTemplateSheet by remember { mutableStateOf(viewModel.showInitialTemplatePicker) }
     var showRuleIconSheet by remember { mutableStateOf(false) }
     var customEmojiDraft by remember { mutableStateOf("") }
-    val previewSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val previewSheetState =
+        rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        )
     val bookmarkedFolders by viewModel.bookmarkedFolders.collectAsStateWithLifecycle()
     var advancedExpanded by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
@@ -628,7 +634,7 @@ fun RuleDetailScreen(
     fun resolveFilesystemPickerStartDirectory(initialPath: String?): String {
         if (initialPath.isNullOrBlank()) return externalStorageRootPath()
         if (initialPath.startsWith("content://")) {
-            val pathFromSaf = runCatching { safTreeUriToPath(Uri.parse(initialPath)) }.getOrNull()
+            val pathFromSaf = runCatching { safTreeUriToPath(initialPath.toUri()) }.getOrNull()
             val normalized = pathFromSaf?.let { normalizeFilesystemFolderPath(it) }
             return normalized?.takeIf { candidate ->
                 val folder = File(candidate)
@@ -797,7 +803,10 @@ fun RuleDetailScreen(
             }
         }
     }
-    val fullBleedBlurModifier = LocalProgressiveBlurStyle.current?.applyToFullBleedLayer(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
+    val fullBleedBlurModifier =
+        LocalProgressiveBlurStyle.current?.let { blurStyle ->
+            Modifier.progressiveBlurFullBleedLayer(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
+        } ?: Modifier
     val alertColors = ruleAlertColors(isErrorSeverity = alertIsErrorSeverity)
     val warningColors = ruleWarningColors()
     val blockingHighlightColor = MaterialTheme.colorScheme.error
@@ -1099,7 +1108,7 @@ fun RuleDetailScreen(
                                 onClick = {
                                     val allFilesIntent =
                                         Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                            data = Uri.parse("package:${context.packageName}")
+                                            data = "package:${context.packageName}".toUri()
                                         }
                                     context.startActivity(allFilesIntent)
                                 },
@@ -1338,7 +1347,7 @@ fun RuleDetailScreen(
                                 onClick = {
                                     val allFilesIntent =
                                         Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                            data = Uri.parse("package:${context.packageName}")
+                                            data = "package:${context.packageName}".toUri()
                                         }
                                     context.startActivity(allFilesIntent)
                                 },
@@ -1854,7 +1863,11 @@ fun RuleDetailScreen(
         AppBottomSheet(
             title = stringResource(R.string.filesystem_folder_picker_title),
             onDismiss = { pendingFilesystemFolderPick = null },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState =
+                rememberBottomSheetState(
+                    initialValue = SheetValue.Hidden,
+                    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+                ),
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             scrollable = false,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
@@ -1922,7 +1935,11 @@ fun RuleDetailScreen(
     }
 
     if (showRuleIconSheet) {
-        val ruleIconSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val ruleIconSheetState =
+            rememberBottomSheetState(
+                initialValue = SheetValue.Hidden,
+                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            )
         LaunchedEffect(showRuleIconSheet) {
             if (showRuleIconSheet) {
                 customEmojiDraft = state.iconEmoji.orEmpty()
@@ -2084,7 +2101,11 @@ fun RuleDetailScreen(
         AppBottomSheet(
             title = "",
             onDismiss = { showTemplateSheet = false },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState =
+                rememberBottomSheetState(
+                    initialValue = SheetValue.Hidden,
+                    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+                ),
             showTitleBar = false,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
         ) {

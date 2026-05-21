@@ -2,7 +2,7 @@ package dev.bikram.filepipe.data.preferences
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -547,7 +547,7 @@ class UserPreferencesRepository
             if (exportUriString.startsWith("content://")) {
                 runCatching {
                     context.contentResolver.takePersistableUriPermission(
-                        Uri.parse(exportUriString),
+                        exportUriString.toUri(),
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                     )
                 }
@@ -556,7 +556,7 @@ class UserPreferencesRepository
             if (cloudExportUriString.startsWith("content://")) {
                 runCatching {
                     context.contentResolver.takePersistableUriPermission(
-                        Uri.parse(cloudExportUriString),
+                        cloudExportUriString.toUri(),
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                     )
                 }

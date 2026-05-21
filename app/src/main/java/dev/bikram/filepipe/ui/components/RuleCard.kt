@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -123,7 +124,6 @@ private fun ruleCardFolderIssueColors(severity: RuleCardFolderIssueSeverity): Ru
 fun RuleCard(
     rule: Rule,
     isSelected: Boolean,
-    isSelectionMode: Boolean = false,
     isExpanded: Boolean,
     progress: RunProgress?,
     onClick: () -> Unit, // toggles expansion (or selection when in selection mode)
@@ -132,18 +132,19 @@ fun RuleCard(
     onToggleEnabled: (Boolean) -> Unit,
     onRunClick: () -> Unit,
     onCancelRunClick: () -> Unit,
-    showInlineProgressCancel: Boolean = false,
     isAnyRuleRunning: Boolean,
+    modifier: Modifier = Modifier,
+    isSelectionMode: Boolean = false,
+    showInlineProgressCancel: Boolean = false,
     hasStaleFolder: Boolean = false,
     folderIssueSeverity: RuleCardFolderIssueSeverity? = null,
     onStaleWarningClick: () -> Unit = {},
     /** When non-null (My order + reorder gesture): long-press on rule icon toggles selection; card body long-press drags. */
     onLeadingLongClick: (() -> Unit)? = null,
     /** Long-press drag to reorder (My order); must be built inside [ReorderableItem]. */
-    reorderLongPressDragModifier: Modifier = Modifier,
+    reorderLongPressDrag: () -> Modifier = { Modifier },
     suppressLongClickForReorder: Boolean = false,
     showOperationalControls: Boolean = true,
-    modifier: Modifier = Modifier,
 ) {
     val cardColors = elevatedCardColors()
     val cardShape = MaterialTheme.shapes.medium
@@ -197,7 +198,7 @@ fun RuleCard(
                     folderIssueSeverity = effectiveFolderIssueSeverity,
                     onStaleWarningClick = onStaleWarningClick,
                     onLeadingLongClick = onLeadingLongClick,
-                    reorderLongPressDragModifier = reorderLongPressDragModifier,
+                    modifier = reorderLongPressDrag(),
                     suppressLongClickForReorder = suppressLongClickForReorder,
                     showOperationalControls = showOperationalControls,
                 )
@@ -216,7 +217,7 @@ fun RuleCard(
                     isAnyRuleRunning = isAnyRuleRunning,
                     folderIssueSeverity = effectiveFolderIssueSeverity,
                     onLeadingLongClick = onLeadingLongClick,
-                    reorderLongPressDragModifier = reorderLongPressDragModifier,
+                    modifier = reorderLongPressDrag(),
                     suppressLongClickForReorder = suppressLongClickForReorder,
                     showOperationalControls = showOperationalControls,
                 )
@@ -244,8 +245,8 @@ private fun CompactContent(
     showInlineProgressCancel: Boolean,
     isAnyRuleRunning: Boolean,
     folderIssueSeverity: RuleCardFolderIssueSeverity?,
+    modifier: Modifier = Modifier,
     onLeadingLongClick: (() -> Unit)? = null,
-    reorderLongPressDragModifier: Modifier = Modifier,
     suppressLongClickForReorder: Boolean = false,
     showOperationalControls: Boolean = true,
 ) {
@@ -285,7 +286,7 @@ private fun CompactContent(
                     onClickLabel = clickLabel,
                     onLongClickLabel = longClickLabel,
                     role = Role.Button,
-                ).then(reorderLongPressDragModifier),
+                ).then(modifier),
     ) {
         ListItem(
             headlineContent = {
@@ -436,10 +437,10 @@ private fun ExpandedContent(
     onCancelRunClick: () -> Unit,
     showInlineProgressCancel: Boolean,
     isAnyRuleRunning: Boolean,
+    modifier: Modifier = Modifier,
     folderIssueSeverity: RuleCardFolderIssueSeverity? = null,
     onStaleWarningClick: () -> Unit = {},
     onLeadingLongClick: (() -> Unit)? = null,
-    reorderLongPressDragModifier: Modifier = Modifier,
     suppressLongClickForReorder: Boolean = false,
     showOperationalControls: Boolean = true,
 ) {
@@ -473,7 +474,7 @@ private fun ExpandedContent(
                     onClickLabel = clickLabel,
                     onLongClickLabel = longClickLabel,
                     role = Role.Button,
-                ).then(reorderLongPressDragModifier)
+                ).then(modifier)
                 .padding(16.dp),
     ) {
         Row(
@@ -682,14 +683,16 @@ private fun ExpandedContent(
                                     else ->
                                         when (rule.operationMode) {
                                             OperationMode.COPY ->
-                                                stringResource(
-                                                    R.string.rule_card_progress_files_copied_summary,
+                                                pluralStringResource(
+                                                    R.plurals.rule_card_progress_files_copied_summary,
+                                                    runProgress.totalFiles,
                                                     runProgress.filesMoved,
                                                     runProgress.totalFiles,
                                                 )
                                             OperationMode.MOVE ->
-                                                stringResource(
-                                                    R.string.rule_card_progress_files_moved_summary,
+                                                pluralStringResource(
+                                                    R.plurals.rule_card_progress_files_moved_summary,
+                                                    runProgress.totalFiles,
                                                     runProgress.filesMoved,
                                                     runProgress.totalFiles,
                                                 )
@@ -875,9 +878,9 @@ private fun LabeledInfo(
 private fun LabeledInfoSingleLine(
     label: String,
     value: String,
-    rowModifier: Modifier = Modifier,
+    modifier: Modifier = Modifier,
 ) {
-    Row(modifier = rowModifier.fillMaxWidth()) {
+    Row(modifier = modifier.fillMaxWidth()) {
         Text(
             text = "$label:",
             style = MaterialTheme.typography.bodyMedium,

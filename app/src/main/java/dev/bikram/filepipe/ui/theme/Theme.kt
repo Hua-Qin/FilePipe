@@ -6,7 +6,6 @@ import android.app.WallpaperManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.database.ContentObserver
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
@@ -405,7 +404,7 @@ private fun rememberWallpaperTintColor(
     context: Context,
     enabled: Boolean,
 ): Color? {
-    if (!enabled || Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) {
+    if (!enabled) {
         return null
     }
     val appContext = context.applicationContext

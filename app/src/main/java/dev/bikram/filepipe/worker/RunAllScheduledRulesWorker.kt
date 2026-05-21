@@ -125,12 +125,31 @@ class RunAllScheduledRulesWorker
             val body =
                 when {
                     failed > 0 && operationMode == OperationMode.COPY ->
-                        appContext.getString(R.string.notification_summary_body_partial_copied, moved, failed)
+                        appContext.resources.getQuantityString(
+                            R.plurals.notification_summary_body_partial_copied,
+                            moved,
+                            moved,
+                            failed,
+                        )
                     failed > 0 ->
-                        appContext.getString(R.string.notification_summary_body_partial, moved, failed)
+                        appContext.resources.getQuantityString(
+                            R.plurals.notification_summary_body_partial,
+                            moved,
+                            moved,
+                            failed,
+                        )
                     operationMode == OperationMode.COPY ->
-                        appContext.getString(R.string.history_files_copied, moved)
-                    else -> appContext.getString(R.string.history_files_moved, moved)
+                        appContext.resources.getQuantityString(
+                            R.plurals.history_files_copied,
+                            moved,
+                            moved,
+                        )
+                    else ->
+                        appContext.resources.getQuantityString(
+                            R.plurals.history_files_moved,
+                            moved,
+                            moved,
+                        )
                 }
             val builder =
                 NotificationCompat
@@ -197,7 +216,13 @@ class RunAllScheduledRulesWorker
                         .setSmallIcon(R.drawable.ic_notification)
                         .setOngoing(true)
                         .setOnlyAlertOnce(true)
-                        .setContentTitle(appContext.getString(R.string.notification_running_batch, rules.size))
+                        .setContentTitle(
+                            appContext.resources.getQuantityString(
+                                R.plurals.notification_running_batch,
+                                rules.size,
+                                rules.size,
+                            ),
+                        )
                 if (allRulesInBatchFinished) {
                     builder.setProgress(0, 0, false)
                     if (progress.error != null) {
@@ -224,7 +249,13 @@ class RunAllScheduledRulesWorker
                     .setSmallIcon(R.drawable.ic_notification)
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
-                    .setContentTitle(appContext.getString(R.string.notification_running_batch, rules.size))
+                    .setContentTitle(
+                        appContext.resources.getQuantityString(
+                            R.plurals.notification_running_batch,
+                            rules.size,
+                            rules.size,
+                        ),
+                    )
 
             when {
                 progress.isComplete -> {
@@ -265,8 +296,13 @@ class RunAllScheduledRulesWorker
             val notification =
                 NotificationCompat
                     .Builder(appContext, FileOrganizerWorker.CHANNEL_ID)
-                    .setContentTitle(appContext.getString(R.string.notification_running_batch, ruleCount))
-                    .setContentText(appContext.getString(R.string.notification_preparing))
+                    .setContentTitle(
+                        appContext.resources.getQuantityString(
+                            R.plurals.notification_running_batch,
+                            ruleCount,
+                            ruleCount,
+                        ),
+                    ).setContentText(appContext.getString(R.string.notification_preparing))
                     .setSmallIcon(R.drawable.ic_notification)
                     .setOngoing(true)
                     .setProgress(0, 0, true)

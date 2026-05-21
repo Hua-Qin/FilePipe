@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -87,22 +88,38 @@ fun HistoryCard(
                 if (history.totalFilesMoved > 0) {
                     when (history.operationMode) {
                         OperationMode.COPY ->
-                            stringResource(R.string.history_files_copied, history.totalFilesMoved)
+                            pluralStringResource(
+                                R.plurals.history_files_copied,
+                                history.totalFilesMoved,
+                                history.totalFilesMoved,
+                            )
                         OperationMode.MOVE ->
-                            stringResource(R.string.history_files_moved, history.totalFilesMoved)
+                            pluralStringResource(
+                                R.plurals.history_files_moved,
+                                history.totalFilesMoved,
+                                history.totalFilesMoved,
+                            )
                     }
                 } else {
                     ""
                 }
             val failedPart =
                 if (history.totalFilesFailed > 0) {
-                    stringResource(R.string.history_files_failed, history.totalFilesFailed)
+                    pluralStringResource(
+                        R.plurals.history_files_failed,
+                        history.totalFilesFailed,
+                        history.totalFilesFailed,
+                    )
                 } else {
                     ""
                 }
             val cancelledPart =
                 if (history.cancelledUnprocessedCount > 0) {
-                    stringResource(R.string.history_files_cancelled_remaining, history.cancelledUnprocessedCount)
+                    pluralStringResource(
+                        R.plurals.history_files_cancelled_remaining,
+                        history.cancelledUnprocessedCount,
+                        history.cancelledUnprocessedCount,
+                    )
                 } else {
                     ""
                 }
@@ -140,8 +157,8 @@ fun HistoryCard(
 @Composable
 fun StatusChip(
     status: RunStatus,
-    noChanges: Boolean = false,
     modifier: Modifier = Modifier,
+    noChanges: Boolean = false,
 ) {
     val (label, targetColor) =
         when {
@@ -175,15 +192,16 @@ fun StatusChip(
     }
 }
 
-private val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
-private val dateTimeFormat = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
+private const val TIME_PATTERN = "h:mm a"
+private const val DATE_TIME_PATTERN = "MMM d, h:mm a"
 
 fun formatTime(millis: Long): String {
     val now = System.currentTimeMillis()
     val diff = now - millis
+    val locale = Locale.getDefault()
     return if (diff < 24 * 60 * 60 * 1000L) {
-        timeFormat.format(Date(millis))
+        SimpleDateFormat(TIME_PATTERN, locale).format(Date(millis))
     } else {
-        dateTimeFormat.format(Date(millis))
+        SimpleDateFormat(DATE_TIME_PATTERN, locale).format(Date(millis))
     }
 }

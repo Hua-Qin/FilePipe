@@ -107,12 +107,31 @@ class FileOrganizerWorker
             val body =
                 when {
                     failed > 0 && operationMode == OperationMode.COPY ->
-                        appContext.getString(R.string.notification_summary_body_partial_copied, moved, failed)
+                        appContext.resources.getQuantityString(
+                            R.plurals.notification_summary_body_partial_copied,
+                            moved,
+                            moved,
+                            failed,
+                        )
                     failed > 0 ->
-                        appContext.getString(R.string.notification_summary_body_partial, moved, failed)
+                        appContext.resources.getQuantityString(
+                            R.plurals.notification_summary_body_partial,
+                            moved,
+                            moved,
+                            failed,
+                        )
                     operationMode == OperationMode.COPY ->
-                        appContext.getString(R.string.history_files_copied, moved)
-                    else -> appContext.getString(R.string.history_files_moved, moved)
+                        appContext.resources.getQuantityString(
+                            R.plurals.history_files_copied,
+                            moved,
+                            moved,
+                        )
+                    else ->
+                        appContext.resources.getQuantityString(
+                            R.plurals.history_files_moved,
+                            moved,
+                            moved,
+                        )
                 }
             val builder =
                 NotificationCompat

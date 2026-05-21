@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
 import android.util.Log
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
@@ -75,7 +76,7 @@ class UndoRunUseCase
                     when (operationMode) {
                         OperationMode.COPY -> {
                             if (fileMoved.destinationUri.startsWith("file:")) {
-                                val path = Uri.parse(fileMoved.destinationUri).path
+                                val path = fileMoved.destinationUri.toUri().path
                                 if (path.isNullOrBlank()) {
                                     errors.add("${fileMoved.fileName}: invalid destination path")
                                     failed++
@@ -100,7 +101,7 @@ class UndoRunUseCase
                                     errors.add("${fileMoved.fileName}: could not delete at destination")
                                 }
                             } else {
-                                val destUri = Uri.parse(fileMoved.destinationUri)
+                                val destUri = fileMoved.destinationUri.toUri()
                                 val destDoc = DocumentFile.fromSingleUri(context, destUri)
                                 if (destDoc == null) {
                                     errors.add("${fileMoved.fileName}: could not open destination document")
@@ -127,7 +128,7 @@ class UndoRunUseCase
                             }
                         }
                         OperationMode.MOVE -> {
-                            val destUri = Uri.parse(fileMoved.destinationUri)
+                            val destUri = fileMoved.destinationUri.toUri()
                             val sourceFolderUriString = parentSourceFolderForUndo(fileMoved.sourceUri)
                             if (sourceFolderUriString == null) {
                                 errors.add("${fileMoved.fileName}: cannot determine original source folder")
@@ -228,7 +229,7 @@ class UndoRunUseCase
                 deleteEmptyFilesystemFoldersAfterCopyUndo(destTreeUriString, deletedFileDestinationUriStrings)
                 return
             }
-            val treeUri = Uri.parse(destTreeUriString)
+            val treeUri = destTreeUriString.toUri()
             val authority = treeUri.authority ?: return
             val treeDocumentId =
                 try {
@@ -286,7 +287,7 @@ class UndoRunUseCase
         ): List<String> {
             val fileDocumentId =
                 try {
-                    DocumentsContract.getDocumentId(Uri.parse(fileDocumentUriString))
+                    DocumentsContract.getDocumentId(fileDocumentUriString.toUri())
                 } catch (_: IllegalArgumentException) {
                     return emptyList()
                 }
@@ -320,7 +321,7 @@ class UndoRunUseCase
             for (uriString in distinctSorted) {
                 try {
                     if (uriString.startsWith("file:")) {
-                        val path = Uri.parse(uriString).path ?: continue
+                        val path = uriString.toUri().path ?: continue
                         val dir = File(path)
                         if (!dir.isDirectory) continue
                         val listed =
@@ -336,7 +337,7 @@ class UndoRunUseCase
                         }
                         continue
                     }
-                    val folderUri = Uri.parse(uriString)
+                    val folderUri = uriString.toUri()
                     val folderDoc =
                         try {
                             DocumentFile.fromSingleUri(context, folderUri)
@@ -379,7 +380,7 @@ class UndoRunUseCase
             val folderPaths = mutableSetOf<String>()
             for (uriStr in deletedFileUriStrings) {
                 if (!uriStr.startsWith("file:")) continue
-                val filePath = Uri.parse(uriStr).path ?: continue
+                val filePath = uriStr.toUri().path ?: continue
                 val file = File(filePath)
                 var parent = file.parentFile ?: continue
                 while (true) {
@@ -433,12 +434,12 @@ class UndoRunUseCase
 
         private fun documentPathDepth(uriString: String): Int {
             if (uriString.startsWith("file:")) {
-                val path = Uri.parse(uriString).path ?: return 0
+                val path = uriString.toUri().path ?: return 0
                 return path.trimEnd('/').count { it == '/' }
             }
             if (!uriString.startsWith("content://")) return 0
             return try {
-                val docId = DocumentsContract.getDocumentId(Uri.parse(uriString))
+                val docId = DocumentsContract.getDocumentId(uriString.toUri())
                 val path = docId.substringAfter(':', "")
                 path.count { it == '/' }
             } catch (_: Exception) {
@@ -449,7 +450,7 @@ class UndoRunUseCase
         private fun parentSourceFolderForUndo(sourceUriString: String): String? {
             if (sourceUriString.startsWith("content://")) return parentTreeUriString(sourceUriString)
             if (sourceUriString.startsWith("file:")) {
-                val path = Uri.parse(sourceUriString).path ?: return null
+                val path = sourceUriString.toUri().path ?: return null
                 val parent = File(path).parentFile ?: return null
                 return normalizeFilesystemFolderPath(parent.absolutePath)
             }
@@ -464,7 +465,7 @@ class UndoRunUseCase
         private fun parentTreeUriString(documentUriString: String): String? {
             if (!documentUriString.startsWith("content://")) return null
             return try {
-                val parsed = Uri.parse(documentUriString)
+                val parsed = documentUriString.toUri()
                 val docAuthority = parsed.authority ?: return null
                 val docId = DocumentsContract.getDocumentId(parsed)
                 val relativePath = docId.substringAfter(":", "")

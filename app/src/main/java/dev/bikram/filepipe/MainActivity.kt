@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
@@ -131,6 +132,7 @@ class MainActivity : ComponentActivity() {
         val sourceIntent = intent ?: return
         val ruleId = sourceIntent.getLongExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID, -1L)
         if (ruleId != -1L) {
+            ShortcutManagerCompat.reportShortcutUsed(this, "rule_$ruleId")
             pendingShortcutRepository.requestRunRule(ruleId)
             sourceIntent.removeExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID)
         }
@@ -158,9 +160,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleOpenSettingsUpdatesIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES, false) == true) {
+        val sourceIntent = intent ?: return
+        if (sourceIntent.getBooleanExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES, false)) {
             pendingShortcutRepository.requestOpenSettingsForUpdates()
-            intent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES)
+            sourceIntent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES)
         }
     }
 }

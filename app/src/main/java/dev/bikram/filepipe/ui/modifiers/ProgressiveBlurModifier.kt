@@ -214,35 +214,37 @@ fun Modifier.progressiveBlur(
     )
 
 /** Blur for [LazyColumn] under a transparent [LargeTopAppBar] (app bar is a sibling, not blurred). */
-fun ProgressiveBlurStyle.applyToScrollableList(
+fun Modifier.progressiveBlurScrollableList(
+    style: ProgressiveBlurStyle,
     topAlphaMultiplier: Float = 1f,
     bottomAlphaMultiplier: Float = 1f,
 ): Modifier =
-    Modifier.progressiveBlur(
-        blurRadius = blurRadius,
-        topHeight = topHeightPx,
-        bottomHeight = bottomHeightPx,
+    progressiveBlur(
+        blurRadius = style.blurRadius,
+        topHeight = style.topHeightPx,
+        bottomHeight = style.bottomHeightPx,
         showGradientOverlay = true,
-        overlayAlpha = overlayAlpha,
-        overlayAlphaBottom = overlayAlphaBottom,
-        topBlurProgressPower = topBlurProgressPower,
+        overlayAlpha = style.overlayAlpha,
+        overlayAlphaBottom = style.overlayAlphaBottom,
+        topBlurProgressPower = style.topBlurProgressPower,
         topAlphaMultiplier = topAlphaMultiplier,
         bottomAlphaMultiplier = bottomAlphaMultiplier,
     )
 
 /** Blur for a full-screen layer (y=0 at window top), e.g. rule edit scroll under transparent chrome. */
-fun ProgressiveBlurStyle.applyToFullBleedLayer(
+fun Modifier.progressiveBlurFullBleedLayer(
+    style: ProgressiveBlurStyle,
     topAlphaMultiplier: Float = 1f,
     bottomAlphaMultiplier: Float = 1f,
 ): Modifier =
-    Modifier.progressiveBlur(
-        blurRadius = blurRadius,
-        topHeight = topHeightPx,
-        bottomHeight = bottomHeightPx,
+    progressiveBlur(
+        blurRadius = style.blurRadius,
+        topHeight = style.topHeightPx,
+        bottomHeight = style.bottomHeightPx,
         showGradientOverlay = true,
-        overlayAlpha = overlayAlpha,
-        overlayAlphaBottom = overlayAlphaBottom,
-        topBlurProgressPower = topBlurProgressPower,
+        overlayAlpha = style.overlayAlpha,
+        overlayAlphaBottom = style.overlayAlphaBottom,
+        topBlurProgressPower = style.topBlurProgressPower,
         topAlphaMultiplier = topAlphaMultiplier,
         bottomAlphaMultiplier = bottomAlphaMultiplier,
     )

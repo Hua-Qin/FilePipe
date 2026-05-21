@@ -9,6 +9,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -276,7 +277,7 @@ class SettingsViewModel
             if (uriString.startsWith("content://")) {
                 runCatching {
                     context.contentResolver.takePersistableUriPermission(
-                        Uri.parse(uriString),
+                        uriString.toUri(),
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                     )
                 }
@@ -650,8 +651,9 @@ class SettingsViewModel
                     importRulesUseCase.mergeRulesFromJson(text).fold(
                         onSuccess = { result ->
                             _userMessage.value =
-                                context.getString(
-                                    R.string.settings_import_merge_success,
+                                context.resources.getQuantityString(
+                                    R.plurals.settings_import_merge_success,
+                                    result.rulesAdded,
                                     result.rulesAdded,
                                     result.rulesUpdated,
                                 )
@@ -915,7 +917,7 @@ class SettingsViewModel
         fun openManageAllFilesAccessSettings() {
             val manageIntent =
                 Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = Uri.parse("package:${context.packageName}")
+                    data = "package:${context.packageName}".toUri()
                 }
             manageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             runCatching { context.startActivity(manageIntent) }

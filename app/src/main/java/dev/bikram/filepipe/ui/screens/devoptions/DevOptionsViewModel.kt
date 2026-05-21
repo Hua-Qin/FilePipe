@@ -9,7 +9,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.UriPermission
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.os.PowerManager
@@ -18,6 +17,7 @@ import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -158,7 +158,7 @@ class DevOptionsViewModel
         fun openAppDetails() {
             startActivity(
                 Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.parse("package:${context.packageName}")
+                    data = "package:${context.packageName}".toUri()
                 },
             )
         }
@@ -174,7 +174,7 @@ class DevOptionsViewModel
         fun openManageAllFilesAccessSettings() {
             startActivity(
                 Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = Uri.parse("package:${context.packageName}")
+                    data = "package:${context.packageName}".toUri()
                 },
             )
         }
@@ -382,7 +382,12 @@ class DevOptionsViewModel
                         context.getString(R.string.dev_options_mock_file_operation_file_2),
                         context.getString(R.string.dev_options_mock_file_operation_file_3),
                     )
-                val body = context.getString(R.string.history_files_moved, movedFileNames.size)
+                val body =
+                    context.resources.getQuantityString(
+                        R.plurals.history_files_moved,
+                        movedFileNames.size,
+                        movedFileNames.size,
+                    )
                 val style =
                     NotificationCompat
                         .InboxStyle()
@@ -571,7 +576,11 @@ class DevOptionsViewModel
                     ),
                     DevOptionsInfoRow(
                         R.string.dev_options_info_backup_destinations,
-                        context.getString(R.string.dev_options_value_configured_count_format, backupDestinations),
+                        context.resources.getQuantityString(
+                            R.plurals.dev_options_value_configured_count_format,
+                            backupDestinations,
+                            backupDestinations,
+                        ),
                     ),
                 )
             val database =
@@ -579,7 +588,11 @@ class DevOptionsViewModel
                     add(
                         DevOptionsInfoRow(
                             R.string.dev_options_info_rules,
-                            context.getString(R.string.dev_options_value_total_count_format, ruleDao.countRules()),
+                            context.resources.getQuantityString(
+                                R.plurals.dev_options_value_total_count_format,
+                                ruleDao.countRules(),
+                                ruleDao.countRules(),
+                            ),
                         ),
                     )
                     add(DevOptionsInfoRow(R.string.dev_options_info_enabled_rules, "${ruleDao.countEnabledRules()}"))
@@ -587,7 +600,11 @@ class DevOptionsViewModel
                     add(
                         DevOptionsInfoRow(
                             R.string.dev_options_info_history_runs,
-                            context.getString(R.string.dev_options_value_total_count_format, runHistoryDao.countHistory()),
+                            context.resources.getQuantityString(
+                                R.plurals.dev_options_value_total_count_format,
+                                runHistoryDao.countHistory(),
+                                runHistoryDao.countHistory(),
+                            ),
                         ),
                     )
                     historyByStatus.forEach { (status, count) ->
@@ -668,7 +685,6 @@ class DevOptionsViewModel
         }
 
         private fun ensureFileOperationChannels() {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (notificationManager.getNotificationChannel(FileOrganizerWorker.CHANNEL_ID) == null) {
                 notificationManager.createNotificationChannel(
@@ -713,10 +729,15 @@ class DevOptionsViewModel
             if (configuredRules == 0) {
                 context.getString(R.string.dev_options_value_no_scheduled_rules)
             } else if (states.isEmpty()) {
-                context.getString(R.string.dev_options_value_no_per_rule_workers_format, configuredRules)
+                context.resources.getQuantityString(
+                    R.plurals.dev_options_value_no_per_rule_workers_format,
+                    configuredRules,
+                    configuredRules,
+                )
             } else {
-                context.getString(
-                    R.string.dev_options_value_configured_worker_states_format,
+                context.resources.getQuantityString(
+                    R.plurals.dev_options_value_configured_worker_states_format,
+                    configuredRules,
                     configuredRules,
                     states
                         .groupingBy { it }
@@ -737,12 +758,7 @@ class DevOptionsViewModel
                 isDevReleaseMock = true,
             )
 
-        private fun allFilesAccessGranted(): String =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                Environment.isExternalStorageManager().toString()
-            } else {
-                context.getString(R.string.dev_options_value_not_supported)
-            }
+        private fun allFilesAccessGranted(): String = Environment.isExternalStorageManager().toString()
 
         private fun buildFolderAccess(
             uriPermissions: List<UriPermission>,
@@ -852,25 +868,20 @@ class DevOptionsViewModel
                 else -> context.getString(R.string.dev_options_saf_access_none)
             }
 
-        private fun allFilesAccessStatusLabel(): String {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
-                return context.getString(R.string.dev_options_value_not_required)
-            }
-            return if (Environment.isExternalStorageManager()) {
+        private fun allFilesAccessStatusLabel(): String =
+            if (Environment.isExternalStorageManager()) {
                 context.getString(R.string.dev_options_folder_access_granted)
             } else {
                 context.getString(R.string.dev_options_folder_access_missing)
             }
-        }
 
-        @Suppress("DEPRECATION")
         private fun installerPackageName(): String =
             runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
-                } else {
-                    context.packageManager.getInstallerPackageName(context.packageName)
-                }.orEmpty().ifBlank { unknownValue() }
+                context.packageManager
+                    .getInstallSourceInfo(context.packageName)
+                    .installingPackageName
+                    .orEmpty()
+                    .ifBlank { unknownValue() }
             }.getOrDefault(unknownValue())
 
         private fun formatInstant(epochMillis: Long): String = runCatching { Instant.ofEpochMilli(epochMillis).toString() }.getOrDefault(unknownValue())

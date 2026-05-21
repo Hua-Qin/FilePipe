@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.core.net.toUri
 import dev.bikram.filepipe.data.storage.absoluteStoragePathToTreeUri
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.theme.compactControlShape
@@ -43,12 +44,12 @@ fun displayPath(
     internalStorageRootDisplayName: String,
 ): String {
     if (path.startsWith("file://")) {
-        val filePath = Uri.parse(path).path ?: path.removePrefix("file://")
+        val filePath = path.toUri().path ?: path.removePrefix("file://")
         return displayPath(filePath, internalStorageRootDisplayName)
     }
     if (path.startsWith("content://")) {
         return try {
-            val docId = DocumentsContract.getTreeDocumentId(Uri.parse(path))
+            val docId = DocumentsContract.getTreeDocumentId(path.toUri())
             val relative = docId.substringAfter(":", "")
             when {
                 relative.isBlank() && docId.startsWith("primary", ignoreCase = true) ->
@@ -96,7 +97,7 @@ fun previewSourceFolderDisplayPath(
     if (trimmed.startsWith("content://")) {
         val parentTreeUri =
             runCatching {
-                val uri = Uri.parse(trimmed)
+                val uri = trimmed.toUri()
                 val authority = uri.authority ?: return@runCatching null
                 val documentId =
                     when {
@@ -115,7 +116,7 @@ fun previewSourceFolderDisplayPath(
 
     val path =
         if (trimmed.startsWith("file://")) {
-            Uri.parse(trimmed).path ?: trimmed.removePrefix("file://")
+            trimmed.toUri().path ?: trimmed.removePrefix("file://")
         } else {
             trimmed
         }
@@ -141,7 +142,7 @@ fun absoluteStoragePathToOpenTreeInitialUri(path: String): Uri? {
     if (path.startsWith("content://")) {
         // Already a SAF URI — just wrap as a document URI for the picker hint
         return try {
-            val treeUri = Uri.parse(path)
+            val treeUri = path.toUri()
             val documentId = DocumentsContract.getTreeDocumentId(treeUri)
             DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
         } catch (_: Exception) {

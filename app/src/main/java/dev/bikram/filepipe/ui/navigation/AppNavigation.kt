@@ -1226,9 +1226,9 @@ private fun FloatingNavBar(
     items: List<BottomNavItem>,
     currentDestination: NavDestination?,
     onItemClick: (BottomNavItem) -> Unit,
-    leadingFab: (@Composable () -> Unit)? = null,
     fabContent: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    leadingFab: (@Composable () -> Unit)? = null,
 ) {
     CenteredPillWithSideFab(
         pill = {

@@ -51,13 +51,13 @@ val hasReleaseSigning =
 extensions.configure<ApplicationExtension>("android") {
     val filePipeApplicationId = "dev.bikram.filepipe"
     namespace = filePipeApplicationId
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = filePipeApplicationId
         minSdk = 31
-        targetSdk = 36
-        versionCode = 350
-        versionName = "3.5.0"
+        targetSdk = 37
+        versionCode = 370
+        versionName = "3.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

@@ -61,8 +61,8 @@ fun PermissionsLearnMoreSheetContent(scheme: ColorScheme) {
 /** "All files access" block from the learn-more article (for FAQ expandable card). */
 @Composable
 fun FolderAccessLearnMoreFullModeSection(
-    scheme: ColorScheme = MaterialTheme.colorScheme,
     modifier: Modifier = Modifier,
+    scheme: ColorScheme = MaterialTheme.colorScheme,
     /** When false, omits the large mode title (card header already shows it). */
     showModeTitleInBody: Boolean = true,
 ) {
@@ -77,8 +77,8 @@ fun FolderAccessLearnMoreFullModeSection(
 /** "Selective access" block from the learn-more article (for FAQ expandable card). */
 @Composable
 fun FolderAccessLearnMoreSelectiveModeSection(
-    scheme: ColorScheme = MaterialTheme.colorScheme,
     modifier: Modifier = Modifier,
+    scheme: ColorScheme = MaterialTheme.colorScheme,
     showModeTitleInBody: Boolean = true,
 ) {
     Column(modifier = modifier) {

@@ -3,6 +3,7 @@ package dev.bikram.filepipe.domain.usecase
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
@@ -118,7 +119,7 @@ class ExportRulesUseCase
             fileName: String,
             json: String,
         ): Result<Unit> {
-            val destinationUri = Uri.parse(destinationUriString)
+            val destinationUri = destinationUriString.toUri()
             return runCatching {
                 if (DocumentsContract.isTreeUri(destinationUri)) {
                     val docTreeUri =

@@ -1,7 +1,6 @@
 package dev.bikram.filepipe.ui.screens.onboarding
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Environment
 import android.provider.Settings
 import androidx.compose.animation.AnimatedVisibility
@@ -83,6 +82,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -258,7 +258,7 @@ fun OnboardingPermissionsScreen(
                                         showAccessNotGrantedHint = false
                                         val manageIntent =
                                             Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                                data = Uri.parse("package:${context.packageName}")
+                                                data = "package:${context.packageName}".toUri()
                                             }
                                         context.startActivity(manageIntent)
                                     },

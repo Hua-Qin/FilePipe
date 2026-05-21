@@ -13,6 +13,7 @@ import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.materialSymbolName
 import javax.inject.Inject
 import kotlin.math.roundToInt
+import androidx.core.graphics.createBitmap as createEmptyBitmap
 
 class RuleShortcutIconFactory
     @Inject
@@ -24,7 +25,7 @@ class RuleShortcutIconFactory
         private fun createBitmap(rule: Rule): Bitmap {
             val density = context.resources.displayMetrics.density
             val iconSizePixels = (ICON_SIZE_DP * density).roundToInt()
-            val bitmap = Bitmap.createBitmap(iconSizePixels, iconSizePixels, Bitmap.Config.ARGB_8888)
+            val bitmap = createEmptyBitmap(iconSizePixels, iconSizePixels, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
 
             canvas.drawColor(SHORTCUT_BACKGROUND_COLOR)

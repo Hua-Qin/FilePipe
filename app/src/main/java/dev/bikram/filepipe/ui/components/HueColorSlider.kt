@@ -13,6 +13,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -23,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
+import androidx.core.graphics.toColorInt
 import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
 import java.util.Locale
 import android.graphics.Color as AndroidColor
@@ -40,7 +42,7 @@ fun HueColorSlider(
     val fallbackHex = colorHexFromHue(fallbackHue)
     val normalizedHex = normalizeCustomSeedHexOrNull(selectedHex.orEmpty()) ?: fallbackHex
     var hue by rememberSaveable(normalizedHex) {
-        mutableStateOf(hueFromHexColor(normalizedHex) ?: fallbackHue)
+        mutableFloatStateOf(hueFromHexColor(normalizedHex) ?: fallbackHue)
     }
     var currentHex by rememberSaveable(normalizedHex) { mutableStateOf(normalizedHex) }
     val currentColor = colorFromHexOrDefault(currentHex, fallbackHue)
@@ -108,7 +110,7 @@ fun hueFromHexColor(hex: String): Float? {
     val normalized = normalizeCustomSeedHexOrNull(hex) ?: return null
     val hsv = FloatArray(3)
     return runCatching {
-        AndroidColor.colorToHSV(AndroidColor.parseColor(normalized), hsv)
+        AndroidColor.colorToHSV(normalized.toColorInt(), hsv)
         hsv[0]
     }.getOrNull()
 }
@@ -123,7 +125,7 @@ fun colorFromHexOrDefault(
     fallbackHue: Float = 270f,
 ): Color {
     val colorInt =
-        runCatching { AndroidColor.parseColor(hex) }
+        runCatching { hex.toColorInt() }
             .getOrDefault(AndroidColor.HSVToColor(floatArrayOf(fallbackHue, 0.72f, 0.96f)))
     return Color(colorInt)
 }

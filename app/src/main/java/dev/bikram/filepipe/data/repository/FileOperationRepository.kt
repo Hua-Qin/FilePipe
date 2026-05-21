@@ -70,7 +70,7 @@ class FileOperationRepository
 
                 if (!folderUriString.startsWith("content://")) return@withContext emptyList()
 
-                val treeUri = Uri.parse(folderUriString)
+                val treeUri = folderUriString.toUri()
                 val folder =
                     try {
                         DocumentFile.fromTreeUri(context, treeUri)
@@ -461,7 +461,7 @@ class FileOperationRepository
                 )
             }
             val destTree =
-                DocumentFile.fromTreeUri(context, Uri.parse(destFolderUriString))
+                DocumentFile.fromTreeUri(context, destFolderUriString.toUri())
                     ?: return FileMoved(
                         fileName = sourceEntry.name,
                         sourceUri = sourceEntry.uri.toString(),
@@ -700,7 +700,7 @@ class FileOperationRepository
             operationMode: OperationMode,
             destFoldersCreatedCollector: MutableCollection<String>?,
         ): FileMoved {
-            val destTree = DocumentFile.fromTreeUri(context, Uri.parse(destFolderUriString))
+            val destTree = DocumentFile.fromTreeUri(context, destFolderUriString.toUri())
             if (destTree == null || !destTree.exists() || !destTree.canWrite()) {
                 return FileMoved(
                     fileName = sourceEntry.name,
@@ -1029,7 +1029,7 @@ class FileOperationRepository
         ): PreviewFileResult {
             val destTree =
                 try {
-                    DocumentFile.fromTreeUri(context, Uri.parse(destFolderUriString))
+                    DocumentFile.fromTreeUri(context, destFolderUriString.toUri())
                 } catch (_: IllegalArgumentException) {
                     null
                 } catch (_: SecurityException) {
@@ -1169,7 +1169,7 @@ class FileOperationRepository
                     }
                     folderPathOrUri.startsWith("content://") ->
                         try {
-                            val document = DocumentFile.fromTreeUri(context, Uri.parse(folderPathOrUri))
+                            val document = DocumentFile.fromTreeUri(context, folderPathOrUri.toUri())
                             when {
                                 document == null -> FolderAccessResult.Unavailable
                                 !document.exists() -> FolderAccessResult.Unavailable

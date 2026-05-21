@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.PowerManager
 import android.os.SystemClock
+import android.os.storage.StorageManager
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import dev.bikram.filepipe.BuildConfig
@@ -142,14 +143,28 @@ object DiagnosticLog {
             ),
         )
         appendLine(context.getString(R.string.diagnostics_installer_format, installerPackageName(context)))
-        appendLine(context.getString(R.string.diagnostics_files_dir_space_format, context.filesDir.usableSpace))
-        appendLine(context.getString(R.string.diagnostics_cache_dir_space_format, context.cacheDir.usableSpace))
+        val filesDirAllocatableBytes = allocatableBytes(context, context.filesDir)
+        appendLine(
+            context.resources.getQuantityString(
+                R.plurals.diagnostics_files_dir_space_format,
+                filesDirAllocatableBytes.toInt(),
+                filesDirAllocatableBytes,
+            ),
+        )
+        val cacheDirAllocatableBytes = allocatableBytes(context, context.cacheDir)
+        appendLine(
+            context.resources.getQuantityString(
+                R.plurals.diagnostics_cache_dir_space_format,
+                cacheDirAllocatableBytes.toInt(),
+                cacheDirAllocatableBytes,
+            ),
+        )
         appendLine(context.getString(R.string.diagnostics_external_storage_state_format, Environment.getExternalStorageState()))
         appendLine()
         appendDiagnosticSection(context.getString(R.string.diagnostics_section_permissions_app_access))
         appendLine(context.getString(R.string.diagnostics_notifications_enabled_format, notificationManagerCompat.areNotificationsEnabled().toString()))
         appendLine(context.getString(R.string.diagnostics_post_notifications_granted_format, postNotificationsGranted(context)))
-        appendLine(context.getString(R.string.diagnostics_all_files_access_granted_format, allFilesAccessGranted(context)))
+        appendLine(context.getString(R.string.diagnostics_all_files_access_granted_format, allFilesAccessGranted()))
         appendLine(
             context.getString(
                 R.string.diagnostics_ignoring_battery_optimizations_format,
@@ -208,7 +223,6 @@ object DiagnosticLog {
     }
 
     private fun StringBuilder.appendNotificationChannels(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channels =
             runCatching {
@@ -235,6 +249,16 @@ object DiagnosticLog {
         }
     }
 
+    private fun allocatableBytes(
+        context: Context,
+        directory: File,
+    ): Long {
+        val storageManager = context.getSystemService(StorageManager::class.java) ?: return directory.usableSpace
+        return runCatching {
+            storageManager.getAllocatableBytes(storageManager.getUuidForPath(directory))
+        }.getOrDefault(directory.usableSpace)
+    }
+
     private fun postNotificationsGranted(context: Context): String =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             (
@@ -245,21 +269,15 @@ object DiagnosticLog {
             context.getString(R.string.diagnostics_value_not_required)
         }
 
-    private fun allFilesAccessGranted(context: Context): String =
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Environment.isExternalStorageManager().toString()
-        } else {
-            context.getString(R.string.diagnostics_value_not_supported)
-        }
+    private fun allFilesAccessGranted(): String = Environment.isExternalStorageManager().toString()
 
-    @Suppress("DEPRECATION")
     private fun installerPackageName(context: Context): String =
         runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
-            } else {
-                context.packageManager.getInstallerPackageName(context.packageName)
-            }.orEmpty().ifBlank { unknownValue(context) }
+            context.packageManager
+                .getInstallSourceInfo(context.packageName)
+                .installingPackageName
+                .orEmpty()
+                .ifBlank { unknownValue(context) }
         }.getOrDefault(unknownValue(context))
 
     private fun redactedLocation(
