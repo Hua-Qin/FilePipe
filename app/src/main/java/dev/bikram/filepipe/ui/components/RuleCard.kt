@@ -313,7 +313,7 @@ private fun CompactContent(
     val runBlocked = isAnyRuleRunning && progress == null
 
     val typesText =
-        rule.fileExtensions.take(4).joinToString(" · ") +
+        rule.fileExtensions.take(4).map { it.removePrefix(".") }.joinToString(" · ") +
             if (rule.fileExtensions.size > 4) " +${rule.fileExtensions.size - 4}" else ""
     val destText = displayPath(rule.destinationFolderPath, internalStorageDisplayName).takeIf { it.isNotBlank() } ?: ""
     val infoText = listOf(typesText, destText).filter { it.isNotBlank() }.joinToString("  |  ")
@@ -599,7 +599,7 @@ private fun ExpandedContent(
                         FilePipeFilterChip(
                             selected = true,
                             onClick = {},
-                            label = { Text(extension, style = MaterialTheme.typography.bodyMedium) },
+                            label = { Text(extension.removePrefix("."), style = MaterialTheme.typography.bodyMedium) },
                             colors =
                                 FilterChipDefaults.filterChipColors(
                                     selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,

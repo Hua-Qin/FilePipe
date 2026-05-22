@@ -204,7 +204,7 @@ private fun TemplateCard(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = template.extensions.joinToString(", "),
+                    text = template.extensions.map { it.removePrefix(".") }.joinToString(", "),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

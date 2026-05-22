@@ -64,6 +64,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -475,13 +476,21 @@ fun RulesScreen(
                                         shape = pillShape,
                                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                                     ) {
-                                        Text(stringResource(R.string.run_button))
+                                        Text(
+                                            text = stringResource(R.string.run_button),
+                                            style = MaterialTheme.typography.labelLarge.copy(
+                                                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                                            ),
+                                            modifier = Modifier.align(Alignment.CenterVertically),
+                                        )
                                         Spacer(Modifier.width(6.dp))
                                         FilePipeMaterialRoundedSymbol(
                                             name = "play_arrow",
                                             contentDescription = null,
-                                            size = 16.dp,
-                                            modifier = Modifier.size(16.dp),
+                                            size = 18.dp,
+                                            modifier = Modifier
+                                                .offset(x = 1.dp)
+                                                .align(Alignment.CenterVertically),
                                         )
                                     }
                                 }

@@ -64,6 +64,26 @@ private data class BreadcrumbSegment(
     val path: String,
 )
 
+private data class FolderPickerDirectoryEntry(
+    val name: String,
+    val path: String,
+    val listKey: String,
+)
+
+private fun folderPickerDirectoryEntry(file: File): FolderPickerDirectoryEntry? {
+    if (!file.isDirectory || !file.canRead() || file.name.startsWith(".")) return null
+    val resolvedPath =
+        runCatching { file.canonicalFile.absolutePath }
+            .getOrElse { file.absolutePath }
+    val normalized = normalizeFilesystemFolderPath(resolvedPath) ?: return null
+    if (!isFilesystemFolderPathAllowedForRules(normalized)) return null
+    return FolderPickerDirectoryEntry(
+        name = file.name,
+        path = normalized,
+        listKey = normalized,
+    )
+}
+
 private fun buildBreadcrumbSegments(
     canonicalPath: String,
     primaryRoot: String,
@@ -145,14 +165,17 @@ fun FilesystemFolderPickerSheetContent(
             buildBreadcrumbSegments(currentPath, primaryRoot, internalStorageLabel, sdCardLabel)
         }
 
-    var childDirectories by remember(currentPath, childListRefreshKey) { mutableStateOf<List<File>>(emptyList()) }
+    var childDirectories by remember(currentPath, childListRefreshKey) {
+        mutableStateOf<List<FolderPickerDirectoryEntry>>(emptyList())
+    }
     LaunchedEffect(currentPath, childListRefreshKey) {
         childDirectories =
             withContext(Dispatchers.IO) {
                 File(currentPath)
                     .listFiles()
-                    ?.filter { file -> file.isDirectory && file.canRead() && !file.name.startsWith(".") }
-                    ?.sortedBy { child -> child.name.lowercase() }
+                    ?.mapNotNull(::folderPickerDirectoryEntry)
+                    ?.distinctBy { entry -> entry.listKey }
+                    ?.sortedBy { entry -> entry.name.lowercase() }
                     ?: emptyList()
             }
     }
@@ -327,12 +350,12 @@ fun FilesystemFolderPickerSheetContent(
                         .fillMaxWidth()
                         .heightIn(max = 360.dp),
             ) {
-                items(childDirectories, key = { it.canonicalPath }) { child ->
+                items(childDirectories, key = { entry -> entry.listKey }) { entry ->
                     ListItem(
                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                         headlineContent = {
                             Text(
-                                text = child.name,
+                                text = entry.name,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -348,13 +371,7 @@ fun FilesystemFolderPickerSheetContent(
                         },
                         modifier =
                             Modifier.tapSoundClickable {
-                                runCatching { child.canonicalFile.absolutePath }
-                                    .getOrNull()
-                                    ?.let { canonicalChild ->
-                                        if (isFilesystemFolderPathAllowedForRules(canonicalChild)) {
-                                            currentPath = canonicalChild
-                                        }
-                                    }
+                                currentPath = entry.path
                             },
                     )
                 }

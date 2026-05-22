@@ -1,3 +1,39 @@
+## v3.7.0 - Rule trash, color slider, expressive refresh
+
+### ✨ New Features
+
+- **Rule Trash** - Deleted rules go to Trash first. Restore them from History → Trash within 30 days, or delete forever.
+- **Preview multiple rules** - Select several rules and preview matching files for each before batch running.
+- **Richer run details** - History run pages show file thumbnails where possible, with open/share actions.
+- **Custom theme live preview** - New color slider with live preview to help you choose a custom color for the theme.
+- **Cloud backup folder** - Set a second backup destination alongside your local one.
+- **Share diagnostic log** - Export a diagnostic log from settings to help troublsehoot any issue.
+- **Developer options** - Hidden tools screen for debugging and testing.
+- **More from Bikram** - About section now showcases my other apps.
+
+### 🔧 Improved Features
+
+- **Flexible Extension Input** - Add multiple file extensions at once. Separate them with commas, semicolons, or spaces, and enter them with or without a leading dot (e.g. `jpg, png, .mp3`).
+- **Subfolder controls** - "Scan subfolders" and "Mirror subfolders to destination" are now separate toggles.
+- **Auto-export** - More reliable backup-on-exit; writes to all configured folders and retries after a failed export.
+- **Help content** - FAQ restructured to load from updated [in-app help document](./HELP.md).
+- **Onboarding** - Permissions screen during onboarding improved with easier layout and a beautiful graphic.
+- **Updated look** - Material Symbols icons and more Material 3 Expressive styling across the app.
+- **Smarter navigation** - Side rail on tablets and wide screens; bottom bar on phones.
+- **Update UI** - Big update banner at top replaced with a small update bar at bottom and a floating Update button.
+- **Animations** - Smoother transitions; respects Android reduced-motion setting.
+
+### 🐛 Bug Fixes
+
+- Fixed long-press on a rule's action buttons accidentally entering multi-select.
+
+### 📦 Others
+
+- Requires Android 12+ (minimum SDK raised).
+- Targets Android API 37.
+
+---
+
 ## v3.1.1 UI consistency
 
 ### 🔧 Improved Features

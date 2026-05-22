@@ -1858,14 +1858,18 @@ fun RuleDetailScreen(
     if (pendingFilesystemFolderPick != null) {
         val pickRequest = pendingFilesystemFolderPick!!
         val pickedIntent = pickRequest.intent
+        val folderPickerSheetState =
+            rememberBottomSheetState(
+                initialValue = SheetValue.Hidden,
+                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            )
+        LaunchedEffect(pickRequest) {
+            folderPickerSheetState.expand()
+        }
         AppBottomSheet(
             title = stringResource(R.string.filesystem_folder_picker_title),
             onDismiss = { pendingFilesystemFolderPick = null },
-            sheetState =
-                rememberBottomSheetState(
-                    initialValue = SheetValue.Hidden,
-                    enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-                ),
+            sheetState = folderPickerSheetState,
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             scrollable = false,
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
@@ -2138,7 +2142,7 @@ fun RuleDetailScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(template.name, style = MaterialTheme.typography.titleSmall)
                             Text(
-                                template.extensions.joinToString(" · "),
+                                template.extensions.map { it.removePrefix(".") }.joinToString(", "),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

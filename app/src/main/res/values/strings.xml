@@ -869,4 +869,11 @@
     <string name="faq_no_results_body">Try a simpler search, or browse the sections below without a filter</string>
     <string name="faq_action_switch_full_access">Switch mode in Settings</string>
     <string name="faq_action_notification_settings">Open notification settings</string>
+
+    <!-- File type dialog strings -->
+    <string name="file_type_dialog_title">Add file type</string>
+    <string name="file_type_dialog_label">File extensions</string>
+    <string name="file_type_dialog_placeholder">jpg, png, mp3</string>
+    <string name="file_type_dialog_supporting_text">Separate extensions with commas</string>
+    <string name="file_type_dialog_add">Add</string>
 </resources>
