@@ -1,0 +1,152 @@
+# FilePipe Help
+
+## Fix common issues
+
+### Fix a rule that isn't working
+- Give the rule a name, source folders, destination folder, and file types.
+- Tap any highlighted folder path on the edit screen and grant access again.
+- If the rule uses Download folder or a storage root, switch to **All files access** in Settings.
+
+### Fix "Folders need attention" errors
+- Common after changing **Selective access** vs **All files access**, restoring a backup, or revoking a folder grant.
+- Open **Edit rule**, tap the highlighted path, and pick the folder again in the folder picker.
+- Download folder and storage roots need **All files access**.
+- Red highlights mean the rule cannot run correctly until the folder problem is fixed.
+- Amber highlights mean a source folder is missing or unavailable. The rule can still be saved, but that source will not be scanned.
+
+### Why does my rule icon have an amber/red ring?
+- A ring on a collapsed rule card means one or more folders need attention.
+- Amber means only a source folder is missing or unavailable. Turn on **Hide missing source folder warnings** in the rule editor if you do not want that reminder on the Rules tab.
+- Red means access was lost, the destination has a problem, or the folder cannot be used in the current access mode.
+
+### Can't add the Download folder?
+- In **Selective access**, Android blocks the Download folder and some storage roots.
+- Turn on **All files access** in Settings, then add the folder, or pick a subfolder inside Download with the picker.
+
+### Files not moving?
+- Confirm the rule is enabled and has a schedule set.
+- Check folder access — tap any highlighted path in the rule editor and grant access again or pick a replacement folder.
+- Review advanced filters: size, age, or filename pattern may be excluding files you expect to match.
+- Check battery restrictions for FilePipe in Android settings.
+
+---
+
+## Getting started
+
+### How do I create a rule?
+- Tap **+** on the Rules tab to start a new rule.
+- Pick source folders, file types (enter manually or use template), and a destination folder.
+- Choose **Move** or **Copy**, and set how to handle duplicate files in the destination.
+- Use advanced filters to match by filename pattern, size range, or file age.
+- Save, then tap **Preview** 👁️ to see which files would be affected before committing.
+- Add a schedule if you want the rule to run automatically in the background.
+
+### What are templates?
+- Templates are pre-built rule starting points for common use cases: screenshots, videos, downloads, documents, and more.
+- On any rule's page, tap the "Use template" button and choose a template to automatically fill extensions and in some cases, sources.
+- Customise any template just like a regular rule.
+
+### How do I run a rule manually?
+- Tap a rule on the Rules tab and use the **Run** action.
+- Use **Preview** first if you want to see which files match before the rule acts on them.
+
+---
+
+## Storage access modes
+
+### All files access
+- Lets FilePipe work with Downloads, storage roots, and plain file paths.
+- Best when rules need broad file access or restored rules point to paths Android will not expose through the folder picker.
+
+### Selective access
+- Lets FilePipe see only folders you choose in the Android folder picker.
+- Good for narrow, private rules where you only want to grant specific folders.
+- Download and some storage roots may be blocked by Android in this mode.
+
+---
+
+## Managing rules
+
+### Why is my rule skipping files?
+- The file may not match the extensions or advanced filters.
+- **Conflict setting** controls what happens when a file with the same name already exists in the destination: **Skip** leaves it untouched, **Overwrite** replaces it, **Rename** keeps both by adding a suffix to the incoming filename.
+- Lost folder access can hide files until you grant access again.
+
+### What does preview do?
+- Preview lists files the rule would act on.
+- Nothing is moved or copied until you run the rule for real.
+- Use it to check filters, destination, and access before you rely on the rule.
+
+### Can rules scan subfolders?
+- Yes — enable **Include subfolders** on a source folder in the rule editor.
+- The destination can optionally recreate the source subfolder structure so files land in matching subdirectories.
+
+---
+
+## History & undo
+
+### What is in History?
+- History records every rule run: which files matched, what happened to each, and whether it succeeded.
+- Runs are grouped by date and rule. Tap a run to see per-file details.
+- Open the History tab to review past runs and access undo for any operation.
+
+### How do I undo a rule run?
+- Tap **Undo** in the run notification to reverse the last move instantly.
+- Open the **History** tab, tap a completed run, and use the undo option there.
+
+---
+
+## Automation & scheduling
+
+### How do scheduled rules work?
+- Scheduled rules run in the background at the interval you configure: hourly, daily, or weekly.
+- They still need valid folder access and files that match the rule.
+- Use **Preview** after changes so automation matches what you expect.
+
+### Not getting scheduled run notifications?
+- Make sure FilePipe has notification permission granted in Android settings.
+- Enable run notifications in the FilePipe Settings screen.
+- Battery saver and background restrictions can suppress or delay notifications — exclude FilePipe in battery settings if needed.
+
+### Why did my rule not run?
+- Confirm the schedule and the rule are both enabled.
+- Android battery limits and notification settings can block or delay background work.
+- Recheck folder access and that matching files still exist.
+
+---
+
+## Backup & restore
+
+### What gets backed up?
+- Backups include rules, run history, and settings.
+- Android does not restore folder grants from a backup.
+- After restore, revisit rules with highlighted paths and grant again.
+
+### Can I schedule automatic backups?
+- Yes — open Settings and enable the auto-export option to back up your rules on a schedule.
+- Backups are saved to a folder you choose and can be shared or archived.
+
+### What do I fix after restore?
+- For **Selective access**, tap each affected folder and grant again.
+- If rules used **All files access**, turn that back on in Android settings.
+- Red highlights mean access must be restored or the folder choice must change.
+- Amber highlights mean only a source folder is missing or unavailable. Recreate the folder, pick a replacement, or hide that missing-source warning for the rule.
+
+---
+
+## Customization
+
+### Theme and appearance
+- Choose **Light**, **Dark**, **OLED black**, or **System** mode.
+- **OLED black** uses a true black background — sharper on OLED screens.
+
+### Colors
+- **Material You** pulls colors from your wallpaper on Android 12 and above, and updates automatically when the wallpaper changes.
+- **Presets** offer hand-tuned color schemes to choose from.
+- **Custom color** lets you enter any hex value. You can save multiple custom colors and switch between them.
+- **Palette style** controls how Material 3 expands your seed color into a full palette — the same color can feel very different across styles.
+
+### Visual effects
+- **Gradient background** blends your primary color into the screen background for depth.
+- **Blur bars** apply a frosted-glass effect behind the top and bottom bars.
+- Effects can be combined or turned off individually in Settings.

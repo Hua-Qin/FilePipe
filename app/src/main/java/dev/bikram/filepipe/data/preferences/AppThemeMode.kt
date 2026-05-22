@@ -4,5 +4,5 @@ enum class AppThemeMode {
     SYSTEM,
     LIGHT,
     DARK,
-    BLACK
+    BLACK,
 }

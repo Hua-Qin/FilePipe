@@ -3,16 +3,16 @@ package dev.bikram.filepipe.data.storage
 import android.content.Context
 import android.net.Uri
 import android.provider.DocumentsContract
+import androidx.core.net.toUri
 
-/**
- * Converts a SAF tree URI (content://.../tree/primary%3ADCIM%2FCamera)
- * to an absolute file system path (/storage/emulated/0/DCIM/Camera).
- */
 /**
  * Derives a persistable tree URI (same format as [androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree])
  * from a document URI returned by [androidx.activity.result.contract.ActivityResultContracts.CreateDocument].
  */
-fun treeUriFromDocumentUri(context: Context, documentUri: Uri): Uri? {
+fun treeUriFromDocumentUri(
+    context: Context,
+    documentUri: Uri,
+): Uri? {
     return try {
         if (!DocumentsContract.isDocumentUri(context, documentUri)) return null
         val authority = documentUri.authority ?: return null
@@ -56,6 +56,20 @@ fun safTreeUriToPath(uri: Uri): String? {
 }
 
 /**
+ * When all-files access is active, maps persisted SAF tree URIs to absolute paths for I/O and access checks.
+ * Returns [folderPathOrUri] unchanged when filesystem access is off or conversion fails.
+ */
+fun folderPathForFilesystemAccess(
+    folderPathOrUri: String,
+    filesystemAccessEnabled: Boolean,
+): String {
+    if (!filesystemAccessEnabled || !folderPathOrUri.startsWith("content://")) {
+        return folderPathOrUri
+    }
+    return safTreeUriToPath(folderPathOrUri.toUri()) ?: folderPathOrUri
+}
+
+/**
  * Normalizes user-facing paths (`/DCIM`, `DCIM/Camera`) to absolute primary emulated storage paths for SAF.
  */
 fun normalizeToAbsoluteStoragePath(path: String): String {
@@ -87,9 +101,4 @@ fun absoluteStoragePathToTreeUri(path: String): Uri? {
     return DocumentsContract.buildTreeDocumentUri(authority, documentId)
 }
 
-/** Resolves template-relative primary paths to persisted-style tree URI strings for rule state. */
-fun primaryRelativePathToTreeUriString(relativePath: String): String? {
-    val absolute = normalizeToAbsoluteStoragePath(relativePath)
-    if (absolute.isEmpty()) return null
-    return absoluteStoragePathToTreeUri(absolute)?.toString()
-}
+

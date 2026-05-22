@@ -11,6 +11,6 @@ interface PlayUpdateSessionHandle {
 interface PlayInAppUpdateStarter {
     fun startUpdateIfPending(
         activity: ComponentActivity,
-        launcher: ActivityResultLauncher<IntentSenderRequest>
+        launcher: ActivityResultLauncher<IntentSenderRequest>,
     ): Boolean
 }

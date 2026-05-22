@@ -10,7 +10,7 @@ sealed interface PlayInAppUpdateBannerUiState {
     data class Downloading(
         val bytesDownloaded: Long,
         val totalBytesToDownload: Long,
-        val indeterminateProgress: Boolean
+        val indeterminateProgress: Boolean,
     ) : PlayInAppUpdateBannerUiState
 
     data object ReadyToInstall : PlayInAppUpdateBannerUiState

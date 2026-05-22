@@ -12,20 +12,17 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import dev.bikram.filepipe.R
 
-/**
- * Profile photo from [R.drawable.me_600] in `res/drawable/`.
- */
 @Composable
 fun AboutAuthorPhoto(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier.background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Image(
             painter = painterResource(R.drawable.me_600),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
         )
     }
 }

@@ -10,32 +10,30 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
-import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.launch
 import dev.bikram.filepipe.ui.InAppRatingAutoPromptHost
 import dev.bikram.filepipe.ui.navigation.AppNavigation
 import dev.bikram.filepipe.ui.theme.FilePipeTheme
 import dev.bikram.filepipe.update.AppReviewLauncher
-import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
     @Inject
     lateinit var userPreferencesRepository: UserPreferencesRepository
 
@@ -48,60 +46,74 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var appReviewLauncher: AppReviewLauncher
 
+    private var isReady = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        splashScreen.setKeepOnScreenCondition { !isReady }
         enableEdgeToEdge()
         handleShortcutIntent(intent)
+        handleOpenHistoryIntent(intent)
         handleOpenHistoryDetailIntent(intent)
         handleOpenSettingsUpdatesIntent(intent)
 
         setContent {
-            val preferences by userPreferencesRepository.preferencesFlow
-                .collectAsStateWithLifecycle(initialValue = AppPreferences.DEFAULT)
+            val preferencesState by userPreferencesRepository.preferencesFlow
+                .collectAsStateWithLifecycle(initialValue = null)
 
-            var introSeenAtLaunch by remember { mutableStateOf<Boolean?>(null) }
-            LaunchedEffect(Unit) {
-                userPreferencesRepository.migrateLegacyEnhancedShadingPreferenceIfNeeded()
-                introSeenAtLaunch = userPreferencesRepository.getPreferencesSnapshot().hasSeenIntro
+            val introSeenAtLaunch = remember(preferencesState != null) {
+                preferencesState?.hasSeenIntro
+            }
+
+            if (preferencesState != null) {
+                isReady = true
             }
 
             SideEffect {
-                val nightMode = when (preferences.themeMode) {
-                    AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
-                    AppThemeMode.DARK, AppThemeMode.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
-                    AppThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                preferencesState?.let { prefs ->
+                    val nightMode =
+                        when (prefs.themeMode) {
+                            AppThemeMode.LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
+                            AppThemeMode.DARK, AppThemeMode.BLACK -> AppCompatDelegate.MODE_NIGHT_YES
+                            AppThemeMode.SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                        }
+                    AppCompatDelegate.setDefaultNightMode(nightMode)
                 }
-                AppCompatDelegate.setDefaultNightMode(nightMode)
             }
 
+            val preferences = preferencesState ?: AppPreferences.DEFAULT
             FilePipeTheme(
                 themeMode = preferences.themeMode,
                 colorSource = preferences.colorSource,
+                savedCustomSeedHexes = preferences.savedCustomSeedHexes,
                 themePaletteStyle = preferences.themePaletteStyle,
                 hapticFeedbackEnabled = preferences.hapticFeedbackEnabled,
-                useGradientBackground = preferences.useGradientBackground,
                 useEnhancedShading = preferences.useEnhancedShading,
-                activeCustomSeedHex = preferences.activeCustomSeedHex
+                activeCustomSeedHex = preferences.activeCustomSeedHex,
+                useGradientBackground = preferences.useGradientBackground,
+                progressiveBlurEnabled = preferences.progressiveBlurEnabled,
             ) {
                 if (introSeenAtLaunch == null) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
-                        color = MaterialTheme.colorScheme.background
+                        color = MaterialTheme.colorScheme.background,
                     ) {
                         Box(Modifier.fillMaxSize())
                     }
                 } else {
+                    val currentPrefs = preferencesState!!
                     InAppRatingAutoPromptHost(
-                        preferences = preferences,
+                        preferences = currentPrefs,
                         activity = this@MainActivity,
                         userPreferencesRepository = userPreferencesRepository,
-                        appReviewLauncher = appReviewLauncher
+                        appReviewLauncher = appReviewLauncher,
                     )
                     AppNavigation(
-                        hasSeenIntro = preferences.hasSeenIntro,
-                        introSeenAtLaunch = introSeenAtLaunch!!,
-                        preferences = preferences,
-                        pendingShortcutRepository = pendingShortcutRepository
+                        hasSeenIntro = currentPrefs.hasSeenIntro,
+                        introSeenAtLaunch = introSeenAtLaunch,
+                        preferences = currentPrefs,
+                        pendingShortcutRepository = pendingShortcutRepository,
                     )
                 }
             }
@@ -112,6 +124,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleShortcutIntent(intent)
+        handleOpenHistoryIntent(intent)
         handleOpenHistoryDetailIntent(intent)
         handleOpenSettingsUpdatesIntent(intent)
     }
@@ -124,28 +137,41 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleShortcutIntent(intent: Intent?) {
-        val ruleId = intent?.getLongExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID, -1L) ?: -1L
+        val sourceIntent = intent ?: return
+        val ruleId = sourceIntent.getLongExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID, -1L)
         if (ruleId != -1L) {
+            ShortcutManagerCompat.reportShortcutUsed(this, "rule_$ruleId")
             pendingShortcutRepository.requestRunRule(ruleId)
+            sourceIntent.removeExtra(AppShortcutsManager.EXTRA_SHORTCUT_RULE_ID)
         }
     }
 
     private fun handleOpenHistoryDetailIntent(intent: Intent?) {
-        val historyId = intent?.getLongExtra(
-            PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID,
-            -1L
-        ) ?: -1L
+        val sourceIntent = intent ?: return
+        val historyId =
+            sourceIntent.getLongExtra(
+                PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID,
+                -1L,
+            )
         if (historyId != -1L) {
             pendingShortcutRepository.requestOpenHistoryDetail(historyId)
-            intent?.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID)
+            sourceIntent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID)
+        }
+    }
+
+    private fun handleOpenHistoryIntent(intent: Intent?) {
+        val sourceIntent = intent ?: return
+        if (sourceIntent.getBooleanExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY, false)) {
+            pendingShortcutRepository.requestOpenHistory()
+            sourceIntent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY)
         }
     }
 
     private fun handleOpenSettingsUpdatesIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES, false) == true) {
+        val sourceIntent = intent ?: return
+        if (sourceIntent.getBooleanExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES, false)) {
             pendingShortcutRepository.requestOpenSettingsForUpdates()
-            intent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES)
+            sourceIntent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES)
         }
     }
 }
-

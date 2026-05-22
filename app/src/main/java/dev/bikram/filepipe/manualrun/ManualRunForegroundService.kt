@@ -6,7 +6,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import dev.bikram.filepipe.R
@@ -17,7 +16,6 @@ import dev.bikram.filepipe.worker.FileOrganizerWorker
  * an in-process manual run ([RulesViewModel]), so the system is less likely to kill the process.
  */
 class ManualRunForegroundService : Service() {
-
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -25,27 +23,28 @@ class ManualRunForegroundService : Service() {
         ensureChannel()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         ensureChannel()
         val title = getString(R.string.notification_running, getString(R.string.app_name))
-        val notification = NotificationCompat.Builder(this, FileOrganizerWorker.CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(getString(R.string.notification_preparing))
-            .setSmallIcon(R.drawable.ic_notification)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setProgress(0, 0, true)
-            .build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            )
-        } else {
-            @Suppress("DEPRECATION")
-            startForeground(NOTIFICATION_ID, notification)
-        }
+        val notification =
+            NotificationCompat
+                .Builder(this, FileOrganizerWorker.CHANNEL_ID)
+                .setContentTitle(title)
+                .setContentText(getString(R.string.notification_preparing))
+                .setSmallIcon(R.drawable.ic_notification)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setProgress(0, 0, true)
+                .build()
+        startForeground(
+            NOTIFICATION_ID,
+            notification,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
+        )
         return START_NOT_STICKY
     }
 
@@ -56,10 +55,10 @@ class ManualRunForegroundService : Service() {
                 NotificationChannel(
                     FileOrganizerWorker.CHANNEL_ID,
                     getString(R.string.notification_channel_name),
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply {
                     description = getString(R.string.notification_channel_desc)
-                }
+                },
             )
         }
     }

@@ -9,7 +9,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class GithubPlayUpdateModule {
-
     @Binds
     @Singleton
     abstract fun bindPlayUpdateSessionHandle(impl: GithubPlayUpdateNoOp): PlayUpdateSessionHandle
@@ -21,7 +20,7 @@ abstract class GithubPlayUpdateModule {
     @Binds
     @Singleton
     abstract fun bindPlayInAppUpdateProgressController(
-        impl: GithubPlayUpdateNoOp
+        impl: GithubPlayUpdateNoOp,
     ): PlayInAppUpdateProgressController
 
     @Binds

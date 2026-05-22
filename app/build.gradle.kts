@@ -3,16 +3,21 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
     alias(libs.plugins.androidx.room)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
 kotlin {
-    jvmToolchain(libs.versions.java.get().toInt())
+    jvmToolchain(
+        libs.versions.java
+            .get()
+            .toInt(),
+    )
     compilerOptions {
         freeCompilerArgs.add("-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi")
     }
@@ -27,7 +32,11 @@ if (keystorePropsFile.exists()) {
 }
 
 val releaseStoreFile =
-    keystoreProps.getProperty("storeFile")?.takeIf { it.isNotBlank() }?.let { rootProject.file(it) }?.takeIf { it.isFile }
+    keystoreProps
+        .getProperty("storeFile")
+        ?.takeIf { it.isNotBlank() }
+        ?.let { rootProject.file(it) }
+        ?.takeIf { it.isFile }
 val releaseStorePassword = keystoreProps.getProperty("storePassword")?.takeIf { it.isNotBlank() }
 val releaseKeyAlias = keystoreProps.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
 val releaseKeyPassword =
@@ -42,20 +51,20 @@ val hasReleaseSigning =
 extensions.configure<ApplicationExtension>("android") {
     val filePipeApplicationId = "dev.bikram.filepipe"
     namespace = filePipeApplicationId
-    compileSdk = 36
+    compileSdk = 37
     defaultConfig {
         applicationId = filePipeApplicationId
-        minSdk = 30
-        targetSdk = 36
-        versionCode = 312
-        versionName = "3.1.2"
+        minSdk = 31
+        targetSdk = 37
+        versionCode = 370
+        versionName = "3.7.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField(
             "String",
             "PLAY_STORE_LISTING_URL",
-            "\"https://play.google.com/store/apps/details?id=$filePipeApplicationId\""
+            "\"https://play.google.com/store/apps/details?id=$filePipeApplicationId\"",
         )
 
         ndk {
@@ -77,6 +86,21 @@ extensions.configure<ApplicationExtension>("android") {
     buildTypes {
         debug {
         }
+        // Declare before devRelease so initWith(getByName("release")) always resolves (Gradle
+        // registers build types in declaration order; release signing above is optional).
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+            // Embed native debug symbols in the AAB for Play Console crash/ANR symbolication (transitive .so from deps).
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
+        }
         create("devRelease") {
             initWith(getByName("release"))
             applicationIdSuffix = ".dev"
@@ -87,22 +111,9 @@ extensions.configure<ApplicationExtension>("android") {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             matchingFallbacks += listOf("release")
-        }
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-            signingConfigs.findByName("release")?.let { signingConfig = it }
-            // Embed native debug symbols in the AAB for Play Console crash/ANR symbolication (transitive .so from deps).
-            ndk {
-                debugSymbolLevel = "SYMBOL_TABLE"
-            }
         }
     }
 
@@ -150,6 +161,15 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+}
+
+ktlint {
+    android.set(true)
+}
+
 dependencies {
     // Compose BOM
     implementation(platform(libs.compose.bom))
@@ -157,8 +177,7 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3.expressive)
-    implementation(libs.compose.material.icons.core)
-    implementation(libs.compose.material.icons.extended)
+    implementation(libs.compose.material3.adaptive.navigation.suite)
     implementation(libs.reorderable)
     debugImplementation(libs.compose.ui.tooling)
 
@@ -208,6 +227,9 @@ dependencies {
     implementation(libs.datastore.preferences)
 
     implementation(libs.material.kolor)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.coroutines.test)
 
     // Play in-app update AARs merge extra manifest entries. App info may list permissions under the
     // "Nearby devices" group on Android 12+ even though FilePipe does not declare them in src manifests.

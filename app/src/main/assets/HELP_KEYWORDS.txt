@@ -1,0 +1,55 @@
+# phrase -> help item ids, separated by |
+# Phrases are matched as substrings of the user's query.
+
+download -> cant_add_downloads_folder|storage_all_files|why_storage_access
+downloads -> cant_add_downloads_folder|storage_all_files|why_storage_access
+folder access -> folder_access_denied|storage_all_files|storage_selective|why_storage_access
+folders need attention -> folder_access_denied
+permission -> folder_access_denied|why_storage_access|permissions_after_restore
+permissions -> folder_access_denied|why_storage_access|permissions_after_restore
+all files -> storage_all_files|why_storage_access
+selective -> storage_selective|folder_access_denied
+storage root -> cant_add_downloads_folder|storage_all_files|why_storage_access
+storage roots -> cant_add_downloads_folder|storage_all_files|why_storage_access
+automatic -> files_not_moving_automatically|scheduled_rules|rule_did_not_run
+background -> files_not_moving_automatically|scheduled_rules|rule_did_not_run
+battery -> files_not_moving_automatically|schedule_notifications|rule_did_not_run
+notification -> schedule_notifications|rule_did_not_run
+notifications -> schedule_notifications|rule_did_not_run
+backup -> backup_contents|permissions_after_restore
+restore -> folder_access_denied|backup_contents|permissions_after_restore
+restored -> folder_access_denied|permissions_after_restore
+duplicate -> create_rule|rule_skipping_files
+duplicates -> create_rule|rule_skipping_files
+preview -> what_preview_does|scheduled_rules
+skip -> rule_skipping_files
+skipping -> rule_skipping_files
+conflict -> rule_skipping_files
+overwrite -> rule_skipping_files
+rename -> rule_skipping_files
+subfolder -> subfolders
+subfolders -> subfolders
+recursive -> subfolders
+template -> templates
+templates -> templates
+shortcut -> run_manually
+shortcuts -> run_manually
+manual -> run_manually
+undo -> undo_run|history_contents
+reverse -> undo_run
+history -> history_contents|undo_run
+log -> history_contents
+export -> scheduled_backup|backup_contents
+auto-export -> scheduled_backup
+auto export -> scheduled_backup
+theme -> theme_appearance
+dark mode -> theme_appearance
+light mode -> theme_appearance
+oled -> theme_appearance
+color -> colors|theme_appearance
+colours -> colors|theme_appearance
+material you -> colors
+palette -> colors
+gradient -> visual_effects
+blur -> visual_effects
+appearance -> theme_appearance|colors|visual_effects

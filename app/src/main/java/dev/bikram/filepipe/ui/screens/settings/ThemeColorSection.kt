@@ -1,9 +1,15 @@
 package dev.bikram.filepipe.ui.screens.settings
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,64 +21,112 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.outlined.Add
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.ColorUtils
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
+import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
-import dev.bikram.filepipe.ui.components.CustomSeedHexDialog
-import dev.bikram.filepipe.ui.theme.Blue40
-import dev.bikram.filepipe.ui.theme.BlueGrey40
-import dev.bikram.filepipe.ui.theme.Teal40
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeFilterChip
+import dev.bikram.filepipe.ui.components.FilePipeSwitch
+import dev.bikram.filepipe.ui.components.FilePipeTextButton
+import dev.bikram.filepipe.ui.components.FilePipeToggleButton
+import dev.bikram.filepipe.ui.components.HueColorSlider
+import dev.bikram.filepipe.ui.components.colorHexFromHue
+import dev.bikram.filepipe.ui.components.containers.GroupPosition
+import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
+import dev.bikram.filepipe.ui.components.containers.GroupedListItem
+import dev.bikram.filepipe.ui.components.hueFromHexColor
+import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
+import dev.bikram.filepipe.ui.feedback.performRejectHaptic
+import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
 import dev.bikram.filepipe.ui.theme.parseSeedColorHexToColorOrNull
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
+import kotlinx.coroutines.delay
+import java.util.Locale
+import android.graphics.Color as AndroidColor
 
 @Composable
-fun themePaletteStyleLabel(style: ThemePaletteStyle): String = stringResource(
-    when (style) {
-        ThemePaletteStyle.TONAL_SPOT -> R.string.theme_palette_tonal_spot
-        ThemePaletteStyle.NEUTRAL -> R.string.theme_palette_neutral
-        ThemePaletteStyle.VIBRANT -> R.string.theme_palette_vibrant
-        ThemePaletteStyle.EXPRESSIVE -> R.string.theme_palette_expressive
-        ThemePaletteStyle.RAINBOW -> R.string.theme_palette_rainbow
-        ThemePaletteStyle.FRUIT_SALAD -> R.string.theme_palette_fruit_salad
-        ThemePaletteStyle.MONOCHROME -> R.string.theme_palette_monochrome
-        ThemePaletteStyle.FIDELITY -> R.string.theme_palette_fidelity
-        ThemePaletteStyle.CONTENT -> R.string.theme_palette_content
-    }
-)
+fun themePaletteStyleLabel(style: ThemePaletteStyle): String =
+    stringResource(
+        when (style) {
+            ThemePaletteStyle.TONAL_SPOT -> R.string.theme_palette_tonal_spot
+            ThemePaletteStyle.NEUTRAL -> R.string.theme_palette_neutral
+            ThemePaletteStyle.VIBRANT -> R.string.theme_palette_vibrant
+            ThemePaletteStyle.EXPRESSIVE -> R.string.theme_palette_expressive
+            ThemePaletteStyle.RAINBOW -> R.string.theme_palette_rainbow
+            ThemePaletteStyle.FRUIT_SALAD -> R.string.theme_palette_fruit_salad
+            ThemePaletteStyle.MONOCHROME -> R.string.theme_palette_monochrome
+            ThemePaletteStyle.FIDELITY -> R.string.theme_palette_fidelity
+            ThemePaletteStyle.CONTENT -> R.string.theme_palette_content
+        },
+    )
 
 private fun customHexSwatchSelected(
     colorSource: AppColorSource,
     activeCustomSeedHex: String,
-    storedHex: String
+    storedHex: String,
 ): Boolean {
     if (colorSource != AppColorSource.CUSTOM) return false
     val activeNorm = normalizeCustomSeedHexOrNull(activeCustomSeedHex)
@@ -88,94 +142,109 @@ fun ThemeAccentRow(
     colorSource: AppColorSource,
     activeCustomSeedHex: String,
     savedCustomSeedHexes: List<String>,
+    customPickerExpanded: Boolean,
     onSelectPreset: (AppColorSource) -> Unit,
     onSelectCustomHex: (String) -> Unit,
     onCustomHexLongPress: (String) -> Unit,
     onAddCustomHexClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         items(AppColorSource.accentOptions, key = { "preset_${it.name}" }) { source ->
             val isSelected = colorSource == source
-            val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+            val borderColor =
+                if (isSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+                }
             Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .border(
-                        width = if (isSelected) 3.dp else 1.dp,
-                        color = borderColor,
-                        shape = CircleShape
-                    )
-                    .clickable(
-                        onClick = { onSelectPreset(source) },
-                        indication = ripple(bounded = true),
-                        interactionSource = remember { MutableInteractionSource() }
-                    )
-                    .semantics { role = Role.RadioButton },
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .border(
+                            width = if (isSelected) 3.dp else 1.dp,
+                            color = borderColor,
+                            shape = CircleShape,
+                        ).tapSoundClickable(
+                            onClick = { onSelectPreset(source) },
+                            indication = ripple(bounded = true),
+                            interactionSource = remember { MutableInteractionSource() },
+                        ).semantics { role = Role.RadioButton },
+                contentAlignment = Alignment.Center,
             ) {
                 ThemeAccentCircleContent(source = source)
             }
         }
         items(savedCustomSeedHexes, key = { "hex_$it" }) { storedHex ->
             val isSelected = customHexSwatchSelected(colorSource, activeCustomSeedHex, storedHex)
-            val borderColor = if (isSelected) MaterialTheme.colorScheme.primary
-            else MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
-            val fillColor = parseSeedColorHexToColorOrNull(storedHex)
-                ?: MaterialTheme.colorScheme.surfaceVariant
+            val borderColor =
+                if (isSelected) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+                }
+            val fillColor =
+                parseSeedColorHexToColorOrNull(storedHex)
+                    ?: MaterialTheme.colorScheme.surfaceVariant
             Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .border(
-                        width = if (isSelected) 3.dp else 1.dp,
-                        color = borderColor,
-                        shape = CircleShape
-                    )
-                    .combinedClickable(
-                        onClick = { onSelectCustomHex(storedHex) },
-                        onLongClick = { onCustomHexLongPress(storedHex) },
-                        indication = ripple(bounded = true),
-                        interactionSource = remember { MutableInteractionSource() }
-                    )
-                    .semantics { role = Role.RadioButton },
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .border(
+                            width = if (isSelected) 3.dp else 1.dp,
+                            color = borderColor,
+                            shape = CircleShape,
+                        ).tapSoundCombinedClickable(
+                            onClick = { onSelectCustomHex(storedHex) },
+                            onLongClick = { onCustomHexLongPress(storedHex) },
+                            indication = ripple(bounded = true),
+                            interactionSource = remember { MutableInteractionSource() },
+                        ).semantics { role = Role.RadioButton },
+                contentAlignment = Alignment.Center,
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(fillColor)
+                    modifier =
+                        Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(fillColor),
                 )
             }
         }
         item(key = "add_custom_seed") {
             val addBorder = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
             Box(
-                modifier = Modifier
-                    .size(52.dp)
-                    .clip(CircleShape)
-                    .border(width = 1.dp, color = addBorder, shape = CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
-                    .clickable(
-                        onClick = onAddCustomHexClick,
-                        indication = ripple(bounded = true),
-                        interactionSource = remember { MutableInteractionSource() }
-                    )
-                    .semantics { role = Role.Button },
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .border(width = 1.dp, color = addBorder, shape = CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+                        .tapSoundClickable(
+                            onClick = onAddCustomHexClick,
+                            indication = ripple(bounded = true),
+                            interactionSource = remember { MutableInteractionSource() },
+                        ).semantics { role = Role.Button },
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Add,
+                FilePipeMaterialRoundedSymbol(
+                    name =
+                        if (customPickerExpanded) {
+                            "expand_more"
+                        } else {
+                            "add"
+                        },
                     contentDescription = stringResource(R.string.settings_custom_seed_dialog_title),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(26.dp)
+                    size = 26.dp,
+                    filled = customPickerExpanded,
                 )
             }
         }
@@ -185,60 +254,80 @@ fun ThemeAccentRow(
 @Composable
 private fun ThemeAccentCircleContent(source: AppColorSource) {
     when (source) {
-        AppColorSource.DEFAULT -> Row(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-        ) {
+        AppColorSource.MATERIAL_YOU ->
             Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(Blue40)
-            )
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(BlueGrey40)
-            )
-            Box(
-                Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(Teal40)
-            )
-        }
-        AppColorSource.MATERIAL_YOU -> Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFF6750A4),
-                            Color(0xFF625B71),
-                            Color(0xFF7D5260)
-                        )
-                    )
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Palette,
-                contentDescription = null,
-                tint = Color.White.copy(alpha = 0.92f),
-                modifier = Modifier.size(22.dp)
-            )
-        }
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Brush.linearGradient(
+                                colors =
+                                    listOf(
+                                        Color(0xFF6750A4),
+                                        Color(0xFF625B71),
+                                        Color(0xFF7D5260),
+                                    ),
+                            ),
+                        ),
+                contentAlignment = Alignment.Center,
+            ) {
+                FilePipeMaterialRoundedSymbol(
+                    name = "palette",
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.92f),
+                    size = 22.dp,
+                )
+            }
         else -> {
-            val seed = source.seedPrimary() ?: Color.Gray
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(seed)
-            )
+            val triplet = source.curatedTriplet()
+            if (triplet != null) {
+                CuratedTripletSwatch(
+                    primary = triplet.primary,
+                    secondary = triplet.secondary,
+                    tertiary = triplet.tertiary,
+                )
+            } else {
+                val seed = source.seedPrimary() ?: Color.Gray
+                Box(
+                    modifier =
+                        Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(seed),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CuratedTripletSwatch(
+    primary: Color,
+    secondary: Color,
+    tertiary: Color,
+) {
+    Column(
+        modifier =
+            Modifier
+                .size(44.dp)
+                .clip(CircleShape),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .background(primary),
+        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+        ) {
+            Box(Modifier.weight(1f).fillMaxHeight().background(secondary))
+            Box(Modifier.weight(1f).fillMaxHeight().background(tertiary))
         }
     }
 }
@@ -248,14 +337,14 @@ fun ThemePaletteStyleRow(
     selected: ThemePaletteStyle,
     enabled: Boolean,
     onSelect: (ThemePaletteStyle) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     LazyRow(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items(ThemePaletteStyle.all, key = { it.name }) { style ->
-            FilterChip(
+            FilePipeFilterChip(
                 selected = selected == style,
                 onClick = { if (enabled) onSelect(style) },
                 enabled = enabled,
@@ -263,43 +352,42 @@ fun ThemePaletteStyleRow(
                     Text(
                         text = themePaletteStyleLabel(style),
                         style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1
+                        maxLines = 1,
                     )
                 },
-                colors = FilterChipDefaults.filterChipColors(
-                    disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                )
+                colors =
+                    FilterChipDefaults.filterChipColors(
+                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        disabledLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                    ),
             )
         }
     }
 }
 
 @Composable
-fun ThemeColorSection(
+fun AppearanceSection(
+    themeMode: AppThemeMode,
     colorSource: AppColorSource,
     savedCustomSeedHexes: List<String>,
     activeCustomSeedHex: String,
     themePaletteStyle: ThemePaletteStyle,
+    useGradientBackground: Boolean,
+    useEnhancedShading: Boolean,
+    progressiveBlurEnabled: Boolean,
+    onThemeMode: (AppThemeMode) -> Unit,
     onColorSource: (AppColorSource) -> Unit,
     onPaletteStyle: (ThemePaletteStyle) -> Unit,
     onAddCustomSeedHex: (String) -> Unit,
     onSelectCustomSeedHex: (String) -> Unit,
-    onRemoveCustomSeedHex: (String) -> Unit
+    onPreviewCustomSeedHex: (String) -> Unit,
+    onRemoveCustomSeedHex: (String) -> Unit,
+    onUseGradientBackground: (Boolean) -> Unit,
+    onUseEnhancedShading: (Boolean) -> Unit,
+    onProgressiveBlurEnabled: (Boolean) -> Unit,
+    onBlackThemeEffectClick: () -> Unit,
 ) {
-    var showCustomHexDialog by remember { mutableStateOf(false) }
     var hexPendingRemove by remember { mutableStateOf<String?>(null) }
-
-    if (showCustomHexDialog) {
-        CustomSeedHexDialog(
-            initialDraft = "",
-            onDismiss = { showCustomHexDialog = false },
-            onConfirm = { raw ->
-                onAddCustomSeedHex(raw)
-                showCustomHexDialog = false
-            }
-        )
-    }
 
     val hexToConfirmRemove = hexPendingRemove
     if (hexToConfirmRemove != null) {
@@ -308,7 +396,7 @@ fun ThemeColorSection(
             title = { Text(stringResource(R.string.settings_custom_seed_remove_title)) },
             text = { Text(stringResource(R.string.settings_custom_seed_remove_message)) },
             confirmButton = {
-                TextButton(onClick = {
+                FilePipeTextButton(onClick = {
                     onRemoveCustomSeedHex(hexToConfirmRemove)
                     hexPendingRemove = null
                 }) {
@@ -316,39 +404,771 @@ fun ThemeColorSection(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { hexPendingRemove = null }) {
+                FilePipeTextButton(onClick = { hexPendingRemove = null }) {
                     Text(stringResource(R.string.cancel))
                 }
-            }
+            },
         )
     }
+    val blackThemeEffectsDisabled = themeMode == AppThemeMode.BLACK
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.settings_theme_colors_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 8.dp)
+    GroupedListColumn {
+        GroupedListItem(position = GroupPosition.FIRST) {
+            AppearanceStudioControls(
+                themeMode = themeMode,
+                colorSource = colorSource,
+                savedCustomSeedHexes = savedCustomSeedHexes,
+                activeCustomSeedHex = activeCustomSeedHex,
+                themePaletteStyle = themePaletteStyle,
+                onThemeMode = onThemeMode,
+                onColorSource = onColorSource,
+                onPaletteStyle = onPaletteStyle,
+                onSelectCustomSeedHex = onSelectCustomSeedHex,
+                onCustomHexLongPress = { hexPendingRemove = it },
+                onAddCustomSeedHex = onAddCustomSeedHex,
+                onPreviewCustomSeedHex = onPreviewCustomSeedHex,
+            )
+        }
+        GroupedListItem(position = GroupPosition.MIDDLE) {
+            AppearanceToggleItem(
+                title = stringResource(R.string.settings_gradient_background),
+                subtitle = stringResource(R.string.settings_gradient_background_desc),
+                checked = useGradientBackground && !blackThemeEffectsDisabled,
+                enabled = !blackThemeEffectsDisabled,
+                onDisabledClick = onBlackThemeEffectClick,
+                onCheckedChange = onUseGradientBackground,
+            )
+        }
+        GroupedListItem(position = GroupPosition.MIDDLE) {
+            AppearanceToggleItem(
+                title = stringResource(R.string.settings_enhanced_shading),
+                subtitle = stringResource(R.string.settings_enhanced_shading_desc),
+                checked = useEnhancedShading || blackThemeEffectsDisabled,
+                enabled = !blackThemeEffectsDisabled,
+                onDisabledClick = onBlackThemeEffectClick,
+                onCheckedChange = onUseEnhancedShading,
+            )
+        }
+        GroupedListItem(position = GroupPosition.LAST) {
+            AppearanceToggleItem(
+                title = stringResource(R.string.settings_progressive_blur),
+                subtitle = stringResource(R.string.settings_progressive_blur_desc),
+                checked = progressiveBlurEnabled,
+                leadingIconName = "blur_on",
+                onCheckedChange = onProgressiveBlurEnabled,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppearanceStudioControls(
+    themeMode: AppThemeMode,
+    colorSource: AppColorSource,
+    savedCustomSeedHexes: List<String>,
+    activeCustomSeedHex: String,
+    themePaletteStyle: ThemePaletteStyle,
+    onThemeMode: (AppThemeMode) -> Unit,
+    onColorSource: (AppColorSource) -> Unit,
+    onPaletteStyle: (ThemePaletteStyle) -> Unit,
+    onSelectCustomSeedHex: (String) -> Unit,
+    onCustomHexLongPress: (String) -> Unit,
+    onAddCustomSeedHex: (String) -> Unit,
+    onPreviewCustomSeedHex: (String) -> Unit,
+) {
+    var customPickerExpanded by rememberSaveable { mutableStateOf(false) }
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        ThemeModeSegmentedRow(
+            selected = themeMode,
+            onSelect = onThemeMode,
         )
         ThemeAccentRow(
             colorSource = colorSource,
             activeCustomSeedHex = activeCustomSeedHex,
             savedCustomSeedHexes = savedCustomSeedHexes,
+            customPickerExpanded = customPickerExpanded,
             onSelectPreset = onColorSource,
             onSelectCustomHex = onSelectCustomSeedHex,
-            onCustomHexLongPress = { hexPendingRemove = it },
-            onAddCustomHexClick = { showCustomHexDialog = true }
+            onCustomHexLongPress = onCustomHexLongPress,
+            onAddCustomHexClick = {
+                customPickerExpanded = !customPickerExpanded
+            },
         )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = stringResource(R.string.settings_palette_style),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface
+        AnimatedVisibility(
+            visible = customPickerExpanded,
+            enter = fadeIn(animationSpec = fadeInSpec) + expandVertically(animationSpec = spatialSpec),
+            exit = fadeOut(animationSpec = fadeOutSpec) + shrinkVertically(animationSpec = spatialSpec),
+        ) {
+            CustomColorSlider(
+                initialSeedHex =
+                    customSliderInitialSeedHex(
+                        colorSource = colorSource,
+                        activeCustomSeedHex = activeCustomSeedHex,
+                        currentPrimary = MaterialTheme.colorScheme.primary,
+                    ),
+                onPreviewColor = onPreviewCustomSeedHex,
+                onSaveColor = onAddCustomSeedHex,
+            )
+        }
+        AppearanceStudioSection(title = stringResource(R.string.settings_palette_style)) {
+            ThemePaletteStyleRow(
+                selected = themePaletteStyle,
+                enabled = colorSource.supportsPaletteStyle,
+                onSelect = onPaletteStyle,
+            )
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f))
+        ThemePreviewPanel(colorSource = colorSource)
+    }
+}
+
+@Composable
+private fun CustomColorSlider(
+    initialSeedHex: String,
+    onPreviewColor: (String) -> Unit,
+    onSaveColor: (String) -> Unit,
+) {
+    val normalizedInitialSeedHex = normalizeCustomSeedHexOrNull(initialSeedHex) ?: colorHexFromHue(DEFAULT_CUSTOM_HUE)
+    var selectedSeedHex by rememberSaveable(normalizedInitialSeedHex) { mutableStateOf(normalizedInitialSeedHex) }
+    var hexEditing by rememberSaveable { mutableStateOf(false) }
+    var hexDraft by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(normalizedInitialSeedHex.toHexFieldValue())
+    }
+    val hexFocusRequester = remember { FocusRequester() }
+    var panelCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var hexEditorBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
+
+    fun commitHexEditing(): String {
+        val draftHex =
+            if (hexDraft.text.length == 6) {
+                normalizeCustomSeedHexOrNull("#${hexDraft.text}")
+            } else {
+                null
+            }
+        val committedHex = draftHex ?: selectedSeedHex
+        selectedSeedHex = committedHex
+        hexDraft = committedHex.toHexFieldValue()
+        if (hexEditing && draftHex != null) onPreviewColor(committedHex)
+        hexEditing = false
+        return committedHex
+    }
+    LaunchedEffect(normalizedInitialSeedHex) {
+        selectedSeedHex = normalizedInitialSeedHex
+        hexDraft = normalizedInitialSeedHex.toHexFieldValue()
+    }
+    LaunchedEffect(hexEditing) {
+        if (hexEditing) hexFocusRequester.requestFocus()
+    }
+    LaunchedEffect(hexDraft, hexEditing) {
+        if (!hexEditing || hexDraft.text.length != 6) return@LaunchedEffect
+        delay(HEX_INPUT_DEBOUNCE_MILLIS)
+        val normalized = "#${hexDraft.text.uppercase(Locale.US)}"
+        if (hueFromHexColor(normalized) != null) {
+            selectedSeedHex = normalized
+            onPreviewColor(normalized)
+        }
+    }
+    val selectedHex = selectedSeedHex
+    val panelShape = MaterialTheme.shapes.extraLarge
+    val sliderPanelColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    val saveColorLabel = stringResource(R.string.save)
+
+    Surface(
+        color = sliderPanelColor,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shape = panelShape,
+        tonalElevation = 2.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { panelCoordinates = it }
+                    .pointerInput(hexEditing, hexDraft, selectedSeedHex) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            val wasEditingAtDown = hexEditing
+                            val up = waitForUpOrCancellation(pass = PointerEventPass.Initial) ?: return@awaitEachGesture
+                            if (!wasEditingAtDown || !hexEditing) return@awaitEachGesture
+                            val tapInRoot = panelCoordinates?.localToRoot(up.position) ?: return@awaitEachGesture
+                            val editorBounds = hexEditorBoundsInRoot
+                            if (editorBounds == null || !editorBounds.contains(tapInRoot)) {
+                                commitHexEditing()
+                            }
+                        }
+                    }.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_custom_seed_slider_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                EditableHexValue(
+                    hex = selectedHex,
+                    editing = hexEditing,
+                    draft = hexDraft,
+                    focusRequester = hexFocusRequester,
+                    onStartEditing = {
+                        hexDraft = selectedSeedHex.toHexFieldValue()
+                        hexEditing = true
+                    },
+                    onDraftChange = { hexDraft = it },
+                    onStopEditing = { commitHexEditing() },
+                    onBoundsChange = { hexEditorBoundsInRoot = it },
+                )
+                FilePipeFilledTonalIconButton(
+                    onClick = { onSaveColor(commitHexEditing()) },
+                    modifier = Modifier.size(40.dp),
+                ) {
+                    FilePipeMaterialRoundedSymbol(
+                        name = "check",
+                        contentDescription = saveColorLabel,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        size = 22.dp,
+                    )
+                }
+            }
+            HueColorSlider(
+                selectedHex = selectedSeedHex,
+                onSelect = {
+                    selectedSeedHex = it
+                    hexDraft = it.toHexFieldValue()
+                },
+                modifier = Modifier.fillMaxWidth(),
+                fallbackHue = DEFAULT_CUSTOM_HUE,
+                sliderPanelColor = sliderPanelColor,
+                onValueChangeFinished = onPreviewColor,
+            )
+        }
+    }
+}
+
+@Composable
+private fun EditableHexValue(
+    hex: String,
+    editing: Boolean,
+    draft: TextFieldValue,
+    focusRequester: FocusRequester,
+    onStartEditing: () -> Unit,
+    onDraftChange: (TextFieldValue) -> Unit,
+    onStopEditing: () -> Unit,
+    onBoundsChange: (Rect?) -> Unit,
+) {
+    val view = LocalView.current
+    val hapticEnabled = LocalHapticEnabled.current
+    val shape = CircleShape
+    val textStyle =
+        MaterialTheme.typography.labelMedium.copy(
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontFamily = FontFamily.Monospace,
+            textAlign = TextAlign.Center,
         )
-        ThemePaletteStyleRow(
-            selected = themePaletteStyle,
-            enabled = colorSource == AppColorSource.DEFAULT || colorSource.isSeedBased,
-            onSelect = onPaletteStyle
+    var hadFocus by remember(editing) { mutableStateOf(false) }
+    LaunchedEffect(editing) {
+        if (!editing) onBoundsChange(null)
+    }
+    if (!editing) {
+        Box(
+            modifier =
+                Modifier
+                    .width(HexValueWidth)
+                    .height(HexValueHeight)
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = shape,
+                    ).tapSoundCombinedClickable(onClick = onStartEditing)
+                    .padding(horizontal = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = hex,
+                style = textStyle,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
+            )
+        }
+        return
+    }
+
+    Box(
+        modifier =
+            Modifier
+                .width(HexValueWidth)
+                .height(HexValueHeight)
+                .onGloballyPositioned { onBoundsChange(it.boundsInRoot()) }
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    shape = shape,
+                ).padding(horizontal = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        BasicTextField(
+            value = draft.toPrefixedHexFieldValue(),
+            onValueChange = { value ->
+                val acceptedValue = value.acceptPrefixedHexInput()
+                if (acceptedValue != null) {
+                    onDraftChange(acceptedValue)
+                } else if (hapticEnabled) {
+                    view.performRejectHaptic()
+                }
+            },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .focusRequester(focusRequester)
+                    .onFocusChanged { state ->
+                        if (state.isFocused) {
+                            hadFocus = true
+                        } else if (hadFocus) {
+                            onStopEditing()
+                        }
+                    },
+            singleLine = true,
+            textStyle = textStyle,
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            keyboardOptions =
+                KeyboardOptions(
+                    capitalization = KeyboardCapitalization.Characters,
+                    keyboardType = KeyboardType.Ascii,
+                    imeAction = ImeAction.Done,
+                ),
+            keyboardActions = KeyboardActions(onDone = { onStopEditing() }),
         )
     }
 }
+
+private const val DEFAULT_CUSTOM_HUE = 270f
+private const val HEX_INPUT_DEBOUNCE_MILLIS = 450L
+private val HexValueWidth = 84.dp
+private val HexValueHeight = 40.dp
+
+private fun String.dropHexPrefix(): String = removePrefix("#").take(6).uppercase(Locale.US)
+
+private fun String.toHexFieldValue(): TextFieldValue {
+    val text = dropHexPrefix()
+    return TextFieldValue(text = text, selection = TextRange(text.length))
+}
+
+private fun TextFieldValue.toPrefixedHexFieldValue(): TextFieldValue {
+    val prefixedSelection =
+        TextRange(
+            start = (selection.start + 1).coerceIn(1, text.length + 1),
+            end = (selection.end + 1).coerceIn(1, text.length + 1),
+        )
+    return copy(text = "#$text", selection = prefixedSelection)
+}
+
+private fun TextFieldValue.acceptPrefixedHexInput(): TextFieldValue? {
+    val hasPrefix = text.startsWith("#")
+    val hexText = text.removePrefix("#").take(6).uppercase(Locale.US)
+    if (text.removePrefix("#").length > 6) return null
+    if (hexText.any { !it.isDigit() && it.lowercaseChar() !in 'a'..'f' }) return null
+    val prefixOffset = if (hasPrefix) 1 else 0
+    return TextFieldValue(
+        text = hexText,
+        selection =
+            TextRange(
+                start = (selection.start - prefixOffset).coerceIn(0, hexText.length),
+                end = (selection.end - prefixOffset).coerceIn(0, hexText.length),
+            ),
+    )
+}
+
+private fun TextFieldValue.acceptHexInput(): TextFieldValue? {
+    if (text.length > 6) return null
+    if (text.any { !it.isDigit() && it.lowercaseChar() !in 'a'..'f' }) return null
+    val uppercaseText = text.uppercase(Locale.US)
+    return copy(
+        text = uppercaseText,
+        selection =
+            TextRange(
+                start = selection.start.coerceIn(0, uppercaseText.length),
+                end = selection.end.coerceIn(0, uppercaseText.length),
+            ),
+    )
+}
+
+private fun customSliderInitialSeedHex(
+    colorSource: AppColorSource,
+    activeCustomSeedHex: String,
+    currentPrimary: Color,
+): String {
+    val activeCustomSeed = normalizeCustomSeedHexOrNull(activeCustomSeedHex)
+    if (colorSource == AppColorSource.CUSTOM && activeCustomSeed != null) {
+        return activeCustomSeed
+    }
+    if (colorSource == AppColorSource.MATERIAL_YOU) {
+        return hexFromColor(currentPrimary)
+    }
+    return hexFromColor(colorSource.migrated().seedPrimary() ?: Color(0xFF16A34A))
+}
+
+private fun hexFromColor(color: Color): String {
+    val colorInt =
+        AndroidColor.argb(
+            255,
+            (color.red * 255).toInt(),
+            (color.green * 255).toInt(),
+            (color.blue * 255).toInt(),
+        )
+    return String.format(Locale.US, "#%06X", 0xFFFFFF and colorInt)
+}
+
+@Composable
+private fun ThemeModeSegmentedRow(
+    selected: AppThemeMode,
+    onSelect: (AppThemeMode) -> Unit,
+) {
+    val colors =
+        ToggleButtonDefaults.toggleButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    val labels = themePickerOrder.map { mode -> themeModeLabel(mode) }
+    val shapes =
+        themePickerOrder.mapIndexed { index, _ ->
+            when (index) {
+                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+            }
+        }
+    ButtonGroup(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
+    ) {
+        themePickerOrder.forEachIndexed { index, mode ->
+            val label = labels[index]
+            customItem(
+                buttonGroupContent = {
+                    FilePipeToggleButton(
+                        checked = selected == mode,
+                        onCheckedChange = { checked -> if (checked) onSelect(mode) },
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .semantics { role = Role.RadioButton },
+                        shapes = shapes[index],
+                        colors = colors,
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+                menuContent = { menuState ->
+                    FilePipeDropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onSelect(mode)
+                            menuState.dismiss()
+                        },
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppearanceStudioSection(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        content()
+    }
+}
+
+@Composable
+private fun AppearanceToggleItem(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit,
+    leadingIconName: String? = null,
+    onDisabledClick: (() -> Unit)? = null,
+) {
+    val alpha = if (enabled) 1f else 0.38f
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .tapSoundCombinedClickable(onClick = {
+                    if (enabled) {
+                        onCheckedChange(!checked)
+                    } else {
+                        onDisabledClick?.invoke()
+                    }
+                })
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leadingIconName != null) {
+            FilePipeMaterialRoundedSymbol(
+                name = leadingIconName,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+            )
+            Spacer(Modifier.width(16.dp))
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
+            )
+            Text(
+                subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        Box {
+            FilePipeSwitch(
+                checked = checked,
+                enabled = enabled,
+                onCheckedChange = if (enabled) onCheckedChange else null,
+            )
+            if (!enabled && onDisabledClick != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .matchParentSize()
+                            .clip(MaterialTheme.shapes.extraExtraLarge)
+                            .tapSoundCombinedClickable(onClick = { onDisabledClick() }),
+                )
+            }
+        }
+    }
+}
+
+private val themePickerOrder =
+    listOf(
+        AppThemeMode.SYSTEM,
+        AppThemeMode.LIGHT,
+        AppThemeMode.DARK,
+        AppThemeMode.BLACK,
+    )
+
+@Composable
+private fun themeModeLabel(mode: AppThemeMode): String =
+    stringResource(
+        when (mode) {
+            AppThemeMode.SYSTEM -> R.string.theme_system
+            AppThemeMode.LIGHT -> R.string.theme_light
+            AppThemeMode.DARK -> R.string.theme_dark
+            AppThemeMode.BLACK -> R.string.theme_black
+        },
+    )
+
+@Composable
+private fun ThemePreviewPanel(colorSource: AppColorSource) {
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_theme_preview_named, colorSourceDisplayName(colorSource)),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        PreviewSubsection(title = stringResource(R.string.settings_theme_preview_surface_ladder)) {
+            SurfaceLadderStrip(scheme = scheme)
+        }
+        PreviewSubsection(title = stringResource(R.string.settings_theme_preview_accent_containers)) {
+            AccentContainersStrip(scheme = scheme)
+        }
+    }
+}
+
+@Composable
+private fun PreviewSubsection(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.64f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        content()
+    }
+}
+
+@Composable
+private fun SurfaceLadderStrip(scheme: ColorScheme) {
+    val swatches =
+        listOf(
+            scheme.surfaceContainerLowest to stringResource(R.string.settings_theme_preview_label_lowest),
+            scheme.surface to stringResource(R.string.settings_theme_preview_label_surface),
+            scheme.surfaceContainerLow to stringResource(R.string.settings_theme_preview_label_low),
+            scheme.surfaceContainer to stringResource(R.string.settings_theme_preview_label_base),
+            scheme.surfaceContainerHigh to stringResource(R.string.settings_theme_preview_label_high),
+            scheme.surfaceContainerHighest to stringResource(R.string.settings_theme_preview_label_highest),
+        )
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(36.dp)
+                .clip(MaterialTheme.shapes.small)
+                .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small),
+    ) {
+        swatches.forEach { (color, label) ->
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .background(color),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = contrastingTextColor(color),
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AccentContainersStrip(scheme: ColorScheme) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AccentChip(
+            modifier = Modifier.weight(1f),
+            container = scheme.primaryContainer,
+            onContainer = scheme.onPrimaryContainer,
+            label = stringResource(R.string.settings_theme_preview_label_primary),
+        )
+        AccentChip(
+            modifier = Modifier.weight(1f),
+            container = scheme.secondaryContainer,
+            onContainer = scheme.onSecondaryContainer,
+            label = stringResource(R.string.settings_theme_preview_label_secondary),
+        )
+        AccentChip(
+            modifier = Modifier.weight(1f),
+            container = scheme.tertiaryContainer,
+            onContainer = scheme.onTertiaryContainer,
+            label = stringResource(R.string.settings_theme_preview_label_tertiary),
+        )
+    }
+}
+
+@Composable
+private fun AccentChip(
+    modifier: Modifier,
+    container: Color,
+    onContainer: Color,
+    label: String,
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        color = container,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = onContainer.copy(alpha = 0.72f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = stringResource(R.string.settings_theme_preview_sample),
+                style = MaterialTheme.typography.titleMedium,
+                color = onContainer,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+private fun contrastingTextColor(background: Color): Color =
+    if (ColorUtils.calculateLuminance(background.toArgb()) > 0.5) {
+        Color.Black.copy(alpha = 0.82f)
+    } else {
+        Color.White.copy(alpha = 0.9f)
+    }
+
+@Composable
+private fun colorSourceDisplayName(source: AppColorSource): String =
+    stringResource(
+        when (source.migrated()) {
+            AppColorSource.MATERIAL_YOU -> R.string.theme_material_you
+            AppColorSource.DEFAULT -> R.string.theme_color_forest
+            AppColorSource.CURATED_EMBER -> R.string.theme_color_ember
+            AppColorSource.CURATED_GROVE -> R.string.theme_color_grove
+            AppColorSource.CURATED_HONEY -> R.string.theme_color_honey
+            AppColorSource.CURATED_OCEAN -> R.string.theme_color_ocean
+            AppColorSource.CURATED_IRIS -> R.string.theme_color_iris
+            AppColorSource.CURATED_DUSK -> R.string.theme_color_dusk
+            AppColorSource.CURATED_BERRY -> R.string.theme_color_berry
+            AppColorSource.CUSTOM -> R.string.theme_color_custom
+            else -> R.string.theme_color_custom
+        },
+    )

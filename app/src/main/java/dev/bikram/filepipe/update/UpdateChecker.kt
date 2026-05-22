@@ -23,9 +23,8 @@ data class UpdateInfo(
     /**
      * Dev release only: [SettingsViewModel] arms a fake update for the global promo without Play or GitHub.
      */
-    val isDevReleaseMock: Boolean = false
+    val isDevReleaseMock: Boolean = false,
 )
 
 /** Used for update notifications dedupe and GitHub release acknowledgment. */
-fun UpdateInfo.notificationDedupeKey(): String =
-    if (remoteApkAssetUpdatedAt.isNotBlank()) "$versionName|$remoteApkAssetUpdatedAt" else versionName
+fun UpdateInfo.notificationDedupeKey(): String = if (remoteApkAssetUpdatedAt.isNotBlank()) "$versionName|$remoteApkAssetUpdatedAt" else versionName

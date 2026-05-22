@@ -8,12 +8,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FileMovedDao {
-
     @Query("SELECT * FROM files_moved WHERE runHistoryId = :runHistoryId ORDER BY movedAt ASC")
     fun getFilesForRun(runHistoryId: Long): Flow<List<FileMovedEntity>>
 
     @Query("SELECT * FROM files_moved WHERE runHistoryId = :runHistoryId ORDER BY movedAt ASC")
     suspend fun getFilesForRunOnce(runHistoryId: Long): List<FileMovedEntity>
+
+    @Query("SELECT COUNT(*) FROM files_moved")
+    suspend fun countFilesMoved(): Int
 
     @Insert
     suspend fun insertFileMoved(file: FileMovedEntity)

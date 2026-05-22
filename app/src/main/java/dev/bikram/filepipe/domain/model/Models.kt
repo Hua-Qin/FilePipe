@@ -15,10 +15,12 @@ data class Rule(
     val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
+    val trashedAt: Long? = null,
     val schedule: RuleSchedule? = null,
     val conflictPolicy: ConflictPolicy = ConflictPolicy.RENAME_SUFFIX,
     val operationMode: OperationMode = OperationMode.MOVE,
     val scanSubdirectories: Boolean = false,
+    val recreateDestinationSubfolders: Boolean = false,
     /**
      * When true, missing/unreadable **source** trees do not show the stale-folder banner on the rule
      * card; rule edit still shows full folder diagnostics. Destination and permission-denied issues
@@ -34,18 +36,18 @@ data class Rule(
     val maxFileSizeBytes: Long? = null,
     val minAgeDays: Int? = null,
     val maxAgeDays: Int? = null,
-    val excludePatterns: List<String> = emptyList()
+    val excludePatterns: List<String> = emptyList(),
 )
 
 enum class ScheduleType { DAILY, WEEKLY, EVERY_N_HOURS }
 
 data class RuleSchedule(
     val type: ScheduleType,
-    val dayOfWeek: Int? = null,  // Calendar.MONDAY (2) … Calendar.SUNDAY (1) — null for DAILY / EVERY_N_HOURS
+    val dayOfWeek: Int? = null, // Calendar.MONDAY (2) … Calendar.SUNDAY (1) — null for DAILY / EVERY_N_HOURS
     val hour: Int,
     val minute: Int,
     /** Required when [type] is [ScheduleType.EVERY_N_HOURS]; UI allows 1–24 hours (use daily for longer gaps). */
-    val intervalHours: Int? = null
+    val intervalHours: Int? = null,
 )
 
 // ---
@@ -67,7 +69,7 @@ data class RunHistory(
     val isReversed: Boolean = false,
     val operationMode: OperationMode = OperationMode.MOVE,
     /** Destination folder document URIs created during a copy run (for undo to remove empty dirs). */
-    val copyCreatedDestFolderUris: List<String> = emptyList()
+    val copyCreatedDestFolderUris: List<String> = emptyList(),
 )
 
 enum class TriggerType { MANUAL, SCHEDULED }
@@ -75,12 +77,10 @@ enum class TriggerType { MANUAL, SCHEDULED }
 enum class RunStatus { IN_PROGRESS, SUCCESS, PARTIAL_FAILURE, FAILED, CANCELLED, UNDONE }
 
 /** Successful run with zero files moved and zero failures (shown as "No changes", not "Success"). */
-fun RunHistory.isNoChangesRun(): Boolean =
-    status == RunStatus.SUCCESS && totalFilesMoved == 0 && totalFilesFailed == 0
+fun RunHistory.isNoChangesRun(): Boolean = status == RunStatus.SUCCESS && totalFilesMoved == 0 && totalFilesFailed == 0
 
 /** True after undo, including legacy rows that only set [RunHistory.isReversed]. */
-fun RunHistory.isEffectivelyUndone(): Boolean =
-    status == RunStatus.UNDONE || isReversed
+fun RunHistory.isEffectivelyUndone(): Boolean = status == RunStatus.UNDONE || isReversed
 
 enum class HistoryStatusFilter {
     ALL,
@@ -105,7 +105,7 @@ data class FileMoved(
     val movedAt: Long = System.currentTimeMillis(),
     val success: Boolean,
     val skipped: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
 )
 
 // ---
@@ -117,17 +117,18 @@ data class RunResult(
     val filesMoved: List<FileMoved>,
     val startedAt: Long,
     val completedAt: Long,
-    val copyCreatedDestFolderUris: List<String> = emptyList()
+    val copyCreatedDestFolderUris: List<String> = emptyList(),
 ) {
     val totalMoved: Int get() = filesMoved.count { it.success && !it.skipped }
     val totalSkipped: Int get() = filesMoved.count { it.skipped }
     val totalFailed: Int get() = filesMoved.count { !it.success && !it.skipped }
-    val status: RunStatus get() = when {
-        filesMoved.isEmpty() -> RunStatus.SUCCESS
-        totalFailed == 0 -> RunStatus.SUCCESS
-        totalMoved == 0 && totalSkipped == 0 -> RunStatus.FAILED
-        else -> RunStatus.PARTIAL_FAILURE
-    }
+    val status: RunStatus get() =
+        when {
+            filesMoved.isEmpty() -> RunStatus.SUCCESS
+            totalFailed == 0 -> RunStatus.SUCCESS
+            totalMoved == 0 && totalSkipped == 0 -> RunStatus.FAILED
+            else -> RunStatus.PARTIAL_FAILURE
+        }
 }
 
 // ---
@@ -139,7 +140,7 @@ data class PreviewFileResult(
     val wouldSkip: Boolean,
     val wouldOverwrite: Boolean,
     val renamedTo: String?,
-    val sizeBytes: Long
+    val sizeBytes: Long,
 )
 
 // ---
@@ -152,7 +153,7 @@ data class RunProgress(
     val filesMoved: Int = 0,
     val totalFiles: Int = 0,
     val isComplete: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 ) {
     companion object {
         /** Matches [ExecuteRulesUseCase] cancellation path; distinguishes success terminal from stopped mid-run. */

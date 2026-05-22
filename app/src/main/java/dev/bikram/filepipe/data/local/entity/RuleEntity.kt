@@ -22,6 +22,7 @@ data class RuleEntity(
     val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
+    val trashedAt: Long? = null,
     val scheduleType: ScheduleType? = null,
     val scheduleDayOfWeek: Int? = null,
     val scheduleHour: Int? = null,
@@ -31,6 +32,8 @@ data class RuleEntity(
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
     val operationMode: String = OperationMode.MOVE.name,
     val scanSubdirectories: Boolean = false,
+    @ColumnInfo(defaultValue = "0")
+    val recreateDestinationSubfolders: Boolean = false,
     @ColumnInfo(name = "suppress_missing_source_folder_card", defaultValue = "0")
     val suppressMissingSourceFolderCardWarning: Boolean = false,
     val iconKey: String = RuleIcon.DEFAULT.name,
@@ -42,78 +45,85 @@ data class RuleEntity(
     val minAgeDays: Int? = null,
     val maxAgeDays: Int? = null,
     @ColumnInfo(defaultValue = "[]")
-    val excludePatterns: List<String> = emptyList()
+    val excludePatterns: List<String> = emptyList(),
 )
 
-fun RuleEntity.toDomain(): Rule = Rule(
-    id = id,
-    name = name,
-    sourceFolderPaths = sourceFolderPaths,
-    destinationFolderPath = destinationFolderPath,
-    fileExtensions = fileExtensions,
-    isEnabled = isEnabled,
-    sortOrder = sortOrder,
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-    schedule = when {
-        scheduleType == ScheduleType.EVERY_N_HOURS && scheduleIntervalHours != null ->
-            RuleSchedule(
-                type = scheduleType,
-                dayOfWeek = null,
-                hour = scheduleHour ?: 0,
-                minute = scheduleMinute ?: 0,
-                intervalHours = scheduleIntervalHours
-            )
-        scheduleType != null && scheduleHour != null && scheduleMinute != null ->
-            RuleSchedule(
-                type = scheduleType,
-                dayOfWeek = scheduleDayOfWeek,
-                hour = scheduleHour,
-                minute = scheduleMinute,
-                intervalHours = null
-            )
-        else -> null
-    },
-    conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
-    operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),
-    scanSubdirectories = scanSubdirectories,
-    suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
-    icon = RuleIcon.fromStored(iconKey),
-    iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
-    filenamePattern = filenamePattern,
-    minFileSizeBytes = minFileSizeBytes,
-    maxFileSizeBytes = maxFileSizeBytes,
-    minAgeDays = minAgeDays,
-    maxAgeDays = maxAgeDays,
-    excludePatterns = excludePatterns
-)
+fun RuleEntity.toDomain(): Rule =
+    Rule(
+        id = id,
+        name = name,
+        sourceFolderPaths = sourceFolderPaths,
+        destinationFolderPath = destinationFolderPath,
+        fileExtensions = fileExtensions,
+        isEnabled = isEnabled,
+        sortOrder = sortOrder,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        trashedAt = trashedAt,
+        schedule =
+            when {
+                scheduleType == ScheduleType.EVERY_N_HOURS && scheduleIntervalHours != null ->
+                    RuleSchedule(
+                        type = scheduleType,
+                        dayOfWeek = null,
+                        hour = scheduleHour ?: 0,
+                        minute = scheduleMinute ?: 0,
+                        intervalHours = scheduleIntervalHours,
+                    )
+                scheduleType != null && scheduleHour != null && scheduleMinute != null ->
+                    RuleSchedule(
+                        type = scheduleType,
+                        dayOfWeek = scheduleDayOfWeek,
+                        hour = scheduleHour,
+                        minute = scheduleMinute,
+                        intervalHours = null,
+                    )
+                else -> null
+            },
+        conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
+        operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),
+        scanSubdirectories = scanSubdirectories,
+        recreateDestinationSubfolders = recreateDestinationSubfolders,
+        suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
+        icon = RuleIcon.fromStored(iconKey),
+        iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
+        filenamePattern = filenamePattern,
+        minFileSizeBytes = minFileSizeBytes,
+        maxFileSizeBytes = maxFileSizeBytes,
+        minAgeDays = minAgeDays,
+        maxAgeDays = maxAgeDays,
+        excludePatterns = excludePatterns,
+    )
 
-fun Rule.toEntity(): RuleEntity = RuleEntity(
-    id = id,
-    name = name,
-    sourceFolderPaths = sourceFolderPaths,
-    destinationFolderPath = destinationFolderPath,
-    fileExtensions = fileExtensions,
-    isEnabled = isEnabled,
-    sortOrder = sortOrder,
-    createdAt = createdAt,
-    updatedAt = updatedAt,
-    scheduleType = schedule?.type,
-    scheduleDayOfWeek = schedule?.dayOfWeek,
-    scheduleHour = schedule?.hour,
-    scheduleMinute = schedule?.minute,
-    scheduleIntervalHours = schedule?.intervalHours,
-    workManagerTag = if (id != 0L) "rule_$id" else null,
-    conflictPolicy = conflictPolicy.name,
-    operationMode = operationMode.name,
-    scanSubdirectories = scanSubdirectories,
-    suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
-    iconKey = icon.name,
-    iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
-    filenamePattern = filenamePattern,
-    minFileSizeBytes = minFileSizeBytes,
-    maxFileSizeBytes = maxFileSizeBytes,
-    minAgeDays = minAgeDays,
-    maxAgeDays = maxAgeDays,
-    excludePatterns = excludePatterns
-)
+fun Rule.toEntity(): RuleEntity =
+    RuleEntity(
+        id = id,
+        name = name,
+        sourceFolderPaths = sourceFolderPaths,
+        destinationFolderPath = destinationFolderPath,
+        fileExtensions = fileExtensions,
+        isEnabled = isEnabled,
+        sortOrder = sortOrder,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
+        trashedAt = trashedAt,
+        scheduleType = schedule?.type,
+        scheduleDayOfWeek = schedule?.dayOfWeek,
+        scheduleHour = schedule?.hour,
+        scheduleMinute = schedule?.minute,
+        scheduleIntervalHours = schedule?.intervalHours,
+        workManagerTag = if (id != 0L) "rule_$id" else null,
+        conflictPolicy = conflictPolicy.name,
+        operationMode = operationMode.name,
+        scanSubdirectories = scanSubdirectories,
+        recreateDestinationSubfolders = recreateDestinationSubfolders,
+        suppressMissingSourceFolderCardWarning = suppressMissingSourceFolderCardWarning,
+        iconKey = icon.name,
+        iconEmoji = iconEmoji?.takeIf { it.isNotBlank() },
+        filenamePattern = filenamePattern,
+        minFileSizeBytes = minFileSizeBytes,
+        maxFileSizeBytes = maxFileSizeBytes,
+        minAgeDays = minAgeDays,
+        maxAgeDays = maxAgeDays,
+        excludePatterns = excludePatterns,
+    )

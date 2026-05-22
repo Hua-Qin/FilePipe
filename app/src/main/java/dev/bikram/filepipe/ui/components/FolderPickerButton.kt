@@ -2,37 +2,29 @@ package dev.bikram.filepipe.ui.components
 
 import android.net.Uri
 import android.os.Environment
+import android.provider.DocumentsContract
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import android.provider.DocumentsContract
+import androidx.core.net.toUri
 import dev.bikram.filepipe.data.storage.absoluteStoragePathToTreeUri
-import dev.bikram.filepipe.ui.feedback.LocalTapSound
+import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.theme.compactControlShape
 import java.io.File
 
 @Composable
 fun FolderPickerButton(
     label: String,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
 ) {
-    val playTap = LocalTapSound.current
-    OutlinedButton(
-        onClick = {
-            playTap()
-            onClick()
-        },
+    FilePipeOutlinedButton(
+        onClick = onClick,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp)
+        shape = compactControlShape,
     ) {
-        Icon(Icons.Default.FolderOpen, contentDescription = null)
+        FilePipeMaterialRoundedSymbol(name = "folder_open", contentDescription = null)
         Text("  $label")
     }
 }
@@ -49,11 +41,15 @@ fun FolderPickerButton(
  */
 fun displayPath(
     path: String,
-    internalStorageRootDisplayName: String
+    internalStorageRootDisplayName: String,
 ): String {
+    if (path.startsWith("file://")) {
+        val filePath = path.toUri().path ?: path.removePrefix("file://")
+        return displayPath(filePath, internalStorageRootDisplayName)
+    }
     if (path.startsWith("content://")) {
         return try {
-            val docId = DocumentsContract.getTreeDocumentId(Uri.parse(path))
+            val docId = DocumentsContract.getTreeDocumentId(path.toUri())
             val relative = docId.substringAfter(":", "")
             when {
                 relative.isBlank() && docId.startsWith("primary", ignoreCase = true) ->
@@ -62,15 +58,19 @@ fun displayPath(
                 docId.startsWith("primary", ignoreCase = true) -> relative
                 else -> "SD Card/$relative"
             }
-        } catch (_: Exception) { path }
+        } catch (_: Exception) {
+            path
+        }
     }
-    val primaryExternalRoot = runCatching {
-        Environment.getExternalStorageDirectory().canonicalPath
-    }.getOrNull()
-    if (primaryExternalRoot != null) {
-        val pathCanonical = runCatching {
-            File(path.trim().trimEnd('/')).canonicalPath
+    val primaryExternalRoot =
+        runCatching {
+            Environment.getExternalStorageDirectory().canonicalPath
         }.getOrNull()
+    if (primaryExternalRoot != null) {
+        val pathCanonical =
+            runCatching {
+                File(path.trim().trimEnd('/')).canonicalPath
+            }.getOrNull()
         if (pathCanonical == primaryExternalRoot) return internalStorageRootDisplayName
         val primaryPrefix = "$primaryExternalRoot/"
         if (path.startsWith(primaryPrefix)) {
@@ -86,6 +86,53 @@ fun displayPath(
     return path.replace(sdCardPrefix) { "SD Card/" }
 }
 
+fun previewSourceFolderDisplayPath(
+    sourcePath: String,
+    fileName: String,
+    internalStorageRootDisplayName: String,
+): String {
+    val trimmed = sourcePath.trim()
+    if (trimmed.isEmpty()) return trimmed
+
+    if (trimmed.startsWith("content://")) {
+        val parentTreeUri =
+            runCatching {
+                val uri = trimmed.toUri()
+                val authority = uri.authority ?: return@runCatching null
+                val documentId =
+                    when {
+                        "document" in uri.pathSegments -> DocumentsContract.getDocumentId(uri)
+                        "tree" in uri.pathSegments -> DocumentsContract.getTreeDocumentId(uri)
+                        else -> null
+                    } ?: return@runCatching null
+                val parentDocumentId = parentDocumentId(documentId) ?: return@runCatching null
+                DocumentsContract.buildTreeDocumentUri(authority, parentDocumentId).toString()
+            }.getOrNull()
+        if (parentTreeUri != null) {
+            return displayPath(parentTreeUri, internalStorageRootDisplayName)
+        }
+        return displayPath(trimmed.substringBeforeLast("/", missingDelimiterValue = trimmed), internalStorageRootDisplayName)
+    }
+
+    val path =
+        if (trimmed.startsWith("file://")) {
+            trimmed.toUri().path ?: trimmed.removePrefix("file://")
+        } else {
+            trimmed
+        }
+    val parent = File(path).parent ?: path.removeSuffix(fileName).trimEnd('/', File.separatorChar)
+    return displayPath(parent, internalStorageRootDisplayName)
+}
+
+private fun parentDocumentId(documentId: String): String? {
+    val clean = documentId.trimEnd('/')
+    val slashIndex = clean.lastIndexOf('/')
+    if (slashIndex >= 0) return clean.substring(0, slashIndex)
+    val colonIndex = clean.indexOf(':')
+    if (colonIndex >= 0) return clean.substring(0, colonIndex + 1)
+    return null
+}
+
 /**
  * Document URI derived from the tree (recommended for [ActivityResultContracts.OpenDocumentTree] initial location).
  * For legacy absolute paths, converts via [absoluteStoragePathToTreeUri].
@@ -95,10 +142,12 @@ fun absoluteStoragePathToOpenTreeInitialUri(path: String): Uri? {
     if (path.startsWith("content://")) {
         // Already a SAF URI — just wrap as a document URI for the picker hint
         return try {
-            val treeUri = Uri.parse(path)
+            val treeUri = path.toUri()
             val documentId = DocumentsContract.getTreeDocumentId(treeUri)
             DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId)
-        } catch (_: Exception) { null }
+        } catch (_: Exception) {
+            null
+        }
     }
     val treeUri = absoluteStoragePathToTreeUri(path) ?: return null
     val documentId = DocumentsContract.getTreeDocumentId(treeUri)

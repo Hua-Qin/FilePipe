@@ -1,9 +1,9 @@
 package dev.bikram.filepipe.ui
 
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
-import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.data.preferences.AppPreferences
@@ -21,7 +21,7 @@ fun InAppRatingAutoPromptHost(
     preferences: AppPreferences,
     activity: ComponentActivity,
     userPreferencesRepository: UserPreferencesRepository,
-    appReviewLauncher: AppReviewLauncher
+    appReviewLauncher: AppReviewLauncher,
 ) {
     if (BuildConfig.FLAVOR != "playstore") return
 
@@ -30,7 +30,7 @@ fun InAppRatingAutoPromptHost(
     LaunchedEffect(
         preferences.inAppReviewAutoNeverAskAgain,
         preferences.playAutoReviewPromptedForLastUpdateTime,
-        preferences.hasSeenIntro
+        preferences.hasSeenIntro,
     ) {
         if (!preferences.hasSeenIntro) return@LaunchedEffect
         val lastUpdateMillis = InAppRatingAutoPrompt.packageLastUpdateTimeMillis(context)
@@ -38,12 +38,14 @@ fun InAppRatingAutoPromptHost(
         val debounceOk =
             nowMillis - InAppRatingAutoPrompt.SessionCoordination.lastInAppReviewAttemptWallClockMillis >=
                 InAppRatingAutoPrompt.SessionCoordination.AUTO_VS_MANUAL_DEBOUNCE_MS
-        val eligible = debounceOk && InAppRatingAutoPrompt.isEligibleForAutoPrompt(
-            lastUpdateTimeMillis = lastUpdateMillis,
-            nowMillis = nowMillis,
-            neverAskAgain = preferences.inAppReviewAutoNeverAskAgain,
-            promptedForLastUpdateTimeMillis = preferences.playAutoReviewPromptedForLastUpdateTime
-        )
+        val eligible =
+            debounceOk &&
+                InAppRatingAutoPrompt.isEligibleForAutoPrompt(
+                    lastUpdateTimeMillis = lastUpdateMillis,
+                    nowMillis = nowMillis,
+                    neverAskAgain = preferences.inAppReviewAutoNeverAskAgain,
+                    promptedForLastUpdateTimeMillis = preferences.playAutoReviewPromptedForLastUpdateTime,
+                )
         if (!eligible) return@LaunchedEffect
 
         appReviewLauncher.tryLaunchInAppReview(activity) {

@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.graphics.createBitmap
 
 /**
  * Renders the app icon the same way the system launcher preview does, including adaptive icons
@@ -21,19 +22,21 @@ import androidx.compose.ui.platform.LocalContext
 @Composable
 fun AppIconImage(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val imageBitmap: ImageBitmap = remember(context.applicationContext.packageName) {
-        val drawable = context.packageManager.getApplicationIcon(context.packageName)
-        val size = 256
-        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bmp ->
-            val canvas = Canvas(bmp)
-            drawable.setBounds(0, 0, size, size)
-            drawable.draw(canvas)
+    val imageBitmap: ImageBitmap =
+        remember(context.applicationContext.packageName) {
+            val drawable = context.packageManager.getApplicationIcon(context.packageName)
+            val size = 256
+            val bitmap =
+                createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bmp ->
+                    val canvas = Canvas(bmp)
+                    drawable.setBounds(0, 0, size, size)
+                    drawable.draw(canvas)
+                }
+            bitmap.asImageBitmap()
         }
-        bitmap.asImageBitmap()
-    }
     Image(
         bitmap = imageBitmap,
         contentDescription = null,
-        modifier = modifier
+        modifier = modifier,
     )
 }

@@ -7,5 +7,8 @@ import androidx.activity.ComponentActivity
  * [onFlowFinished] runs after [requestReviewFlow] / [launchReviewFlow] complete (success or failure).
  */
 fun interface AppReviewLauncher {
-    fun tryLaunchInAppReview(activity: ComponentActivity, onFlowFinished: () -> Unit)
+    fun tryLaunchInAppReview(
+        activity: ComponentActivity,
+        onFlowFinished: () -> Unit,
+    )
 }

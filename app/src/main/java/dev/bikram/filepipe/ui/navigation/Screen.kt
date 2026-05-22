@@ -1,9 +1,16 @@
 package dev.bikram.filepipe.ui.navigation
 
-sealed class Screen(val route: String) {
+sealed class Screen(
+    val route: String,
+) {
     data object Rules : Screen("rules")
+
     data object History : Screen("history")
+
     data object Settings : Screen("settings")
+
+    data object DevOptions : Screen("dev_options")
+
     data object Faq : Screen("faq?focusSection={focusSection}") {
         const val ARG_FOCUS_SECTION = "focusSection"
         const val FOCUS_STORAGE_ACCESS = "storage"
@@ -13,12 +20,12 @@ sealed class Screen(val route: String) {
     }
 
     data object RuleDetail : Screen(
-        "rule_detail/{ruleId}?templateIndex={templateIndex}&skipTemplatePicker={skipTemplatePicker}"
+        "rule_detail/{ruleId}?templateIndex={templateIndex}&skipTemplatePicker={skipTemplatePicker}",
     ) {
         fun createRoute(
             ruleId: Long = NEW_RULE_ID,
             templateIndex: Int = -1,
-            skipTemplatePicker: Boolean = false
+            skipTemplatePicker: Boolean = false,
         ): String {
             val queryParts = mutableListOf<String>()
             if (templateIndex >= 0) queryParts += "templateIndex=$templateIndex"
@@ -29,6 +36,7 @@ sealed class Screen(val route: String) {
                 "rule_detail/$ruleId?${queryParts.joinToString("&")}"
             }
         }
+
         const val ARG_RULE_ID = "ruleId"
         const val ARG_TEMPLATE_INDEX = "templateIndex"
         const val ARG_SKIP_TEMPLATE_PICKER = "skipTemplatePicker"
@@ -37,11 +45,13 @@ sealed class Screen(val route: String) {
 
     data object HistoryDetail : Screen("history_detail/{historyId}") {
         fun createRoute(historyId: Long) = "history_detail/$historyId"
+
         const val ARG_HISTORY_ID = "historyId"
     }
 
     data object HistoryForRule : Screen("history_for_rule/{ruleId}") {
         fun createRoute(ruleId: Long) = "history_for_rule/$ruleId"
+
         const val ARG_RULE_ID = "ruleId"
     }
 
