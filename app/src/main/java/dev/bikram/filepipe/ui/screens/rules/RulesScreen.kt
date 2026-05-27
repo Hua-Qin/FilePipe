@@ -478,9 +478,7 @@ fun RulesScreen(
                                     ) {
                                         Text(
                                             text = stringResource(R.string.run_button),
-                                            style = MaterialTheme.typography.labelLarge.copy(
-                                                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                                            ),
+                                            style = MaterialTheme.typography.labelLarge.copy(platformStyle = PlatformTextStyle(includeFontPadding = false)),
                                             modifier = Modifier.align(Alignment.CenterVertically),
                                         )
                                         Spacer(Modifier.width(6.dp))
@@ -488,9 +486,7 @@ fun RulesScreen(
                                             name = "play_arrow",
                                             contentDescription = null,
                                             size = 18.dp,
-                                            modifier = Modifier
-                                                .offset(x = 1.dp)
-                                                .align(Alignment.CenterVertically),
+                                            modifier = Modifier.offset(x = 1.dp).align(Alignment.CenterVertically),
                                         )
                                     }
                                 }

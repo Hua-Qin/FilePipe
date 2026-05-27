@@ -56,8 +56,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = filePipeApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 370
-        versionName = "3.7.0"
+        versionCode = 371
+        versionName = "3.7.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -159,6 +159,16 @@ extensions.configure<ApplicationExtension>("android") {
 
 room {
     schemaDirectory("$projectDir/schemas")
+}
+
+val copyHelpDoc =
+    tasks.register<Copy>("copyHelpDoc") {
+        from(rootProject.file("docs/HELP.md"))
+        into("src/main/assets")
+    }
+
+tasks.named("preBuild") {
+    dependsOn(copyHelpDoc)
 }
 
 detekt {

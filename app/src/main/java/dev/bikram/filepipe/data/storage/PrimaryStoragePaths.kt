@@ -100,5 +100,3 @@ fun absoluteStoragePathToTreeUri(path: String): Uri? {
     val documentId = if (tail.isEmpty()) "$volumeId:" else "$volumeId:$tail"
     return DocumentsContract.buildTreeDocumentUri(authority, documentId)
 }
-
-

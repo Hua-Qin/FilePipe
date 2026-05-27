@@ -313,7 +313,10 @@ private fun CompactContent(
     val runBlocked = isAnyRuleRunning && progress == null
 
     val typesText =
-        rule.fileExtensions.take(4).map { it.removePrefix(".") }.joinToString(" · ") +
+        rule.fileExtensions
+            .take(4)
+            .map { it.removePrefix(".") }
+            .joinToString(" · ") +
             if (rule.fileExtensions.size > 4) " +${rule.fileExtensions.size - 4}" else ""
     val destText = displayPath(rule.destinationFolderPath, internalStorageDisplayName).takeIf { it.isNotBlank() } ?: ""
     val infoText = listOf(typesText, destText).filter { it.isNotBlank() }.joinToString("  |  ")
@@ -527,314 +530,308 @@ private fun ExpandedContent(
             clickLabel = clickLabel,
             longClickLabel = longClickLabel,
         ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Box(
-                    modifier =
-                        Modifier.then(
-                            if (onLeadingLongClick != null) {
-                                Modifier.tapSoundCombinedClickable(
-                                    onClick = onClick,
-                                    onLongClick = onLeadingLongClick,
-                                    onClickLabel = clickLabel,
-                                    onLongClickLabel = longClickLabel,
-                                    role = Role.Button,
-                                )
-                            } else {
-                                Modifier
-                            },
-                        ),
-                ) {
-                    RuleIconOrEmoji(
-                        iconEmoji = rule.iconEmoji,
-                        icon = rule.icon,
-                        vectorSize = 28.dp,
-                        emojiFontSize = 22.sp,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier,
-                    )
-                }
-                Text(
-                    text = rule.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-            }
-            if (showOperationalControls) {
-                FilePipeSwitch(
-                    checked = rule.isEnabled,
-                    onCheckedChange = { enabled ->
-                        onToggleEnabled(enabled)
-                    },
-                    modifier = Modifier.padding(start = 8.dp),
-                )
-            }
-        }
-
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Spacer(Modifier.height(8.dp))
-
-            if (rule.fileExtensions.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.rule_card_types_none),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                FlowRow(
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    rule.fileExtensions.forEach { extension ->
-                        FilePipeFilterChip(
-                            selected = true,
-                            onClick = {},
-                            label = { Text(extension.removePrefix("."), style = MaterialTheme.typography.bodyMedium) },
-                            colors =
-                                FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                ),
-                            border =
-                                FilterChipDefaults.filterChipBorder(
-                                    enabled = true,
-                                    selected = true,
-                                    borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0f),
-                                ),
+                    Box(
+                        modifier =
+                            Modifier.then(
+                                if (onLeadingLongClick != null) {
+                                    Modifier.tapSoundCombinedClickable(
+                                        onClick = onClick,
+                                        onLongClick = onLeadingLongClick,
+                                        onClickLabel = clickLabel,
+                                        onLongClickLabel = longClickLabel,
+                                        role = Role.Button,
+                                    )
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                    ) {
+                        RuleIconOrEmoji(
+                            iconEmoji = rule.iconEmoji,
+                            icon = rule.icon,
+                            vectorSize = 28.dp,
+                            emojiFontSize = 22.sp,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier,
                         )
                     }
+                    Text(
+                        text = rule.name,
+                        style = MaterialTheme.typography.titleLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+                if (showOperationalControls) {
+                    FilePipeSwitch(
+                        checked = rule.isEnabled,
+                        onCheckedChange = { enabled ->
+                            onToggleEnabled(enabled)
+                        },
+                        modifier = Modifier.padding(start = 8.dp),
+                    )
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-
-            val notSet = stringResource(R.string.rule_card_destination_not_set)
-            val fromText =
-                if (rule.sourceFolderPaths.isEmpty()) {
-                    stringResource(R.string.rule_card_from_none)
-                } else {
-                    val shown = rule.sourceFolderPaths.take(3)
-                    val extra = rule.sourceFolderPaths.size - shown.size
-                    shown.joinToString(", ") { displayPath(it, internalStorageDisplayName) } +
-                        if (extra > 0) ", +$extra" else ""
-                }
-            LabeledInfoSingleLine(
-                label = stringResource(R.string.rule_card_from),
-                value = fromText,
-            )
-            Spacer(Modifier.height(4.dp))
-            LabeledInfoSingleLine(
-                label = stringResource(R.string.rule_card_to),
-                value =
-                    if (rule.destinationFolderPath.isEmpty()) {
-                        notSet
-                    } else {
-                        displayPath(rule.destinationFolderPath, internalStorageDisplayName)
-                    },
-            )
-
-            if (folderIssueSeverity != null) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 Spacer(Modifier.height(8.dp))
-                val issueColors = ruleCardFolderIssueColors(folderIssueSeverity)
-                Surface(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .tapSoundClickable(
-                                onClickLabel = stringResource(R.string.edit_rule),
-                                role = Role.Button,
-                                onClick = onStaleWarningClick,
-                            ),
-                    shape = MaterialTheme.shapes.large,
-                    color = issueColors.container,
-                    contentColor = issueColors.content,
-                ) {
-                    Row(
+
+                if (rule.fileExtensions.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.rule_card_types_none),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        rule.fileExtensions.forEach { extension ->
+                            FilePipeFilterChip(
+                                selected = true,
+                                onClick = {},
+                                label = { Text(extension.removePrefix("."), style = MaterialTheme.typography.bodyMedium) },
+                                colors =
+                                    FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    ),
+                                border =
+                                    FilterChipDefaults.filterChipBorder(
+                                        enabled = true,
+                                        selected = true,
+                                        borderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0f),
+                                    ),
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                val notSet = stringResource(R.string.rule_card_destination_not_set)
+                val fromText =
+                    if (rule.sourceFolderPaths.isEmpty()) {
+                        stringResource(R.string.rule_card_from_none)
+                    } else {
+                        val shown = rule.sourceFolderPaths.take(3)
+                        val extra = rule.sourceFolderPaths.size - shown.size
+                        shown.joinToString(", ") { displayPath(it, internalStorageDisplayName) } +
+                            if (extra > 0) ", +$extra" else ""
+                    }
+                LabeledInfoSingleLine(
+                    label = stringResource(R.string.rule_card_from),
+                    value = fromText,
+                )
+                Spacer(Modifier.height(4.dp))
+                LabeledInfoSingleLine(
+                    label = stringResource(R.string.rule_card_to),
+                    value =
+                        if (rule.destinationFolderPath.isEmpty()) {
+                            notSet
+                        } else {
+                            displayPath(rule.destinationFolderPath, internalStorageDisplayName)
+                        },
+                )
+
+                if (folderIssueSeverity != null) {
+                    Spacer(Modifier.height(8.dp))
+                    val issueColors = ruleCardFolderIssueColors(folderIssueSeverity)
+                    Surface(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                .tapSoundClickable(
+                                    onClickLabel = stringResource(R.string.edit_rule),
+                                    role = Role.Button,
+                                    onClick = onStaleWarningClick,
+                                ),
+                        shape = MaterialTheme.shapes.large,
+                        color = issueColors.container,
+                        contentColor = issueColors.content,
                     ) {
-                        FilePipeMaterialRoundedSymbol(
-                            name = "warning",
-                            contentDescription = null,
-                            size = 22.dp,
-                            tint = issueColors.content,
-                            weight = FontWeight.Medium,
-                        )
-                        Text(
-                            text = stringResource(R.string.rule_card_stale_folder_warning),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = issueColors.content,
-                            modifier = Modifier.weight(1f),
-                        )
-                        FilePipeMaterialRoundedSymbol(
-                            name = "edit",
-                            contentDescription = stringResource(R.string.edit_rule),
-                            size = 20.dp,
-                            tint = issueColors.content,
-                            weight = FontWeight.Medium,
-                        )
-                    }
-                }
-            }
-
-            rule.schedule?.let { schedule ->
-                Spacer(Modifier.height(4.dp))
-                val scheduleText =
-                    when (schedule.type) {
-                        ScheduleType.DAILY -> "Daily at %02d:%02d".format(schedule.hour, schedule.minute)
-                        ScheduleType.WEEKLY -> {
-                            val days = arrayOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                            val dayName = schedule.dayOfWeek?.let { days.getOrNull(it - 2) } ?: "?"
-                            "Weekly $dayName at %02d:%02d".format(schedule.hour, schedule.minute)
-                        }
-                        ScheduleType.EVERY_N_HOURS -> {
-                            val hours = schedule.intervalHours ?: 1
-                            "Every ${hours}h"
-                        }
-                    }
-                LabeledInfo(label = stringResource(R.string.schedule_card_label), value = scheduleText)
-            }
-
-            AnimatedVisibility(
-                visible = progress != null,
-                enter =
-                    reducedMotionEnterTransition(
-                        expandVertically(animationSpec = progressSpatialSpec) + fadeIn(animationSpec = progressFadeInSpec),
-                    ),
-                exit =
-                    reducedMotionExitTransition(
-                        shrinkVertically(animationSpec = progressSpatialSpec) + fadeOut(animationSpec = progressFadeOutSpec),
-                    ),
-            ) {
-                progress?.let { runProgress ->
-                    Column(
-                        modifier = Modifier.padding(top = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        if (runProgress.isComplete) {
-                            val summary =
-                                when {
-                                    runProgress.error != null -> stringResource(R.string.rule_card_progress_error, runProgress.error)
-                                    runProgress.totalFiles == 0 -> stringResource(R.string.rule_card_progress_no_matching_files)
-                                    else ->
-                                        when (rule.operationMode) {
-                                            OperationMode.COPY ->
-                                                pluralStringResource(
-                                                    R.plurals.rule_card_progress_files_copied_summary,
-                                                    runProgress.totalFiles,
-                                                    runProgress.filesMoved,
-                                                    runProgress.totalFiles,
-                                                )
-                                            OperationMode.MOVE ->
-                                                pluralStringResource(
-                                                    R.plurals.rule_card_progress_files_moved_summary,
-                                                    runProgress.totalFiles,
-                                                    runProgress.filesMoved,
-                                                    runProgress.totalFiles,
-                                                )
-                                        }
-                                }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-                                CircularWavyProgressIndicator(
-                                    progress = { 1f },
-                                    modifier = Modifier.size(28.dp),
-                                )
-                                Text(
-                                    text = summary,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color =
-                                        if (runProgress.error != null) {
-                                            MaterialTheme.colorScheme.error
-                                        } else {
-                                            MaterialTheme.colorScheme.primary
-                                        },
-                                )
-                            }
-                        } else if (runProgress.totalFiles > 0) {
-                            @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-                            val progressSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
-                            val animatedProgress by animateFloatAsState(
-                                targetValue = runProgress.progress,
-                                animationSpec = reducedMotionAwareSpec(progressSpec),
-                                label = "progress",
+                        Row(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            FilePipeMaterialRoundedSymbol(
+                                name = "warning",
+                                contentDescription = null,
+                                size = 22.dp,
+                                tint = issueColors.content,
+                                weight = FontWeight.Medium,
                             )
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                val currentFileName =
-                                    runProgress.currentFileName.ifBlank {
-                                        stringResource(R.string.rule_card_progress_unknown_file)
-                                    }
-                                LinearWavyProgressIndicator(
-                                    progress = { animatedProgress },
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .height(8.dp),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
-                                )
-                                Text(
-                                    text =
-                                        when (rule.operationMode) {
-                                            OperationMode.COPY ->
-                                                stringResource(
-                                                    R.string.rule_card_progress_copying_file,
-                                                    currentFileName,
-                                                    runProgress.filesMoved + 1,
-                                                    runProgress.totalFiles,
-                                                )
-                                            OperationMode.MOVE ->
-                                                stringResource(
-                                                    R.string.rule_card_progress_moving_file,
-                                                    currentFileName,
-                                                    runProgress.filesMoved + 1,
-                                                    runProgress.totalFiles,
-                                                )
-                                        },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
+                            Text(
+                                text = stringResource(R.string.rule_card_stale_folder_warning),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = issueColors.content,
+                                modifier = Modifier.weight(1f),
+                            )
+                            FilePipeMaterialRoundedSymbol(
+                                name = "edit",
+                                contentDescription = stringResource(R.string.edit_rule),
+                                size = 20.dp,
+                                tint = issueColors.content,
+                                weight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                }
+
+                rule.schedule?.let { schedule ->
+                    Spacer(Modifier.height(4.dp))
+                    val scheduleText =
+                        when (schedule.type) {
+                            ScheduleType.DAILY -> "Daily at %02d:%02d".format(schedule.hour, schedule.minute)
+                            ScheduleType.WEEKLY -> {
+                                val days = arrayOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+                                val dayName = schedule.dayOfWeek?.let { days.getOrNull(it - 2) } ?: "?"
+                                "Weekly $dayName at %02d:%02d".format(schedule.hour, schedule.minute)
                             }
-                        } else {
-                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                LinearWavyProgressIndicator(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .height(8.dp),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
+                            ScheduleType.EVERY_N_HOURS -> {
+                                val hours = schedule.intervalHours ?: 1
+                                "Every ${hours}h"
+                            }
+                        }
+                    LabeledInfo(label = stringResource(R.string.schedule_card_label), value = scheduleText)
+                }
+
+                AnimatedVisibility(
+                    visible = progress != null,
+                    enter =
+                        reducedMotionEnterTransition(
+                            expandVertically(animationSpec = progressSpatialSpec) + fadeIn(animationSpec = progressFadeInSpec),
+                        ),
+                    exit =
+                        reducedMotionExitTransition(
+                            shrinkVertically(animationSpec = progressSpatialSpec) + fadeOut(animationSpec = progressFadeOutSpec),
+                        ),
+                ) {
+                    progress?.let { runProgress ->
+                        Column(
+                            modifier = Modifier.padding(top = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            if (runProgress.isComplete) {
+                                val summary =
+                                    when {
+                                        runProgress.error != null -> stringResource(R.string.rule_card_progress_error, runProgress.error)
+                                        runProgress.totalFiles == 0 -> stringResource(R.string.rule_card_progress_no_matching_files)
+                                        else ->
+                                            when (rule.operationMode) {
+                                                OperationMode.COPY ->
+                                                    pluralStringResource(
+                                                        R.plurals.rule_card_progress_files_copied_summary,
+                                                        runProgress.totalFiles,
+                                                        runProgress.filesMoved,
+                                                        runProgress.totalFiles,
+                                                    )
+                                                OperationMode.MOVE ->
+                                                    pluralStringResource(
+                                                        R.plurals.rule_card_progress_files_moved_summary,
+                                                        runProgress.totalFiles,
+                                                        runProgress.filesMoved,
+                                                        runProgress.totalFiles,
+                                                    )
+                                            }
+                                    }
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                                    CircularWavyProgressIndicator(
+                                        progress = { 1f },
+                                        modifier = Modifier.size(28.dp),
+                                    )
+                                    Text(
+                                        text = summary,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color =
+                                            if (runProgress.error != null) {
+                                                MaterialTheme.colorScheme.error
+                                            } else {
+                                                MaterialTheme.colorScheme.primary
+                                            },
+                                    )
+                                }
+                            } else if (runProgress.totalFiles > 0) {
+                                @OptIn(ExperimentalMaterial3ExpressiveApi::class)
+                                val progressSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+                                val animatedProgress by animateFloatAsState(
+                                    targetValue = runProgress.progress,
+                                    animationSpec = reducedMotionAwareSpec(progressSpec),
+                                    label = "progress",
                                 )
-                                Text(
-                                    text = stringResource(R.string.rule_card_progress_scanning),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    val currentFileName =
+                                        runProgress.currentFileName.ifBlank {
+                                            stringResource(R.string.rule_card_progress_unknown_file)
+                                        }
+                                    LinearWavyProgressIndicator(
+                                        progress = { animatedProgress },
+                                        modifier = Modifier.fillMaxWidth().height(8.dp),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
+                                    )
+                                    Text(
+                                        text =
+                                            when (rule.operationMode) {
+                                                OperationMode.COPY ->
+                                                    stringResource(
+                                                        R.string.rule_card_progress_copying_file,
+                                                        currentFileName,
+                                                        runProgress.filesMoved + 1,
+                                                        runProgress.totalFiles,
+                                                    )
+                                                OperationMode.MOVE ->
+                                                    stringResource(
+                                                        R.string.rule_card_progress_moving_file,
+                                                        currentFileName,
+                                                        runProgress.filesMoved + 1,
+                                                        runProgress.totalFiles,
+                                                    )
+                                            },
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    LinearWavyProgressIndicator(
+                                        modifier = Modifier.fillMaxWidth().height(8.dp),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f),
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.rule_card_progress_scanning),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
-        }
         }
 
         if (showOperationalControls || cardActions.isNotEmpty()) {

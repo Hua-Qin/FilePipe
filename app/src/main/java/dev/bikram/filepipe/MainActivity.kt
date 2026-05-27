@@ -62,9 +62,10 @@ class MainActivity : ComponentActivity() {
             val preferencesState by userPreferencesRepository.preferencesFlow
                 .collectAsStateWithLifecycle(initialValue = null)
 
-            val introSeenAtLaunch = remember(preferencesState != null) {
-                preferencesState?.hasSeenIntro
-            }
+            val introSeenAtLaunch =
+                remember(preferencesState != null) {
+                    preferencesState?.hasSeenIntro
+                }
 
             if (preferencesState != null) {
                 isReady = true

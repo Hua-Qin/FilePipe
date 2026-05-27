@@ -137,12 +137,13 @@ private fun AddExtensionDialog(
         confirmButton = {
             FilePipeTextButton(
                 onClick = {
-                    val extensions = text
-                        .split(Regex("[,;\\s]+"))
-                        .map { it.trim().lowercase() }
-                        .filter { it.isNotEmpty() }
-                        .map { if (it.startsWith(".")) it else ".$it" }
-                        .filter { it.length > 1 }
+                    val extensions =
+                        text
+                            .split(Regex("[,;\\s]+"))
+                            .map { it.trim().lowercase() }
+                            .filter { it.isNotEmpty() }
+                            .map { if (it.startsWith(".")) it else ".$it" }
+                            .filter { it.length > 1 }
                     extensions.forEach { onAdd(it) }
                 },
                 enabled = text.isNotBlank(),
