@@ -51,7 +51,7 @@ class UpdateCheckerImpl
                             ?: return@runCatching null
 
                     val apkUpdatedAt = apkAsset.updated_at
-                    val currentFingerprint = "$remoteVersion|$apkUpdatedAt"
+                    val remoteReleaseFingerprint = "$remoteVersion|$apkUpdatedAt"
 
                     val ack = userPreferencesRepository.readGithubReleaseAck()
                     val effectiveFingerprint =
@@ -62,43 +62,24 @@ class UpdateCheckerImpl
                         }
 
                     val installedVersion = BuildConfig.VERSION_NAME
-                    val versionCmp = compareVersionNames(remoteVersion, installedVersion)
-
-                    when {
-                        versionCmp < 0 -> null
-                        versionCmp > 0 -> {
-                            if (effectiveFingerprint == currentFingerprint) {
-                                null
-                            } else {
-                                UpdateInfo(
-                                    versionName = remoteVersion,
-                                    downloadUrl = apkAsset.browser_download_url,
-                                    releaseNotes = release.body,
-                                    remoteApkFileName = apkAsset.name,
-                                    remoteApkAssetUpdatedAt = apkUpdatedAt,
-                                )
-                            }
-                        }
-                        else -> {
-                            if (effectiveFingerprint == null) {
-                                userPreferencesRepository.writeGithubReleaseAck(
-                                    fingerprint = currentFingerprint,
-                                    installedVersionName = installedVersion,
-                                )
-                                null
-                            } else if (effectiveFingerprint == currentFingerprint) {
-                                null
-                            } else {
-                                UpdateInfo(
-                                    versionName = remoteVersion,
-                                    downloadUrl = apkAsset.browser_download_url,
-                                    releaseNotes = release.body,
-                                    remoteApkFileName = apkAsset.name,
-                                    remoteApkAssetUpdatedAt = apkUpdatedAt,
-                                )
-                            }
-                        }
+                    if (!isGithubReleaseUpdateAvailable(remoteVersion, installedVersion, remoteReleaseFingerprint, effectiveFingerprint)) {
+                        return@runCatching null
                     }
+
+                    UpdateInfo(
+                        versionName = remoteVersion,
+                        downloadUrl = apkAsset.browser_download_url,
+                        releaseNotes = release.body,
+                        remoteApkFileName = apkAsset.name,
+                        remoteApkAssetUpdatedAt = apkUpdatedAt,
+                    )
                 }.getOrNull()
             }
     }
+
+internal fun isGithubReleaseUpdateAvailable(
+    remoteVersion: String,
+    installedVersion: String,
+    remoteReleaseFingerprint: String,
+    effectiveAcknowledgedFingerprint: String?,
+): Boolean = isRemoteVersionNewer(remoteVersion, installedVersion) && effectiveAcknowledgedFingerprint != remoteReleaseFingerprint

@@ -1,3 +1,13 @@
+## v3.7.5 - Granular color control
+
+### 🚀 New Features
+
+- Added a Surface shading slider so you can fine-tune how much color tint appears in app backgrounds and surfaces.
+- Added separate custom color controls for primary, secondary, and tertiary theme colors.
+- Custom themes can now show and save multi-color accent palettes.
+
+---
+
 ## v3.7.0 - Rule trash, color slider, expressive refresh
 
 ### ✨ New Features
