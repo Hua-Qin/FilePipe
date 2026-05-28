@@ -19,6 +19,8 @@ val LocalUseGradientBackground = compositionLocalOf { false }
 
 val LocalUseEnhancedShading = compositionLocalOf { false }
 
+val LocalShadingIntensity = compositionLocalOf { 0.0f }
+
 val LocalHeroOnCards = compositionLocalOf { false }
 
 data class GradientBackgroundColors(
@@ -66,8 +68,11 @@ data class FilePipeThemeState(
     val activeCustomSeedHex: String = "",
     val themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     val useGradientBackground: Boolean = true,
-    val useEnhancedShading: Boolean = false,
+    val shadingIntensity: Float = 0.0f,
     val progressiveBlurEnabled: Boolean = true,
-)
+) {
+    val useEnhancedShading: Boolean
+        get() = shadingIntensity > 0.0f
+}
 
 val LocalFilePipeThemeState = compositionLocalOf { FilePipeThemeState() }

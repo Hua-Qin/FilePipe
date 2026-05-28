@@ -388,6 +388,11 @@ class SettingsViewModel
                 userPreferencesRepository.setUseEnhancedShading(enabled)
             }
 
+        fun setShadingIntensity(intensity: Float) =
+            viewModelScope.launch {
+                userPreferencesRepository.setShadingIntensity(intensity)
+            }
+
         fun setUpdateCheckSchedule(schedule: UpdateCheckSchedule) =
             viewModelScope.launch {
                 userPreferencesRepository.setUpdateCheckSchedule(schedule)

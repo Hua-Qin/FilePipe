@@ -772,7 +772,7 @@ fun SettingsScreen(
                         activeCustomSeedHex = preferences.activeCustomSeedHex,
                         themePaletteStyle = preferences.themePaletteStyle,
                         useGradientBackground = preferences.useGradientBackground,
-                        useEnhancedShading = preferences.useEnhancedShading,
+                        shadingIntensity = preferences.shadingIntensity,
                         progressiveBlurEnabled = preferences.progressiveBlurEnabled,
                         onThemeMode = viewModel::setThemeMode,
                         onColorSource = viewModel::setColorSource,
@@ -782,7 +782,7 @@ fun SettingsScreen(
                         onPreviewCustomSeedHex = viewModel::previewCustomSeedHex,
                         onRemoveCustomSeedHex = viewModel::removeCustomSeedHex,
                         onUseGradientBackground = viewModel::setUseGradientBackground,
-                        onUseEnhancedShading = viewModel::setUseEnhancedShading,
+                        onShadingIntensity = viewModel::setShadingIntensity,
                         onProgressiveBlurEnabled = viewModel::setProgressiveBlurEnabled,
                         onBlackThemeEffectClick = {
                             coroutineScope.launch {

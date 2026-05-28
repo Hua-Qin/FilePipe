@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
                 savedCustomSeedHexes = preferences.savedCustomSeedHexes,
                 themePaletteStyle = preferences.themePaletteStyle,
                 hapticFeedbackEnabled = preferences.hapticFeedbackEnabled,
-                useEnhancedShading = preferences.useEnhancedShading,
+                shadingIntensity = preferences.shadingIntensity,
                 activeCustomSeedHex = preferences.activeCustomSeedHex,
                 useGradientBackground = preferences.useGradientBackground,
                 progressiveBlurEnabled = preferences.progressiveBlurEnabled,

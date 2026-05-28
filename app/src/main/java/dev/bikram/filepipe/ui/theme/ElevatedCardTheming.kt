@@ -2,15 +2,15 @@ package dev.bikram.filepipe.ui.theme
 
 import androidx.compose.material3.CardColors
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.ColorUtils
 import dev.bikram.filepipe.data.preferences.AppThemeMode
+
+private val DarkContent = Color(0xFFE6E6EA)
+private val LightContent = Color(0xFF1C1B1F)
 
 /**
  * Elevated card colors used by every list card so all cards read the same as
@@ -19,11 +19,14 @@ import dev.bikram.filepipe.data.preferences.AppThemeMode
  */
 @Composable
 fun elevatedCardColors(): CardColors {
-    val scheme = MaterialTheme.colorScheme
     val themeState = LocalFilePipeThemeState.current
-    val darkUi = ColorUtils.calculateLuminance(scheme.background.toArgb()) < 0.35
-    val contentColor = if (darkUi) Color(0xFFE6E6EA) else Color(0xFF1C1B1F)
-    val containerColor = resolveElevatedCardContainerColor(scheme, themeState.themeMode, darkUi)
+    val containerColor =
+        if (themeState.themeMode == AppThemeMode.BLACK) {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        }
+    val contentColor = if (LocalIsDark.current) DarkContent else LightContent
     return CardDefaults.elevatedCardColors(
         containerColor = containerColor,
         contentColor = contentColor,
@@ -40,19 +43,3 @@ fun cardFilledTonalIconButtonColors(): IconButtonColors =
         containerColor = cardIconContainerColor(),
         contentColor = MaterialTheme.colorScheme.primary,
     )
-
-private fun resolveElevatedCardContainerColor(
-    scheme: ColorScheme,
-    themeMode: AppThemeMode,
-    darkUi: Boolean,
-): Color {
-    val baseRung =
-        when {
-            themeMode == AppThemeMode.BLACK -> scheme.surfaceContainerLow
-            darkUi -> scheme.surfaceContainerHigh
-            else -> scheme.surfaceContainer
-        }
-    val liftTarget = if (darkUi) scheme.surfaceContainerHighest else scheme.surfaceBright
-    val liftAmount = if (darkUi) 0.34f else 0.18f
-    return Color(ColorUtils.blendARGB(baseRung.toArgb(), liftTarget.toArgb(), liftAmount))
-}

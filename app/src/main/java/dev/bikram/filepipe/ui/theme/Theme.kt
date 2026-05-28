@@ -109,14 +109,18 @@ private fun ColorScheme.toOled(): ColorScheme =
     )
 
 /** Blend every surface role toward the active accent so panels visibly pick up the theme hue. */
-private fun ColorScheme.tintSurfacesTowardPrimary(darkTheme: Boolean): ColorScheme {
+private fun ColorScheme.tintSurfacesTowardPrimary(
+    darkTheme: Boolean,
+    intensityFactor: Float,
+): ColorScheme {
+    if (intensityFactor <= 0.0f) return this
     val accentArgb =
         ColorUtils.blendARGB(
             primary.toArgb(),
             primaryContainer.toArgb(),
             if (darkTheme) 0.4f else 0.3f,
         )
-    val blendAmount = if (darkTheme) 0.24f else 0.15f
+    val blendAmount = (if (darkTheme) 0.24f else 0.15f) * intensityFactor
 
     fun tinted(role: Color) = Color(ColorUtils.blendARGB(role.toArgb(), accentArgb, blendAmount))
     return copy(
@@ -226,8 +230,7 @@ fun FilePipeTheme(
     savedCustomSeedHexes: List<String> = emptyList(),
     themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
     hapticFeedbackEnabled: Boolean = true,
-    /** When true, omit primary surface boost (Remember-style enhanced shading). */
-    useEnhancedShading: Boolean = false,
+    shadingIntensity: Float = 0.0f,
     activeCustomSeedHex: String = "",
     useGradientBackground: Boolean = true,
     progressiveBlurEnabled: Boolean = true,
@@ -252,8 +255,10 @@ fun FilePipeTheme(
 
     /** Non-wallpaper themes use either curated triplets or a custom seed ramp. */
     val staticTriplet =
-        if (useDynamic || colorSource == AppColorSource.CUSTOM) {
+        if (useDynamic) {
             null
+        } else if (colorSource == AppColorSource.CUSTOM) {
+            parseCustomTriplet(activeCustomSeedHex)
         } else {
             colorSource.curatedTriplet()
         }
@@ -261,10 +266,7 @@ fun FilePipeTheme(
         if (useDynamic || staticTriplet != null) {
             null
         } else {
-            when (colorSource) {
-                AppColorSource.CUSTOM -> parseSeedColorHexToColorOrNull(activeCustomSeedHex) ?: Blue40
-                else -> colorSource.seedPrimary() ?: Blue40
-            }
+            colorSource.seedPrimary() ?: Blue40
         }
 
     val baseColorScheme =
@@ -297,8 +299,11 @@ fun FilePipeTheme(
     val oledAdjusted = if (black) baseColorScheme.toOled() else baseColorScheme
     val colorScheme =
         (
-            if (!useEnhancedShading && !black) {
-                oledAdjusted.tintSurfacesTowardPrimary(darkTheme = darkTheme)
+            if (!black) {
+                oledAdjusted.tintSurfacesTowardPrimary(
+                    darkTheme = darkTheme,
+                    intensityFactor = shadingIntensity,
+                )
             } else {
                 oledAdjusted
             }
@@ -367,14 +372,15 @@ fun FilePipeTheme(
             activeCustomSeedHex = activeCustomSeedHex,
             themePaletteStyle = themePaletteStyle,
             useGradientBackground = effectiveUseGradientBackground,
-            useEnhancedShading = useEnhancedShading,
+            shadingIntensity = shadingIntensity,
             progressiveBlurEnabled = progressiveBlurEnabled,
         )
 
     CompositionLocalProvider(
         LocalIsDark provides darkTheme,
         LocalUseGradientBackground provides effectiveUseGradientBackground,
-        LocalUseEnhancedShading provides useEnhancedShading,
+        LocalUseEnhancedShading provides (shadingIntensity > 0.0f),
+        LocalShadingIntensity provides shadingIntensity,
         LocalHeroOnCards provides false,
         LocalBlurBars provides progressiveBlurEnabled,
         LocalFilePipeThemeState provides themeState,

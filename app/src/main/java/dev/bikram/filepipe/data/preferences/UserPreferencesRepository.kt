@@ -7,6 +7,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -72,6 +73,8 @@ private object PrefKeys {
     val UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED = booleanPreferencesKey("update_apk_downloads_copy_succeeded")
     val USE_GRADIENT_BACKGROUND = booleanPreferencesKey("use_gradient_background")
     val ENHANCED_SHADING = booleanPreferencesKey("enhanced_shading")
+    val SHADING_INTENSITY = stringPreferencesKey("shading_intensity")
+    val SHADING_INTENSITY_FACTOR = floatPreferencesKey("shading_intensity_factor")
 
     /** Legacy DataStore key; read once then removed in [UserPreferencesRepository.migrateLegacyEnhancedShadingPreferenceIfNeeded]. */
     val ENHANCED_SHADING_LEGACY = booleanPreferencesKey("fixed_card_colors")
@@ -86,6 +89,41 @@ private object PrefKeys {
         longPreferencesKey("play_auto_review_prompted_for_last_update_time")
     val DEVELOPER_OPTIONS_ENABLED = booleanPreferencesKey("developer_options_enabled")
 }
+
+private enum class ShadingIntensity {
+    NONE,
+    SUBTLE,
+    MEDIUM,
+    INTENSE,
+}
+
+private fun shadingIntensityToLegacyEnum(intensity: Float): ShadingIntensity =
+    when {
+        intensity <= 0.2f -> ShadingIntensity.NONE
+        intensity <= 0.7f -> ShadingIntensity.SUBTLE
+        intensity <= 1.4f -> ShadingIntensity.MEDIUM
+        else -> ShadingIntensity.INTENSE
+    }
+
+private fun legacyShadingEnumToFactor(intensity: ShadingIntensity): Float =
+    when (intensity) {
+        ShadingIntensity.NONE -> 0.0f
+        ShadingIntensity.SUBTLE -> 0.4f
+        ShadingIntensity.MEDIUM -> 1.0f
+        ShadingIntensity.INTENSE -> 1.8f
+    }
+
+private fun readShadingIntensity(prefs: Preferences): Float =
+    prefs[PrefKeys.SHADING_INTENSITY_FACTOR]
+        ?: runCatching {
+            legacyShadingEnumToFactor(ShadingIntensity.valueOf(prefs[PrefKeys.SHADING_INTENSITY] ?: ""))
+        }.getOrElse {
+            val legacySkipTint =
+                prefs[PrefKeys.ENHANCED_SHADING]
+                    ?: prefs[PrefKeys.ENHANCED_SHADING_LEGACY]
+                    ?: true
+            if (legacySkipTint) 0.0f else 1.0f
+        }
 
 @Singleton
 class UserPreferencesRepository
@@ -176,10 +214,7 @@ class UserPreferencesRepository
                     saveUpdateApkToDownloads = prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] ?: false,
                     updateApkDownloadsCopySucceeded = prefs[PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED] ?: false,
                     useGradientBackground = prefs[PrefKeys.USE_GRADIENT_BACKGROUND] ?: true,
-                    useEnhancedShading =
-                        prefs[PrefKeys.ENHANCED_SHADING]
-                            ?: prefs[PrefKeys.ENHANCED_SHADING_LEGACY]
-                            ?: false,
+                    shadingIntensity = readShadingIntensity(prefs),
                     folderAccessMode =
                         normalizeFolderAccessModeStored(
                             prefs[PrefKeys.FOLDER_ACCESS_MODE]?.let { raw ->
@@ -360,8 +395,14 @@ class UserPreferencesRepository
         }
 
         suspend fun setUseEnhancedShading(enabled: Boolean) {
+            setShadingIntensity(if (enabled) 1.0f else 0.0f)
+        }
+
+        suspend fun setShadingIntensity(intensity: Float) {
             dataStore.edit { prefs ->
-                prefs[PrefKeys.ENHANCED_SHADING] = enabled
+                prefs[PrefKeys.SHADING_INTENSITY_FACTOR] = intensity
+                prefs[PrefKeys.SHADING_INTENSITY] = shadingIntensityToLegacyEnum(intensity).name
+                prefs[PrefKeys.ENHANCED_SHADING] = intensity <= 0.0f
                 prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
             }
         }
@@ -443,6 +484,8 @@ class UserPreferencesRepository
                 prefs.remove(PrefKeys.ACTIVE_CUSTOM_SEED_HEX)
                 prefs.remove(PrefKeys.USE_GRADIENT_BACKGROUND)
                 prefs.remove(PrefKeys.ENHANCED_SHADING)
+                prefs.remove(PrefKeys.SHADING_INTENSITY)
+                prefs.remove(PrefKeys.SHADING_INTENSITY_FACTOR)
                 prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
                 prefs.remove(PrefKeys.PROGRESSIVE_BLUR)
                 prefs.remove(PrefKeys.HAPTIC_FEEDBACK)
@@ -623,7 +666,10 @@ class UserPreferencesRepository
                 prefs[PrefKeys.SAVE_UPDATE_APK_TO_DOWNLOADS] = dto.saveUpdateApkToDownloads
                 prefs.remove(PrefKeys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED)
                 prefs[PrefKeys.USE_GRADIENT_BACKGROUND] = dto.useGradientBackground
-                prefs[PrefKeys.ENHANCED_SHADING] = dto.useEnhancedShading
+                val shadingIntensity = dto.shadingIntensity ?: if (dto.useEnhancedShading) 0.0f else 1.0f
+                prefs[PrefKeys.SHADING_INTENSITY_FACTOR] = shadingIntensity
+                prefs[PrefKeys.SHADING_INTENSITY] = shadingIntensityToLegacyEnum(shadingIntensity).name
+                prefs[PrefKeys.ENHANCED_SHADING] = shadingIntensity <= 0.0f
                 prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
 
                 dto.folderAccessMode?.let { raw ->
