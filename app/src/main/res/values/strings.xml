@@ -346,6 +346,8 @@
     <string name="settings_gradient_background_desc">Tinted background using your theme color</string>
     <string name="settings_enhanced_shading">Enhanced shading</string>
     <string name="settings_enhanced_shading_desc">Makes cards darker in dark mode and lighter in light mode</string>
+    <string name="settings_surface_shading">Surface shading</string>
+    <string name="settings_surface_shading_desc">Adjust the amount of color tint mixed into backgrounds</string>
     <string name="settings_black_theme_effect_disabled">Can\'t change this in Black theme</string>
     <string name="settings_backup_section">Backup &amp; restore</string>
     <string name="settings_choose_local_backup_folder">Choose local backup folder</string>
@@ -397,7 +399,9 @@
     <string name="theme_color_berry">Berry</string>
     <string name="theme_color_custom">Custom</string>
     <string name="settings_palette_style">Palette style</string>
-    <string name="settings_theme_preview_named">Preview - %1$s</string>
+    <string name="settings_palette">Palette</string>
+    <string name="settings_theme_preview_named">Preview · %1$s</string>
+    <string name="settings_theme_preview_customize">Customize</string>
     <string name="settings_theme_preview_surface_ladder">Surface ladder</string>
     <string name="settings_theme_preview_accent_containers">Accent containers</string>
     <string name="settings_theme_preview_label_lowest">lowest</string>
@@ -410,7 +414,9 @@
     <string name="settings_theme_preview_label_secondary">secondary</string>
     <string name="settings_theme_preview_label_tertiary">tertiary</string>
     <string name="settings_theme_preview_sample">Aa</string>
-    <string name="settings_custom_seed_slider_title">Select a color</string>
+    <string name="settings_custom_seed_slider_title">Select primary color</string>
+    <string name="settings_custom_seed_slider_title_secondary">Select a secondary color</string>
+    <string name="settings_custom_seed_slider_title_tertiary">Select a tertiary color</string>
     <string name="settings_custom_seed_dialog_title">Add custom accent color</string>
     <string name="settings_custom_seed_remove_title">Remove this color?</string>
     <string name="settings_custom_seed_remove_message">It will be removed from your saved custom colors</string>
@@ -668,7 +674,7 @@
     <string name="diagnostics_saved_custom_seeds_format">Saved custom seeds: %1$d</string>
     <string name="diagnostics_active_custom_seed_format">Active custom seed set: %1$s</string>
     <string name="diagnostics_gradient_background_format">Gradient background: %1$s</string>
-    <string name="diagnostics_enhanced_shading_format">Enhanced shading: %1$s</string>
+    <string name="diagnostics_surface_shading_format">Surface shading: %1$s</string>
     <string name="diagnostics_folder_access_mode_format">Folder access mode: %1$s</string>
     <string name="diagnostics_log_retention_days_format">Log retention days: %1$d</string>
     <string name="diagnostics_auto_export_rule_change_format">Auto export on rule change: %1$s</string>

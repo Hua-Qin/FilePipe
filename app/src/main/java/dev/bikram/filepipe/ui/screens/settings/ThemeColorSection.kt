@@ -2,8 +2,6 @@ package dev.bikram.filepipe.ui.screens.settings
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +9,8 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +21,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -32,9 +34,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Label
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
@@ -42,6 +49,7 @@ import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -67,7 +75,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -76,6 +86,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.ColorUtils
@@ -83,6 +95,7 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
+import dev.bikram.filepipe.data.preferences.generateTripletForSeed
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
@@ -101,10 +114,13 @@ import dev.bikram.filepipe.ui.feedback.performRejectHaptic
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
+import dev.bikram.filepipe.ui.theme.normalizeSeedHexOrNull
+import dev.bikram.filepipe.ui.theme.parseCustomTriplet
 import dev.bikram.filepipe.ui.theme.parseSeedColorHexToColorOrNull
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
 import java.util.Locale
+import kotlin.math.roundToInt
 import android.graphics.Color as AndroidColor
 
 @Composable
@@ -189,8 +205,9 @@ fun ThemeAccentRow(
                 } else {
                     MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
                 }
+            val triplet = runCatching { parseCustomTriplet(storedHex) }.getOrNull()
             val fillColor =
-                parseSeedColorHexToColorOrNull(storedHex)
+                parseSeedColorHexToColorOrNull(storedHex.split("|").first())
                     ?: MaterialTheme.colorScheme.surfaceVariant
             Box(
                 modifier =
@@ -209,13 +226,21 @@ fun ThemeAccentRow(
                         ).semantics { role = Role.RadioButton },
                 contentAlignment = Alignment.Center,
             ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(44.dp)
-                            .clip(CircleShape)
-                            .background(fillColor),
-                )
+                if (triplet != null) {
+                    CuratedTripletSwatch(
+                        primary = triplet.primary,
+                        secondary = triplet.secondary,
+                        tertiary = triplet.tertiary,
+                    )
+                } else {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .background(fillColor),
+                    )
+                }
             }
         }
         item(key = "add_custom_seed") {
@@ -373,7 +398,7 @@ fun AppearanceSection(
     activeCustomSeedHex: String,
     themePaletteStyle: ThemePaletteStyle,
     useGradientBackground: Boolean,
-    useEnhancedShading: Boolean,
+    shadingIntensity: Float,
     progressiveBlurEnabled: Boolean,
     onThemeMode: (AppThemeMode) -> Unit,
     onColorSource: (AppColorSource) -> Unit,
@@ -383,7 +408,7 @@ fun AppearanceSection(
     onPreviewCustomSeedHex: (String) -> Unit,
     onRemoveCustomSeedHex: (String) -> Unit,
     onUseGradientBackground: (Boolean) -> Unit,
-    onUseEnhancedShading: (Boolean) -> Unit,
+    onShadingIntensity: (Float) -> Unit,
     onProgressiveBlurEnabled: (Boolean) -> Unit,
     onBlackThemeEffectClick: () -> Unit,
 ) {
@@ -430,6 +455,42 @@ fun AppearanceSection(
             )
         }
         GroupedListItem(position = GroupPosition.MIDDLE) {
+            val enabled = !blackThemeEffectsDisabled
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_surface_shading),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color =
+                            if (enabled) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                            },
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_surface_shading_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color =
+                            if (enabled) {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            },
+                    )
+                }
+                ShadingIntensitySlider(
+                    intensity = shadingIntensity,
+                    enabled = enabled,
+                    onDisabledClick = onBlackThemeEffectClick,
+                    onValueChange = onShadingIntensity,
+                )
+            }
+        }
+        GroupedListItem(position = GroupPosition.MIDDLE) {
             AppearanceToggleItem(
                 title = stringResource(R.string.settings_gradient_background),
                 subtitle = stringResource(R.string.settings_gradient_background_desc),
@@ -437,16 +498,6 @@ fun AppearanceSection(
                 enabled = !blackThemeEffectsDisabled,
                 onDisabledClick = onBlackThemeEffectClick,
                 onCheckedChange = onUseGradientBackground,
-            )
-        }
-        GroupedListItem(position = GroupPosition.MIDDLE) {
-            AppearanceToggleItem(
-                title = stringResource(R.string.settings_enhanced_shading),
-                subtitle = stringResource(R.string.settings_enhanced_shading_desc),
-                checked = useEnhancedShading || blackThemeEffectsDisabled,
-                enabled = !blackThemeEffectsDisabled,
-                onDisabledClick = onBlackThemeEffectClick,
-                onCheckedChange = onUseEnhancedShading,
             )
         }
         GroupedListItem(position = GroupPosition.LAST) {
@@ -477,9 +528,13 @@ private fun AppearanceStudioControls(
     onPreviewCustomSeedHex: (String) -> Unit,
 ) {
     var customPickerExpanded by rememberSaveable { mutableStateOf(false) }
+    var editingTarget by rememberSaveable { mutableStateOf(ColorTarget.PRIMARY) }
     val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
-    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
-    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+    LaunchedEffect(customPickerExpanded) {
+        if (!customPickerExpanded) {
+            editingTarget = ColorTarget.PRIMARY
+        }
+    }
 
     Column(
         modifier =
@@ -492,57 +547,108 @@ private fun AppearanceStudioControls(
             selected = themeMode,
             onSelect = onThemeMode,
         )
-        ThemeAccentRow(
-            colorSource = colorSource,
-            activeCustomSeedHex = activeCustomSeedHex,
-            savedCustomSeedHexes = savedCustomSeedHexes,
-            customPickerExpanded = customPickerExpanded,
-            onSelectPreset = onColorSource,
-            onSelectCustomHex = onSelectCustomSeedHex,
-            onCustomHexLongPress = onCustomHexLongPress,
-            onAddCustomHexClick = {
-                customPickerExpanded = !customPickerExpanded
-            },
-        )
-        AnimatedVisibility(
-            visible = customPickerExpanded,
-            enter = fadeIn(animationSpec = fadeInSpec) + expandVertically(animationSpec = spatialSpec),
-            exit = fadeOut(animationSpec = fadeOutSpec) + shrinkVertically(animationSpec = spatialSpec),
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            CustomColorSlider(
-                initialSeedHex =
-                    customSliderInitialSeedHex(
-                        colorSource = colorSource,
-                        activeCustomSeedHex = activeCustomSeedHex,
-                        currentPrimary = MaterialTheme.colorScheme.primary,
-                    ),
-                onPreviewColor = onPreviewCustomSeedHex,
-                onSaveColor = onAddCustomSeedHex,
-            )
-        }
-        AppearanceStudioSection(title = stringResource(R.string.settings_palette_style)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_palette),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                    modifier = Modifier.weight(1f),
+                )
+            }
             ThemePaletteStyleRow(
                 selected = themePaletteStyle,
                 enabled = colorSource.supportsPaletteStyle,
                 onSelect = onPaletteStyle,
             )
         }
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            ThemeAccentRow(
+                colorSource = colorSource,
+                activeCustomSeedHex = activeCustomSeedHex,
+                savedCustomSeedHexes = savedCustomSeedHexes,
+                customPickerExpanded = customPickerExpanded,
+                onSelectPreset = { source ->
+                    if (customPickerExpanded) {
+                        editingTarget = ColorTarget.PRIMARY
+                    }
+                    onColorSource(source)
+                },
+                onSelectCustomHex = { hex ->
+                    if (customPickerExpanded) {
+                        editingTarget = ColorTarget.PRIMARY
+                    }
+                    onSelectCustomSeedHex(hex)
+                },
+                onCustomHexLongPress = onCustomHexLongPress,
+                onAddCustomHexClick = {
+                    customPickerExpanded = !customPickerExpanded
+                },
+            )
+            AnimatedVisibility(
+                visible = customPickerExpanded,
+                enter = expandVertically(animationSpec = spatialSpec, expandFrom = Alignment.Top),
+                exit = shrinkVertically(animationSpec = spatialSpec, shrinkTowards = Alignment.Top),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Spacer(Modifier.height(0.dp))
+                    CustomColorSlider(
+                        initialSeedHex =
+                            customSliderInitialSeedHex(
+                                colorSource = colorSource,
+                                activeCustomSeedHex = activeCustomSeedHex,
+                                currentPrimary = MaterialTheme.colorScheme.primary,
+                            ),
+                        editingTarget = editingTarget,
+                        onPreviewColor = onPreviewCustomSeedHex,
+                        onSaveColor = onAddCustomSeedHex,
+                    )
+                }
+            }
+        }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f))
-        ThemePreviewPanel(colorSource = colorSource)
+        ThemePreviewPanel(
+            colorSource = colorSource,
+            isInteractive = colorSource == AppColorSource.CUSTOM,
+            selectedTarget = editingTarget,
+            onTargetSelect = { target ->
+                editingTarget = target
+                customPickerExpanded = true
+            },
+        )
     }
 }
 
 @Composable
 private fun CustomColorSlider(
     initialSeedHex: String,
+    editingTarget: ColorTarget,
     onPreviewColor: (String) -> Unit,
     onSaveColor: (String) -> Unit,
 ) {
-    val normalizedInitialSeedHex = normalizeCustomSeedHexOrNull(initialSeedHex) ?: colorHexFromHue(DEFAULT_CUSTOM_HUE)
-    var selectedSeedHex by rememberSaveable(normalizedInitialSeedHex) { mutableStateOf(normalizedInitialSeedHex) }
+    var currentSeedHex by remember(initialSeedHex) {
+        mutableStateOf(normalizeCustomSeedHexOrNull(initialSeedHex) ?: colorHexFromHue(DEFAULT_CUSTOM_HUE))
+    }
+    val targetHex =
+        remember(currentSeedHex, editingTarget) {
+            extractTargetHex(currentSeedHex, editingTarget)
+        }
+    val normalizedTargetHex = normalizeSeedHexOrNull(targetHex) ?: colorHexFromHue(DEFAULT_CUSTOM_HUE)
     var hexEditing by rememberSaveable { mutableStateOf(false) }
     var hexDraft by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(normalizedInitialSeedHex.toHexFieldValue())
+        mutableStateOf(normalizedTargetHex.toHexFieldValue())
     }
     val hexFocusRequester = remember { FocusRequester() }
     var panelCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
@@ -551,20 +657,20 @@ private fun CustomColorSlider(
     fun commitHexEditing(): String {
         val draftHex =
             if (hexDraft.text.length == 6) {
-                normalizeCustomSeedHexOrNull("#${hexDraft.text}")
+                normalizeSeedHexOrNull("#${hexDraft.text}")
             } else {
                 null
             }
-        val committedHex = draftHex ?: selectedSeedHex
-        selectedSeedHex = committedHex
-        hexDraft = committedHex.toHexFieldValue()
-        if (hexEditing && draftHex != null) onPreviewColor(committedHex)
+        val committedTargetHex = draftHex ?: normalizedTargetHex
+        hexDraft = committedTargetHex.toHexFieldValue()
+        val nextSeedHex = updateTargetHex(currentSeedHex, committedTargetHex, editingTarget)
+        currentSeedHex = nextSeedHex
+        if (hexEditing && draftHex != null) onPreviewColor(nextSeedHex)
         hexEditing = false
-        return committedHex
+        return nextSeedHex
     }
-    LaunchedEffect(normalizedInitialSeedHex) {
-        selectedSeedHex = normalizedInitialSeedHex
-        hexDraft = normalizedInitialSeedHex.toHexFieldValue()
+    LaunchedEffect(normalizedTargetHex) {
+        hexDraft = normalizedTargetHex.toHexFieldValue()
     }
     LaunchedEffect(hexEditing) {
         if (hexEditing) hexFocusRequester.requestFocus()
@@ -574,12 +680,12 @@ private fun CustomColorSlider(
         delay(HEX_INPUT_DEBOUNCE_MILLIS)
         val normalized = "#${hexDraft.text.uppercase(Locale.US)}"
         if (hueFromHexColor(normalized) != null) {
-            selectedSeedHex = normalized
-            onPreviewColor(normalized)
+            val nextSeedHex = updateTargetHex(currentSeedHex, normalized, editingTarget)
+            currentSeedHex = nextSeedHex
+            onPreviewColor(nextSeedHex)
         }
     }
-    val selectedHex = selectedSeedHex
-    val panelShape = MaterialTheme.shapes.extraLarge
+    val panelShape = MaterialTheme.shapes.extraLargeIncreased
     val sliderPanelColor = MaterialTheme.colorScheme.surfaceContainerHigh
     val saveColorLabel = stringResource(R.string.save)
 
@@ -595,7 +701,7 @@ private fun CustomColorSlider(
                 Modifier
                     .fillMaxWidth()
                     .onGloballyPositioned { panelCoordinates = it }
-                    .pointerInput(hexEditing, hexDraft, selectedSeedHex) {
+                    .pointerInput(hexEditing, hexDraft, currentSeedHex, editingTarget) {
                         awaitEachGesture {
                             awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                             val wasEditingAtDown = hexEditing
@@ -615,19 +721,53 @@ private fun CustomColorSlider(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                val rawString =
+                    when (editingTarget) {
+                        ColorTarget.PRIMARY -> stringResource(R.string.settings_custom_seed_slider_title)
+                        ColorTarget.SECONDARY -> stringResource(R.string.settings_custom_seed_slider_title_secondary)
+                        ColorTarget.TERTIARY -> stringResource(R.string.settings_custom_seed_slider_title_tertiary)
+                    }
+                val targetWord =
+                    when (editingTarget) {
+                        ColorTarget.PRIMARY -> stringResource(R.string.settings_theme_preview_label_primary).lowercase(Locale.US)
+                        ColorTarget.SECONDARY -> stringResource(R.string.settings_theme_preview_label_secondary).lowercase(Locale.US)
+                        ColorTarget.TERTIARY -> stringResource(R.string.settings_theme_preview_label_tertiary).lowercase(Locale.US)
+                    }
+                val parsedTriplet = remember(currentSeedHex) { parseCustomTriplet(currentSeedHex) }
+                val targetColor =
+                    when (editingTarget) {
+                        ColorTarget.PRIMARY -> parsedTriplet?.primary ?: MaterialTheme.colorScheme.primary
+                        ColorTarget.SECONDARY -> parsedTriplet?.secondary ?: MaterialTheme.colorScheme.secondary
+                        ColorTarget.TERTIARY -> parsedTriplet?.tertiary ?: MaterialTheme.colorScheme.tertiary
+                    }
+                val annotatedTitle =
+                    remember(rawString, targetWord, targetColor) {
+                        val index = rawString.indexOf(targetWord, ignoreCase = true)
+                        buildAnnotatedString {
+                            if (index != -1) {
+                                append(rawString.substring(0, index))
+                                withStyle(SpanStyle(color = targetColor)) {
+                                    append(rawString.substring(index, index + targetWord.length))
+                                }
+                                append(rawString.substring(index + targetWord.length))
+                            } else {
+                                append(rawString)
+                            }
+                        }
+                    }
                 Text(
-                    text = stringResource(R.string.settings_custom_seed_slider_title),
+                    text = annotatedTitle,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.weight(1f),
                 )
                 EditableHexValue(
-                    hex = selectedHex,
+                    hex = normalizedTargetHex,
                     editing = hexEditing,
                     draft = hexDraft,
                     focusRequester = hexFocusRequester,
                     onStartEditing = {
-                        hexDraft = selectedSeedHex.toHexFieldValue()
+                        hexDraft = normalizedTargetHex.toHexFieldValue()
                         hexEditing = true
                     },
                     onDraftChange = { hexDraft = it },
@@ -647,15 +787,20 @@ private fun CustomColorSlider(
                 }
             }
             HueColorSlider(
-                selectedHex = selectedSeedHex,
-                onSelect = {
-                    selectedSeedHex = it
-                    hexDraft = it.toHexFieldValue()
+                selectedHex = normalizedTargetHex,
+                onSelect = { newHex ->
+                    val nextSeedHex = updateTargetHex(currentSeedHex, newHex, editingTarget)
+                    currentSeedHex = nextSeedHex
+                    hexDraft = newHex.toHexFieldValue()
                 },
                 modifier = Modifier.fillMaxWidth(),
                 fallbackHue = DEFAULT_CUSTOM_HUE,
                 sliderPanelColor = sliderPanelColor,
-                onValueChangeFinished = onPreviewColor,
+                onValueChangeFinished = { newHex ->
+                    val nextSeedHex = updateTargetHex(currentSeedHex, newHex, editingTarget)
+                    currentSeedHex = nextSeedHex
+                    onPreviewColor(nextSeedHex)
+                },
             )
         }
     }
@@ -761,10 +906,133 @@ private fun EditableHexValue(
     }
 }
 
+private enum class ColorTarget { PRIMARY, SECONDARY, TERTIARY }
+
+private fun extractTargetHex(
+    seedHex: String,
+    target: ColorTarget,
+): String {
+    val parts = seedHex.split("|")
+    return when (target) {
+        ColorTarget.PRIMARY -> parts.getOrNull(0) ?: seedHex
+        ColorTarget.SECONDARY -> parts.getOrNull(1) ?: seedHex
+        ColorTarget.TERTIARY -> parts.getOrNull(2) ?: seedHex
+    }
+}
+
+private fun updateTargetHex(
+    seedHex: String,
+    newHex: String,
+    target: ColorTarget,
+): String {
+    val parts = seedHex.split("|").toMutableList()
+    while (parts.size < 3) {
+        val primaryHex = parts.getOrNull(0) ?: "#16A34A"
+        val primaryColor = parseSeedColorHexToColorOrNull(primaryHex) ?: Color(0xFF16A34A)
+        val generatedColors = generateTripletForSeed(primaryColor)
+        val defaultColors =
+            listOf(
+                primaryHex,
+                hexFromColor(generatedColors.secondary),
+                hexFromColor(generatedColors.tertiary),
+            )
+        parts.add(defaultColors[parts.size])
+    }
+    parts[target.ordinal] = newHex
+
+    if (target == ColorTarget.PRIMARY) {
+        val newPrimaryColor = parseSeedColorHexToColorOrNull(newHex) ?: Color(0xFF16A34A)
+        val generated = generateTripletForSeed(newPrimaryColor)
+        parts[1] = hexFromColor(generated.secondary)
+        parts[2] = hexFromColor(generated.tertiary)
+    }
+
+    return parts.joinToString("|")
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ShadingIntensitySlider(
+    intensity: Float,
+    enabled: Boolean,
+    onDisabledClick: () -> Unit,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var sliderValue by remember { mutableFloatStateOf(intensity.roundToShadingStep()) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isDragged by interactionSource.collectIsDraggedAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val interacting = isDragged || isPressed
+
+    LaunchedEffect(intensity, interacting) {
+        if (!interacting) {
+            sliderValue = intensity.roundToShadingStep()
+        }
+    }
+
+    Slider(
+        value = sliderValue,
+        onValueChange = { rawValue ->
+            if (enabled) {
+                val steppedValue = rawValue.roundToShadingStep()
+                if (steppedValue != sliderValue) {
+                    sliderValue = steppedValue
+                    onValueChange(steppedValue)
+                }
+            } else {
+                onDisabledClick()
+            }
+        },
+        valueRange = 0f..2f,
+        steps = 19,
+        enabled = enabled,
+        interactionSource = interactionSource,
+        thumb = {
+            Label(
+                label = {
+                    PlainTooltip(
+                        modifier =
+                            Modifier
+                                .sizeIn(
+                                    minWidth = ShadingSliderLabelMinWidth,
+                                    minHeight = ShadingSliderLabelMinHeight,
+                                ).wrapContentWidth(),
+                    ) {
+                        Text(getShadingLabel(sliderValue))
+                    }
+                },
+                interactionSource = interactionSource,
+                isPersistent = interacting,
+            ) {
+                SliderDefaults.Thumb(
+                    interactionSource = interactionSource,
+                    enabled = enabled,
+                    thumbSize = ShadingSliderThumbSize,
+                )
+            }
+        },
+        modifier = modifier.fillMaxWidth(),
+    )
+}
+
+private fun getShadingLabel(value: Float): String {
+    val percentage = (value * 100f).roundToInt()
+    return "$percentage%"
+}
+
+private fun Float.roundToShadingStep(): Float =
+    (this * 10f)
+        .roundToInt()
+        .coerceIn(0, 20) / 10f
+
 private const val DEFAULT_CUSTOM_HUE = 270f
 private const val HEX_INPUT_DEBOUNCE_MILLIS = 450L
 private val HexValueWidth = 84.dp
 private val HexValueHeight = 40.dp
+private val ShadingSliderLabelMinWidth = 45.dp
+private val ShadingSliderLabelMinHeight = 25.dp
+private val ShadingSliderThumbSize = DpSize(width = 4.dp, height = 32.dp)
 
 private fun String.dropHexPrefix(): String = removePrefix("#").take(6).uppercase(Locale.US)
 
@@ -904,23 +1172,6 @@ private fun ThemeModeSegmentedRow(
 }
 
 @Composable
-private fun AppearanceStudioSection(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        content()
-    }
-}
-
-@Composable
 private fun AppearanceToggleItem(
     title: String,
     subtitle: String,
@@ -1010,42 +1261,41 @@ private fun themeModeLabel(mode: AppThemeMode): String =
     )
 
 @Composable
-private fun ThemePreviewPanel(colorSource: AppColorSource) {
+private fun ThemePreviewPanel(
+    colorSource: AppColorSource,
+    isInteractive: Boolean,
+    selectedTarget: ColorTarget,
+    onTargetSelect: (ColorTarget) -> Unit,
+) {
     val scheme = MaterialTheme.colorScheme
+    val title =
+        if (colorSource == AppColorSource.CUSTOM) {
+            stringResource(R.string.settings_theme_preview_customize)
+        } else {
+            stringResource(
+                R.string.settings_theme_preview_named,
+                colorSourceDisplayName(colorSource),
+            )
+        }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
-            text = stringResource(R.string.settings_theme_preview_named, colorSourceDisplayName(colorSource)),
+            text = title,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        PreviewSubsection(title = stringResource(R.string.settings_theme_preview_surface_ladder)) {
-            SurfaceLadderStrip(scheme = scheme)
-        }
-        PreviewSubsection(title = stringResource(R.string.settings_theme_preview_accent_containers)) {
-            AccentContainersStrip(scheme = scheme)
-        }
-    }
-}
-
-@Composable
-private fun PreviewSubsection(
-    title: String,
-    content: @Composable () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.64f),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        AccentContainersStrip(
+            scheme = scheme,
+            isInteractive = isInteractive,
+            selectedTarget = selectedTarget,
+            onTargetSelect = onTargetSelect,
         )
-        content()
+        SurfaceLadderStrip(scheme = scheme)
     }
 }
 
@@ -1089,7 +1339,12 @@ private fun SurfaceLadderStrip(scheme: ColorScheme) {
 }
 
 @Composable
-private fun AccentContainersStrip(scheme: ColorScheme) {
+private fun AccentContainersStrip(
+    scheme: ColorScheme,
+    isInteractive: Boolean,
+    selectedTarget: ColorTarget,
+    onTargetSelect: (ColorTarget) -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1099,18 +1354,27 @@ private fun AccentContainersStrip(scheme: ColorScheme) {
             container = scheme.primaryContainer,
             onContainer = scheme.onPrimaryContainer,
             label = stringResource(R.string.settings_theme_preview_label_primary),
+            isSelected = isInteractive && selectedTarget == ColorTarget.PRIMARY,
+            isInteractive = isInteractive,
+            onClick = { onTargetSelect(ColorTarget.PRIMARY) },
         )
         AccentChip(
             modifier = Modifier.weight(1f),
             container = scheme.secondaryContainer,
             onContainer = scheme.onSecondaryContainer,
             label = stringResource(R.string.settings_theme_preview_label_secondary),
+            isSelected = isInteractive && selectedTarget == ColorTarget.SECONDARY,
+            isInteractive = isInteractive,
+            onClick = { onTargetSelect(ColorTarget.SECONDARY) },
         )
         AccentChip(
             modifier = Modifier.weight(1f),
             container = scheme.tertiaryContainer,
             onContainer = scheme.onTertiaryContainer,
             label = stringResource(R.string.settings_theme_preview_label_tertiary),
+            isSelected = isInteractive && selectedTarget == ColorTarget.TERTIARY,
+            isInteractive = isInteractive,
+            onClick = { onTargetSelect(ColorTarget.TERTIARY) },
         )
     }
 }
@@ -1121,11 +1385,28 @@ private fun AccentChip(
     container: Color,
     onContainer: Color,
     label: String,
+    isSelected: Boolean = false,
+    isInteractive: Boolean = false,
+    onClick: () -> Unit = {},
 ) {
+    val chipModifier =
+        if (isInteractive) {
+            modifier.tapSoundClickable(onClick = onClick)
+        } else {
+            modifier
+        }
     Surface(
-        modifier = modifier,
+        modifier =
+            chipModifier.then(
+                if (isSelected) {
+                    Modifier.border(1.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.medium)
+                } else {
+                    Modifier
+                },
+            ),
         shape = MaterialTheme.shapes.medium,
         color = container,
+        tonalElevation = if (isSelected) 4.dp else 0.dp,
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),

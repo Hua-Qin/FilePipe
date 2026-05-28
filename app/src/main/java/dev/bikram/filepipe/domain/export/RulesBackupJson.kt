@@ -134,6 +134,7 @@ data class SettingsBackupDto(
     val notifyOnNewUpdates: Boolean = false,
     val saveUpdateApkToDownloads: Boolean = false,
     val useGradientBackground: Boolean = true,
+    val shadingIntensity: Float? = null,
     @JsonNames("useFixedCardColors")
     val useEnhancedShading: Boolean = false,
     val customSeedHex: String? = null,
@@ -239,6 +240,7 @@ fun AppPreferences.toBackupDto(): SettingsBackupDto =
         notifyOnNewUpdates = notifyOnNewUpdates,
         saveUpdateApkToDownloads = saveUpdateApkToDownloads,
         useGradientBackground = useGradientBackground,
+        shadingIntensity = shadingIntensity,
         useEnhancedShading = useEnhancedShading,
         customSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },
         customSeedHexes = savedCustomSeedHexes.takeIf { it.isNotEmpty() },

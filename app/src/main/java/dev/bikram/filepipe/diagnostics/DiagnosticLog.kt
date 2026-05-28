@@ -191,7 +191,7 @@ object DiagnosticLog {
         appendLine(context.getString(R.string.diagnostics_saved_custom_seeds_format, preferences.savedCustomSeedHexes.size))
         appendLine(context.getString(R.string.diagnostics_active_custom_seed_format, preferences.activeCustomSeedHex.isNotBlank().toString()))
         appendLine(context.getString(R.string.diagnostics_gradient_background_format, preferences.useGradientBackground.toString()))
-        appendLine(context.getString(R.string.diagnostics_enhanced_shading_format, preferences.useEnhancedShading.toString()))
+        appendLine(context.getString(R.string.diagnostics_surface_shading_format, preferences.shadingIntensity.toString()))
         appendLine(context.getString(R.string.diagnostics_folder_access_mode_format, preferences.folderAccessMode.toString()))
         appendLine(context.getString(R.string.diagnostics_log_retention_days_format, preferences.logRetentionDays))
         appendLine(context.getString(R.string.diagnostics_auto_export_rule_change_format, preferences.autoExportOnRuleChange.toString()))

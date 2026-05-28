@@ -48,11 +48,7 @@ data class AppPreferences(
      */
     val updateApkDownloadsCopySucceeded: Boolean = false,
     val useGradientBackground: Boolean = true,
-    /**
-     * Remember-style enhanced shading: skips primary boost on surface container roles so cards stay
-     * theme-derived but read darker in dark theme and lighter in light theme versus the boosted look.
-     */
-    val useEnhancedShading: Boolean = false,
+    val shadingIntensity: Float = 0.0f,
     /** SAF vs All files. Legacy [FolderAccessMode.DEFERRED] is migrated to [FolderAccessMode.SAF_ONLY]. */
     val folderAccessMode: FolderAccessMode = FolderAccessMode.SAF_ONLY,
     /**
@@ -66,6 +62,9 @@ data class AppPreferences(
      */
     val playAutoReviewPromptedForLastUpdateTime: Long = 0L,
 ) {
+    val useEnhancedShading: Boolean
+        get() = shadingIntensity > 0.0f
+
     companion object {
         val DEFAULT = AppPreferences()
     }

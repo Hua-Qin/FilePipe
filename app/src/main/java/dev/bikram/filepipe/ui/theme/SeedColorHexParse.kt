@@ -2,6 +2,8 @@ package dev.bikram.filepipe.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import dev.bikram.filepipe.data.preferences.CuratedColorTriplet
+import dev.bikram.filepipe.data.preferences.generateTripletForSeed
 import java.util.Locale
 
 /**
@@ -29,9 +31,36 @@ fun parseSeedColorHexToColorOrNull(raw: String): Color? {
     return Color(argb)
 }
 
-/** Canonical `#RRGGBB` for storage and deduplication; null if [raw] does not parse. */
-fun normalizeCustomSeedHexOrNull(raw: String): String? {
+/** Canonical `#RRGGBB` for storage and deduplication; null if [raw] does not parse as a single color. */
+fun normalizeSeedHexOrNull(raw: String): String? {
     val color = parseSeedColorHexToColorOrNull(raw) ?: return null
     val rgb = color.toArgb() and 0xFFFFFF
     return String.format(Locale.US, "#%06X", rgb)
+}
+
+/** Canonical custom seed, either one `#RRGGBB` or a primary|secondary|tertiary triplet. */
+fun normalizeCustomSeedHexOrNull(raw: String): String? {
+    if (raw.contains("|")) {
+        val parts = raw.split("|")
+        val normalizedParts =
+            parts.map { part ->
+                normalizeSeedHexOrNull(part) ?: return null
+            }
+        return normalizedParts.joinToString("|")
+    }
+    return normalizeSeedHexOrNull(raw)
+}
+
+fun parseCustomTriplet(activeCustomSeed: String): CuratedColorTriplet? {
+    if (activeCustomSeed.isBlank()) return null
+    val parts = normalizeCustomSeedHexOrNull(activeCustomSeed)?.split("|") ?: return null
+    val primaryColor = parseSeedColorHexToColorOrNull(parts.getOrNull(0).orEmpty()) ?: return null
+    if (parts.size >= 3) {
+        val secondaryColor = parseSeedColorHexToColorOrNull(parts[1])
+        val tertiaryColor = parseSeedColorHexToColorOrNull(parts[2])
+        if (secondaryColor != null && tertiaryColor != null) {
+            return CuratedColorTriplet(primaryColor, secondaryColor, tertiaryColor)
+        }
+    }
+    return generateTripletForSeed(primaryColor)
 }
