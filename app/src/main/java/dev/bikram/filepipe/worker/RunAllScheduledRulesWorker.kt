@@ -47,6 +47,12 @@ class RunAllScheduledRulesWorker
         /** Rules that have reported [RunProgress.isComplete]; used so one finished rule does not show Finishing while others run. */
         private val completedRuleIdsInBatch = mutableSetOf<Long>()
 
+        override suspend fun getForegroundInfo(): ForegroundInfo {
+            val ruleIds = inputData.getLongArray(KEY_RULE_IDS)
+            val ruleCount = ruleIds?.size ?: 0
+            return createForegroundInfo(ruleCount)
+        }
+
         override suspend fun doWork(): Result {
             val ruleIds =
                 inputData.getLongArray(KEY_RULE_IDS)
@@ -54,6 +60,17 @@ class RunAllScheduledRulesWorker
                         DiagnosticLog.record(appContext, "Scheduled batch worker failed: missing rule ids")
                         return Result.failure()
                     }
+            val scheduledTriggerAtMillis = inputData.getLong(KEY_SCHEDULED_TRIGGER_AT_MILLIS, UNKNOWN_SCHEDULED_TIME_MILLIS)
+            val alarmReceivedAtMillis = inputData.getLong(KEY_ALARM_RECEIVED_AT_MILLIS, UNKNOWN_SCHEDULED_TIME_MILLIS)
+            val workerStartedAtMillis = System.currentTimeMillis()
+            DiagnosticLog.record(
+                appContext,
+                "Scheduled batch worker starting: ruleCount=${ruleIds.size}, triggerAt=$scheduledTriggerAtMillis, " +
+                    "alarmReceivedAt=$alarmReceivedAtMillis, startedAt=$workerStartedAtMillis, " +
+                    "alarmToWorkerDelayMs=${elapsedMillis(alarmReceivedAtMillis, workerStartedAtMillis)}, " +
+                    "triggerToWorkerDelayMs=${elapsedMillis(scheduledTriggerAtMillis, workerStartedAtMillis)}",
+            )
+
             val rules =
                 buildList {
                     for (id in ruleIds) {
@@ -62,7 +79,11 @@ class RunAllScheduledRulesWorker
                 }
             if (rules.isEmpty()) return Result.success()
 
-            setForeground(createForegroundInfo(rules.size))
+            try {
+                setForeground(createForegroundInfo(rules.size))
+            } catch (e: Exception) {
+                DiagnosticLog.record(appContext, "Failed to setForeground for batch size=${rules.size}", e)
+            }
             val firstRule = rules.first()
             synchronized(progressNotifyLock) {
                 completedRuleIdsInBatch.clear()
@@ -111,6 +132,16 @@ class RunAllScheduledRulesWorker
                 )
                 if (runAttemptCount < 2) Result.retry() else Result.failure()
             }
+        }
+
+        private fun elapsedMillis(
+            startMillis: Long,
+            endMillis: Long,
+        ): Long {
+            if (startMillis == UNKNOWN_SCHEDULED_TIME_MILLIS) {
+                return UNKNOWN_SCHEDULED_TIME_MILLIS
+            }
+            return endMillis - startMillis
         }
 
         private fun postSummaryNotification(
@@ -352,7 +383,10 @@ class RunAllScheduledRulesWorker
 
         companion object {
             const val KEY_RULE_IDS = "rule_ids"
+            const val KEY_SCHEDULED_TRIGGER_AT_MILLIS = "scheduled_trigger_at_millis"
+            const val KEY_ALARM_RECEIVED_AT_MILLIS = "alarm_received_at_millis"
             const val NOTIFICATION_ID = 1003
             const val SUMMARY_NOTIFICATION_BASE_ID = 2000
+            private const val UNKNOWN_SCHEDULED_TIME_MILLIS = -1L
         }
     }
