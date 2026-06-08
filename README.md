@@ -98,4 +98,14 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 
 ---
 
+## 📥 Download / links
+
+- [**Play Store**](https://play.google.com/store/apps/details?id=dev.bikram.filepipe)
+- [**GitHub**](https://github.com/bikram-agarwal/FilePipe/releases/latest) 
+
+- [Project site](https://bikram-agarwal.github.io/filepipe/)
+- [Privacy policy](https://bikram-agarwal.github.io/filepipe/privacy)
+
+---
+
 Made with ❤️ by Bikram Agarwal
