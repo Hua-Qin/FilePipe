@@ -131,6 +131,8 @@ class RunAllScheduledRulesWorker
                     e,
                 )
                 if (runAttemptCount < 2) Result.retry() else Result.failure()
+            } finally {
+                clearProgressNotification()
             }
         }
 
@@ -328,6 +330,10 @@ class RunAllScheduledRulesWorker
             }
 
             notificationManager.notify(NOTIFICATION_ID, builder.build())
+        }
+
+        private fun clearProgressNotification() {
+            notificationManager.cancel(NOTIFICATION_ID)
         }
 
         private fun createForegroundInfo(ruleCount: Int): ForegroundInfo {

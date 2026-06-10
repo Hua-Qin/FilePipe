@@ -15,16 +15,20 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,6 +38,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -50,17 +55,32 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
+import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.material3.adaptive.layout.PaneExpansionAnchor
+import androidx.compose.material3.adaptive.layout.PaneExpansionState
+import androidx.compose.material3.adaptive.layout.PaneExpansionStateKey
+import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
+import androidx.compose.material3.adaptive.layout.rememberPaneExpansionState
+import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,11 +88,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -96,9 +118,13 @@ import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFloatingActionButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
+import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
+import dev.bikram.filepipe.ui.components.ThemeColoredEmptyHistoryIllustration
+import dev.bikram.filepipe.ui.components.ThemeColoredEmptyTrashIllustration
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.screens.devoptions.DevOptionsScreen
 import dev.bikram.filepipe.ui.screens.help.FaqScreen
@@ -110,10 +136,15 @@ import dev.bikram.filepipe.ui.screens.onboarding.OnboardingPermissionsScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingRuleWizardScreen
 import dev.bikram.filepipe.ui.screens.onboarding.OnboardingTitleScreen
 import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
+import dev.bikram.filepipe.ui.screens.rules.ManualRunCancelAnchor
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
+import dev.bikram.filepipe.ui.screens.rules.RulesViewModel
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
+import dev.bikram.filepipe.ui.screens.settings.SettingsSectionKey
+import dev.bikram.filepipe.ui.screens.settings.SettingsSectionListPane
 import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
 import dev.bikram.filepipe.ui.screens.settings.launchAppShareChooser
+import dev.bikram.filepipe.ui.screens.settings.settingsSectionKeyForHighlight
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurEnabled
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalReducedMotion
@@ -125,6 +156,7 @@ import dev.bikram.filepipe.ui.theme.pillShape
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
 import dev.bikram.filepipe.update.notificationDedupeKey
+import kotlinx.coroutines.launch
 
 private data class BottomNavItem(
     val screen: Screen,
@@ -171,6 +203,7 @@ private sealed interface UpdateChromeState {
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
+    ExperimentalMaterial3AdaptiveApi::class,
     ExperimentalMaterial3AdaptiveNavigationSuiteApi::class,
     ExperimentalSharedTransitionApi::class,
 )
@@ -193,11 +226,18 @@ fun AppNavigation(
         bottomNavItems.any {
             currentDestination?.hierarchy?.any { destination -> destination.route == it.screen.route } == true
         }
+    val windowAdaptiveInfo = currentWindowAdaptiveInfo()
     val navigationSuiteType =
-        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
-    val useAdaptiveNavigationRail =
-        showBottomBar && navigationSuiteType != NavigationSuiteType.NavigationBar
-    val showFloatingBottomBar = showBottomBar && !useAdaptiveNavigationRail
+        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
+    // Derive the pane directive directly instead of allocating a throwaway navigator (each
+    // two-pane route creates its own). Matches the navigator's default directive.
+    val paneScaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
+    val canUseListDetailPanes = navigationSuiteType != NavigationSuiteType.NavigationBar
+    val useListDetailPanes =
+        canUseListDetailPanes &&
+            paneScaffoldDirective.maxHorizontalPartitions > 1
+    val useNavigationSuiteScaffold = useListDetailPanes
+    val showFloatingBottomBar = showBottomBar && !useNavigationSuiteScaffold
 
     val isRuleDetailRoute =
         currentDestination?.hierarchy?.any { destination ->
@@ -215,6 +255,13 @@ fun AppNavigation(
         currentDestination?.hierarchy?.any { destination ->
             destination.route == Screen.DevOptions.route
         } == true
+    val isOnboardingRoute =
+        currentDestination?.hierarchy?.any { destination ->
+            destination.route == Screen.OnboardingTitle.route ||
+                destination.route == Screen.OnboardingPermissions.route ||
+                destination.route == Screen.OnboardingRuleWizard.route
+        } == true
+    val showNavigationSuiteScaffold = useNavigationSuiteScaffold && !isOnboardingRoute
 
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
@@ -232,6 +279,7 @@ fun AppNavigation(
     val playBannerState by settingsVm.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
     var dismissedUpdateBarKey by remember { mutableStateOf<String?>(null) }
     var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
+    var openNewRuleInPane by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val updateKey = updateInfo?.notificationDedupeKey()
     val updateAvailable = BuildConfig.SHOW_UPDATES && updateInfo != null && showFloatingBottomBar
@@ -302,9 +350,18 @@ fun AppNavigation(
     val bottomBlurHeightDp =
         when {
             isFaqRoute -> 0.dp
+
+            // Two-pane (tablet/landscape) has no floating bottom bar to fade content under, so a
+            // tall bottom blur is purely decorative and was obscuring the bottom of detail-pane
+            // content. Fade only under the system navigation bar here.
+            useNavigationSuiteScaffold -> navBarInset
+
             showFloatingBottomBar -> scrimHeight
+
             showBottomBar -> navBarInset + 96.dp
+
             isRuleDetailRoute -> fullScreenBottomBlurRuleEdit
+
             else -> fullScreenBottomBlurShort
         }
     val primaryTabContentPadding =
@@ -553,6 +610,7 @@ fun AppNavigation(
                             enterTransition = {
                                 primaryTabEnterTransition(
                                     reducedMotion = reducedMotion,
+                                    verticalMotion = useNavigationSuiteScaffold,
                                     spatialSpec = navSpatialSpec,
                                     fadeInSpec = navFadeInSpec,
                                 )
@@ -566,6 +624,7 @@ fun AppNavigation(
                             exitTransition = {
                                 primaryTabExitTransition(
                                     reducedMotion = reducedMotion,
+                                    verticalMotion = useNavigationSuiteScaffold,
                                     spatialSpec = navSpatialSpec,
                                     fadeOutSpec = navFadeOutSpec,
                                 )
@@ -577,20 +636,32 @@ fun AppNavigation(
                                     }
                             },
                             popEnterTransition = {
-                                if (reducedMotion) {
-                                    EnterTransition.None
-                                } else {
-                                    slideInHorizontally(animationSpec = navSpatialSpec) { -it } +
-                                        fadeIn(animationSpec = navFadeInSpec)
-                                }
+                                primaryTabEnterTransition(
+                                    reducedMotion = reducedMotion,
+                                    verticalMotion = useNavigationSuiteScaffold,
+                                    spatialSpec = navSpatialSpec,
+                                    fadeInSpec = navFadeInSpec,
+                                )
+                                    ?: if (reducedMotion) {
+                                        EnterTransition.None
+                                    } else {
+                                        slideInHorizontally(animationSpec = navSpatialSpec) { -it } +
+                                            fadeIn(animationSpec = navFadeInSpec)
+                                    }
                             },
                             popExitTransition = {
-                                if (reducedMotion) {
-                                    ExitTransition.None
-                                } else {
-                                    slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
-                                        fadeOut(animationSpec = navFadeOutSpec)
-                                }
+                                primaryTabExitTransition(
+                                    reducedMotion = reducedMotion,
+                                    verticalMotion = useNavigationSuiteScaffold,
+                                    spatialSpec = navSpatialSpec,
+                                    fadeOutSpec = navFadeOutSpec,
+                                )
+                                    ?: if (reducedMotion) {
+                                        ExitTransition.None
+                                    } else {
+                                        slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
+                                            fadeOut(animationSpec = navFadeOutSpec)
+                                    }
                             },
                         ) {
                             val sharedTransitionScope = this@SharedTransitionLayout
@@ -653,27 +724,59 @@ fun AppNavigation(
                             }
 
                             composable(Screen.Rules.route) {
-                                RulesScreen(
-                                    contentPadding = primaryTabContentPadding,
-                                    onEditRule = { ruleId -> navController.navigate(Screen.RuleDetail.createRoute(ruleId)) },
-                                    onNavigateToHistoryDetail = { historyId ->
-                                        navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
-                                            launchSingleTop = true
-                                        }
-                                    },
-                                    onNavigateToHistoryList = {
-                                        navController.navigate(Screen.History.route) {
-                                            popUpTo(navController.graph.findStartDestination().id) {
-                                                saveState = true
+                                if (useListDetailPanes) {
+                                    RulesTwoPaneRoute(
+                                        contentPadding = primaryTabContentPadding,
+                                        onOpenRuleDetail = { ruleId ->
+                                            navController.navigate(Screen.RuleDetail.createRoute(ruleId))
+                                        },
+                                        onOpenNewRule = {
+                                            navController.navigate(Screen.RuleDetail.createRoute())
+                                        },
+                                        onOpenFaq = { navController.navigate(Screen.Faq.createRoute()) },
+                                        onNavigateToHistoryDetail = { historyId ->
+                                            navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
+                                                launchSingleTop = true
                                             }
-                                            launchSingleTop = true
-                                            restoreState = true
-                                        }
-                                    },
-                                    onNavigateToRuleHistory = { ruleId ->
-                                        navController.navigate(Screen.HistoryForRule.createRoute(ruleId))
-                                    },
-                                )
+                                        },
+                                        onNavigateToHistoryList = {
+                                            navController.navigate(Screen.History.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        },
+                                        onNavigateToRuleHistory = { ruleId ->
+                                            navController.navigate(Screen.HistoryForRule.createRoute(ruleId))
+                                        },
+                                        onRegisterOpenNewRuleInPane = { openNewRuleInPane = it },
+                                        settingsViewModel = settingsVm,
+                                    )
+                                } else {
+                                    RulesScreen(
+                                        contentPadding = primaryTabContentPadding,
+                                        onEditRule = { ruleId -> navController.navigate(Screen.RuleDetail.createRoute(ruleId)) },
+                                        onNavigateToHistoryDetail = { historyId ->
+                                            navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
+                                                launchSingleTop = true
+                                            }
+                                        },
+                                        onNavigateToHistoryList = {
+                                            navController.navigate(Screen.History.route) {
+                                                popUpTo(navController.graph.findStartDestination().id) {
+                                                    saveState = true
+                                                }
+                                                launchSingleTop = true
+                                                restoreState = true
+                                            }
+                                        },
+                                        onNavigateToRuleHistory = { ruleId ->
+                                            navController.navigate(Screen.HistoryForRule.createRoute(ruleId))
+                                        },
+                                    )
+                                }
                             }
                             composable(
                                 route = Screen.RuleDetail.route,
@@ -698,13 +801,36 @@ fun AppNavigation(
                                 )
                             }
                             composable(Screen.History.route) {
-                                HistoryScreen(
-                                    contentPadding = primaryTabContentPadding,
-                                    onHistoryClick = { historyId ->
-                                        navController.navigate(Screen.HistoryDetail.createRoute(historyId))
-                                    },
-                                    viewModel = historyVm,
-                                )
+                                if (useListDetailPanes) {
+                                    HistoryTwoPaneRoute(
+                                        contentPadding = primaryTabContentPadding,
+                                        onOpenHistoryDetail = { historyId ->
+                                            navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                                        },
+                                        onNavigateBack = null,
+                                        paneFabContent = {
+                                            MainNavFabSlot(
+                                                currentTab = Screen.History,
+                                                hasAnyHistory = hasAnyHistory,
+                                                historySection = historySection,
+                                                hasAnyTrashedRules = hasAnyTrashedRules,
+                                                onAddRule = {},
+                                                onClearHistory = { showClearHistoryDialog = true },
+                                                onEmptyTrash = { showEmptyTrashDialog = true },
+                                                onShareApp = {},
+                                            )
+                                        },
+                                        viewModel = historyVm,
+                                    )
+                                } else {
+                                    HistoryScreen(
+                                        contentPadding = primaryTabContentPadding,
+                                        onHistoryClick = { historyId ->
+                                            navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                                        },
+                                        viewModel = historyVm,
+                                    )
+                                }
                             }
                             composable(
                                 route = Screen.Settings.route,
@@ -757,26 +883,61 @@ fun AppNavigation(
                                     LocalSharedTransitionScope provides sharedTransitionScope,
                                     LocalNavAnimatedVisibilityScope provides this,
                                 ) {
-                                    SettingsScreen(
-                                        contentPadding = primaryTabContentPadding,
-                                        onOpenIntro = {
-                                            navController.navigate(Screen.OnboardingTitle.route)
-                                        },
-                                        onOpenFaqStorageSection = {
-                                            navController.navigate(Screen.Faq.createRoute(Screen.Faq.FOCUS_STORAGE_ACCESS))
-                                        },
-                                        onOpenHelp = {
-                                            navController.navigate(Screen.Faq.createRoute())
-                                        },
-                                        onOpenDevOptions = {
-                                            navController.navigate(Screen.DevOptions.route) {
-                                                launchSingleTop = true
-                                            }
-                                        },
-                                        viewModel = settingsVm,
-                                        highlightSectionKey = settingsHighlightSection,
-                                        onHighlightHandled = { settingsHighlightSection = null },
-                                    )
+                                    if (useListDetailPanes) {
+                                        SettingsTwoPaneRoute(
+                                            contentPadding = primaryTabContentPadding,
+                                            onOpenIntro = {
+                                                navController.navigate(Screen.OnboardingTitle.route)
+                                            },
+                                            onOpenFaqStorageSection = {
+                                                navController.navigate(Screen.Faq.createRoute(Screen.Faq.FOCUS_STORAGE_ACCESS))
+                                            },
+                                            onOpenHelp = {
+                                                navController.navigate(Screen.Faq.createRoute())
+                                            },
+                                            onOpenDevOptions = {
+                                                navController.navigate(Screen.DevOptions.route) {
+                                                    launchSingleTop = true
+                                                }
+                                            },
+                                            paneFabContent = {
+                                                MainNavFabSlot(
+                                                    currentTab = Screen.Settings,
+                                                    hasAnyHistory = hasAnyHistory,
+                                                    historySection = historySection,
+                                                    hasAnyTrashedRules = hasAnyTrashedRules,
+                                                    onAddRule = {},
+                                                    onClearHistory = {},
+                                                    onEmptyTrash = {},
+                                                    onShareApp = { launchAppShareChooser(hostContext) },
+                                                )
+                                            },
+                                            viewModel = settingsVm,
+                                            highlightSectionKey = settingsHighlightSection,
+                                            onHighlightHandled = { settingsHighlightSection = null },
+                                        )
+                                    } else {
+                                        SettingsScreen(
+                                            contentPadding = primaryTabContentPadding,
+                                            onOpenIntro = {
+                                                navController.navigate(Screen.OnboardingTitle.route)
+                                            },
+                                            onOpenFaqStorageSection = {
+                                                navController.navigate(Screen.Faq.createRoute(Screen.Faq.FOCUS_STORAGE_ACCESS))
+                                            },
+                                            onOpenHelp = {
+                                                navController.navigate(Screen.Faq.createRoute())
+                                            },
+                                            onOpenDevOptions = {
+                                                navController.navigate(Screen.DevOptions.route) {
+                                                    launchSingleTop = true
+                                                }
+                                            },
+                                            viewModel = settingsVm,
+                                            highlightSectionKey = settingsHighlightSection,
+                                            onHighlightHandled = { settingsHighlightSection = null },
+                                        )
+                                    }
                                 }
                             }
                             composable(
@@ -878,12 +1039,22 @@ fun AppNavigation(
                                         },
                                     ),
                             ) {
-                                HistoryScreen(
-                                    onHistoryClick = { historyId ->
-                                        navController.navigate(Screen.HistoryDetail.createRoute(historyId))
-                                    },
-                                    onNavigateBack = { navController.popBackStack() },
-                                )
+                                if (useListDetailPanes) {
+                                    HistoryTwoPaneRoute(
+                                        contentPadding = PaddingValues(),
+                                        onOpenHistoryDetail = { historyId ->
+                                            navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                                        },
+                                        onNavigateBack = { navController.popBackStack() },
+                                    )
+                                } else {
+                                    HistoryScreen(
+                                        onHistoryClick = { historyId ->
+                                            navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                                        },
+                                        onNavigateBack = { navController.popBackStack() },
+                                    )
+                                }
                             }
                         }
                     }
@@ -940,7 +1111,7 @@ fun AppNavigation(
                                 historySection = historySection,
                                 hasAnyTrashedRules = hasAnyTrashedRules,
                                 onAddRule = {
-                                    navController.navigate(Screen.RuleDetail.createRoute())
+                                    openNewRuleInPane?.invoke() ?: navController.navigate(Screen.RuleDetail.createRoute())
                                 },
                                 onClearHistory = { showClearHistoryDialog = true },
                                 onEmptyTrash = { showEmptyTrashDialog = true },
@@ -950,30 +1121,6 @@ fun AppNavigation(
                         modifier = Modifier.align(Alignment.BottomCenter),
                     )
                 }
-                if (showBottomBar && useAdaptiveNavigationRail) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomEnd)
-                                .windowInsetsPadding(WindowInsets.navigationBars)
-                                .padding(end = 24.dp, bottom = 24.dp),
-                    ) {
-                        val hostContext = LocalContext.current
-                        MainNavFabSlot(
-                            currentTab = currentTab,
-                            hasAnyHistory = hasAnyHistory,
-                            historySection = historySection,
-                            hasAnyTrashedRules = hasAnyTrashedRules,
-                            onAddRule = {
-                                navController.navigate(Screen.RuleDetail.createRoute())
-                            },
-                            onClearHistory = { showClearHistoryDialog = true },
-                            onEmptyTrash = { showEmptyTrashDialog = true },
-                            onShareApp = { launchAppShareChooser(hostContext) },
-                        )
-                    }
-                }
-
                 SnackbarHost(
                     hostState = snackbarHostState,
                     modifier =
@@ -984,7 +1131,7 @@ fun AppNavigation(
                 )
             }
         }
-        if (showBottomBar && useAdaptiveNavigationRail) {
+        if (showNavigationSuiteScaffold) {
             NavigationSuiteScaffold(
                 layoutType = navigationSuiteType,
                 containerColor = Color.Transparent,
@@ -1028,6 +1175,901 @@ fun AppNavigation(
             }
         } else {
             navigationContent()
+        }
+    }
+}
+
+@Composable
+private fun TwoPaneListPaneWithFab(
+    fabContent: (@Composable () -> Unit)?,
+    content: @Composable () -> Unit,
+) {
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        val centeredContentModifier =
+            if (maxWidth > 720.dp) {
+                Modifier
+                    .width(720.dp)
+                    .fillMaxHeight()
+            } else {
+                Modifier.fillMaxSize()
+            }
+        Box(centeredContentModifier) {
+            content()
+            if (fabContent != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                            .padding(end = 24.dp, bottom = 24.dp),
+                ) {
+                    fabContent()
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun RulesTwoPaneRoute(
+    contentPadding: PaddingValues,
+    onOpenRuleDetail: (Long) -> Unit,
+    onOpenNewRule: () -> Unit,
+    onOpenFaq: () -> Unit,
+    onNavigateToHistoryDetail: (Long) -> Unit,
+    onNavigateToHistoryList: () -> Unit,
+    onNavigateToRuleHistory: (Long) -> Unit,
+    onRegisterOpenNewRuleInPane: ((() -> Unit)?) -> Unit,
+    viewModel: RulesViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
+) {
+    val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
+    val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
+
+    if (!isMultiPane) {
+        DisposableEffect(onRegisterOpenNewRuleInPane) {
+            onRegisterOpenNewRuleInPane(null)
+            onDispose {
+                onRegisterOpenNewRuleInPane(null)
+            }
+        }
+        Box(Modifier.fillMaxSize()) {
+            RulesScreen(
+                contentPadding = contentPadding,
+                onEditRule = onOpenRuleDetail,
+                onNavigateToHistoryDetail = onNavigateToHistoryDetail,
+                onNavigateToHistoryList = onNavigateToHistoryList,
+                onNavigateToRuleHistory = onNavigateToRuleHistory,
+                viewModel = viewModel,
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(end = 24.dp, bottom = 24.dp),
+            ) {
+                SimpleNavFab(
+                    icon = { tint ->
+                        FilePipeMaterialRoundedSymbol(
+                            name = "add",
+                            contentDescription = null,
+                            tint = tint,
+                        )
+                    },
+                    description = stringResource(R.string.rules_add_rule),
+                    enabled = true,
+                    onClick = onOpenNewRule,
+                )
+            }
+        }
+        return
+    }
+
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var activeRuleId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var pendingSavedRuleId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var previousRuleIdBeforeNew by rememberSaveable { mutableStateOf<Long?>(null) }
+    var pendingDeleteSelected by remember { mutableStateOf(false) }
+
+    // The detail pane has no FAB, so the list-pane FAB clearance in contentPadding would be
+    // dead space here. Use a plain navigation-bar inset for detail-pane content instead.
+    val detailPaneContentPadding =
+        PaddingValues(
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
+        )
+
+    fun showRuleInDetailPane(ruleId: Long) {
+        if (ruleId == Screen.RuleDetail.NEW_RULE_ID && activeRuleId != Screen.RuleDetail.NEW_RULE_ID) {
+            previousRuleIdBeforeNew = activeRuleId
+        } else if (ruleId != Screen.RuleDetail.NEW_RULE_ID) {
+            previousRuleIdBeforeNew = null
+        }
+        activeRuleId = ruleId
+        pendingSavedRuleId = null
+        scope.launch {
+            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, ruleId)
+        }
+    }
+
+    fun closePendingNewRule() {
+        val ruleIds = uiState.rules.map { rule -> rule.id }
+        val fallbackRuleId =
+            when {
+                previousRuleIdBeforeNew != null && previousRuleIdBeforeNew in ruleIds -> previousRuleIdBeforeNew
+                ruleIds.isNotEmpty() -> ruleIds.first()
+                else -> null
+            }
+        previousRuleIdBeforeNew = null
+        activeRuleId = fallbackRuleId
+        scope.launch {
+            if (fallbackRuleId != null) {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, fallbackRuleId)
+            } else {
+                navigator.navigateBack()
+            }
+        }
+    }
+
+    val openNewRuleInPane: () -> Unit =
+        remember {
+            {
+                showRuleInDetailPane(Screen.RuleDetail.NEW_RULE_ID)
+            }
+        }
+
+    DisposableEffect(onRegisterOpenNewRuleInPane, openNewRuleInPane) {
+        onRegisterOpenNewRuleInPane(openNewRuleInPane)
+        onDispose {
+            onRegisterOpenNewRuleInPane(null)
+        }
+    }
+
+    LaunchedEffect(uiState.rules, activeRuleId, pendingSavedRuleId, isMultiPane) {
+        val ruleIds = uiState.rules.map { rule -> rule.id }
+        val currentRuleId = activeRuleId
+        if (pendingSavedRuleId != null && pendingSavedRuleId in ruleIds) {
+            pendingSavedRuleId = null
+            previousRuleIdBeforeNew = null
+        }
+        val targetRuleId =
+            when {
+                currentRuleId == Screen.RuleDetail.NEW_RULE_ID -> currentRuleId
+                currentRuleId != null && currentRuleId == pendingSavedRuleId -> currentRuleId
+                currentRuleId != null && currentRuleId in ruleIds -> currentRuleId
+                ruleIds.isNotEmpty() -> ruleIds.first()
+                else -> null
+            }
+        if (targetRuleId != currentRuleId) {
+            activeRuleId = targetRuleId
+            targetRuleId?.let { ruleId ->
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, ruleId)
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.selectedRuleIds) {
+        if (uiState.selectedRuleIds.isEmpty()) {
+            pendingDeleteSelected = false
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        val balancedPaneExpansionState =
+            rememberFlatScreenBalancedPaneExpansionState(
+                directive = navigator.scaffoldDirective,
+            )
+        val showDetailNavigateBack = navigator.scaffoldDirective.maxHorizontalPartitions <= 1
+        val showPaneSelectionState = !showDetailNavigateBack
+        ListDetailPaneScaffold(
+            directive = navigator.scaffoldDirective,
+            scaffoldState = navigator.scaffoldState,
+            listPane = {
+                AnimatedPane {
+                    TwoPaneListPaneWithFab(
+                        fabContent = {
+                            SimpleNavFab(
+                                icon = { tint ->
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "add",
+                                        contentDescription = null,
+                                        tint = tint,
+                                    )
+                                },
+                                description = stringResource(R.string.rules_add_rule),
+                                enabled = true,
+                                onClick = openNewRuleInPane,
+                            )
+                        },
+                    ) {
+                        RulesScreen(
+                            contentPadding = contentPadding,
+                            onEditRule = { ruleId -> showRuleInDetailPane(ruleId) },
+                            onNavigateToHistoryDetail = onNavigateToHistoryDetail,
+                            onNavigateToHistoryList = onNavigateToHistoryList,
+                            onNavigateToRuleHistory = onNavigateToRuleHistory,
+                            activeRuleId = activeRuleId.takeIf { showPaneSelectionState },
+                            onActivateRuleInDetailPane =
+                                if (showPaneSelectionState) {
+                                    { ruleId -> showRuleInDetailPane(ruleId) }
+                                } else {
+                                    null
+                                },
+                            onActivateRuleForRunInDetailPane =
+                                if (showPaneSelectionState) {
+                                    { ruleId -> showRuleInDetailPane(ruleId) }
+                                } else {
+                                    null
+                                },
+                            showPendingNewRuleInDetailPane =
+                                showPaneSelectionState && activeRuleId == Screen.RuleDetail.NEW_RULE_ID,
+                            showSelectionActionBar = false,
+                            viewModel = viewModel,
+                        )
+                    }
+                }
+            },
+            detailPane = {
+                AnimatedPane {
+                    val selectedRuleId = activeRuleId
+                    if (uiState.selectedRuleIds.isNotEmpty()) {
+                        RulesSelectionActionPane(
+                            selectedCount = uiState.selectedRuleIds.size,
+                            totalRuleCount = uiState.rules.size,
+                            enabledSelectedCount =
+                                uiState.rules.count { rule ->
+                                    rule.id in uiState.selectedRuleIds && rule.isEnabled
+                                },
+                            isRunning = uiState.isRunning,
+                            showRunCancel = uiState.manualRunCancelAnchor == ManualRunCancelAnchor.RunSelectedBar,
+                            onSelectAll = viewModel::selectAll,
+                            onClearSelection = viewModel::clearSelection,
+                            onPreviewSelected = viewModel::startPreviewSelected,
+                            onDeleteSelected = { pendingDeleteSelected = true },
+                            onRunSelected = viewModel::runSelected,
+                            onCancelRun = viewModel::cancelManualRun,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else if (selectedRuleId == null) {
+                        SettingsScreen(
+                            contentPadding = detailPaneContentPadding,
+                            onOpenHelp = onOpenFaq,
+                            viewModel = settingsViewModel,
+                            selectedSectionKey = SettingsSectionKey.About,
+                            showTopBar = false,
+                            showSectionHeaders = false,
+                        )
+                    } else {
+                        RuleDetailPaneHost(
+                            ruleId = selectedRuleId,
+                            onNavigateBack = {
+                                if (showPaneSelectionState && selectedRuleId == Screen.RuleDetail.NEW_RULE_ID) {
+                                    closePendingNewRule()
+                                } else {
+                                    scope.launch {
+                                        navigator.navigateBack()
+                                    }
+                                }
+                            },
+                            onOpenFaq = onOpenFaq,
+                            onSavedRule = { savedRuleId ->
+                                activeRuleId = savedRuleId
+                                pendingSavedRuleId = savedRuleId
+                                previousRuleIdBeforeNew = null
+                                if (!showPaneSelectionState) {
+                                    scope.launch {
+                                        navigator.navigateBack()
+                                    }
+                                }
+                            },
+                            showNavigateBack = showDetailNavigateBack,
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+            paneExpansionState = balancedPaneExpansionState,
+        )
+    }
+
+    if (pendingDeleteSelected) {
+        val count = uiState.selectedRuleIds.size
+        AlertDialog(
+            onDismissRequest = { pendingDeleteSelected = false },
+            title = {
+                Text(
+                    pluralStringResource(
+                        R.plurals.rules_move_to_trash_confirm_title,
+                        count,
+                        count,
+                    ),
+                )
+            },
+            text = { Text(stringResource(R.string.rules_move_to_trash_confirm_message)) },
+            confirmButton = {
+                FilePipeTextButton(onClick = {
+                    viewModel.deleteSelected()
+                    pendingDeleteSelected = false
+                }) {
+                    Text(
+                        text = stringResource(R.string.move_to_trash),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            },
+            dismissButton = {
+                FilePipeTextButton(onClick = {
+                    pendingDeleteSelected = false
+                }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun RulesSelectionActionPane(
+    selectedCount: Int,
+    totalRuleCount: Int,
+    enabledSelectedCount: Int,
+    isRunning: Boolean,
+    showRunCancel: Boolean,
+    onSelectAll: () -> Unit,
+    onClearSelection: () -> Unit,
+    onPreviewSelected: () -> Unit,
+    onDeleteSelected: () -> Unit,
+    onRunSelected: () -> Unit,
+    onCancelRun: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text =
+                    pluralStringResource(
+                        R.plurals.rules_selection_count,
+                        selectedCount,
+                        selectedCount,
+                    ),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+
+            if (showRunCancel) {
+                FilePipeOutlinedButton(
+                    onClick = onCancelRun,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "close",
+                        label = stringResource(R.string.cancel),
+                    )
+                }
+            } else {
+                FilePipeFilledTonalButton(
+                    onClick = onSelectAll,
+                    enabled = !isRunning && selectedCount < totalRuleCount,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "select_all",
+                        label = stringResource(R.string.run_select_all),
+                    )
+                }
+                FilePipeOutlinedButton(
+                    onClick = onClearSelection,
+                    enabled = !isRunning,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "close",
+                        label = stringResource(R.string.run_cancel_selection),
+                    )
+                }
+                FilePipeFilledTonalButton(
+                    onClick = onPreviewSelected,
+                    enabled = !isRunning,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "visibility",
+                        label = stringResource(R.string.preview_selected_rules),
+                    )
+                }
+                FilePipeButton(
+                    onClick = onRunSelected,
+                    enabled = !isRunning && enabledSelectedCount > 0,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "play_arrow",
+                        label = stringResource(R.string.run_button),
+                    )
+                }
+                FilePipeButton(
+                    onClick = onDeleteSelected,
+                    enabled = !isRunning,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    shape = pillShape,
+                    colors =
+                        ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+                ) {
+                    RulesSelectionActionContent(
+                        iconName = "delete",
+                        label = stringResource(R.string.delete),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RulesSelectionActionContent(
+    iconName: String,
+    label: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilePipeMaterialRoundedSymbol(
+            name = iconName,
+            contentDescription = null,
+            size = 20.dp,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun HistoryTwoPaneRoute(
+    contentPadding: PaddingValues,
+    onOpenHistoryDetail: (Long) -> Unit,
+    onNavigateBack: (() -> Unit)?,
+    paneFabContent: (@Composable () -> Unit)? = null,
+    viewModel: HistoryViewModel = hiltViewModel(),
+) {
+    val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
+    val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
+
+    if (!isMultiPane) {
+        Box(Modifier.fillMaxSize()) {
+            HistoryScreen(
+                contentPadding = contentPadding,
+                onHistoryClick = onOpenHistoryDetail,
+                onNavigateBack = onNavigateBack,
+                viewModel = viewModel,
+            )
+            if (paneFabContent != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                            .padding(end = 24.dp, bottom = 24.dp),
+                ) {
+                    paneFabContent()
+                }
+            }
+        }
+        return
+    }
+
+    val visibleRunIds by viewModel.visibleRunIds.collectAsStateWithLifecycle()
+    val section by viewModel.section.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
+    var activeHistoryId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    fun showHistoryInDetailPane(historyId: Long) {
+        activeHistoryId = historyId
+        scope.launch {
+            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, historyId)
+        }
+    }
+
+    LaunchedEffect(visibleRunIds, activeHistoryId) {
+        val currentHistoryId = activeHistoryId
+        val targetHistoryId =
+            when {
+                currentHistoryId != null && currentHistoryId in visibleRunIds -> currentHistoryId
+                visibleRunIds.isNotEmpty() -> visibleRunIds.first()
+                else -> null
+            }
+        if (targetHistoryId != currentHistoryId) {
+            activeHistoryId = targetHistoryId
+            targetHistoryId?.let { historyId ->
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, historyId)
+            }
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        val balancedPaneExpansionState =
+            rememberFlatScreenBalancedPaneExpansionState(
+                directive = navigator.scaffoldDirective,
+            )
+        val showDetailNavigateBack = navigator.scaffoldDirective.maxHorizontalPartitions <= 1
+        val showPaneSelectionState = !showDetailNavigateBack
+        ListDetailPaneScaffold(
+            directive = navigator.scaffoldDirective,
+            scaffoldState = navigator.scaffoldState,
+            listPane = {
+                AnimatedPane {
+                    TwoPaneListPaneWithFab(fabContent = paneFabContent) {
+                        HistoryScreen(
+                            contentPadding = contentPadding,
+                            onHistoryClick = { historyId -> showHistoryInDetailPane(historyId) },
+                            onNavigateBack = onNavigateBack,
+                            activeHistoryId = activeHistoryId.takeIf { showPaneSelectionState },
+                            viewModel = viewModel,
+                        )
+                    }
+                }
+            },
+            detailPane = {
+                AnimatedPane {
+                    val selectedHistoryId = activeHistoryId
+                    if (section == HistorySection.TRASH) {
+                        TwoPaneEmptyDetail(
+                            illustration = { ThemeColoredEmptyTrashIllustration() },
+                            title = stringResource(R.string.history_two_pane_trash_title),
+                            message = stringResource(R.string.history_two_pane_trash_message),
+                        )
+                    } else if (selectedHistoryId == null) {
+                        TwoPaneEmptyDetail(
+                            illustration = { ThemeColoredEmptyHistoryIllustration(Modifier.size(120.dp)) },
+                            title = stringResource(R.string.history_empty_title),
+                            message = stringResource(R.string.history_empty_subtitle),
+                        )
+                    } else {
+                        HistoryDetailPaneHost(
+                            historyId = selectedHistoryId,
+                            onNavigateBack = {
+                                scope.launch {
+                                    navigator.navigateBack()
+                                }
+                            },
+                            showNavigateBack = showDetailNavigateBack,
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+            paneExpansionState = balancedPaneExpansionState,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsTwoPaneRoute(
+    contentPadding: PaddingValues,
+    onOpenIntro: () -> Unit,
+    onOpenFaqStorageSection: () -> Unit,
+    onOpenHelp: () -> Unit,
+    onOpenDevOptions: () -> Unit,
+    paneFabContent: (@Composable () -> Unit)? = null,
+    viewModel: SettingsViewModel = hiltViewModel(),
+    highlightSectionKey: String? = null,
+    onHighlightHandled: () -> Unit = {},
+) {
+    val developerOptionsEnabled by viewModel.developerOptionsEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
+    val navigator = rememberListDetailPaneScaffoldNavigator<String>()
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val paneContentPadding =
+        PaddingValues(
+            top = statusBarPadding,
+            bottom = contentPadding.calculateBottomPadding(),
+        )
+    // The detail pane has no FAB/bottom bar, so the list-pane FAB clearance baked into
+    // contentPadding would just be dead space at the bottom. Use a plain navigation-bar
+    // inset (plus a little breathing room) instead.
+    val detailPaneContentPadding =
+        PaddingValues(
+            top = statusBarPadding,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
+        )
+    val scope = rememberCoroutineScope()
+    var selectedSectionKey by rememberSaveable { mutableStateOf(SettingsSectionKey.Appearance) }
+    val showDetailNavigateBack = navigator.scaffoldDirective.maxHorizontalPartitions <= 1
+    val showPaneSelectionState = !showDetailNavigateBack
+
+    fun showSettingsSection(sectionKey: SettingsSectionKey) {
+        selectedSectionKey = sectionKey
+        scope.launch {
+            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, sectionKey.routeKey)
+        }
+    }
+
+    LaunchedEffect(highlightSectionKey, showPaneSelectionState) {
+        if (!showPaneSelectionState) return@LaunchedEffect
+        val highlightedSectionKey = settingsSectionKeyForHighlight(highlightSectionKey) ?: return@LaunchedEffect
+        showSettingsSection(highlightedSectionKey)
+    }
+
+    if (!showPaneSelectionState) {
+        Box(Modifier.fillMaxSize()) {
+            SettingsScreen(
+                contentPadding = contentPadding,
+                onOpenIntro = onOpenIntro,
+                onOpenFaqStorageSection = onOpenFaqStorageSection,
+                onOpenHelp = onOpenHelp,
+                onOpenDevOptions = onOpenDevOptions,
+                viewModel = viewModel,
+                highlightSectionKey = highlightSectionKey,
+                onHighlightHandled = onHighlightHandled,
+            )
+            if (paneFabContent != null) {
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                            .padding(end = 24.dp, bottom = 24.dp),
+                ) {
+                    paneFabContent()
+                }
+            }
+        }
+        return
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        val balancedPaneExpansionState =
+            rememberFlatScreenBalancedPaneExpansionState(
+                directive = navigator.scaffoldDirective,
+            )
+        ListDetailPaneScaffold(
+            directive = navigator.scaffoldDirective,
+            scaffoldState = navigator.scaffoldState,
+            listPane = {
+                AnimatedPane {
+                    TwoPaneListPaneWithFab(fabContent = paneFabContent) {
+                        SettingsSectionListPane(
+                            contentPadding = paneContentPadding,
+                            selectedSectionKey = selectedSectionKey,
+                            developerOptionsEnabled = developerOptionsEnabled,
+                            onSectionSelected = ::showSettingsSection,
+                            showSelectedState = showPaneSelectionState,
+                            extraTopPadding = 52.dp,
+                        )
+                    }
+                }
+            },
+            detailPane = {
+                AnimatedPane {
+                    if (selectedSectionKey == SettingsSectionKey.DeveloperOptions) {
+                        DevOptionsScreen(
+                            contentPadding = detailPaneContentPadding,
+                            onNavigateBack = { showSettingsSection(SettingsSectionKey.About) },
+                            settingsViewModel = viewModel,
+                            showNavigateBack = showDetailNavigateBack,
+                        )
+                    } else {
+                        SettingsScreen(
+                            contentPadding = detailPaneContentPadding,
+                            onOpenIntro = onOpenIntro,
+                            onOpenFaqStorageSection = onOpenFaqStorageSection,
+                            onOpenHelp = onOpenHelp,
+                            onOpenDevOptions = { showSettingsSection(SettingsSectionKey.DeveloperOptions) },
+                            viewModel = viewModel,
+                            highlightSectionKey = highlightSectionKey,
+                            onHighlightHandled = onHighlightHandled,
+                            selectedSectionKey = selectedSectionKey,
+                            showTopBar = false,
+                            showSectionHeaders = false,
+                        )
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxSize(),
+            paneExpansionState = balancedPaneExpansionState,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
+@Composable
+private fun rememberFlatScreenBalancedPaneExpansionState(
+    directive: PaneScaffoldDirective,
+): PaneExpansionState {
+    val targetFirstPaneProportion: Float? =
+        if (directive.excludedBounds.isEmpty() && directive.maxHorizontalPartitions > 1) {
+            0.4f
+        } else {
+            null
+        }
+    val paneExpansionAnchors =
+        remember(targetFirstPaneProportion) {
+            if (targetFirstPaneProportion == null) {
+                emptyList()
+            } else {
+                listOf(PaneExpansionAnchor.Proportion(targetFirstPaneProportion))
+            }
+        }
+    val paneExpansionState =
+        rememberPaneExpansionState(
+            key = PaneExpansionStateKey.Default,
+            anchors = paneExpansionAnchors,
+        )
+    LaunchedEffect(paneExpansionState, targetFirstPaneProportion) {
+        if (targetFirstPaneProportion == null) {
+            paneExpansionState.clear()
+        } else {
+            paneExpansionState.setFirstPaneProportion(targetFirstPaneProportion)
+        }
+    }
+    return paneExpansionState
+}
+
+@Composable
+private fun RuleDetailPaneHost(
+    ruleId: Long,
+    onNavigateBack: () -> Unit,
+    onOpenFaq: () -> Unit,
+    onSavedRule: (Long) -> Unit,
+    showNavigateBack: Boolean,
+) {
+    val detailRoute = Screen.RuleDetail.createRoute(ruleId)
+    key(detailRoute) {
+        val detailNavController = rememberNavController()
+        NavHost(
+            navController = detailNavController,
+            startDestination = detailRoute,
+        ) {
+            composable(
+                route = Screen.RuleDetail.route,
+                arguments =
+                    listOf(
+                        navArgument(Screen.RuleDetail.ARG_RULE_ID) {
+                            type = NavType.LongType
+                        },
+                        navArgument(Screen.RuleDetail.ARG_TEMPLATE_INDEX) {
+                            type = NavType.IntType
+                            defaultValue = -1
+                        },
+                        navArgument(Screen.RuleDetail.ARG_SKIP_TEMPLATE_PICKER) {
+                            type = NavType.BoolType
+                            defaultValue = false
+                        },
+                    ),
+            ) {
+                RuleDetailScreen(
+                    onNavigateBack = onNavigateBack,
+                    onOpenFaq = onOpenFaq,
+                    onSavedRule = onSavedRule,
+                    showNavigateBack = showNavigateBack,
+                    allowInitialRuleNameFocus = false,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryDetailPaneHost(
+    historyId: Long,
+    onNavigateBack: () -> Unit,
+    showNavigateBack: Boolean,
+) {
+    val detailRoute = Screen.HistoryDetail.createRoute(historyId)
+    key(detailRoute) {
+        val detailNavController = rememberNavController()
+        NavHost(
+            navController = detailNavController,
+            startDestination = detailRoute,
+        ) {
+            composable(
+                route = Screen.HistoryDetail.route,
+                arguments =
+                    listOf(
+                        navArgument(Screen.HistoryDetail.ARG_HISTORY_ID) {
+                            type = NavType.LongType
+                        },
+                    ),
+            ) {
+                HistoryDetailScreen(
+                    onNavigateBack = onNavigateBack,
+                    showNavigateBack = showNavigateBack,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TwoPaneEmptyDetail(
+    illustration: @Composable () -> Unit,
+    title: String,
+    message: String,
+    actionLabel: String? = null,
+    actionIconName: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .padding(32.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            illustration()
+            Spacer(Modifier.height(16.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                textAlign = TextAlign.Center,
+            )
+            if (actionLabel != null && onAction != null) {
+                Spacer(Modifier.height(8.dp))
+                FilePipeButton(
+                    onClick = onAction,
+                    shape = pillShape,
+                    modifier = Modifier.fillMaxWidth(0.72f),
+                ) {
+                    if (actionIconName != null) {
+                        FilePipeMaterialRoundedSymbol(
+                            name = actionIconName,
+                            contentDescription = null,
+                            size = 20.dp,
+                            opticalCenterYOffset = (-2).dp,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(actionLabel)
+                }
+            }
         }
     }
 }
@@ -1534,6 +2576,7 @@ private fun SimpleNavFab(
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryTabEnterTransition(
     reducedMotion: Boolean,
+    verticalMotion: Boolean,
     spatialSpec: FiniteAnimationSpec<IntOffset>,
     fadeInSpec: FiniteAnimationSpec<Float>,
 ): EnterTransition? {
@@ -1542,14 +2585,23 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryTabEnterTra
     return if (reducedMotion) {
         EnterTransition.None
     } else if (targetOrdinal > initialOrdinal) {
-        slideInHorizontally(animationSpec = spatialSpec) { it } + fadeIn(animationSpec = fadeInSpec)
+        if (verticalMotion) {
+            slideInVertically(animationSpec = spatialSpec) { it } + fadeIn(animationSpec = fadeInSpec)
+        } else {
+            slideInHorizontally(animationSpec = spatialSpec) { it } + fadeIn(animationSpec = fadeInSpec)
+        }
     } else {
-        slideInHorizontally(animationSpec = spatialSpec) { -it } + fadeIn(animationSpec = fadeInSpec)
+        if (verticalMotion) {
+            slideInVertically(animationSpec = spatialSpec) { -it } + fadeIn(animationSpec = fadeInSpec)
+        } else {
+            slideInHorizontally(animationSpec = spatialSpec) { -it } + fadeIn(animationSpec = fadeInSpec)
+        }
     }
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryTabExitTransition(
     reducedMotion: Boolean,
+    verticalMotion: Boolean,
     spatialSpec: FiniteAnimationSpec<IntOffset>,
     fadeOutSpec: FiniteAnimationSpec<Float>,
 ): ExitTransition? {
@@ -1558,8 +2610,16 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryTabExitTran
     return if (reducedMotion) {
         ExitTransition.None
     } else if (targetOrdinal > initialOrdinal) {
-        slideOutHorizontally(animationSpec = spatialSpec) { -it / 3 } + fadeOut(animationSpec = fadeOutSpec)
+        if (verticalMotion) {
+            slideOutVertically(animationSpec = spatialSpec) { -it / 3 } + fadeOut(animationSpec = fadeOutSpec)
+        } else {
+            slideOutHorizontally(animationSpec = spatialSpec) { -it / 3 } + fadeOut(animationSpec = fadeOutSpec)
+        }
     } else {
-        slideOutHorizontally(animationSpec = spatialSpec) { it } + fadeOut(animationSpec = fadeOutSpec)
+        if (verticalMotion) {
+            slideOutVertically(animationSpec = spatialSpec) { it } + fadeOut(animationSpec = fadeOutSpec)
+        } else {
+            slideOutHorizontally(animationSpec = spatialSpec) { it } + fadeOut(animationSpec = fadeOutSpec)
+        }
     }
 }

@@ -118,6 +118,8 @@ class FileOrganizerWorker
                     e,
                 )
                 if (runAttemptCount < 2) Result.retry() else Result.failure()
+            } finally {
+                clearProgressNotification()
             }
         }
 
@@ -268,6 +270,10 @@ class FileOrganizerWorker
             }
 
             notificationManager.notify(progressNotificationId, builder.build())
+        }
+
+        private fun clearProgressNotification() {
+            notificationManager.cancel(progressNotificationId)
         }
 
         private fun createForegroundInfo(ruleName: String): ForegroundInfo {

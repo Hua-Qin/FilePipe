@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,14 +42,22 @@ fun HistoryCard(
     history: RunHistory,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    isActiveInDetailPane: Boolean = false,
 ) {
     val cardColors = elevatedCardColors()
     val historyCardShape = MaterialTheme.shapes.medium
+    val activePaneModifier =
+        if (isActiveInDetailPane) {
+            Modifier.border(1.dp, MaterialTheme.colorScheme.secondary, historyCardShape)
+        } else {
+            Modifier
+        }
     FilePipeSurface(
         onClick = onClick,
         modifier =
             modifier
                 .fillMaxWidth()
+                .then(activePaneModifier)
                 .semantics(mergeDescendants = true) {
                     role = Role.Button
                 },
@@ -205,11 +214,16 @@ fun StatusChip(
     }
 }
 
-fun formatTime(context: android.content.Context, millis: Long): String {
+fun formatTime(
+    context: android.content.Context,
+    millis: Long,
+): String {
     val now = System.currentTimeMillis()
     val diff = now - millis
     val locale = Locale.getDefault()
-    val isSystem24Hour = android.text.format.DateFormat.is24HourFormat(context)
+    val isSystem24Hour =
+        android.text.format.DateFormat
+            .is24HourFormat(context)
     val timePattern = if (isSystem24Hour) "HH:mm" else "h:mm a"
     val dateTimePattern = if (isSystem24Hour) "MMM d, HH:mm" else "MMM d, h:mm a"
     val pattern = if (diff < 24 * 60 * 60 * 1000L) timePattern else dateTimePattern

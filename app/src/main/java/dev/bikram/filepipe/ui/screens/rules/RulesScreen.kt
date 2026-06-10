@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -67,6 +69,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -124,6 +127,13 @@ fun RulesScreen(
     onNavigateToHistoryDetail: (Long) -> Unit,
     onNavigateToHistoryList: () -> Unit,
     onNavigateToRuleHistory: (Long) -> Unit,
+    activeRuleId: Long? = null,
+    onActivateRuleInDetailPane: ((Long) -> Unit)? = null,
+    onActivateRuleForRunInDetailPane: ((Long) -> Unit)? = null,
+    showPendingNewRuleInDetailPane: Boolean = false,
+    showSelectionActionBar: Boolean = true,
+    listStartPadding: Dp = 16.dp,
+    listEndPadding: Dp = 16.dp,
     viewModel: RulesViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -215,6 +225,12 @@ fun RulesScreen(
         }
     val sortKeyState = rememberUpdatedState(sortKey)
 
+    LaunchedEffect(showPendingNewRuleInDetailPane) {
+        if (showPendingNewRuleInDetailPane) {
+            lazyListState.animateScrollToItem(0)
+        }
+    }
+
     BackHandler(enabled = hasSelection) {
         viewModel.clearSelection()
     }
@@ -287,7 +303,7 @@ fun RulesScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            if (hasSelection && !isRunning) {
+                            if (showSelectionActionBar && hasSelection && !isRunning) {
                                 Box(modifier = Modifier.size(48.dp)) {
                                     val selectAllLabel = stringResource(R.string.run_select_all)
                                     FilePipeFilledTonalIconButton(
@@ -369,7 +385,7 @@ fun RulesScreen(
         },
         bottomBar = {
             when {
-                isRunning && manualRunCancelAnchor == ManualRunCancelAnchor.RunSelectedBar -> {
+                showSelectionActionBar && isRunning && manualRunCancelAnchor == ManualRunCancelAnchor.RunSelectedBar -> {
                     Box(
                         modifier =
                             Modifier
@@ -412,7 +428,7 @@ fun RulesScreen(
                     val selectionBarFadeOutSpec =
                         reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
                     AnimatedVisibility(
-                        visible = hasSelection,
+                        visible = showSelectionActionBar && hasSelection,
                         enter =
                             reducedMotionEnterTransition(
                                 expandVertically(animationSpec = selectionBarSpatialSpec) +
@@ -499,8 +515,8 @@ fun RulesScreen(
             }
         },
     ) { innerPadding ->
-        if (rules.isEmpty()) {
-            EmptyState(
+        if (rules.isEmpty() && !showPendingNewRuleInDetailPane) {
+            RulesEmptyState(
                 onAddRule = {
                     onEditRule(Screen.RuleDetail.NEW_RULE_ID)
                 },
@@ -520,14 +536,16 @@ fun RulesScreen(
                 )
             val listColumnPadding =
                 PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
+                    start = listStartPadding,
+                    end = listEndPadding,
                     top = innerPadding.calculateTopPadding() + 8.dp,
                     bottom = bottomChromePadding + 56.dp,
                 )
             val listModifier =
                 Modifier
                     .fillMaxSize()
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+                    .widthIn(max = 720.dp)
                     .then(scrollBlurModifier)
 
             LazyColumn(
@@ -537,6 +555,16 @@ fun RulesScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 userScrollEnabled = listScrollEnabled,
             ) {
+                if (showPendingNewRuleInDetailPane) {
+                    item(key = "pending_new_rule") {
+                        PendingNewRuleCard(
+                            onClick = {
+                                onActivateRuleInDetailPane?.invoke(Screen.RuleDetail.NEW_RULE_ID)
+                            },
+                            modifier = Modifier.animateItem(),
+                        )
+                    }
+                }
                 items(reorderableRules, key = { it.id }) { rule ->
                     ReorderableItem(
                         reorderableLazyListState,
@@ -588,6 +616,7 @@ fun RulesScreen(
                         SwipeToDismissRuleCard(
                             rule = rule,
                             isSelected = rule.id in selectedRuleIds,
+                            isActiveInDetailPane = !hasSelection && rule.id == activeRuleId,
                             isSelectionMode = hasSelection,
                             isExpanded = isExpanded,
                             progress = progressMap[rule.id],
@@ -604,16 +633,19 @@ fun RulesScreen(
                                 } else if (hasSelection) {
                                     viewModel.toggleSelection(rule.id)
                                 } else {
-                                    viewModel.toggleCardExpansion(rule.id)
+                                    onEditRule(rule.id)
                                 }
                             },
                             onLongClick = {
                                 viewModel.toggleSelection(rule.id)
                             },
-                            onEdit = { onEditRule(rule.id) },
+                            onToggleExpansion = { viewModel.toggleCardExpansion(rule.id) },
                             onDelete = { viewModel.deleteRule(rule) },
                             onDuplicate = { viewModel.duplicateRule(rule) },
-                            onRunRule = { viewModel.runRule(rule) },
+                            onRunRule = {
+                                onActivateRuleForRunInDetailPane?.invoke(rule.id)
+                                viewModel.runRule(rule)
+                            },
                             onCancelManualRun = { viewModel.cancelManualRun() },
                             showInlineProgressCancel = showInlineProgressCancel,
                             onPreviewRule = { viewModel.startPreview(rule) },
@@ -889,6 +921,7 @@ private fun RulesSortDropdown(
 private fun SwipeToDismissRuleCard(
     rule: Rule,
     isSelected: Boolean,
+    isActiveInDetailPane: Boolean,
     isSelectionMode: Boolean,
     isExpanded: Boolean,
     progress: dev.bikram.filepipe.domain.model.RunProgress?,
@@ -901,7 +934,7 @@ private fun SwipeToDismissRuleCard(
     onToggleEnabled: (Boolean) -> Unit,
     onToggleSelectOrExpand: () -> Unit,
     onLongClick: () -> Unit,
-    onEdit: () -> Unit,
+    onToggleExpansion: () -> Unit,
     onDelete: () -> Unit,
     onDuplicate: () -> Unit,
     onRunRule: () -> Unit,
@@ -923,9 +956,17 @@ private fun SwipeToDismissRuleCard(
             .filterNot { action -> isMockRule && action.isBlockedForMockRule() }
             .map { action ->
                 RuleCardAction(
-                    iconName = action.materialSymbolName(),
-                    label = action.label(),
-                    onClick = { action.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule) },
+                    iconName = action.materialSymbolName(isExpanded),
+                    label = action.label(isExpanded),
+                    onClick = {
+                        action.dispatch(
+                            onDelete = onDelete,
+                            onToggleExpansion = onToggleExpansion,
+                            onDuplicate = onDuplicate,
+                            onViewHistory = onViewHistory,
+                            onPreview = onPreviewRule,
+                        )
+                    },
                 )
             }
 
@@ -935,12 +976,24 @@ private fun SwipeToDismissRuleCard(
         cardShape = cardShape,
         onSwipeStartToEnd = {
             if (!isMockRule || !swipeStartToEnd.isBlockedForMockRule()) {
-                swipeStartToEnd.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
+                swipeStartToEnd.dispatch(
+                    onDelete = onDelete,
+                    onToggleExpansion = onToggleExpansion,
+                    onDuplicate = onDuplicate,
+                    onViewHistory = onViewHistory,
+                    onPreview = onPreviewRule,
+                )
             }
         },
         onSwipeEndToStart = {
             if (!isMockRule || !swipeEndToStart.isBlockedForMockRule()) {
-                swipeEndToStart.dispatch(onDelete, onEdit, onDuplicate, onViewHistory, onPreviewRule)
+                swipeEndToStart.dispatch(
+                    onDelete = onDelete,
+                    onToggleExpansion = onToggleExpansion,
+                    onDuplicate = onDuplicate,
+                    onViewHistory = onViewHistory,
+                    onPreview = onPreviewRule,
+                )
             }
         },
         hapticEnabled = hapticEnabled,
@@ -976,26 +1029,26 @@ private fun SwipeToDismissRuleCard(
                 ) {
                     if (fromStart) {
                         FilePipeMaterialRoundedSymbol(
-                            name = action.materialSymbolName(),
+                            name = action.materialSymbolName(isExpanded),
                             contentDescription = null,
                             size = 20.dp,
                             tint = iconTint,
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = action.shortLabel(),
+                            text = action.shortLabel(isExpanded),
                             style = MaterialTheme.typography.labelMedium,
                             color = iconTint,
                         )
                     } else {
                         Text(
-                            text = action.shortLabel(),
+                            text = action.shortLabel(isExpanded),
                             style = MaterialTheme.typography.labelMedium,
                             color = iconTint,
                         )
                         Spacer(Modifier.width(6.dp))
                         FilePipeMaterialRoundedSymbol(
-                            name = action.materialSymbolName(),
+                            name = action.materialSymbolName(isExpanded),
                             contentDescription = null,
                             size = 20.dp,
                             tint = iconTint,
@@ -1009,6 +1062,7 @@ private fun SwipeToDismissRuleCard(
         RuleCard(
             rule = rule,
             isSelected = isSelected,
+            isActiveInDetailPane = isActiveInDetailPane,
             isSelectionMode = isSelectionMode,
             isExpanded = isExpanded,
             progress = progress,
@@ -1030,16 +1084,57 @@ private fun SwipeToDismissRuleCard(
     }
 }
 
-private fun SwipeAction.isBlockedForMockRule(): Boolean = this == SwipeAction.EDIT || this == SwipeAction.DUPLICATE
+@Composable
+private fun PendingNewRuleCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val pendingRule =
+        remember {
+            Rule(
+                id = Screen.RuleDetail.NEW_RULE_ID,
+                name = "",
+                sourceFolderPaths = emptyList(),
+                destinationFolderPath = "",
+                fileExtensions = emptyList(),
+                isEnabled = true,
+            )
+        }
+    RuleCard(
+        rule = pendingRule.copy(name = stringResource(R.string.new_rule)),
+        isSelected = false,
+        isActiveInDetailPane = true,
+        isSelectionMode = false,
+        isExpanded = false,
+        progress = null,
+        onClick = onClick,
+        onLongClick = {},
+        cardActions = emptyList(),
+        onToggleEnabled = {},
+        onRunClick = {},
+        onCancelRunClick = {},
+        isAnyRuleRunning = false,
+        showOperationalControls = false,
+        modifier = modifier,
+    )
+}
+
+private fun SwipeAction.isBlockedForMockRule(): Boolean = this == SwipeAction.DUPLICATE
+
+private fun SwipeAction.materialSymbolName(isExpanded: Boolean): String =
+    when (this) {
+        SwipeAction.EDIT -> if (isExpanded) "unfold_less" else "unfold_more"
+        else -> materialSymbolName()
+    }
 
 private fun SwipeAction.dispatch(
     onDelete: () -> Unit,
-    onEdit: () -> Unit,
+    onToggleExpansion: () -> Unit,
     onDuplicate: () -> Unit,
     onViewHistory: () -> Unit,
     onPreview: () -> Unit,
 ) = when (this) {
-    SwipeAction.EDIT -> onEdit()
+    SwipeAction.EDIT -> onToggleExpansion()
     SwipeAction.DELETE -> onDelete()
     SwipeAction.DUPLICATE -> onDuplicate()
     SwipeAction.PREVIEW -> onPreview()
@@ -1047,27 +1142,67 @@ private fun SwipeAction.dispatch(
 }
 
 @Composable
-private fun SwipeAction.label(): String =
+private fun SwipeAction.label(isExpanded: Boolean): String =
     when (this) {
-        SwipeAction.EDIT -> stringResource(R.string.edit_rule)
-        SwipeAction.DELETE -> stringResource(R.string.delete_rule)
-        SwipeAction.DUPLICATE -> stringResource(R.string.duplicate_rule)
-        SwipeAction.PREVIEW -> stringResource(R.string.preview_rule)
-        SwipeAction.VIEW_HISTORY -> stringResource(R.string.view_history)
+        SwipeAction.EDIT -> {
+            stringResource(
+                if (isExpanded) {
+                    R.string.action_collapse
+                } else {
+                    R.string.action_expand
+                },
+            )
+        }
+
+        SwipeAction.DELETE -> {
+            stringResource(R.string.delete_rule)
+        }
+
+        SwipeAction.DUPLICATE -> {
+            stringResource(R.string.duplicate_rule)
+        }
+
+        SwipeAction.PREVIEW -> {
+            stringResource(R.string.preview_rule)
+        }
+
+        SwipeAction.VIEW_HISTORY -> {
+            stringResource(R.string.view_history)
+        }
     }
 
 @Composable
-private fun SwipeAction.shortLabel(): String =
+private fun SwipeAction.shortLabel(isExpanded: Boolean): String =
     when (this) {
-        SwipeAction.EDIT -> stringResource(R.string.action_edit)
-        SwipeAction.DELETE -> stringResource(R.string.settings_swipe_action_trash)
-        SwipeAction.DUPLICATE -> stringResource(R.string.action_duplicate)
-        SwipeAction.PREVIEW -> stringResource(R.string.preview_title)
-        SwipeAction.VIEW_HISTORY -> stringResource(R.string.settings_swipe_action_history)
+        SwipeAction.EDIT -> {
+            stringResource(
+                if (isExpanded) {
+                    R.string.action_collapse
+                } else {
+                    R.string.action_expand
+                },
+            )
+        }
+
+        SwipeAction.DELETE -> {
+            stringResource(R.string.settings_swipe_action_trash)
+        }
+
+        SwipeAction.DUPLICATE -> {
+            stringResource(R.string.action_duplicate)
+        }
+
+        SwipeAction.PREVIEW -> {
+            stringResource(R.string.preview_title)
+        }
+
+        SwipeAction.VIEW_HISTORY -> {
+            stringResource(R.string.settings_swipe_action_history)
+        }
     }
 
 @Composable
-private fun EmptyState(
+fun RulesEmptyState(
     onAddRule: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1083,45 +1218,50 @@ private fun EmptyState(
                     slideInVertically(animationSpec = emptyStateSpatialSpec) { it / 4 },
             ),
     ) {
-        Column(
+        Box(
             modifier = modifier.fillMaxSize().padding(32.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally,
+            contentAlignment = Alignment.Center,
         ) {
-            ThemeColoredEmptyRulesIllustration(Modifier.size(120.dp))
-            Spacer(Modifier.height(24.dp))
             Column(
-                modifier = Modifier.semantics(mergeDescendants = true) { },
+                modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth(),
+                verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text(
-                    stringResource(R.string.rules_empty_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    stringResource(R.string.rules_empty_subtitle),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
-                    textAlign = TextAlign.Center,
-                )
-            }
-            Spacer(Modifier.height(24.dp))
-            FilePipeButton(
-                onClick = onAddRule,
-                shape = pillShape,
-                modifier = Modifier.fillMaxWidth(0.72f),
-            ) {
-                FilePipeMaterialRoundedSymbol(
-                    name = "add",
-                    contentDescription = null,
-                    size = 20.dp,
-                    opticalCenterYOffset = (-2).dp,
-                    modifier = Modifier.size(20.dp),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.rules_add_rule))
+                ThemeColoredEmptyRulesIllustration(Modifier.size(120.dp))
+                Spacer(Modifier.height(24.dp))
+                Column(
+                    modifier = Modifier.semantics(mergeDescendants = true) { },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        stringResource(R.string.rules_empty_title),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        stringResource(R.string.rules_empty_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f),
+                        textAlign = TextAlign.Center,
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+                FilePipeButton(
+                    onClick = onAddRule,
+                    shape = pillShape,
+                    modifier = Modifier.fillMaxWidth(0.72f),
+                ) {
+                    FilePipeMaterialRoundedSymbol(
+                        name = "add",
+                        contentDescription = null,
+                        size = 20.dp,
+                        opticalCenterYOffset = (-2).dp,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.rules_add_rule))
+                }
             }
         }
     }

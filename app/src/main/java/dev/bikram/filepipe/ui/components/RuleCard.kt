@@ -182,6 +182,7 @@ private fun RuleCardClickableBody(
 fun RuleCard(
     rule: Rule,
     isSelected: Boolean,
+    isActiveInDetailPane: Boolean,
     isExpanded: Boolean,
     progress: RunProgress?,
     onClick: () -> Unit, // toggles expansion (or selection when in selection mode)
@@ -218,6 +219,8 @@ fun RuleCard(
                 .then(
                     if (isSelected) {
                         Modifier.border(2.dp, MaterialTheme.colorScheme.primary, cardShape)
+                    } else if (isActiveInDetailPane) {
+                        Modifier.border(1.dp, MaterialTheme.colorScheme.secondary, cardShape)
                     } else {
                         Modifier
                     },
@@ -697,18 +700,21 @@ private fun ExpandedContent(
                 rule.schedule?.let { schedule ->
                     Spacer(Modifier.height(4.dp))
                     val cardContext = androidx.compose.ui.platform.LocalContext.current
-                    val isSystem24Hour = android.text.format.DateFormat.is24HourFormat(cardContext)
-                    val timeStr = if (isSystem24Hour) {
-                        "%02d:%02d".format(schedule.hour, schedule.minute)
-                    } else {
-                        val hour12 =
-                            when (val hourMod = schedule.hour % 12) {
-                                0 -> 12
-                                else -> hourMod
-                            }
-                        val amPm = if (schedule.hour < 12) "AM" else "PM"
-                        "%d:%02d %s".format(hour12, schedule.minute, amPm)
-                    }
+                    val isSystem24Hour =
+                        android.text.format.DateFormat
+                            .is24HourFormat(cardContext)
+                    val timeStr =
+                        if (isSystem24Hour) {
+                            "%02d:%02d".format(schedule.hour, schedule.minute)
+                        } else {
+                            val hour12 =
+                                when (val hourMod = schedule.hour % 12) {
+                                    0 -> 12
+                                    else -> hourMod
+                                }
+                            val amPm = if (schedule.hour < 12) "AM" else "PM"
+                            "%d:%02d %s".format(hour12, schedule.minute, amPm)
+                        }
                     val scheduleText =
                         when (schedule.type) {
                             ScheduleType.DAILY -> {
@@ -932,7 +938,11 @@ private fun ExpandedContent(
                                     size = 20.dp,
                                 )
                                 Spacer(Modifier.width(6.dp))
-                                Text(text = stringResource(R.string.run_now))
+                                Text(
+                                    text = stringResource(R.string.run_now),
+                                    maxLines = 1,
+                                    softWrap = false,
+                                )
                             }
                         }
                     }

@@ -11,6 +11,9 @@
     <string name="rules_empty_title">No rules yet</string>
     <string name="rules_empty_subtitle">Tap \"Add rule\" to create your first organizing rule</string>
     <string name="rules_add_rule">Add rule</string>
+    <string name="rules_two_pane_empty_title">No rule selected</string>
+    <string name="rules_two_pane_empty_message">Create or select a rule to see its details here.</string>
+    <string name="rules_two_pane_empty_action">Create rule</string>
     <string name="rule_card_types_none">None</string>
     <string name="rule_card_from">From</string>
     <string name="rule_card_from_none">No sources</string>
@@ -119,6 +122,9 @@
     <string name="move_to_trash">Move to Trash</string>
     <string name="undo">Undo</string>
     <string name="action_edit">Edit</string>
+    <string name="action_expand">Expand</string>
+    <string name="action_collapse">Collapse</string>
+    <string name="action_expand_collapse">Expand / collapse</string>
     <string name="action_duplicate">Duplicate</string>
     <string name="nav_back">Back</string>
     <string name="delete_rule">Delete rule</string>
@@ -137,6 +143,12 @@
     <!-- History screen -->
     <string name="history_no_files_affected">No files affected</string>
     <string name="history_detail_title">Run details</string>
+    <string name="history_detail_files_header">Files (%1$d)</string>
+    <string name="history_detail_no_file_records">No file records for this run.</string>
+    <string name="history_two_pane_empty_title">No run selected</string>
+    <string name="history_two_pane_empty_message">Run details will appear here when history is available.</string>
+    <string name="history_two_pane_trash_title">Trash selected</string>
+    <string name="history_two_pane_trash_message">Trashed rules stay in the list. Run details appear when you switch back to Runs.</string>
     <string name="history_detail_files_moved_label">Files moved</string>
     <string name="history_detail_files_copied_label">Files copied</string>
     <plurals name="history_detail_undo_files">
@@ -173,6 +185,10 @@
     <plurals name="rules_move_to_trash_confirm_title">
         <item quantity="one">Move %1$d rule to Trash?</item>
         <item quantity="other">Move %1$d rules to Trash?</item>
+    </plurals>
+    <plurals name="rules_selection_count">
+        <item quantity="one">%1$d selected rule</item>
+        <item quantity="other">%1$d selected rules</item>
     </plurals>
     <string name="rules_move_to_trash_confirm_message">Scheduled runs for the selected rules will be paused. You can restore them from History -&gt; Trash within 30 days.</string>
     <string name="history_triggered_manual">Manual</string>
@@ -887,4 +903,7 @@
     <string name="file_type_dialog_placeholder">jpg, png, mp3</string>
     <string name="file_type_dialog_supporting_text">Separate extensions with commas</string>
     <string name="file_type_dialog_add">Add</string>
+    <string name="file_type_add_type">Add type</string>
+    <string name="file_type_use_template">Use template</string>
+    <string name="file_type_remove_content_description">Remove %1$s</string>
 </resources>
