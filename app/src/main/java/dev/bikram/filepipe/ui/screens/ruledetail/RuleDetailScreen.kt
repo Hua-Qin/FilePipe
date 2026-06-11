@@ -826,7 +826,9 @@ fun RuleDetailScreen(
         if (bottomBarMessages.isEmpty()) dismissedBottomBarKey = null
     }
     val showBottomBar = bottomBarMessages.isNotEmpty() && dismissedBottomBarKey != bottomBarKey
-    val showBottomActions = isDirty
+    // A pristine new rule hosted in a pane has no back arrow, so it must always offer
+    // Cancel/Save; on phone the top-bar back covers cancel until the form is dirty.
+    val showBottomActions = isDirty || (viewModel.isNewRule && !showNavigateBack)
     val validationErrorOverlayExtraPadding = if (showBottomBar) 72.dp else 0.dp
     val bottomActionOverlayPadding = if (showBottomActions) 88.dp else 0.dp
     val bottomOverlayPadding = bottomActionOverlayPadding + validationErrorOverlayExtraPadding

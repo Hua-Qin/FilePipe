@@ -49,7 +49,9 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -1621,7 +1623,13 @@ private fun RulesSelectionActionPane(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 360.dp)
+                    // Low-height windows (landscape phones / low-res tablets) can't fit the
+                    // whole stack; scroll instead of truncating the bottom buttons.
+                    .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {

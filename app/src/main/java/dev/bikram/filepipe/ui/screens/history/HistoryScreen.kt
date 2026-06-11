@@ -31,6 +31,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
@@ -500,10 +502,15 @@ fun HistoryScreen(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     Column(
+                        // The scroll container spans the whole pane and the top/FAB
+                        // clearances live INSIDE it — exactly like the content lists.
+                        // Low-height panes then scroll edge-to-edge instead of clipping
+                        // the empty state at a padded boundary.
                         modifier =
                             Modifier
                                 .fillMaxSize()
                                 .then(scrollBlurModifier)
+                                .verticalScroll(rememberScrollState())
                                 .padding(top = innerPadding.calculateTopPadding())
                                 .padding(bottom = contentPadding.calculateBottomPadding())
                                 .padding(32.dp),
