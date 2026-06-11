@@ -250,6 +250,7 @@ fun AppNavigation(
     val pendingOpenSettingsUpdates by pendingShortcutRepository.pendingOpenSettingsForUpdates.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val navRoute = currentDestination?.route
 
     val showBottomBar =
         bottomNavItems.any {
@@ -385,7 +386,9 @@ fun AppNavigation(
             // Two-pane (tablet/landscape) has no floating bottom bar to fade content under, so a
             // tall bottom blur is purely decorative and was obscuring the bottom of detail-pane
             // content. Fade only under the system navigation bar here.
-            useNavigationSuiteScaffold -> navBarInset
+            useNavigationSuiteScaffold && navRoute != Screen.Rules.route -> navBarInset
+
+            useNavigationSuiteScaffold && navRoute == Screen.Rules.route -> navBarInset + 96.dp
 
             showFloatingBottomBar -> scrimHeight
 
@@ -481,7 +484,6 @@ fun AppNavigation(
         pendingShortcutRepository.clearPendingHistoryDetail()
     }
 
-    val navRoute = navBackStackEntry?.destination?.route
     val primaryTabRoute =
         navRoute != null &&
             (
@@ -491,7 +493,7 @@ fun AppNavigation(
             )
     val topBlurSmallChrome = statusBarInset + 56.dp
     val topBlurHeightDp =
-        if (navRoute == Screen.Rules.route || navRoute == Screen.Settings.route) {
+        if ((navRoute == Screen.Rules.route || navRoute == Screen.Settings.route) && !useListDetailPanes) {
             0.dp
         } else if (isDevOptionsRoute) {
             topBlurSmallChrome + 48.dp
@@ -848,6 +850,17 @@ fun AppNavigation(
                                             navController.navigate(Screen.HistoryDetail.createRoute(historyId))
                                         },
                                         onNavigateBack = null,
+                                        onOpenIntro = {
+                                            navController.navigate(Screen.OnboardingTitle.route)
+                                        },
+                                        onOpenHelp = {
+                                            navController.navigate(Screen.Faq.createRoute())
+                                        },
+                                        onOpenDevOptions = {
+                                            navController.navigate(Screen.DevOptions.route) {
+                                                launchSingleTop = true
+                                            }
+                                        },
                                         paneFabContent = {
                                             MainNavFabSlot(
                                                 currentTab = Screen.History,
@@ -867,6 +880,9 @@ fun AppNavigation(
                                         contentPadding = primaryTabContentPadding,
                                         onHistoryClick = { historyId ->
                                             navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                                        },
+                                        onActivateTrashedRuleInDetailPane = { ruleId ->
+                                            navController.navigate(Screen.RuleDetail.createRoute(ruleId))
                                         },
                                         viewModel = historyVm,
                                     )
@@ -1086,6 +1102,17 @@ fun AppNavigation(
                                             navController.navigate(Screen.HistoryDetail.createRoute(historyId))
                                         },
                                         onNavigateBack = { navController.popBackStack() },
+                                        onOpenIntro = {
+                                            navController.navigate(Screen.OnboardingTitle.route)
+                                        },
+                                        onOpenHelp = {
+                                            navController.navigate(Screen.Faq.createRoute())
+                                        },
+                                        onOpenDevOptions = {
+                                            navController.navigate(Screen.DevOptions.route) {
+                                                launchSingleTop = true
+                                            }
+                                        },
                                     )
                                 } else {
                                     HistoryScreen(
@@ -1416,6 +1443,8 @@ private fun RulesTwoPaneRoute(
         }
     }
 
+    var previousRuleIds by remember { mutableStateOf(uiState.rules.map { it.id }) }
+
     LaunchedEffect(uiState.rules, activeRuleId, pendingSavedRuleId, isMultiPane) {
         val ruleIds = uiState.rules.map { rule -> rule.id }
         val currentRuleId = activeRuleId
@@ -1428,15 +1457,34 @@ private fun RulesTwoPaneRoute(
                 currentRuleId == Screen.RuleDetail.NEW_RULE_ID -> currentRuleId
                 currentRuleId != null && currentRuleId == pendingSavedRuleId -> currentRuleId
                 currentRuleId != null && currentRuleId in ruleIds -> currentRuleId
-                ruleIds.isNotEmpty() -> ruleIds.first()
-                else -> null
+                else -> {
+                    if (currentRuleId != null && currentRuleId in previousRuleIds) {
+                        val prevIndex = previousRuleIds.indexOf(currentRuleId)
+                        when {
+                            ruleIds.isEmpty() -> null
+                            prevIndex in 0 until previousRuleIds.size -> {
+                                if (prevIndex < ruleIds.size) {
+                                    ruleIds[prevIndex]
+                                } else {
+                                    ruleIds.last()
+                                }
+                            }
+                            else -> ruleIds.firstOrNull()
+                        }
+                    } else {
+                        ruleIds.firstOrNull()
+                    }
+                }
             }
         if (targetRuleId != currentRuleId) {
             activeRuleId = targetRuleId
-            targetRuleId?.let { ruleId ->
-                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, ruleId)
+            if (targetRuleId != null) {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, targetRuleId)
+            } else {
+                navigator.navigateBack()
             }
         }
+        previousRuleIds = ruleIds
     }
 
     LaunchedEffect(uiState.selectedRuleIds) {
@@ -1529,6 +1577,7 @@ private fun RulesTwoPaneRoute(
                             selectedSectionKey = SettingsSectionKey.About,
                             showTopBar = false,
                             showSectionHeaders = false,
+                            showAboutHeader = false,
                         )
                     } else {
                         RuleDetailPaneHost(
@@ -1757,9 +1806,19 @@ private fun HistoryTwoPaneRoute(
     contentPadding: PaddingValues,
     onOpenHistoryDetail: (Long) -> Unit,
     onNavigateBack: (() -> Unit)?,
+    onOpenIntro: () -> Unit = {},
+    onOpenHelp: () -> Unit = {},
+    onOpenDevOptions: () -> Unit = {},
     paneFabContent: (@Composable () -> Unit)? = null,
     viewModel: HistoryViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
 ) {
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val detailPaneContentPadding =
+        PaddingValues(
+            top = statusBarPadding,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
+        )
     val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
 
@@ -1788,8 +1847,17 @@ private fun HistoryTwoPaneRoute(
 
     val visibleRunIds by viewModel.visibleRunIds.collectAsStateWithLifecycle()
     val section by viewModel.section.collectAsStateWithLifecycle()
+    val trashedRules by viewModel.trashedRules.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var activeHistoryId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    val currentIds = remember(section, visibleRunIds, trashedRules) {
+        if (section == HistorySection.TRASH) {
+            trashedRules.map { it.id }
+        } else {
+            visibleRunIds
+        }
+    }
 
     fun showHistoryInDetailPane(historyId: Long) {
         activeHistoryId = historyId
@@ -1798,20 +1866,47 @@ private fun HistoryTwoPaneRoute(
         }
     }
 
-    LaunchedEffect(visibleRunIds, activeHistoryId) {
+    var previousIds by remember { mutableStateOf(currentIds) }
+    var previousSection by remember { mutableStateOf(section) }
+
+    LaunchedEffect(currentIds) {
+        val sectionChanged = section != previousSection
+        previousSection = section
+
         val currentHistoryId = activeHistoryId
-        val targetHistoryId =
-            when {
-                currentHistoryId != null && currentHistoryId in visibleRunIds -> currentHistoryId
-                visibleRunIds.isNotEmpty() -> visibleRunIds.first()
-                else -> null
+        if (sectionChanged) {
+            val targetId = currentIds.firstOrNull()
+            activeHistoryId = targetId
+            if (targetId != null) {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, targetId)
+            } else {
+                navigator.navigateBack()
             }
-        if (targetHistoryId != currentHistoryId) {
-            activeHistoryId = targetHistoryId
-            targetHistoryId?.let { historyId ->
-                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, historyId)
+        } else if (currentHistoryId != null && currentHistoryId !in currentIds) {
+            val prevIndex = previousIds.indexOf(currentHistoryId)
+            val nextHistoryId = when {
+                currentIds.isEmpty() -> null
+                prevIndex in 0 until previousIds.size -> {
+                    if (prevIndex < currentIds.size) {
+                        currentIds[prevIndex]
+                    } else {
+                        currentIds.last()
+                    }
+                }
+                else -> currentIds.firstOrNull()
             }
+            activeHistoryId = nextHistoryId
+            if (nextHistoryId != null) {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, nextHistoryId)
+            } else {
+                navigator.navigateBack()
+            }
+        } else if (currentHistoryId == null && currentIds.isNotEmpty()) {
+            val firstId = currentIds.first()
+            activeHistoryId = firstId
+            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, firstId)
         }
+        previousIds = currentIds
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -1832,6 +1927,11 @@ private fun HistoryTwoPaneRoute(
                             onHistoryClick = { historyId -> showHistoryInDetailPane(historyId) },
                             onNavigateBack = onNavigateBack,
                             activeHistoryId = activeHistoryId.takeIf { showPaneSelectionState },
+                            onActivateTrashedRuleInDetailPane = if (showPaneSelectionState) {
+                                { ruleId -> showHistoryInDetailPane(ruleId) }
+                            } else {
+                                null
+                            },
                             viewModel = viewModel,
                         )
                     }
@@ -1840,17 +1940,30 @@ private fun HistoryTwoPaneRoute(
             detailPane = {
                 AnimatedPane {
                     val selectedHistoryId = activeHistoryId
-                    if (section == HistorySection.TRASH) {
-                        TwoPaneEmptyDetail(
-                            illustration = { ThemeColoredEmptyTrashIllustration() },
-                            title = stringResource(R.string.history_two_pane_trash_title),
-                            message = stringResource(R.string.history_two_pane_trash_message),
+                    if (selectedHistoryId == null) {
+                        SettingsScreen(
+                            contentPadding = detailPaneContentPadding,
+                            onOpenIntro = onOpenIntro,
+                            onOpenHelp = onOpenHelp,
+                            onOpenDevOptions = onOpenDevOptions,
+                            viewModel = settingsViewModel,
+                            selectedSectionKey = SettingsSectionKey.About,
+                            showTopBar = false,
+                            showSectionHeaders = false,
+                            showAboutHeader = false,
                         )
-                    } else if (selectedHistoryId == null) {
-                        TwoPaneEmptyDetail(
-                            illustration = { ThemeColoredEmptyHistoryIllustration(Modifier.size(120.dp)) },
-                            title = stringResource(R.string.history_empty_title),
-                            message = stringResource(R.string.history_empty_subtitle),
+                    } else if (section == HistorySection.TRASH) {
+                        RuleDetailPaneHost(
+                            ruleId = selectedHistoryId,
+                            onNavigateBack = {
+                                scope.launch {
+                                    navigator.navigateBack()
+                                }
+                            },
+                            onOpenFaq = onOpenHelp,
+                            onSavedRule = { _ -> },
+                            showNavigateBack = showDetailNavigateBack,
+                            isReadOnly = true,
                         )
                     } else {
                         HistoryDetailPaneHost(
@@ -2040,6 +2153,7 @@ private fun RuleDetailPaneHost(
     onOpenFaq: () -> Unit,
     onSavedRule: (Long) -> Unit,
     showNavigateBack: Boolean,
+    isReadOnly: Boolean = false,
 ) {
     val detailRoute = Screen.RuleDetail.createRoute(ruleId)
     key(detailRoute) {
@@ -2071,6 +2185,7 @@ private fun RuleDetailPaneHost(
                     onSavedRule = onSavedRule,
                     showNavigateBack = showNavigateBack,
                     allowInitialRuleNameFocus = false,
+                    isReadOnly = isReadOnly,
                 )
             }
         }

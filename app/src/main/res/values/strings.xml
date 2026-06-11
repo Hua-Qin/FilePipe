@@ -44,6 +44,7 @@
     <string name="rule_detail_redundant_subfolder_removed">Removed redundant subfolder(s): %1$s</string>
     <string name="new_rule">New rule</string>
     <string name="edit_rule">Edit rule</string>
+    <string name="rule_details">Rule details</string>
     <string name="rule_name_label">Rule name</string>
     <string name="rule_name_placeholder">e.g. Photos backup</string>
     <string name="rule_detail_folder_access_summary_unavailable">One or more folders are missing or no longer available. Tap the highlighted paths above to fix them.</string>

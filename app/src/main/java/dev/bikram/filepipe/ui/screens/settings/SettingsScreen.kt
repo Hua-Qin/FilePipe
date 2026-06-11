@@ -433,6 +433,7 @@ fun SettingsScreen(
     selectedSectionKey: SettingsSectionKey? = null,
     showTopBar: Boolean = true,
     showSectionHeaders: Boolean = true,
+    showAboutHeader: Boolean = true,
 ) {
     val preferencesOrNull by viewModel.preferencesState.collectAsStateWithLifecycle()
     val preferences =
@@ -1768,42 +1769,44 @@ fun SettingsScreen(
                     var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
                     var developerOptionsTapCount by rememberSaveable { mutableIntStateOf(0) }
                     Column(modifier = Modifier.padding(top = if (developerOptionsEnabled) 0.dp else 24.dp)) {
-                        if (showSectionHeaders) {
-                            SettingsSectionHeader(
-                                iconName = SettingsSectionKey.About.iconName,
-                                title = stringResource(R.string.settings_about_section),
-                            ) {
-                                FilePipeIconButton(
-                                    onClick = shareDiagnostics,
-                                    modifier = Modifier.size(40.dp),
-                                    tooltipLabel = diagnosticsTooltip,
+                        if (showAboutHeader) {
+                            if (showSectionHeaders) {
+                                SettingsSectionHeader(
+                                    iconName = SettingsSectionKey.About.iconName,
+                                    title = stringResource(R.string.settings_about_section),
                                 ) {
-                                    FilePipeMaterialRoundedSymbol(
-                                        name = "bug_report",
-                                        contentDescription = diagnosticsTooltip,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
+                                    FilePipeIconButton(
+                                        onClick = shareDiagnostics,
+                                        modifier = Modifier.size(40.dp),
+                                        tooltipLabel = diagnosticsTooltip,
+                                    ) {
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "bug_report",
+                                            contentDescription = diagnosticsTooltip,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
                                 }
-                            }
-                            Spacer(Modifier.height(8.dp))
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
-                            ) {
-                                FilePipeIconButton(
-                                    onClick = shareDiagnostics,
-                                    modifier = Modifier.size(40.dp),
-                                    tooltipLabel = diagnosticsTooltip,
+                                Spacer(Modifier.height(8.dp))
+                            } else {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End,
                                 ) {
-                                    FilePipeMaterialRoundedSymbol(
-                                        name = "bug_report",
-                                        contentDescription = diagnosticsTooltip,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
+                                    FilePipeIconButton(
+                                        onClick = shareDiagnostics,
+                                        modifier = Modifier.size(40.dp),
+                                        tooltipLabel = diagnosticsTooltip,
+                                    ) {
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "bug_report",
+                                            contentDescription = diagnosticsTooltip,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                    }
                                 }
+                                Spacer(Modifier.height(4.dp))
                             }
-                            Spacer(Modifier.height(4.dp))
                         }
                         GroupedListColumn {
                             GroupedListItem(position = GroupPosition.ONLY) {

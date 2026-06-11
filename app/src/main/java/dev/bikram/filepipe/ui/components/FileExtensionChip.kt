@@ -37,6 +37,7 @@ fun FileExtensionChips(
     onRemove: (String) -> Unit,
     onUseTemplate: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     val addTypeLabel = stringResource(R.string.file_type_add_type)
@@ -51,8 +52,11 @@ fun FileExtensionChips(
             FilePipeInputChip(
                 selected = true,
                 onClick = {
-                    onRemove(ext)
+                    if (enabled) {
+                        onRemove(ext)
+                    }
                 },
+                enabled = enabled,
                 label = { Text(ext.removePrefix(".")) },
                 colors =
                     InputChipDefaults.inputChipColors(
@@ -60,37 +64,41 @@ fun FileExtensionChips(
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     ),
-                trailingIcon = {
-                    FilePipeMaterialRoundedSymbol(
-                        name = "close",
-                        contentDescription = stringResource(R.string.file_type_remove_content_description, ext),
-                        size = InputChipDefaults.AvatarSize,
-                        modifier = Modifier.size(InputChipDefaults.AvatarSize),
-                    )
+                trailingIcon = if (enabled) {
+                    {
+                        FilePipeMaterialRoundedSymbol(
+                            name = "close",
+                            contentDescription = stringResource(R.string.file_type_remove_content_description, ext),
+                            size = InputChipDefaults.AvatarSize,
+                            modifier = Modifier.size(InputChipDefaults.AvatarSize),
+                        )
+                    }
+                } else null,
+            )
+        }
+        if (enabled) {
+            FilePipeOutlinedButton(
+                onClick = {
+                    showAddDialog = true
                 },
-            )
-        }
-        FilePipeOutlinedButton(
-            onClick = {
-                showAddDialog = true
-            },
-            shape = FilterChipDefaults.shape,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            FileTypeActionButtonContent(
-                iconName = "add",
-                text = addTypeLabel,
-            )
-        }
-        FilePipeOutlinedButton(
-            onClick = onUseTemplate,
-            shape = FilterChipDefaults.shape,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            FileTypeActionButtonContent(
-                iconName = "auto_awesome",
-                text = useTemplateLabel,
-            )
+                shape = FilterChipDefaults.shape,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                FileTypeActionButtonContent(
+                    iconName = "add",
+                    text = addTypeLabel,
+                )
+            }
+            FilePipeOutlinedButton(
+                onClick = onUseTemplate,
+                shape = FilterChipDefaults.shape,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                FileTypeActionButtonContent(
+                    iconName = "auto_awesome",
+                    text = useTemplateLabel,
+                )
+            }
         }
     }
 

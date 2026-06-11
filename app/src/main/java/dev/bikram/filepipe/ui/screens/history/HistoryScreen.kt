@@ -121,6 +121,7 @@ fun HistoryScreen(
     onHistoryClick: (Long) -> Unit,
     onNavigateBack: (() -> Unit)? = null,
     activeHistoryId: Long? = null,
+    onActivateTrashedRuleInDetailPane: ((Long) -> Unit)? = null,
     listStartPadding: Dp = 16.dp,
     listEndPadding: Dp = 16.dp,
     viewModel: HistoryViewModel = hiltViewModel(),
@@ -587,20 +588,15 @@ fun HistoryScreen(
                         items = trashedRules,
                         key = { rule -> "trash_rule_${rule.id}" },
                     ) { rule ->
-                        val isExpanded = rule.id in expandedTrashRuleIds
                         SwipeToDismissTrashRuleCard(
                             rule = rule,
-                            isExpanded = isExpanded,
+                            isExpanded = false,
                             onToggleExpanded = {
-                                expandedTrashRuleIds =
-                                    if (isExpanded) {
-                                        expandedTrashRuleIds - rule.id
-                                    } else {
-                                        expandedTrashRuleIds + rule.id
-                                    }
+                                onActivateTrashedRuleInDetailPane?.invoke(rule.id)
                             },
                             onRestore = { viewModel.restoreRule(rule.id) },
                             onDeleteForever = { pendingDeleteForeverRule = rule },
+                            isActiveInDetailPane = rule.id == activeHistoryId,
                             modifier = Modifier.animateItem(),
                         )
                     }
@@ -875,6 +871,7 @@ private fun SwipeToDismissTrashRuleCard(
     onRestore: () -> Unit,
     onDeleteForever: () -> Unit,
     modifier: Modifier = Modifier,
+    isActiveInDetailPane: Boolean = false,
 ) {
     val hapticEnabled = LocalHapticEnabled.current
     val cardShape = MaterialTheme.shapes.medium
@@ -952,6 +949,7 @@ private fun SwipeToDismissTrashRuleCard(
             isExpanded = isExpanded,
             onToggleExpanded = onToggleExpanded,
             daysLeft = daysLeftInTrash(rule),
+            isActiveInDetailPane = isActiveInDetailPane,
         )
     }
 }
@@ -962,12 +960,13 @@ private fun TrashRuleCard(
     isExpanded: Boolean,
     onToggleExpanded: () -> Unit,
     daysLeft: Int?,
+    isActiveInDetailPane: Boolean = false,
 ) {
     Box(Modifier.fillMaxWidth()) {
         RuleCard(
             rule = rule,
             isSelected = false,
-            isActiveInDetailPane = false,
+            isActiveInDetailPane = isActiveInDetailPane,
             isSelectionMode = false,
             isExpanded = isExpanded,
             progress = null,
