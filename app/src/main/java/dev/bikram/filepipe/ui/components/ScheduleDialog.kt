@@ -1,14 +1,20 @@
 package dev.bikram.filepipe.ui.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -36,7 +42,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -57,33 +66,28 @@ fun ScheduleDialog(
     var scheduleType by remember { mutableStateOf(initialSchedule?.type ?: ScheduleType.DAILY) }
     var hour by remember { mutableIntStateOf(initialSchedule?.hour ?: 9) }
     var minute by remember { mutableIntStateOf(initialSchedule?.minute ?: 0) }
-    var dayOfWeek by remember { mutableIntStateOf(initialSchedule?.dayOfWeek ?: Calendar.MONDAY) }
-    var intervalHoursText by remember {
+
+    // selectedDays bitmask initialized from model helper
+    var selectedDays by remember {
         mutableStateOf(
-            (initialSchedule?.intervalHours?.coerceIn(1, 24) ?: 6).toString(),
+            RuleSchedule.bitmaskToDaysOfWeek(initialSchedule?.dayOfWeek).toSet()
+        )
+    }
+
+    var intervalText by remember {
+        mutableStateOf(
+            (initialSchedule?.intervalHours ?: 1).toString()
         )
     }
     var intervalFieldError by remember { mutableStateOf(false) }
 
     var typeExpanded by remember { mutableStateOf(false) }
-    var dayExpanded by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
-    val days =
-        listOf(
-            Calendar.MONDAY to "Monday",
-            Calendar.TUESDAY to "Tuesday",
-            Calendar.WEDNESDAY to "Wednesday",
-            Calendar.THURSDAY to "Thursday",
-            Calendar.FRIDAY to "Friday",
-            Calendar.SATURDAY to "Saturday",
-            Calendar.SUNDAY to "Sunday",
-        )
-
     fun validateIntervalText(): Boolean {
-        val parsed = intervalHoursText.toIntOrNull()
-        val valid = parsed != null && parsed in 1..24
-        intervalFieldError = scheduleType == ScheduleType.EVERY_N_HOURS && !valid
+        val parsed = intervalText.toIntOrNull()
+        val valid = parsed != null && parsed >= 1
+        intervalFieldError = !valid
         return valid
     }
 
@@ -128,149 +132,168 @@ fun ScheduleDialog(
                             .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    ExposedDropdownMenuBox(
-                        expanded = typeExpanded,
-                        onExpandedChange = { typeExpanded = it },
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val frequencyLabel =
-                            stringResource(
-                                when (scheduleType) {
-                                    ScheduleType.EVERY_N_HOURS -> R.string.schedule_hourly
-                                    ScheduleType.DAILY -> R.string.schedule_daily
-                                    ScheduleType.WEEKLY -> R.string.schedule_weekly
-                                },
-                            )
                         OutlinedTextField(
-                            value = frequencyLabel,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text(stringResource(R.string.schedule_frequency)) },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeExpanded) },
-                            modifier =
-                                Modifier
-                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
-                                    .fillMaxWidth(),
-                        )
-                        ExposedDropdownMenu(
-                            expanded = typeExpanded,
-                            onDismissRequest = { typeExpanded = false },
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        ) {
-                            FilePipeDropdownMenuItem(
-                                text = { Text(stringResource(R.string.schedule_hourly)) },
-                                onClick = {
-                                    scheduleType = ScheduleType.EVERY_N_HOURS
-                                    typeExpanded = false
-                                },
-                            )
-                            FilePipeDropdownMenuItem(
-                                text = { Text(stringResource(R.string.schedule_daily)) },
-                                onClick = {
-                                    scheduleType = ScheduleType.DAILY
-                                    typeExpanded = false
-                                },
-                            )
-                            FilePipeDropdownMenuItem(
-                                text = { Text(stringResource(R.string.schedule_weekly)) },
-                                onClick = {
-                                    scheduleType = ScheduleType.WEEKLY
-                                    typeExpanded = false
-                                },
-                            )
-                        }
-                    }
-
-                    if (scheduleType == ScheduleType.WEEKLY) {
-                        val selectedDayName = days.find { it.first == dayOfWeek }?.second ?: "Monday"
-                        ExposedDropdownMenuBox(
-                            expanded = dayExpanded,
-                            onExpandedChange = { dayExpanded = it },
-                        ) {
-                            OutlinedTextField(
-                                value = selectedDayName,
-                                onValueChange = {},
-                                readOnly = true,
-                                label = { Text(stringResource(R.string.schedule_day)) },
-                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(dayExpanded) },
-                                modifier =
-                                    Modifier
-                                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
-                                        .fillMaxWidth(),
-                            )
-                            ExposedDropdownMenu(
-                                expanded = dayExpanded,
-                                onDismissRequest = { dayExpanded = false },
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            ) {
-                                days.forEach { (calDay, name) ->
-                                    FilePipeDropdownMenuItem(
-                                        text = { Text(name) },
-                                        onClick = {
-                                            dayOfWeek = calDay
-                                            dayExpanded = false
-                                        },
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    if (scheduleType == ScheduleType.EVERY_N_HOURS) {
-                        OutlinedTextField(
-                            value = intervalHoursText,
+                            value = intervalText,
                             onValueChange = { newValue ->
-                                intervalHoursText = newValue.filter { character -> character.isDigit() }.take(2)
+                                intervalText = newValue.filter { character -> character.isDigit() }.take(3)
                                 intervalFieldError = false
                             },
                             isError = intervalFieldError,
-                            label = { Text(stringResource(R.string.schedule_interval_hours)) },
-                            supportingText = {
-                                Text(
-                                    text = stringResource(R.string.schedule_interval_hours_helper),
-                                    color =
-                                        if (intervalFieldError) {
-                                            MaterialTheme.colorScheme.error
-                                        } else {
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                        },
-                                )
-                            },
+                            label = { Text(stringResource(R.string.schedule_every)) },
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f),
                         )
+
+                        ExposedDropdownMenuBox(
+                            expanded = typeExpanded,
+                            onExpandedChange = { typeExpanded = it },
+                            modifier = Modifier.weight(1.2f),
+                        ) {
+                            val selectedLabel = stringResource(
+                                when (scheduleType) {
+                                    ScheduleType.EVERY_N_HOURS -> R.string.schedule_unit_hours
+                                    ScheduleType.DAILY -> R.string.schedule_unit_days
+                                    ScheduleType.WEEKLY -> R.string.schedule_unit_weeks
+                                }
+                            )
+                            OutlinedTextField(
+                                value = selectedLabel,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text(stringResource(R.string.schedule_frequency)) },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeExpanded) },
+                                modifier = Modifier
+                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
+                                    .fillMaxWidth(),
+                            )
+                            ExposedDropdownMenu(
+                                expanded = typeExpanded,
+                                onDismissRequest = { typeExpanded = false },
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            ) {
+                                FilePipeDropdownMenuItem(
+                                    text = { Text(stringResource(R.string.schedule_unit_hours)) },
+                                    onClick = {
+                                        scheduleType = ScheduleType.EVERY_N_HOURS
+                                        typeExpanded = false
+                                    },
+                                )
+                                FilePipeDropdownMenuItem(
+                                    text = { Text(stringResource(R.string.schedule_unit_days)) },
+                                    onClick = {
+                                        scheduleType = ScheduleType.DAILY
+                                        typeExpanded = false
+                                    },
+                                )
+                                FilePipeDropdownMenuItem(
+                                    text = { Text(stringResource(R.string.schedule_unit_weeks)) },
+                                    onClick = {
+                                        scheduleType = ScheduleType.WEEKLY
+                                        typeExpanded = false
+                                    },
+                                )
+                            }
+                        }
                     }
 
-                    if (scheduleType == ScheduleType.DAILY || scheduleType == ScheduleType.WEEKLY) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
                         Text(
-                            text = stringResource(R.string.schedule_time),
+                            text = stringResource(R.string.schedule_start_time),
                             style = MaterialTheme.typography.labelMedium,
                         )
                         val dialogContext = androidx.compose.ui.platform.LocalContext.current
-                        val isSystem24Hour =
-                            android.text.format.DateFormat
-                                .is24HourFormat(dialogContext)
-                        val timeStr =
-                            if (isSystem24Hour) {
-                                "%02d:%02d".format(hour, minute)
-                            } else {
-                                val hour12 =
-                                    when (val hourMod = hour % 12) {
-                                        0 -> 12
-                                        else -> hourMod
-                                    }
-                                val amPm = if (hour < 12) "AM" else "PM"
-                                "%d:%02d %s".format(hour12, minute, amPm)
+                        val isSystem24Hour = android.text.format.DateFormat.is24HourFormat(dialogContext)
+                        val timeStr = if (isSystem24Hour) {
+                            "%02d:%02d".format(hour, minute)
+                        } else {
+                            val hour12 = when (val hourMod = hour % 12) {
+                                0 -> 12
+                                else -> hourMod
                             }
+                            val amPm = if (hour < 12) "AM" else "PM"
+                            "%d:%02d %s".format(hour12, minute, amPm)
+                        }
                         FilePipeOutlinedButton(
                             onClick = { showTimePicker = true },
                             modifier = Modifier.fillMaxWidth(),
                             shape = compactControlShape,
                         ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "schedule",
+                                    contentDescription = null,
+                                    size = 18.dp,
+                                )
+                                Text(text = timeStr)
+                            }
+                        }
+                    }
+
+                    if (scheduleType == ScheduleType.WEEKLY) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
                             Text(
-                                text =
-                                    stringResource(R.string.schedule_pick_time) + ": " +
-                                        timeStr,
+                                text = stringResource(R.string.schedule_day),
+                                style = MaterialTheme.typography.labelMedium,
                             )
+                            val weekdays = listOf(
+                                Calendar.SUNDAY to stringResource(R.string.day_sun).first().toString(),
+                                Calendar.MONDAY to stringResource(R.string.day_mon).first().toString(),
+                                Calendar.TUESDAY to stringResource(R.string.day_tue).first().toString(),
+                                Calendar.WEDNESDAY to stringResource(R.string.day_wed).first().toString(),
+                                Calendar.THURSDAY to stringResource(R.string.day_thu).first().toString(),
+                                Calendar.FRIDAY to stringResource(R.string.day_fri).first().toString(),
+                                Calendar.SATURDAY to stringResource(R.string.day_sat).first().toString(),
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                weekdays.forEach { (calDay, shortLabel) ->
+                                    val isSelected = selectedDays.contains(calDay)
+                                    val dayBoxModifier = Modifier
+                                        .size(38.dp)
+                                        .background(
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
+                                            shape = CircleShape
+                                        )
+                                        .clip(CircleShape)
+                                        .clickable {
+                                            selectedDays = if (isSelected) {
+                                                selectedDays - calDay
+                                            } else {
+                                                selectedDays + calDay
+                                            }
+                                        }
+                                    Box(
+                                        modifier = dayBoxModifier,
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = shortLabel,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -304,22 +327,23 @@ fun ScheduleDialog(
                     }
                     FilePipeButton(
                         onClick = {
-                            if (scheduleType == ScheduleType.EVERY_N_HOURS && !validateIntervalText()) {
+                            val validInterval = validateIntervalText()
+                            val validDays = scheduleType != ScheduleType.WEEKLY || selectedDays.isNotEmpty()
+                            if (!validInterval || !validDays) {
                                 return@FilePipeButton
                             }
-                            val intervalParsed = intervalHoursText.toIntOrNull()?.coerceIn(1, 24) ?: 6
+                            val intervalParsed = intervalText.toIntOrNull()?.coerceAtLeast(1) ?: 1
                             onSave(
                                 RuleSchedule(
                                     type = scheduleType,
-                                    dayOfWeek = if (scheduleType == ScheduleType.WEEKLY) dayOfWeek else null,
-                                    hour = if (scheduleType == ScheduleType.EVERY_N_HOURS) 0 else hour,
-                                    minute = if (scheduleType == ScheduleType.EVERY_N_HOURS) 0 else minute,
-                                    intervalHours =
-                                        if (scheduleType == ScheduleType.EVERY_N_HOURS) {
-                                            intervalParsed
-                                        } else {
-                                            null
-                                        },
+                                    dayOfWeek = if (scheduleType == ScheduleType.WEEKLY) {
+                                        RuleSchedule.daysOfWeekToBitmask(selectedDays.toList())
+                                    } else {
+                                        null
+                                    },
+                                    hour = hour,
+                                    minute = minute,
+                                    intervalHours = intervalParsed,
                                 ),
                             )
                         },
