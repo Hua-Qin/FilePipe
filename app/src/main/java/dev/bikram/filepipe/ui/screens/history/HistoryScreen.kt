@@ -31,6 +31,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
@@ -119,6 +121,7 @@ fun HistoryScreen(
     onHistoryClick: (Long) -> Unit,
     onNavigateBack: (() -> Unit)? = null,
     activeHistoryId: Long? = null,
+    onActivateTrashedRuleInDetailPane: ((Long) -> Unit)? = null,
     listStartPadding: Dp = 16.dp,
     listEndPadding: Dp = 16.dp,
     viewModel: HistoryViewModel = hiltViewModel(),
@@ -500,10 +503,15 @@ fun HistoryScreen(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     Column(
+                        // The scroll container spans the whole pane and the top/FAB
+                        // clearances live INSIDE it — exactly like the content lists.
+                        // Low-height panes then scroll edge-to-edge instead of clipping
+                        // the empty state at a padded boundary.
                         modifier =
                             Modifier
                                 .fillMaxSize()
                                 .then(scrollBlurModifier)
+                                .verticalScroll(rememberScrollState())
                                 .padding(top = innerPadding.calculateTopPadding())
                                 .padding(bottom = contentPadding.calculateBottomPadding())
                                 .padding(32.dp),
@@ -580,20 +588,15 @@ fun HistoryScreen(
                         items = trashedRules,
                         key = { rule -> "trash_rule_${rule.id}" },
                     ) { rule ->
-                        val isExpanded = rule.id in expandedTrashRuleIds
                         SwipeToDismissTrashRuleCard(
                             rule = rule,
-                            isExpanded = isExpanded,
+                            isExpanded = false,
                             onToggleExpanded = {
-                                expandedTrashRuleIds =
-                                    if (isExpanded) {
-                                        expandedTrashRuleIds - rule.id
-                                    } else {
-                                        expandedTrashRuleIds + rule.id
-                                    }
+                                onActivateTrashedRuleInDetailPane?.invoke(rule.id)
                             },
                             onRestore = { viewModel.restoreRule(rule.id) },
                             onDeleteForever = { pendingDeleteForeverRule = rule },
+                            isActiveInDetailPane = rule.id == activeHistoryId,
                             modifier = Modifier.animateItem(),
                         )
                     }
@@ -868,6 +871,7 @@ private fun SwipeToDismissTrashRuleCard(
     onRestore: () -> Unit,
     onDeleteForever: () -> Unit,
     modifier: Modifier = Modifier,
+    isActiveInDetailPane: Boolean = false,
 ) {
     val hapticEnabled = LocalHapticEnabled.current
     val cardShape = MaterialTheme.shapes.medium
@@ -945,6 +949,7 @@ private fun SwipeToDismissTrashRuleCard(
             isExpanded = isExpanded,
             onToggleExpanded = onToggleExpanded,
             daysLeft = daysLeftInTrash(rule),
+            isActiveInDetailPane = isActiveInDetailPane,
         )
     }
 }
@@ -955,12 +960,13 @@ private fun TrashRuleCard(
     isExpanded: Boolean,
     onToggleExpanded: () -> Unit,
     daysLeft: Int?,
+    isActiveInDetailPane: Boolean = false,
 ) {
     Box(Modifier.fillMaxWidth()) {
         RuleCard(
             rule = rule,
             isSelected = false,
-            isActiveInDetailPane = false,
+            isActiveInDetailPane = isActiveInDetailPane,
             isSelectionMode = false,
             isExpanded = isExpanded,
             progress = null,

@@ -151,6 +151,11 @@ class SettingsViewModel
         val updatePromoBannerDismissedThisSession: StateFlow<Boolean> =
             _updatePromoBannerDismissedThisSession.asStateFlow()
 
+        // Bumped on every user-initiated update check so the alert chrome can re-present
+        // itself even when the resulting update state is unchanged.
+        private val _manualUpdateCheckTrigger = MutableStateFlow(0)
+        val manualUpdateCheckTrigger: StateFlow<Int> = _manualUpdateCheckTrigger.asStateFlow()
+
         val playInAppUpdateBannerUiState: StateFlow<PlayInAppUpdateBannerUiState> =
             if (updateMocksAvailable) {
                 combine(
@@ -419,6 +424,10 @@ class SettingsViewModel
             }
 
         fun flagOpenUpdateSheetFromNotification() {
+            _openUpdateSheetFromNotification.value = true
+        }
+
+        fun flagOpenUpdateSheetFromChrome() {
             _openUpdateSheetFromNotification.value = true
         }
 
@@ -719,6 +728,9 @@ class SettingsViewModel
 
         fun checkForUpdate(silent: Boolean = false) =
             viewModelScope.launch {
+                if (!silent) {
+                    _manualUpdateCheckTrigger.value += 1
+                }
                 _isCheckingUpdate.value = true
                 _downloadProgress.value = null
                 val checked = runCatching { updateChecker.checkForUpdate() }
@@ -757,6 +769,7 @@ class SettingsViewModel
          * No snackbar; the sheet shows up-to-date vs available.
          */
         fun beginManualUpdateCheckFromSheet() {
+            _manualUpdateCheckTrigger.value += 1
             _isCheckingUpdate.value = true
             _downloadProgress.value = null
             _manualUpdateNoResult.value = false

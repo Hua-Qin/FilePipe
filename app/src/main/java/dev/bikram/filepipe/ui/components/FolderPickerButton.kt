@@ -3,10 +3,13 @@ package dev.bikram.filepipe.ui.components
 import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import dev.bikram.filepipe.data.storage.absoluteStoragePathToTreeUri
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
@@ -23,9 +26,15 @@ fun FolderPickerButton(
         onClick = onClick,
         modifier = modifier.fillMaxWidth(),
         shape = compactControlShape,
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
     ) {
         FilePipeMaterialRoundedSymbol(name = "folder_open", contentDescription = null)
-        Text("  $label")
+        Text(
+            text = "  $label",
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

@@ -1,5 +1,9 @@
 package dev.bikram.filepipe.domain.model
 
+import android.content.Context
+import dev.bikram.filepipe.R
+import java.util.Calendar
+
 enum class ConflictPolicy { SKIP, OVERWRITE, RENAME_SUFFIX }
 
 enum class OperationMode { MOVE, COPY }
@@ -50,7 +54,91 @@ data class RuleSchedule(
     val minute: Int,
     /** Required when [type] is [ScheduleType.EVERY_N_HOURS]; UI allows 1–24 hours (use daily for longer gaps). */
     val intervalHours: Int? = null,
-)
+) {
+    fun toReadableString(context: Context): String {
+        val isSystem24Hour =
+            android.text.format.DateFormat
+                .is24HourFormat(context)
+        val timeStr =
+            if (isSystem24Hour) {
+                "%02d:%02d".format(hour, minute)
+            } else {
+                val hour12 =
+                    when (val hourMod = hour % 12) {
+                        0 -> 12
+                        else -> hourMod
+                    }
+                val amPm = if (hour < 12) "AM" else "PM"
+                "%d:%02d %s".format(hour12, minute, amPm)
+            }
+        val interval = intervalHours ?: 1
+        return when (type) {
+            ScheduleType.EVERY_N_HOURS -> {
+                if (interval == 1) {
+                    context.getString(R.string.schedule_every_hour_starting, timeStr)
+                } else {
+                    context.getString(R.string.schedule_every_hours_starting, interval, timeStr)
+                }
+            }
+
+            ScheduleType.DAILY -> {
+                if (interval == 1) {
+                    context.getString(R.string.schedule_daily_at, timeStr)
+                } else {
+                    context.getString(R.string.schedule_every_days_at, interval, timeStr)
+                }
+            }
+
+            ScheduleType.WEEKLY -> {
+                val dayResIds =
+                    arrayOf(
+                        R.string.day_sun,
+                        R.string.day_mon,
+                        R.string.day_tue,
+                        R.string.day_wed,
+                        R.string.day_thu,
+                        R.string.day_fri,
+                        R.string.day_sat,
+                    )
+                val daysList = bitmaskToDaysOfWeek(dayOfWeek)
+                val sortedDays = daysList.sorted()
+                val daysStr =
+                    sortedDays.joinToString(", ") { day ->
+                        context.getString(dayResIds.getOrNull(day - 1) ?: R.string.day_mon)
+                    }
+                if (interval == 1) {
+                    context.getString(R.string.schedule_weekly_on, daysStr, timeStr)
+                } else {
+                    context.getString(R.string.schedule_every_weeks_on, interval, daysStr, timeStr)
+                }
+            }
+        }
+    }
+
+    companion object {
+        fun bitmaskToDaysOfWeek(bitmask: Int?): List<Int> {
+            if (bitmask == null) return listOf(Calendar.MONDAY)
+            if (bitmask and (1 shl 8) == 0) {
+                return if (bitmask in 1..7) listOf(bitmask) else listOf(Calendar.MONDAY)
+            }
+            val days = mutableListOf<Int>()
+            for (day in Calendar.SUNDAY..Calendar.SATURDAY) {
+                if (bitmask and (1 shl day) != 0) {
+                    days.add(day)
+                }
+            }
+            return if (days.isEmpty()) listOf(Calendar.MONDAY) else days
+        }
+
+        fun daysOfWeekToBitmask(days: List<Int>): Int {
+            var bitmask = 1 shl 8
+            for (day in days) {
+                bitmask = bitmask or (1 shl day)
+            }
+            return bitmask
+        }
+    }
+}
 
 // ---
 

@@ -3,6 +3,7 @@ package dev.bikram.filepipe.ui.components
 import android.os.Environment
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -25,6 +26,9 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -35,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -130,6 +136,7 @@ private fun buildBreadcrumbSegments(
  * Bottom sheet body for choosing a folder using direct filesystem paths (requires All files access).
  * Does not use [androidx.activity.result.contract.ActivityResultContracts.OpenDocumentTree].
  */
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun FilesystemFolderPickerSheetContent(
     initialDirectory: String,
@@ -336,98 +343,220 @@ fun FilesystemFolderPickerSheetContent(
             }
         }
         HorizontalDivider()
-        if (childDirectories.isEmpty()) {
-            Text(
-                text = stringResource(R.string.filesystem_folder_picker_empty),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
-            )
-        } else {
-            LazyColumn(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 360.dp),
-            ) {
-                items(childDirectories, key = { entry -> entry.listKey }) { entry ->
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                        headlineContent = {
-                            Text(
-                                text = entry.name,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        },
-                        leadingContent = {
-                            FilePipeMaterialRoundedSymbol(
-                                name = "folder",
-                                contentDescription = null,
-                                size = 24.dp,
-                                modifier = Modifier.size(24.dp),
-                                tint = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        modifier =
-                            Modifier.tapSoundClickable {
-                                currentPath = entry.path
+        Box(
+            modifier =
+                Modifier
+                    .weight(1f, fill = false),
+        ) {
+            if (childDirectories.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.filesystem_folder_picker_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 24.dp),
+                )
+            } else {
+                LazyColumn(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 360.dp),
+                ) {
+                    items(childDirectories, key = { it.listKey }) { entry ->
+                        ListItem(
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            headlineContent = {
+                                Text(
+                                    text = entry.name,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             },
-                    )
+                            leadingContent = {
+                                FilePipeMaterialRoundedSymbol(
+                                    name = "folder",
+                                    contentDescription = null,
+                                    size = 24.dp,
+                                    modifier = Modifier.size(24.dp),
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            },
+                            modifier =
+                                Modifier.tapSoundClickable {
+                                    currentPath = entry.path
+                                },
+                        )
+                    }
                 }
             }
         }
         Spacer(Modifier.height(8.dp))
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilePipeTextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.filesystem_folder_picker_cancel))
-            }
-            Spacer(Modifier.weight(1f))
-            Row(
-                modifier = Modifier.width(IntrinsicSize.Max),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                FilePipeOutlinedButton(
-                    onClick = {
-                        newFolderNameInput = ""
-                        newFolderDialogErrorResId = null
-                        showNewFolderDialog = true
-                    },
-                    enabled = canCreateSubfolder,
+        val fontScale = LocalDensity.current.fontScale
+        val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val windowAdaptiveInfo = currentWindowAdaptiveInfo()
+        val isTwoPane = calculatePaneScaffoldDirective(windowAdaptiveInfo).maxHorizontalPartitions > 1
+        if (fontScale > 1.15f) {
+            if (isLandscape || isTwoPane) {
+                Row(
                     modifier =
                         Modifier
-                            .weight(1f)
                             .fillMaxWidth()
-                            .heightIn(min = ButtonDefaults.MinHeight),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(R.string.filesystem_folder_picker_new_folder))
+                    FilePipeTextButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.heightIn(min = ButtonDefaults.MinHeight),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.filesystem_folder_picker_cancel),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    FilePipeOutlinedButton(
+                        onClick = {
+                            newFolderNameInput = ""
+                            newFolderDialogErrorResId = null
+                            showNewFolderDialog = true
+                        },
+                        enabled = canCreateSubfolder,
+                        modifier = Modifier.heightIn(min = ButtonDefaults.MinHeight),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.filesystem_folder_picker_new_folder),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    FilePipeButton(
+                        onClick = {
+                            val normalized = normalizeFilesystemFolderPath(currentPath) ?: return@FilePipeButton
+                            if (File(normalized).isDirectory &&
+                                File(normalized).canRead() &&
+                                isFilesystemFolderPathAllowedForRules(normalized)
+                            ) {
+                                onFolderChosen(normalized)
+                            }
+                        },
+                        enabled = canConfirmSelection,
+                        modifier = Modifier.heightIn(min = ButtonDefaults.MinHeight),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.filesystem_folder_picker_use_folder),
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                 }
-                FilePipeButton(
-                    onClick = {
-                        val normalized = normalizeFilesystemFolderPath(currentPath) ?: return@FilePipeButton
-                        if (File(normalized).isDirectory &&
-                            File(normalized).canRead() &&
-                            isFilesystemFolderPathAllowedForRules(normalized)
-                        ) {
-                            onFolderChosen(normalized)
-                        }
-                    },
-                    enabled = canConfirmSelection,
+            } else {
+                Column(
                     modifier =
                         Modifier
-                            .weight(1f)
                             .fillMaxWidth()
-                            .heightIn(min = ButtonDefaults.MinHeight),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(stringResource(R.string.filesystem_folder_picker_use_folder))
+                    FilePipeButton(
+                        onClick = {
+                            val normalized = normalizeFilesystemFolderPath(currentPath) ?: return@FilePipeButton
+                            if (File(normalized).isDirectory &&
+                                File(normalized).canRead() &&
+                                isFilesystemFolderPathAllowedForRules(normalized)
+                            ) {
+                                onFolderChosen(normalized)
+                            }
+                        },
+                        enabled = canConfirmSelection,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = ButtonDefaults.MinHeight),
+                    ) {
+                        Text(stringResource(R.string.filesystem_folder_picker_use_folder))
+                    }
+                    FilePipeOutlinedButton(
+                        onClick = {
+                            newFolderNameInput = ""
+                            newFolderDialogErrorResId = null
+                            showNewFolderDialog = true
+                        },
+                        enabled = canCreateSubfolder,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = ButtonDefaults.MinHeight),
+                    ) {
+                        Text(stringResource(R.string.filesystem_folder_picker_new_folder))
+                    }
+                    FilePipeTextButton(
+                        onClick = onDismiss,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = ButtonDefaults.MinHeight),
+                    ) {
+                        Text(stringResource(R.string.filesystem_folder_picker_cancel))
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilePipeTextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.filesystem_folder_picker_cancel))
+                }
+                Spacer(Modifier.weight(1f))
+                Row(
+                    modifier = Modifier.width(IntrinsicSize.Max),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    FilePipeOutlinedButton(
+                        onClick = {
+                            newFolderNameInput = ""
+                            newFolderDialogErrorResId = null
+                            showNewFolderDialog = true
+                        },
+                        enabled = canCreateSubfolder,
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .heightIn(min = ButtonDefaults.MinHeight),
+                    ) {
+                        Text(stringResource(R.string.filesystem_folder_picker_new_folder))
+                    }
+                    FilePipeButton(
+                        onClick = {
+                            val normalized = normalizeFilesystemFolderPath(currentPath) ?: return@FilePipeButton
+                            if (File(normalized).isDirectory &&
+                                File(normalized).canRead() &&
+                                isFilesystemFolderPathAllowedForRules(normalized)
+                            ) {
+                                onFolderChosen(normalized)
+                            }
+                        },
+                        enabled = canConfirmSelection,
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .heightIn(min = ButtonDefaults.MinHeight),
+                    ) {
+                        Text(stringResource(R.string.filesystem_folder_picker_use_folder))
+                    }
                 }
             }
         }

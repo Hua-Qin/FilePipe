@@ -9,6 +9,7 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.util.DisplayMetrics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -36,7 +37,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 import com.materialkolor.PaletteStyle
@@ -46,6 +49,9 @@ import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.LocalTapSound
+
+private const val MAX_APP_DISPLAY_SCALE = 1.15f
+private const val MAX_APP_FONT_SCALE = 1.3f
 
 private val LightColors =
     lightColorScheme(
@@ -238,6 +244,15 @@ fun FilePipeTheme(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
+    val baseDensity = LocalDensity.current
+    val stableDensity = DisplayMetrics.DENSITY_DEVICE_STABLE.toFloat() / DisplayMetrics.DENSITY_DEFAULT
+    val appDensity =
+        remember(baseDensity.density, baseDensity.fontScale, stableDensity) {
+            Density(
+                density = baseDensity.density.coerceAtMost(stableDensity * MAX_APP_DISPLAY_SCALE),
+                fontScale = baseDensity.fontScale.coerceAtMost(MAX_APP_FONT_SCALE),
+            )
+        }
     val systemDark = isSystemInDarkTheme()
     val reducedMotion = rememberSystemReducedMotionEnabled(context)
 
@@ -403,6 +418,7 @@ fun FilePipeTheme(
         LocalReducedMotion provides reducedMotion,
         LocalTapSound provides playTapSound,
         LocalHapticEnabled provides hapticFeedbackEnabled,
+        LocalDensity provides appDensity,
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorScheme,

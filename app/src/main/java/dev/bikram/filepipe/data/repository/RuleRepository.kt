@@ -25,6 +25,8 @@ class RuleRepository
 
         suspend fun getRuleById(id: Long): Rule? = ruleDao.getRuleById(id)?.toDomain()
 
+        suspend fun getRuleByIdIncludingTrashed(id: Long): Rule? = ruleDao.getRuleByIdIncludingTrashed(id)?.toDomain()
+
         suspend fun getAllRulesOrderedBySortOrder(): List<Rule> = ruleDao.getAllRulesOrderedBySortOrder().map { entity -> entity.toDomain() }
 
         suspend fun getEnabledRules(): List<Rule> = ruleDao.getEnabledRules().map { it.toDomain() }

@@ -4,13 +4,18 @@ import android.app.Activity
 import android.os.Build
 import android.text.format.Formatter
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,7 +23,10 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,17 +42,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.FloatingActionButtonMenu
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.IconButtonDefaults
@@ -55,6 +69,8 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleFloatingActionButton
+import androidx.compose.material3.ToggleFloatingActionButtonDefaults
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
 import androidx.compose.material3.adaptive.layout.AnimatedPane
@@ -77,6 +93,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -85,9 +102,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -96,8 +120,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
+import androidx.graphics.shapes.Morph
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
@@ -117,6 +144,7 @@ import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
+import dev.bikram.filepipe.ui.components.AlertFloatingActionButtonMenu
 import dev.bikram.filepipe.ui.components.FilePipeButton
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFloatingActionButton
@@ -125,6 +153,9 @@ import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyHistoryIllustration
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyTrashIllustration
+import dev.bikram.filepipe.ui.components.UpdateChromeState
+import dev.bikram.filepipe.ui.components.UpdateFloatingBar
+import dev.bikram.filepipe.ui.components.alertChromeSummary
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.screens.devoptions.DevOptionsScreen
 import dev.bikram.filepipe.ui.screens.help.FaqScreen
@@ -150,13 +181,14 @@ import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalReducedMotion
 import dev.bikram.filepipe.ui.theme.LocalSnackbarHostState
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
+import dev.bikram.filepipe.ui.theme.MorphPolygonShape
 import dev.bikram.filepipe.ui.theme.ProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.RoundedPolygonShape
 import dev.bikram.filepipe.ui.theme.pillShape
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import dev.bikram.filepipe.update.PlayInAppUpdateBannerUiState
-import dev.bikram.filepipe.update.notificationDedupeKey
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private data class BottomNavItem(
     val screen: Screen,
@@ -186,19 +218,17 @@ private val bottomNavItems =
 private val mainTabRouteOrdinals: Map<String, Int> =
     bottomNavItems.mapIndexed { index, item -> item.screen.route to index }.toMap()
 
-private sealed interface UpdateChromeState {
-    data object Hidden : UpdateChromeState
-
-    data object Available : UpdateChromeState
-
-    data class Downloading(
-        val bytesDownloaded: Long,
-        val totalBytesToDownload: Long,
-        val indeterminateProgress: Boolean,
-    ) : UpdateChromeState
-
-    data object ReadyToInstall : UpdateChromeState
-}
+/**
+ * Stable identity for "which alert is showing" — Downloading progress updates map to the
+ * same key so they don't re-trigger the auto-expand presentation.
+ */
+private fun updateStatePresentationKey(updateState: UpdateChromeState): String =
+    when (updateState) {
+        UpdateChromeState.Hidden -> "hidden"
+        UpdateChromeState.Available -> "available"
+        is UpdateChromeState.Downloading -> "downloading"
+        UpdateChromeState.ReadyToInstall -> "ready"
+    }
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -221,6 +251,7 @@ fun AppNavigation(
     val pendingOpenSettingsUpdates by pendingShortcutRepository.pendingOpenSettingsForUpdates.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+    val navRoute = currentDestination?.route
 
     val showBottomBar =
         bottomNavItems.any {
@@ -277,40 +308,15 @@ fun AppNavigation(
     val updateInfo by settingsVm.updateInfo.collectAsStateWithLifecycle()
     val openUpdateSheetFromNotification by settingsVm.openUpdateSheetFromNotification.collectAsStateWithLifecycle()
     val playBannerState by settingsVm.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
-    var dismissedUpdateBarKey by remember { mutableStateOf<String?>(null) }
+    val updatePromoDismissed by settingsVm.updatePromoBannerDismissedThisSession.collectAsStateWithLifecycle()
     var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
     var openNewRuleInPane by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var alertBarsExpanded by rememberSaveable { mutableStateOf(false) }
+    var lastPresentedAlertKey by rememberSaveable { mutableStateOf<String?>(null) }
 
-    val updateKey = updateInfo?.notificationDedupeKey()
-    val updateAvailable = BuildConfig.SHOW_UPDATES && updateInfo != null && showFloatingBottomBar
-    val updateFabState =
-        if (!showFloatingBottomBar) {
-            UpdateChromeState.Hidden
-        } else {
-            when (val currentPlayState = playBannerState) {
-                is PlayInAppUpdateBannerUiState.Downloading -> {
-                    UpdateChromeState.Downloading(
-                        bytesDownloaded = currentPlayState.bytesDownloaded,
-                        totalBytesToDownload = currentPlayState.totalBytesToDownload,
-                        indeterminateProgress = currentPlayState.indeterminateProgress,
-                    )
-                }
-
-                PlayInAppUpdateBannerUiState.ReadyToInstall -> {
-                    UpdateChromeState.ReadyToInstall
-                }
-
-                PlayInAppUpdateBannerUiState.Hidden -> {
-                    if (updateAvailable) {
-                        UpdateChromeState.Available
-                    } else {
-                        UpdateChromeState.Hidden
-                    }
-                }
-            }
-        }
+    val updateAvailable = BuildConfig.SHOW_UPDATES && updateInfo != null && showBottomBar
     val updateBarState =
-        if (!showFloatingBottomBar) {
+        if (!showBottomBar) {
             UpdateChromeState.Hidden
         } else {
             when (val currentPlayState = playBannerState) {
@@ -327,7 +333,7 @@ fun AppNavigation(
                 }
 
                 PlayInAppUpdateBannerUiState.Hidden -> {
-                    if (updateAvailable && updateKey != dismissedUpdateBarKey) {
+                    if (updateAvailable && !updatePromoDismissed) {
                         UpdateChromeState.Available
                     } else {
                         UpdateChromeState.Hidden
@@ -335,8 +341,35 @@ fun AppNavigation(
                 }
             }
         }
-    val floatingUpdateBarExtraHeight = if (updateBarState != UpdateChromeState.Hidden) 72.dp else 0.dp
-    val scrimHeight = navBarInset + floatingBarHeight + 24.dp + floatingUpdateBarExtraHeight
+    val alertSummary = remember(updateBarState) { alertChromeSummary(updateBarState) }
+    // Auto-present new alerts as expanded bars (same scheme as Remember): each distinct
+    // alert composition pops the bars open exactly once. The saveable key survives
+    // rotation but resets on cold start, so alerts pop again on the next launch.
+    val alertPresentationKey =
+        if (updateBarState == UpdateChromeState.Hidden) {
+            null
+        } else {
+            updateStatePresentationKey(updateBarState)
+        }
+    // A user-initiated update check forgets the presented alert, so the chrome pops
+    // again for the re-checked result even when the alert state itself is unchanged.
+    val manualUpdateCheckTrigger by settingsVm.manualUpdateCheckTrigger.collectAsStateWithLifecycle()
+    LaunchedEffect(manualUpdateCheckTrigger) {
+        if (manualUpdateCheckTrigger > 0) {
+            lastPresentedAlertKey = null
+        }
+    }
+    LaunchedEffect(alertPresentationKey, lastPresentedAlertKey) {
+        val currentAlertKey = alertPresentationKey
+        if (currentAlertKey == null) {
+            alertBarsExpanded = false
+            lastPresentedAlertKey = null
+        } else if (currentAlertKey != lastPresentedAlertKey) {
+            alertBarsExpanded = true
+            lastPresentedAlertKey = currentAlertKey
+        }
+    }
+    val scrimHeight = navBarInset + floatingBarHeight + 24.dp
 
     /** Extra top blur under History filter chips (must match [isHistoryFilterRoute] detection). */
     val historyFilterChipsBand = 96.dp
@@ -354,7 +387,9 @@ fun AppNavigation(
             // Two-pane (tablet/landscape) has no floating bottom bar to fade content under, so a
             // tall bottom blur is purely decorative and was obscuring the bottom of detail-pane
             // content. Fade only under the system navigation bar here.
-            useNavigationSuiteScaffold -> navBarInset
+            useNavigationSuiteScaffold && navRoute != Screen.Rules.route -> navBarInset
+
+            useNavigationSuiteScaffold && navRoute == Screen.Rules.route -> navBarInset + 96.dp
 
             showFloatingBottomBar -> scrimHeight
 
@@ -365,7 +400,16 @@ fun AppNavigation(
             else -> fullScreenBottomBlurShort
         }
     val primaryTabContentPadding =
-        PaddingValues(bottom = if (showFloatingBottomBar) scrimHeight else navBarInset + 96.dp)
+        PaddingValues(
+            bottom =
+                if (showFloatingBottomBar) {
+                    scrimHeight
+                } else {
+                    // Two-pane: the update chrome lives in the collapsed alert FAB, so no
+                    // extra clearance is reserved for a floating bar.
+                    navBarInset + 96.dp
+                },
+        )
     val density = LocalDensity.current
     val bottomBlurHeightPx = with(density) { bottomBlurHeightDp.toPx() }
 
@@ -441,7 +485,6 @@ fun AppNavigation(
         pendingShortcutRepository.clearPendingHistoryDetail()
     }
 
-    val navRoute = navBackStackEntry?.destination?.route
     val primaryTabRoute =
         navRoute != null &&
             (
@@ -451,7 +494,7 @@ fun AppNavigation(
             )
     val topBlurSmallChrome = statusBarInset + 56.dp
     val topBlurHeightDp =
-        if (navRoute == Screen.Rules.route || navRoute == Screen.Settings.route) {
+        if ((navRoute == Screen.Rules.route || navRoute == Screen.Settings.route) && !useListDetailPanes) {
             0.dp
         } else if (isDevOptionsRoute) {
             topBlurSmallChrome + 48.dp
@@ -580,7 +623,7 @@ fun AppNavigation(
         val navigationContent: @Composable () -> Unit = {
             val hostContext = LocalContext.current
             val openUpdateSheetFromChrome = {
-                settingsVm.flagOpenUpdateSheetFromRulesPromo()
+                settingsVm.flagOpenUpdateSheetFromChrome()
                 navController.navigate(Screen.Settings.route) {
                     popUpTo(navController.graph.findStartDestination().id) {
                         saveState = true
@@ -808,6 +851,17 @@ fun AppNavigation(
                                             navController.navigate(Screen.HistoryDetail.createRoute(historyId))
                                         },
                                         onNavigateBack = null,
+                                        onOpenIntro = {
+                                            navController.navigate(Screen.OnboardingTitle.route)
+                                        },
+                                        onOpenHelp = {
+                                            navController.navigate(Screen.Faq.createRoute())
+                                        },
+                                        onOpenDevOptions = {
+                                            navController.navigate(Screen.DevOptions.route) {
+                                                launchSingleTop = true
+                                            }
+                                        },
                                         paneFabContent = {
                                             MainNavFabSlot(
                                                 currentTab = Screen.History,
@@ -827,6 +881,9 @@ fun AppNavigation(
                                         contentPadding = primaryTabContentPadding,
                                         onHistoryClick = { historyId ->
                                             navController.navigate(Screen.HistoryDetail.createRoute(historyId))
+                                        },
+                                        onActivateTrashedRuleInDetailPane = { ruleId ->
+                                            navController.navigate(Screen.RuleDetail.createRoute(ruleId))
                                         },
                                         viewModel = historyVm,
                                     )
@@ -1046,6 +1103,17 @@ fun AppNavigation(
                                             navController.navigate(Screen.HistoryDetail.createRoute(historyId))
                                         },
                                         onNavigateBack = { navController.popBackStack() },
+                                        onOpenIntro = {
+                                            navController.navigate(Screen.OnboardingTitle.route)
+                                        },
+                                        onOpenHelp = {
+                                            navController.navigate(Screen.Faq.createRoute())
+                                        },
+                                        onOpenDevOptions = {
+                                            navController.navigate(Screen.DevOptions.route) {
+                                                launchSingleTop = true
+                                            }
+                                        },
                                     )
                                 } else {
                                     HistoryScreen(
@@ -1060,66 +1128,112 @@ fun AppNavigation(
                     }
                 }
 
-                UpdateFloatingBar(
-                    state = updateBarState,
-                    onCheckClick = openUpdateSheetFromChrome,
-                    onDismissAvailable = { dismissedUpdateBarKey = updateKey },
-                    onInstallClick = installReadyUpdate,
-                    modifier =
+                // Tapping anywhere outside the expanded alert bars collapses them; the
+                // nav chrome rendered after this stays tappable above the catcher.
+                if (alertBarsExpanded) {
+                    Box(
                         Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(horizontal = 16.dp)
-                            .padding(bottom = floatingBarHeight + 28.dp),
-                )
+                            .fillMaxSize()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) {
+                                playTap()
+                                alertBarsExpanded = false
+                            },
+                    )
+                }
+                // Same as Remember: Check dismisses the alert chrome (a re-check or new
+                // delivery resurrects it) and surfaces the update sheet.
+                val checkUpdateFromAlertBar = {
+                    settingsVm.dismissUpdatePromoBanner()
+                    openUpdateSheetFromChrome()
+                }
+                if (showNavigationSuiteScaffold) {
+                    // Two-pane: the alert FAB menu anchors beside the nav rail.
+                    BoxWithConstraints(modifier = Modifier.matchParentSize()) {
+                        // Keep the unfurled bar inside the list pane (0.4 of the content
+                        // width, same proportion as the pane split).
+                        val railBarsMaxWidth = maxWidth * 0.4f - 30.dp
+                        AlertFloatingActionButtonMenu(
+                            expanded = alertBarsExpanded,
+                            onExpandedChange = { expanded -> alertBarsExpanded = expanded },
+                            summary = alertSummary,
+                            updateState = updateBarState,
+                            onUpdateClick = checkUpdateFromAlertBar,
+                            onDismissUpdateAvailable = settingsVm::dismissUpdatePromoBanner,
+                            onInstallUpdate = installReadyUpdate,
+                            barsMaxWidth = railBarsMaxWidth,
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomStart)
+                                    .windowInsetsPadding(WindowInsets.navigationBars)
+                                    // Same 24dp baseline as the list-pane FABs.
+                                    .padding(start = 24.dp, bottom = 24.dp),
+                        )
+                    }
+                }
 
                 if (showFloatingBottomBar) {
-                    FloatingNavBar(
-                        items = bottomNavItems,
-                        currentDestination = currentDestination,
-                        onItemClick = { item ->
-                            navController.navigate(item.screen.route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        leadingFab =
-                            if (updateFabState == UpdateChromeState.Hidden) {
-                                null
-                            } else {
-                                {
-                                    UpdateFloatingFab(
-                                        state = updateFabState,
-                                        onClick = {
-                                            if (updateFabState == UpdateChromeState.ReadyToInstall) {
-                                                installReadyUpdate()
-                                            } else {
-                                                openUpdateSheetFromChrome()
-                                            }
-                                        },
-                                    )
-                                }
-                            },
-                        fabContent = {
-                            MainNavFabSlot(
-                                currentTab = currentTab,
-                                hasAnyHistory = hasAnyHistory,
-                                historySection = historySection,
-                                hasAnyTrashedRules = hasAnyTrashedRules,
-                                onAddRule = {
-                                    openNewRuleInPane?.invoke() ?: navController.navigate(Screen.RuleDetail.createRoute())
+                    // Same render path as Remember's chrome strip: the strip renders in a
+                    // shared-transition overlay so the alert menu's unfurled bar can draw
+                    // past the menu wrapper's bounds (the window-centered bar extends left
+                    // of the leading FAB) without being clipped.
+                    SharedTransitionLayout(modifier = Modifier.matchParentSize()) {
+                        Box(Modifier.fillMaxSize()) {
+                            FloatingNavBar(
+                                items = bottomNavItems,
+                                currentDestination = currentDestination,
+                                onItemClick = { item ->
+                                    navController.navigate(item.screen.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
                                 },
-                                onClearHistory = { showClearHistoryDialog = true },
-                                onEmptyTrash = { showEmptyTrashDialog = true },
-                                onShareApp = { launchAppShareChooser(hostContext) },
+                                leadingFab =
+                                    if (alertSummary.count == 0) {
+                                        null
+                                    } else {
+                                        {
+                                            // Phone: the same expandable alert FAB menu as
+                                            // Remember, riding the nav pill's leading slot with
+                                            // the bars centered over the whole chrome strip.
+                                            AlertFloatingActionButtonMenu(
+                                                expanded = alertBarsExpanded,
+                                                onExpandedChange = { expanded -> alertBarsExpanded = expanded },
+                                                summary = alertSummary,
+                                                updateState = updateBarState,
+                                                onUpdateClick = checkUpdateFromAlertBar,
+                                                onDismissUpdateAvailable = settingsVm::dismissUpdatePromoBanner,
+                                                onInstallUpdate = installReadyUpdate,
+                                                centerBarsInWindow = true,
+                                            )
+                                        }
+                                    },
+                                fabContent = {
+                                    MainNavFabSlot(
+                                        currentTab = currentTab,
+                                        hasAnyHistory = hasAnyHistory,
+                                        historySection = historySection,
+                                        hasAnyTrashedRules = hasAnyTrashedRules,
+                                        onAddRule = {
+                                            openNewRuleInPane?.invoke() ?: navController.navigate(Screen.RuleDetail.createRoute())
+                                        },
+                                        onClearHistory = { showClearHistoryDialog = true },
+                                        onEmptyTrash = { showEmptyTrashDialog = true },
+                                        onShareApp = { launchAppShareChooser(hostContext) },
+                                    )
+                                },
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .renderInSharedTransitionScopeOverlay(zIndexInOverlay = 10f),
                             )
-                        },
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                    )
+                        }
+                    }
                 }
                 SnackbarHost(
                     hostState = snackbarHostState,
@@ -1330,6 +1444,8 @@ private fun RulesTwoPaneRoute(
         }
     }
 
+    var previousRuleIds by remember { mutableStateOf(uiState.rules.map { it.id }) }
+
     LaunchedEffect(uiState.rules, activeRuleId, pendingSavedRuleId, isMultiPane) {
         val ruleIds = uiState.rules.map { rule -> rule.id }
         val currentRuleId = activeRuleId
@@ -1339,18 +1455,52 @@ private fun RulesTwoPaneRoute(
         }
         val targetRuleId =
             when {
-                currentRuleId == Screen.RuleDetail.NEW_RULE_ID -> currentRuleId
-                currentRuleId != null && currentRuleId == pendingSavedRuleId -> currentRuleId
-                currentRuleId != null && currentRuleId in ruleIds -> currentRuleId
-                ruleIds.isNotEmpty() -> ruleIds.first()
-                else -> null
+                currentRuleId == Screen.RuleDetail.NEW_RULE_ID -> {
+                    currentRuleId
+                }
+
+                currentRuleId != null && currentRuleId == pendingSavedRuleId -> {
+                    currentRuleId
+                }
+
+                currentRuleId != null && currentRuleId in ruleIds -> {
+                    currentRuleId
+                }
+
+                else -> {
+                    if (currentRuleId != null && currentRuleId in previousRuleIds) {
+                        val prevIndex = previousRuleIds.indexOf(currentRuleId)
+                        when {
+                            ruleIds.isEmpty() -> {
+                                null
+                            }
+
+                            prevIndex in 0 until previousRuleIds.size -> {
+                                if (prevIndex < ruleIds.size) {
+                                    ruleIds[prevIndex]
+                                } else {
+                                    ruleIds.last()
+                                }
+                            }
+
+                            else -> {
+                                ruleIds.firstOrNull()
+                            }
+                        }
+                    } else {
+                        ruleIds.firstOrNull()
+                    }
+                }
             }
         if (targetRuleId != currentRuleId) {
             activeRuleId = targetRuleId
-            targetRuleId?.let { ruleId ->
-                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, ruleId)
+            if (targetRuleId != null) {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, targetRuleId)
+            } else {
+                navigator.navigateBack()
             }
         }
+        previousRuleIds = ruleIds
     }
 
     LaunchedEffect(uiState.selectedRuleIds) {
@@ -1443,6 +1593,8 @@ private fun RulesTwoPaneRoute(
                             selectedSectionKey = SettingsSectionKey.About,
                             showTopBar = false,
                             showSectionHeaders = false,
+                            showAboutHeader = false,
+                            centerSelectedSectionContent = true,
                         )
                     } else {
                         RuleDetailPaneHost(
@@ -1537,7 +1689,13 @@ private fun RulesSelectionActionPane(
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().widthIn(max = 360.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 360.dp)
+                    // Low-height windows (landscape phones / low-res tablets) can't fit the
+                    // whole stack; scroll instead of truncating the bottom buttons.
+                    .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -1583,6 +1741,12 @@ private fun RulesSelectionActionPane(
                     enabled = !isRunning,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = pillShape,
+                    colors =
+                        ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                        ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
                 ) {
                     RulesSelectionActionContent(
@@ -1665,9 +1829,19 @@ private fun HistoryTwoPaneRoute(
     contentPadding: PaddingValues,
     onOpenHistoryDetail: (Long) -> Unit,
     onNavigateBack: (() -> Unit)?,
+    onOpenIntro: () -> Unit = {},
+    onOpenHelp: () -> Unit = {},
+    onOpenDevOptions: () -> Unit = {},
     paneFabContent: (@Composable () -> Unit)? = null,
     viewModel: HistoryViewModel = hiltViewModel(),
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
 ) {
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val detailPaneContentPadding =
+        PaddingValues(
+            top = statusBarPadding,
+            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
+        )
     val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
 
@@ -1696,8 +1870,18 @@ private fun HistoryTwoPaneRoute(
 
     val visibleRunIds by viewModel.visibleRunIds.collectAsStateWithLifecycle()
     val section by viewModel.section.collectAsStateWithLifecycle()
+    val trashedRules by viewModel.trashedRules.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     var activeHistoryId by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    val currentIds =
+        remember(section, visibleRunIds, trashedRules) {
+            if (section == HistorySection.TRASH) {
+                trashedRules.map { it.id }
+            } else {
+                visibleRunIds
+            }
+        }
 
     fun showHistoryInDetailPane(historyId: Long) {
         activeHistoryId = historyId
@@ -1706,20 +1890,54 @@ private fun HistoryTwoPaneRoute(
         }
     }
 
-    LaunchedEffect(visibleRunIds, activeHistoryId) {
+    var previousIds by remember { mutableStateOf(currentIds) }
+    var previousSection by remember { mutableStateOf(section) }
+
+    LaunchedEffect(currentIds) {
+        val sectionChanged = section != previousSection
+        previousSection = section
+
         val currentHistoryId = activeHistoryId
-        val targetHistoryId =
-            when {
-                currentHistoryId != null && currentHistoryId in visibleRunIds -> currentHistoryId
-                visibleRunIds.isNotEmpty() -> visibleRunIds.first()
-                else -> null
+        if (sectionChanged) {
+            val targetId = currentIds.firstOrNull()
+            activeHistoryId = targetId
+            if (targetId != null) {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, targetId)
+            } else {
+                navigator.navigateBack()
             }
-        if (targetHistoryId != currentHistoryId) {
-            activeHistoryId = targetHistoryId
-            targetHistoryId?.let { historyId ->
-                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, historyId)
+        } else if (currentHistoryId != null && currentHistoryId !in currentIds) {
+            val prevIndex = previousIds.indexOf(currentHistoryId)
+            val nextHistoryId =
+                when {
+                    currentIds.isEmpty() -> {
+                        null
+                    }
+
+                    prevIndex in 0 until previousIds.size -> {
+                        if (prevIndex < currentIds.size) {
+                            currentIds[prevIndex]
+                        } else {
+                            currentIds.last()
+                        }
+                    }
+
+                    else -> {
+                        currentIds.firstOrNull()
+                    }
+                }
+            activeHistoryId = nextHistoryId
+            if (nextHistoryId != null) {
+                navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, nextHistoryId)
+            } else {
+                navigator.navigateBack()
             }
+        } else if (currentHistoryId == null && currentIds.isNotEmpty()) {
+            val firstId = currentIds.first()
+            activeHistoryId = firstId
+            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, firstId)
         }
+        previousIds = currentIds
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -1740,6 +1958,12 @@ private fun HistoryTwoPaneRoute(
                             onHistoryClick = { historyId -> showHistoryInDetailPane(historyId) },
                             onNavigateBack = onNavigateBack,
                             activeHistoryId = activeHistoryId.takeIf { showPaneSelectionState },
+                            onActivateTrashedRuleInDetailPane =
+                                if (showPaneSelectionState) {
+                                    { ruleId -> showHistoryInDetailPane(ruleId) }
+                                } else {
+                                    null
+                                },
                             viewModel = viewModel,
                         )
                     }
@@ -1748,17 +1972,31 @@ private fun HistoryTwoPaneRoute(
             detailPane = {
                 AnimatedPane {
                     val selectedHistoryId = activeHistoryId
-                    if (section == HistorySection.TRASH) {
-                        TwoPaneEmptyDetail(
-                            illustration = { ThemeColoredEmptyTrashIllustration() },
-                            title = stringResource(R.string.history_two_pane_trash_title),
-                            message = stringResource(R.string.history_two_pane_trash_message),
+                    if (selectedHistoryId == null) {
+                        SettingsScreen(
+                            contentPadding = detailPaneContentPadding,
+                            onOpenIntro = onOpenIntro,
+                            onOpenHelp = onOpenHelp,
+                            onOpenDevOptions = onOpenDevOptions,
+                            viewModel = settingsViewModel,
+                            selectedSectionKey = SettingsSectionKey.About,
+                            showTopBar = false,
+                            showSectionHeaders = false,
+                            showAboutHeader = false,
+                            centerSelectedSectionContent = true,
                         )
-                    } else if (selectedHistoryId == null) {
-                        TwoPaneEmptyDetail(
-                            illustration = { ThemeColoredEmptyHistoryIllustration(Modifier.size(120.dp)) },
-                            title = stringResource(R.string.history_empty_title),
-                            message = stringResource(R.string.history_empty_subtitle),
+                    } else if (section == HistorySection.TRASH) {
+                        RuleDetailPaneHost(
+                            ruleId = selectedHistoryId,
+                            onNavigateBack = {
+                                scope.launch {
+                                    navigator.navigateBack()
+                                }
+                            },
+                            onOpenFaq = onOpenHelp,
+                            onSavedRule = { _ -> },
+                            showNavigateBack = showDetailNavigateBack,
+                            isReadOnly = true,
                         )
                     } else {
                         HistoryDetailPaneHost(
@@ -1948,6 +2186,7 @@ private fun RuleDetailPaneHost(
     onOpenFaq: () -> Unit,
     onSavedRule: (Long) -> Unit,
     showNavigateBack: Boolean,
+    isReadOnly: Boolean = false,
 ) {
     val detailRoute = Screen.RuleDetail.createRoute(ruleId)
     key(detailRoute) {
@@ -1979,6 +2218,7 @@ private fun RuleDetailPaneHost(
                     onSavedRule = onSavedRule,
                     showNavigateBack = showNavigateBack,
                     allowInitialRuleNameFocus = false,
+                    isReadOnly = isReadOnly,
                 )
             }
         }
@@ -2068,217 +2308,6 @@ private fun TwoPaneEmptyDetail(
                         Spacer(Modifier.width(8.dp))
                     }
                     Text(actionLabel)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun UpdateFloatingFab(
-    state: UpdateChromeState,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (state == UpdateChromeState.Hidden) return
-
-    val label = stringResource(R.string.update_fab_label)
-    val shape = remember { RoundedPolygonShape(MaterialShapes.Cookie9Sided) }
-    FilePipeFloatingActionButton(
-        onClick = onClick,
-        modifier = modifier.semantics { contentDescription = label },
-        shape = shape,
-        containerColor = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
-        tooltipLabel = label,
-    ) {
-        FilePipeMaterialRoundedSymbol(
-            name = if (state == UpdateChromeState.ReadyToInstall) "download_done" else "download",
-            contentDescription = null,
-            size = 28.dp,
-            weight = FontWeight.Medium,
-        )
-    }
-}
-
-@Composable
-private fun UpdateFloatingBar(
-    state: UpdateChromeState,
-    onCheckClick: () -> Unit,
-    onDismissAvailable: () -> Unit,
-    onInstallClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (state == UpdateChromeState.Hidden) return
-
-    val context = LocalContext.current
-    val scheme = MaterialTheme.colorScheme
-    val iconShape = remember { RoundedPolygonShape(MaterialShapes.Cookie9Sided) }
-    val (title, body) =
-        when (state) {
-            UpdateChromeState.Hidden -> {
-                return
-            }
-
-            UpdateChromeState.Available -> {
-                Pair(
-                    stringResource(R.string.update_bar_available_title),
-                    null,
-                )
-            }
-
-            is UpdateChromeState.Downloading -> {
-                val progressLabel =
-                    if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
-                        stringResource(R.string.play_update_bar_downloading)
-                    } else {
-                        val downloaded = Formatter.formatFileSize(context, state.bytesDownloaded)
-                        val total = Formatter.formatFileSize(context, state.totalBytesToDownload)
-                        stringResource(R.string.play_update_bar_downloading_bytes, downloaded, total)
-                    }
-                Pair(
-                    stringResource(R.string.play_update_bar_downloading_title),
-                    progressLabel,
-                )
-            }
-
-            UpdateChromeState.ReadyToInstall -> {
-                Pair(
-                    stringResource(R.string.play_update_bar_install_title),
-                    stringResource(R.string.play_update_bar_install_subtitle),
-                )
-            }
-        }
-
-    Surface(
-        modifier = modifier,
-        shape = pillShape,
-        color = scheme.surfaceContainerHigh,
-        tonalElevation = 3.dp,
-        shadowElevation = 3.dp,
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 48.dp)
-                        .padding(start = 14.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                Surface(
-                    modifier = Modifier.size(34.dp),
-                    shape = iconShape,
-                    color = scheme.primaryContainer,
-                    contentColor = scheme.onPrimaryContainer,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        FilePipeMaterialRoundedSymbol(
-                            name = if (state == UpdateChromeState.ReadyToInstall) "download_done" else "download",
-                            contentDescription = null,
-                            size = 24.dp,
-                            weight = FontWeight.Medium,
-                            tint = scheme.onPrimaryContainer,
-                        )
-                    }
-                }
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.labelLargeEmphasized,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (body != null) {
-                        Text(
-                            text = body,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = scheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-
-                when (state) {
-                    UpdateChromeState.Available -> {
-                        FilePipeButton(
-                            onClick = onCheckClick,
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                            colors =
-                                ButtonDefaults.buttonColors(
-                                    containerColor = scheme.primary,
-                                    contentColor = scheme.onPrimary,
-                                ),
-                        ) {
-                            Text(stringResource(R.string.update_bar_available_action))
-                        }
-                        val closeLabel = stringResource(R.string.close)
-                        FilePipeIconButton(
-                            onClick = onDismissAvailable,
-                            modifier =
-                                Modifier
-                                    .size(40.dp)
-                                    .semantics { contentDescription = closeLabel },
-                        ) {
-                            FilePipeMaterialRoundedSymbol(
-                                name = "close",
-                                contentDescription = null,
-                                size = 20.dp,
-                                weight = FontWeight.Medium,
-                            )
-                        }
-                    }
-
-                    is UpdateChromeState.Downloading -> {}
-
-                    UpdateChromeState.ReadyToInstall -> {
-                        FilePipeButton(
-                            onClick = onInstallClick,
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                            colors =
-                                ButtonDefaults.buttonColors(
-                                    containerColor = scheme.primary,
-                                    contentColor = scheme.onPrimary,
-                                ),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.play_update_bar_install_action),
-                                maxLines = 1,
-                            )
-                        }
-                    }
-
-                    UpdateChromeState.Hidden -> {}
-                }
-            }
-
-            if (state is UpdateChromeState.Downloading) {
-                if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
-                    LinearWavyProgressIndicator(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(8.dp),
-                        color = scheme.primary,
-                        trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
-                    )
-                } else {
-                    val fraction =
-                        (state.bytesDownloaded.toFloat() / state.totalBytesToDownload.toFloat())
-                            .coerceIn(0f, 1f)
-                    LinearWavyProgressIndicator(
-                        progress = { fraction },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(8.dp),
-                        color = scheme.primary,
-                        trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
-                    )
                 }
             }
         }
@@ -2410,7 +2439,13 @@ private fun CenteredPillWithSideFab(
     modifier: Modifier = Modifier,
     leadingFab: (@Composable () -> Unit)? = null,
     fabCoreSize: androidx.compose.ui.unit.Dp = 56.dp,
+    fabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
+    leadingFabGap: androidx.compose.ui.unit.Dp = fabGap,
+    leadingFabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
+    // Side FABs are measured at their natural width and with infinite height so hosted
+    // menus can unfurl above the strip. The strip reports only the scaled FAB core
+    // height, so expanded menus overflow upward without re-centering the pill.
     androidx.compose.ui.layout.Layout(
         modifier = modifier,
         content = {
@@ -2421,35 +2456,100 @@ private fun CenteredPillWithSideFab(
             }
         },
     ) { measurables, constraints ->
-        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val loose =
+            constraints.copy(
+                minWidth = 0,
+                minHeight = 0,
+                maxWidth = androidx.compose.ui.unit.Constraints.Infinity,
+            )
         val pillPlaceable = measurables[0].measure(loose)
-        val fabPlaceable = measurables[1].measure(loose)
-        val leadingFabPlaceable = measurables.getOrNull(2)?.measure(loose)
+        val fabPlaceable =
+            measurables[1].measure(
+                loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity),
+            )
+        val leadingFabPlaceable =
+            measurables
+                .getOrNull(2)
+                ?.measure(loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
         val gapPx = fabGap.roundToPx()
+        val leadingGapPx = leadingFabGap.roundToPx()
         val fabCorePx = fabCoreSize.roundToPx()
+        val fabBottomInsetPx = fabBottomInset.roundToPx()
+        val leadingFabBottomInsetPx = leadingFabBottomInset.roundToPx()
+
         val width =
             if (constraints.hasBoundedWidth) {
                 constraints.maxWidth
             } else {
                 pillPlaceable.width + gapPx + fabPlaceable.width
             }
-        val stripHeight = maxOf(pillPlaceable.height, fabCorePx)
+        val trailingSideRoomPx = gapPx + maxOf(fabCorePx, fabPlaceable.width)
+        val leadingSideRoomPx =
+            if (leadingFabPlaceable != null) {
+                leadingGapPx + maxOf(fabCorePx, leadingFabPlaceable.width)
+            } else {
+                0
+            }
+        val sideRoomPx =
+            maxOf(
+                trailingSideRoomPx,
+                leadingSideRoomPx,
+            )
+        val rowNaturalWidth = pillPlaceable.width + sideRoomPx * 2
+        val chromeScale =
+            if (rowNaturalWidth > width && rowNaturalWidth > 0) {
+                width.toFloat() / rowNaturalWidth.toFloat()
+            } else {
+                1f
+            }
+        val scaledPillWidth = (pillPlaceable.width * chromeScale).roundToInt()
+        val scaledPillHeight = (pillPlaceable.height * chromeScale).roundToInt()
+        val scaledFabWidth = (fabPlaceable.width * chromeScale).roundToInt()
+        val scaledFabHeight = (fabPlaceable.height * chromeScale).roundToInt()
+        val scaledFabCore = (fabCorePx * chromeScale).roundToInt()
+        val scaledGap = (gapPx * chromeScale).roundToInt()
+        val scaledFabBottomInset = (fabBottomInsetPx * chromeScale).roundToInt()
+        val scaledLeadingGap = (leadingGapPx * chromeScale).roundToInt()
+        val scaledLeadingFabBottomInset = (leadingFabBottomInsetPx * chromeScale).roundToInt()
+        // Strip height tracks the FAB's *core* size rather than the wrapper's measured
+        // height so the expanded menu never re-flows the strip.
+        val stripHeight = maxOf(scaledPillHeight, scaledFabCore)
 
         layout(width, stripHeight) {
-            val pillX = (width - pillPlaceable.width) / 2
-            val pillY = (stripHeight - pillPlaceable.height) / 2
-            pillPlaceable.place(pillX, pillY)
+            val pillX = (width - scaledPillWidth) / 2
+            val pillY = (stripHeight - scaledPillHeight) / 2
+            pillPlaceable.placeWithLayer(pillX, pillY) {
+                scaleX = chromeScale
+                scaleY = chromeScale
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
 
-            val desiredFabRight = pillX + pillPlaceable.width + gapPx + fabCorePx
-            val fabRight = desiredFabRight.coerceAtMost(width)
-            val fabX = (fabRight - fabPlaceable.width).coerceAtLeast(0)
-            val fabY = (stripHeight - fabPlaceable.height) / 2
-            fabPlaceable.place(fabX, fabY)
+            val fabX =
+                (pillX + scaledPillWidth + scaledGap)
+                    .coerceAtMost(width - scaledFabWidth)
+                    .coerceAtLeast(0)
+            val fabBottomY = (stripHeight + scaledFabCore) / 2 + scaledFabBottomInset
+            val fabY = fabBottomY - scaledFabHeight
+            fabPlaceable.placeWithLayer(fabX, fabY) {
+                scaleX = chromeScale
+                scaleY = chromeScale
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
 
             leadingFabPlaceable?.let { leadingPlaceable ->
-                val leadingX = (pillX - gapPx - fabCorePx).coerceAtLeast(0)
-                val leadingY = (stripHeight - leadingPlaceable.height) / 2
-                leadingPlaceable.place(leadingX, leadingY)
+                val scaledLeadingFabWidth = (leadingPlaceable.width * chromeScale).roundToInt()
+                val leadingX =
+                    (pillX - scaledLeadingGap - scaledLeadingFabWidth)
+                        .coerceAtLeast(0)
+                val leadingFabBottomY = (stripHeight + scaledFabCore) / 2 + scaledLeadingFabBottomInset
+                val leadingY =
+                    leadingFabBottomY -
+                        (leadingPlaceable.height * chromeScale).roundToInt()
+                leadingPlaceable.placeWithLayer(leadingX, leadingY) {
+                    scaleX = chromeScale
+                    scaleY = chromeScale
+                    transformOrigin = TransformOrigin(0f, 0f)
+                }
             }
         }
     }

@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.DropdownMenu
@@ -334,6 +336,11 @@ fun RulesScreen(
                                 FilePipeFilledTonalIconButton(
                                     onClick = { viewModel.clearSelection() },
                                     tooltipLabel = deselectAllLabel,
+                                    colors =
+                                        IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        ),
                                 ) {
                                     FilePipeMaterialRoundedSymbol(name = "deselect", contentDescription = deselectAllLabel)
                                 }
@@ -463,6 +470,11 @@ fun RulesScreen(
                                     FilePipeFilledTonalIconButton(
                                         onClick = { viewModel.clearSelection() },
                                         tooltipLabel = cancelSelectionLabel,
+                                        colors =
+                                            IconButtonDefaults.filledTonalIconButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            ),
                                     ) {
                                         FilePipeMaterialRoundedSymbol(name = "close", contentDescription = cancelSelectionLabel)
                                     }
@@ -523,9 +535,17 @@ fun RulesScreen(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .then(scrollBlurModifier)
-                        .padding(innerPadding)
-                        .padding(bottom = contentPadding.calculateBottomPadding()),
+                        .then(scrollBlurModifier),
+                // Clearances ride inside the scroll container (see RulesEmptyState) so
+                // they never become a hard wall that clips the empty state.
+                contentPadding =
+                    PaddingValues(
+                        top = innerPadding.calculateTopPadding(),
+                        bottom =
+                            innerPadding.calculateBottomPadding() +
+                                contentPadding.calculateBottomPadding(),
+                    ),
+                showAddRuleAction = showSelectionActionBar,
             )
         } else {
             val reorderLongPressActive = !isRunning
@@ -1205,6 +1225,10 @@ private fun SwipeAction.shortLabel(isExpanded: Boolean): String =
 fun RulesEmptyState(
     onAddRule: () -> Unit,
     modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    // Pane mode hosts its own add-rule FAB in the list pane, so the inline button
+    // is redundant there.
+    showAddRuleAction: Boolean = true,
 ) {
     val emptyStateSpatialSpec =
         reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
@@ -1219,11 +1243,20 @@ fun RulesEmptyState(
             ),
     ) {
         Box(
-            modifier = modifier.fillMaxSize().padding(32.dp),
+            modifier = modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
             Column(
-                modifier = Modifier.widthIn(max = 720.dp).fillMaxWidth(),
+                // Scroll spans the whole pane; the host clearances and margins live
+                // inside it so low-height panes scroll edge-to-edge instead of
+                // clipping the illustration/text at a padded boundary.
+                modifier =
+                    Modifier
+                        .widthIn(max = 720.dp)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                        .padding(contentPadding)
+                        .padding(32.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
@@ -1246,21 +1279,23 @@ fun RulesEmptyState(
                         textAlign = TextAlign.Center,
                     )
                 }
-                Spacer(Modifier.height(24.dp))
-                FilePipeButton(
-                    onClick = onAddRule,
-                    shape = pillShape,
-                    modifier = Modifier.fillMaxWidth(0.72f),
-                ) {
-                    FilePipeMaterialRoundedSymbol(
-                        name = "add",
-                        contentDescription = null,
-                        size = 20.dp,
-                        opticalCenterYOffset = (-2).dp,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.rules_add_rule))
+                if (showAddRuleAction) {
+                    Spacer(Modifier.height(24.dp))
+                    FilePipeButton(
+                        onClick = onAddRule,
+                        shape = pillShape,
+                        modifier = Modifier.fillMaxWidth(0.72f),
+                    ) {
+                        FilePipeMaterialRoundedSymbol(
+                            name = "add",
+                            contentDescription = null,
+                            size = 20.dp,
+                            opticalCenterYOffset = (-2).dp,
+                            modifier = Modifier.size(20.dp),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.rules_add_rule))
+                    }
                 }
             }
         }

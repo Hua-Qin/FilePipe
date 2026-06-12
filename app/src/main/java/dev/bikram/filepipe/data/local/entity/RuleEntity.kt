@@ -64,30 +64,16 @@ fun RuleEntity.toDomain(): Rule =
         updatedAt = updatedAt,
         trashedAt = trashedAt,
         schedule =
-            when {
-                scheduleType == ScheduleType.EVERY_N_HOURS && scheduleIntervalHours != null -> {
-                    RuleSchedule(
-                        type = scheduleType,
-                        dayOfWeek = null,
-                        hour = scheduleHour ?: 0,
-                        minute = scheduleMinute ?: 0,
-                        intervalHours = scheduleIntervalHours,
-                    )
-                }
-
-                scheduleType != null && scheduleHour != null && scheduleMinute != null -> {
-                    RuleSchedule(
-                        type = scheduleType,
-                        dayOfWeek = scheduleDayOfWeek,
-                        hour = scheduleHour,
-                        minute = scheduleMinute,
-                        intervalHours = null,
-                    )
-                }
-
-                else -> {
-                    null
-                }
+            if (scheduleType != null) {
+                RuleSchedule(
+                    type = scheduleType,
+                    dayOfWeek = scheduleDayOfWeek,
+                    hour = scheduleHour ?: 0,
+                    minute = scheduleMinute ?: 0,
+                    intervalHours = scheduleIntervalHours,
+                )
+            } else {
+                null
             },
         conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),
         operationMode = runCatching { OperationMode.valueOf(operationMode) }.getOrDefault(OperationMode.MOVE),

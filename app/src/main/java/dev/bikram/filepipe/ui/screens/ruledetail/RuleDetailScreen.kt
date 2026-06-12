@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -95,6 +96,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
@@ -110,6 +112,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.graphics.ColorUtils
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -557,13 +560,18 @@ private fun RuleSectionCard(
 
 private fun isScheduleInvalid(schedule: RuleSchedule?): Boolean {
     if (schedule == null) return false
+    val interval = schedule.intervalHours ?: 1
+    if (interval < 1) return true
     return when (schedule.type) {
         ScheduleType.EVERY_N_HOURS -> {
-            schedule.intervalHours !in 1..24
+            interval !in 1..24 ||
+                schedule.hour !in 0..23 ||
+                schedule.minute !in 0..59
         }
 
         ScheduleType.WEEKLY -> {
-            schedule.dayOfWeek == null ||
+            val days = RuleSchedule.bitmaskToDaysOfWeek(schedule.dayOfWeek)
+            days.isEmpty() ||
                 schedule.hour !in 0..23 ||
                 schedule.minute !in 0..59
         }
@@ -587,12 +595,15 @@ fun RuleDetailScreen(
     onSavedRule: ((Long) -> Unit)? = null,
     showNavigateBack: Boolean = true,
     allowInitialRuleNameFocus: Boolean = true,
+    isReadOnly: Boolean = false,
     viewModel: RuleDetailViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val isReadOnly = isReadOnly || state.isTrashed
     val isDirty by viewModel.isDirty.collectAsStateWithLifecycle()
     var showScheduleDialog by remember { mutableStateOf(false) }
     var showDiscardDialog by remember { mutableStateOf(false) }
+    var showDeleteForeverConfirm by remember { mutableStateOf(false) }
     var showTemplateSheet by remember { mutableStateOf(viewModel.showInitialTemplatePicker) }
     var showRuleIconSheet by remember { mutableStateOf(false) }
     var customEmojiDraft by remember { mutableStateOf("") }
@@ -825,10 +836,14 @@ fun RuleDetailScreen(
     LaunchedEffect(bottomBarMessages.isEmpty()) {
         if (bottomBarMessages.isEmpty()) dismissedBottomBarKey = null
     }
-    val showBottomBar = bottomBarMessages.isNotEmpty() && dismissedBottomBarKey != bottomBarKey
-    val showBottomActions = isDirty
+    val isPortrait = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+    val showReadOnlyBottomActions = isReadOnly && isPortrait
+    val showBottomBar = !isReadOnly && bottomBarMessages.isNotEmpty() && dismissedBottomBarKey != bottomBarKey
+    // A pristine new rule hosted in a pane has no back arrow, so it must always offer
+    // Cancel/Save; on phone the top-bar back covers cancel until the form is dirty.
+    val showBottomActions = isDirty || (viewModel.isNewRule && !showNavigateBack)
     val validationErrorOverlayExtraPadding = if (showBottomBar) 72.dp else 0.dp
-    val bottomActionOverlayPadding = if (showBottomActions) 88.dp else 0.dp
+    val bottomActionOverlayPadding = if (showBottomActions || showReadOnlyBottomActions) 88.dp else 0.dp
     val bottomOverlayPadding = bottomActionOverlayPadding + validationErrorOverlayExtraPadding
     val bottomContentPadding = navBottom + bottomOverlayPadding
     val density = LocalDensity.current
@@ -939,7 +954,8 @@ fun RuleDetailScreen(
                             state = rememberTooltipState(),
                         ) {
                             FilePipeFilledTonalIconButton(
-                                onClick = { showRuleIconSheet = true },
+                                onClick = { if (!isReadOnly) showRuleIconSheet = true },
+                                enabled = !isReadOnly,
                                 modifier =
                                     Modifier
                                         .padding(top = 4.dp)
@@ -952,7 +968,7 @@ fun RuleDetailScreen(
                                     icon = state.icon,
                                     vectorSize = 34.dp,
                                     emojiFontSize = 32.sp,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = if (isReadOnly) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f) else MaterialTheme.colorScheme.primary,
                                     contentDescription = stringResource(R.string.rule_icon_picker_cd),
                                     modifier = Modifier,
                                 )
@@ -964,12 +980,13 @@ fun RuleDetailScreen(
                             label = { Text(stringResource(R.string.rule_name_label)) },
                             placeholder = { Text(stringResource(R.string.rule_name_placeholder)) },
                             singleLine = true,
+                            enabled = !isReadOnly,
                             isError = nameHasError,
                             modifier =
                                 Modifier
                                     .weight(1f)
                                     .focusProperties {
-                                        canFocus = ruleNameCanFocus
+                                        canFocus = ruleNameCanFocus && !isReadOnly
                                     },
                         )
                     }
@@ -985,6 +1002,7 @@ fun RuleDetailScreen(
                             onAdd = viewModel::addExtension,
                             onRemove = viewModel::removeExtension,
                             onUseTemplate = { showTemplateSheet = true },
+                            enabled = !isReadOnly,
                         )
                     }
 
@@ -1021,125 +1039,135 @@ fun RuleDetailScreen(
                                         modifier =
                                             Modifier
                                                 .weight(1f)
-                                                .tapSoundClickable {
+                                                .tapSoundClickable(enabled = !isReadOnly) {
                                                     launchFolderPicker(FolderPickIntent.ReplaceSource(path), path)
                                                 },
                                     )
-                                    TooltipBox(
-                                        positionProvider =
-                                            TooltipDefaults.rememberTooltipPositionProvider(
-                                                TooltipAnchorPosition.Above,
-                                            ),
-                                        tooltip = {
-                                            PlainTooltip {
-                                                CenteredTooltipText(stringResource(R.string.bookmark_toggle_cd))
+                                    if (!isReadOnly) {
+                                        TooltipBox(
+                                            positionProvider =
+                                                TooltipDefaults.rememberTooltipPositionProvider(
+                                                    TooltipAnchorPosition.Above,
+                                                ),
+                                            tooltip = {
+                                                PlainTooltip {
+                                                    CenteredTooltipText(stringResource(R.string.bookmark_toggle_cd))
+                                                }
+                                            },
+                                            state = rememberTooltipState(),
+                                        ) {
+                                            FilePipeIconButton(onClick = { viewModel.toggleBookmark(path) }) {
+                                                FilePipeMaterialRoundedSymbol(
+                                                    name = "bookmark",
+                                                    contentDescription = stringResource(R.string.bookmark_toggle_cd),
+                                                    size = 22.dp,
+                                                    filled = isSourceBookmarked,
+                                                    tint =
+                                                        if (isSourceBookmarked) {
+                                                            MaterialTheme.colorScheme.primary
+                                                        } else {
+                                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                                        },
+                                                )
                                             }
-                                        },
-                                        state = rememberTooltipState(),
-                                    ) {
-                                        FilePipeIconButton(onClick = { viewModel.toggleBookmark(path) }) {
-                                            FilePipeMaterialRoundedSymbol(
-                                                name = "bookmark",
-                                                contentDescription = stringResource(R.string.bookmark_toggle_cd),
-                                                size = 22.dp,
-                                                filled = isSourceBookmarked,
-                                                tint =
-                                                    if (isSourceBookmarked) {
-                                                        MaterialTheme.colorScheme.primary
-                                                    } else {
-                                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                                    },
-                                            )
                                         }
-                                    }
-                                    TooltipBox(
-                                        positionProvider =
-                                            TooltipDefaults.rememberTooltipPositionProvider(
-                                                TooltipAnchorPosition.Above,
-                                            ),
-                                        tooltip = {
-                                            PlainTooltip {
-                                                CenteredTooltipText(stringResource(R.string.schedule_remove_short))
+                                        TooltipBox(
+                                            positionProvider =
+                                                TooltipDefaults.rememberTooltipPositionProvider(
+                                                    TooltipAnchorPosition.Above,
+                                                ),
+                                            tooltip = {
+                                                PlainTooltip {
+                                                    CenteredTooltipText(stringResource(R.string.schedule_remove_short))
+                                                }
+                                            },
+                                            state = rememberTooltipState(),
+                                        ) {
+                                            FilePipeIconButton(onClick = { viewModel.removeSourceFolder(path) }) {
+                                                FilePipeMaterialRoundedSymbol(
+                                                    name = "close",
+                                                    contentDescription = stringResource(R.string.schedule_remove_short),
+                                                    size = 18.dp,
+                                                )
                                             }
-                                        },
-                                        state = rememberTooltipState(),
-                                    ) {
-                                        FilePipeIconButton(onClick = { viewModel.removeSourceFolder(path) }) {
-                                            FilePipeMaterialRoundedSymbol(
-                                                name = "close",
-                                                contentDescription = stringResource(R.string.schedule_remove_short),
-                                                size = 18.dp,
-                                            )
                                         }
                                     }
                                 }
                             }
                         }
-                        val unusedBookmarks =
-                            bookmarkedFolders.filter {
-                                it.startsWith("content://") && it !in state.sourceFolderPaths
-                            }
-                        var bookmarkDropdownExpanded by remember { mutableStateOf(false) }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            FolderPickerButton(
-                                label = stringResource(R.string.add_source_folder),
-                                onClick = { launchFolderPicker(FolderPickIntent.AddSource, null) },
-                                modifier = Modifier.weight(1f),
-                            )
-                            Box(modifier = Modifier.weight(1f)) {
-                                FilePipeOutlinedButton(
-                                    onClick = { if (unusedBookmarks.isNotEmpty()) bookmarkDropdownExpanded = true },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = compactControlShape,
-                                    enabled = unusedBookmarks.isNotEmpty(),
-                                ) {
-                                    FilePipeMaterialRoundedSymbol(
-                                        name = "bookmark",
-                                        contentDescription = null,
-                                        size = 18.dp,
-                                        filled = false,
-                                    )
-                                    Text("  ${stringResource(R.string.bookmarks_choose)}")
+                        if (!isReadOnly) {
+                            val unusedBookmarks =
+                                bookmarkedFolders.filter {
+                                    it.startsWith("content://") && it !in state.sourceFolderPaths
                                 }
-                                DropdownMenu(
-                                    expanded = bookmarkDropdownExpanded,
-                                    onDismissRequest = { bookmarkDropdownExpanded = false },
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                ) {
-                                    unusedBookmarks.forEach { bookmarkPath ->
-                                        FilePipeDropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = displayPath(bookmarkPath, internalStorageDisplayName),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                )
-                                            },
-                                            onClick = {
-                                                viewModel.addSourceFolder(bookmarkPath)
-                                                bookmarkDropdownExpanded = false
-                                            },
+                            var bookmarkDropdownExpanded by remember { mutableStateOf(false) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                FolderPickerButton(
+                                    label = stringResource(R.string.add_source_folder),
+                                    onClick = { launchFolderPicker(FolderPickIntent.AddSource, null) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Box(modifier = Modifier.weight(1f)) {
+                                    FilePipeOutlinedButton(
+                                        onClick = { if (unusedBookmarks.isNotEmpty()) bookmarkDropdownExpanded = true },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = compactControlShape,
+                                        enabled = unusedBookmarks.isNotEmpty(),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                    ) {
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "bookmark",
+                                            contentDescription = null,
+                                            size = 18.dp,
+                                            filled = false,
+                                        )
+                                        Text(
+                                            text = "  ${stringResource(R.string.bookmarks_choose)}",
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis,
                                         )
                                     }
+                                    DropdownMenu(
+                                        expanded = bookmarkDropdownExpanded,
+                                        onDismissRequest = { bookmarkDropdownExpanded = false },
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    ) {
+                                        unusedBookmarks.forEach { bookmarkPath ->
+                                            FilePipeDropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = displayPath(bookmarkPath, internalStorageDisplayName),
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                    )
+                                                },
+                                                onClick = {
+                                                    viewModel.addSourceFolder(bookmarkPath)
+                                                    bookmarkDropdownExpanded = false
+                                                },
+                                            )
+                                        }
+                                    }
                                 }
                             }
-                        }
-                        if (state.folderAccessMode.usesAllFilesPaths() &&
-                            !state.allFilesAccessGranted
-                        ) {
-                            FilePipeTextButton(
-                                onClick = {
-                                    val allFilesIntent =
-                                        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                            data = "package:${context.packageName}".toUri()
-                                        }
-                                    context.startActivity(allFilesIntent)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
+                            if (state.folderAccessMode.usesAllFilesPaths() &&
+                                !state.allFilesAccessGranted
                             ) {
-                                Text(stringResource(R.string.rule_open_all_files_settings))
+                                FilePipeTextButton(
+                                    onClick = {
+                                        val allFilesIntent =
+                                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                                data = "package:${context.packageName}".toUri()
+                                            }
+                                        context.startActivity(allFilesIntent)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(stringResource(R.string.rule_open_all_files_settings))
+                                }
                             }
                         }
                         Column(Modifier.fillMaxWidth()) {
@@ -1168,6 +1196,7 @@ fun RuleDetailScreen(
                                 FilePipeSwitch(
                                     checked = state.scanSubdirectories,
                                     onCheckedChange = viewModel::setScanSubdirectories,
+                                    enabled = !isReadOnly,
                                 )
                             }
                         }
@@ -1197,7 +1226,7 @@ fun RuleDetailScreen(
                                 FilePipeSwitch(
                                     checked = state.scanSubdirectories && state.recreateDestinationSubfolders,
                                     onCheckedChange = viewModel::setRecreateDestinationSubfolders,
-                                    enabled = state.scanSubdirectories,
+                                    enabled = state.scanSubdirectories && !isReadOnly,
                                 )
                             }
                         }
@@ -1227,6 +1256,7 @@ fun RuleDetailScreen(
                                 FilePipeSwitch(
                                     checked = state.suppressMissingSourceFolderCardWarning,
                                     onCheckedChange = viewModel::setSuppressMissingSourceFolderCardWarning,
+                                    enabled = !isReadOnly,
                                 )
                             }
                         }
@@ -1268,117 +1298,127 @@ fun RuleDetailScreen(
                                     modifier =
                                         Modifier
                                             .weight(1f)
-                                            .tapSoundClickable {
+                                            .tapSoundClickable(enabled = !isReadOnly) {
                                                 launchFolderPicker(
                                                     FolderPickIntent.SetDestination,
                                                     state.destinationFolderPath,
                                                 )
                                             },
                                 )
-                                TooltipBox(
-                                    positionProvider =
-                                        TooltipDefaults.rememberTooltipPositionProvider(
-                                            TooltipAnchorPosition.Above,
-                                        ),
-                                    tooltip = {
-                                        PlainTooltip {
-                                            CenteredTooltipText(stringResource(R.string.bookmark_toggle_cd))
+                                if (!isReadOnly) {
+                                    TooltipBox(
+                                        positionProvider =
+                                            TooltipDefaults.rememberTooltipPositionProvider(
+                                                TooltipAnchorPosition.Above,
+                                            ),
+                                        tooltip = {
+                                            PlainTooltip {
+                                                CenteredTooltipText(stringResource(R.string.bookmark_toggle_cd))
+                                            }
+                                        },
+                                        state = rememberTooltipState(),
+                                    ) {
+                                        FilePipeIconButton(onClick = { viewModel.toggleBookmark(state.destinationFolderPath) }) {
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = "bookmark",
+                                                contentDescription = stringResource(R.string.bookmark_toggle_cd),
+                                                size = 22.dp,
+                                                filled = isDestBookmarked,
+                                                tint =
+                                                    if (isDestBookmarked) {
+                                                        MaterialTheme.colorScheme.primary
+                                                    } else {
+                                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                                    },
+                                            )
                                         }
+                                    }
+                                }
+                            }
+                        }
+                        if (!isReadOnly) {
+                            val unusedDestBookmarks =
+                                bookmarkedFolders.filter {
+                                    it.startsWith("content://") && it != state.destinationFolderPath
+                                }
+                            var destBookmarkDropdownExpanded by remember { mutableStateOf(false) }
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                FolderPickerButton(
+                                    label =
+                                        if (state.destinationFolderPath.isBlank()) {
+                                            stringResource(R.string.pick_folder)
+                                        } else {
+                                            stringResource(R.string.change_destination)
+                                        },
+                                    onClick = {
+                                        launchFolderPicker(
+                                            FolderPickIntent.SetDestination,
+                                            state.destinationFolderPath.takeIf { it.isNotBlank() },
+                                        )
                                     },
-                                    state = rememberTooltipState(),
-                                ) {
-                                    FilePipeIconButton(onClick = { viewModel.toggleBookmark(state.destinationFolderPath) }) {
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Box(modifier = Modifier.weight(1f)) {
+                                    FilePipeOutlinedButton(
+                                        onClick = { if (unusedDestBookmarks.isNotEmpty()) destBookmarkDropdownExpanded = true },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = compactControlShape,
+                                        enabled = unusedDestBookmarks.isNotEmpty(),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                    ) {
                                         FilePipeMaterialRoundedSymbol(
                                             name = "bookmark",
-                                            contentDescription = stringResource(R.string.bookmark_toggle_cd),
-                                            size = 22.dp,
-                                            filled = isDestBookmarked,
-                                            tint =
-                                                if (isDestBookmarked) {
-                                                    MaterialTheme.colorScheme.primary
-                                                } else {
-                                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                            contentDescription = null,
+                                            size = 18.dp,
+                                            filled = false,
+                                        )
+                                        Text(
+                                            text = "  ${stringResource(R.string.bookmarks_choose)}",
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = destBookmarkDropdownExpanded,
+                                        onDismissRequest = { destBookmarkDropdownExpanded = false },
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    ) {
+                                        unusedDestBookmarks.forEach { bookmarkPath ->
+                                            FilePipeDropdownMenuItem(
+                                                text = {
+                                                    Text(
+                                                        text = displayPath(bookmarkPath, internalStorageDisplayName),
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                    )
                                                 },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        val unusedDestBookmarks =
-                            bookmarkedFolders.filter {
-                                it.startsWith("content://") && it != state.destinationFolderPath
-                            }
-                        var destBookmarkDropdownExpanded by remember { mutableStateOf(false) }
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            FolderPickerButton(
-                                label =
-                                    if (state.destinationFolderPath.isBlank()) {
-                                        stringResource(R.string.pick_folder)
-                                    } else {
-                                        stringResource(R.string.change_destination)
-                                    },
-                                onClick = {
-                                    launchFolderPicker(
-                                        FolderPickIntent.SetDestination,
-                                        state.destinationFolderPath.takeIf { it.isNotBlank() },
-                                    )
-                                },
-                                modifier = Modifier.weight(1f),
-                            )
-                            Box(modifier = Modifier.weight(1f)) {
-                                FilePipeOutlinedButton(
-                                    onClick = { if (unusedDestBookmarks.isNotEmpty()) destBookmarkDropdownExpanded = true },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = compactControlShape,
-                                    enabled = unusedDestBookmarks.isNotEmpty(),
-                                ) {
-                                    FilePipeMaterialRoundedSymbol(
-                                        name = "bookmark",
-                                        contentDescription = null,
-                                        size = 18.dp,
-                                        filled = false,
-                                    )
-                                    Text("  ${stringResource(R.string.bookmarks_choose)}")
-                                }
-                                DropdownMenu(
-                                    expanded = destBookmarkDropdownExpanded,
-                                    onDismissRequest = { destBookmarkDropdownExpanded = false },
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                ) {
-                                    unusedDestBookmarks.forEach { bookmarkPath ->
-                                        FilePipeDropdownMenuItem(
-                                            text = {
-                                                Text(
-                                                    text = displayPath(bookmarkPath, internalStorageDisplayName),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                )
-                                            },
-                                            onClick = {
-                                                viewModel.setDestination(bookmarkPath)
-                                                destBookmarkDropdownExpanded = false
-                                            },
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        if (state.folderAccessMode.usesAllFilesPaths() &&
-                            !state.allFilesAccessGranted
-                        ) {
-                            FilePipeTextButton(
-                                onClick = {
-                                    val allFilesIntent =
-                                        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                            data = "package:${context.packageName}".toUri()
+                                                onClick = {
+                                                    viewModel.setDestination(bookmarkPath)
+                                                    destBookmarkDropdownExpanded = false
+                                                },
+                                            )
                                         }
-                                    context.startActivity(allFilesIntent)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
+                                    }
+                                }
+                            }
+                            if (state.folderAccessMode.usesAllFilesPaths() &&
+                                !state.allFilesAccessGranted
                             ) {
-                                Text(stringResource(R.string.rule_open_all_files_settings))
+                                FilePipeTextButton(
+                                    onClick = {
+                                        val allFilesIntent =
+                                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                                data = "package:${context.packageName}".toUri()
+                                            }
+                                        context.startActivity(allFilesIntent)
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Text(stringResource(R.string.rule_open_all_files_settings))
+                                }
                             }
                         }
                     }
@@ -1421,6 +1461,7 @@ fun RuleDetailScreen(
                                         FilePipeToggleButton(
                                             checked = state.operationMode == mode,
                                             onCheckedChange = { checked -> if (checked) viewModel.setOperationMode(mode) },
+                                            enabled = !isReadOnly,
                                             shapes = operationShapes[index],
                                             modifier = Modifier.weight(1f),
                                         ) {
@@ -1431,8 +1472,10 @@ fun RuleDetailScreen(
                                         FilePipeDropdownMenuItem(
                                             text = { Text(label) },
                                             onClick = {
-                                                viewModel.setOperationMode(mode)
-                                                menuState.dismiss()
+                                                if (!isReadOnly) {
+                                                    viewModel.setOperationMode(mode)
+                                                    menuState.dismiss()
+                                                }
                                             },
                                         )
                                     },
@@ -1476,6 +1519,7 @@ fun RuleDetailScreen(
                                         FilePipeToggleButton(
                                             checked = state.conflictPolicy == policy,
                                             onCheckedChange = { checked -> if (checked) viewModel.setConflictPolicy(policy) },
+                                            enabled = !isReadOnly,
                                             shapes = conflictShapes[index],
                                             modifier = Modifier.weight(1f),
                                         ) {
@@ -1486,8 +1530,10 @@ fun RuleDetailScreen(
                                         FilePipeDropdownMenuItem(
                                             text = { Text(label) },
                                             onClick = {
-                                                viewModel.setConflictPolicy(policy)
-                                                menuState.dismiss()
+                                                if (!isReadOnly) {
+                                                    viewModel.setConflictPolicy(policy)
+                                                    menuState.dismiss()
+                                                }
                                             },
                                         )
                                     },
@@ -1504,37 +1550,7 @@ fun RuleDetailScreen(
                     ) {
                         val schedule = state.schedule
                         if (schedule != null) {
-                            val isSystem24Hour =
-                                android.text.format.DateFormat
-                                    .is24HourFormat(context)
-                            val timeStr =
-                                if (isSystem24Hour) {
-                                    "%02d:%02d".format(schedule.hour, schedule.minute)
-                                } else {
-                                    val hour12 =
-                                        when (val hourMod = schedule.hour % 12) {
-                                            0 -> 12
-                                            else -> hourMod
-                                        }
-                                    val amPm = if (schedule.hour < 12) "AM" else "PM"
-                                    "%d:%02d %s".format(hour12, schedule.minute, amPm)
-                                }
-                            val scheduleText =
-                                when (schedule.type) {
-                                    ScheduleType.DAILY -> {
-                                        "Daily at $timeStr"
-                                    }
-
-                                    ScheduleType.WEEKLY -> {
-                                        val days = arrayOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-                                        val dayName = schedule.dayOfWeek?.let { days.getOrNull(it - 2) } ?: "?"
-                                        "Weekly ($dayName) at $timeStr"
-                                    }
-
-                                    ScheduleType.EVERY_N_HOURS -> {
-                                        "Every ${schedule.intervalHours ?: 1}h"
-                                    }
-                                }
+                            val scheduleText = schedule.toReadableString(context)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1542,39 +1558,49 @@ fun RuleDetailScreen(
                             ) {
                                 FilePipeOutlinedButton(
                                     onClick = { showScheduleDialog = true },
+                                    enabled = !isReadOnly,
                                     modifier = Modifier.weight(1f),
                                     shape = compactControlShape,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                                 ) {
                                     FilePipeMaterialRoundedSymbol(
                                         name = "calendar_month",
                                         contentDescription = null,
                                         size = 18.dp,
                                     )
-                                    Text(text = "  $scheduleText")
+                                    Text(
+                                        text = "  $scheduleText",
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
-                                TooltipBox(
-                                    positionProvider =
-                                        TooltipDefaults.rememberTooltipPositionProvider(
-                                            TooltipAnchorPosition.Above,
-                                        ),
-                                    tooltip = {
-                                        PlainTooltip {
-                                            CenteredTooltipText(stringResource(R.string.remove_schedule))
+                                if (!isReadOnly) {
+                                    TooltipBox(
+                                        positionProvider =
+                                            TooltipDefaults.rememberTooltipPositionProvider(
+                                                TooltipAnchorPosition.Above,
+                                            ),
+                                        tooltip = {
+                                            PlainTooltip {
+                                                CenteredTooltipText(stringResource(R.string.remove_schedule))
+                                            }
+                                        },
+                                        state = rememberTooltipState(),
+                                    ) {
+                                        FilePipeIconButton(onClick = { viewModel.setSchedule(null) }) {
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = "close",
+                                                contentDescription = stringResource(R.string.remove_schedule),
+                                            )
                                         }
-                                    },
-                                    state = rememberTooltipState(),
-                                ) {
-                                    FilePipeIconButton(onClick = { viewModel.setSchedule(null) }) {
-                                        FilePipeMaterialRoundedSymbol(
-                                            name = "close",
-                                            contentDescription = stringResource(R.string.remove_schedule),
-                                        )
                                     }
                                 }
                             }
                         } else {
                             FilePipeOutlinedButton(
                                 onClick = { showScheduleDialog = true },
+                                enabled = !isReadOnly,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = compactControlShape,
                             ) {
@@ -1687,6 +1713,7 @@ fun RuleDetailScreen(
                                         label = { Text(stringResource(R.string.advanced_filename_pattern_label)) },
                                         placeholder = { Text(stringResource(R.string.advanced_filename_pattern_placeholder)) },
                                         singleLine = true,
+                                        enabled = !isReadOnly,
                                         modifier = Modifier.fillMaxWidth(),
                                     )
 
@@ -1699,6 +1726,7 @@ fun RuleDetailScreen(
                                             onValueChange = viewModel::setMinFileSizeMb,
                                             label = { Text(stringResource(R.string.advanced_min_size_label)) },
                                             singleLine = true,
+                                            enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
@@ -1707,6 +1735,7 @@ fun RuleDetailScreen(
                                             onValueChange = viewModel::setMaxFileSizeMb,
                                             label = { Text(stringResource(R.string.advanced_max_size_label)) },
                                             singleLine = true,
+                                            enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
@@ -1721,6 +1750,7 @@ fun RuleDetailScreen(
                                             onValueChange = viewModel::setMinAgeDays,
                                             label = { Text(stringResource(R.string.advanced_min_age_label)) },
                                             singleLine = true,
+                                            enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
@@ -1729,6 +1759,7 @@ fun RuleDetailScreen(
                                             onValueChange = viewModel::setMaxAgeDays,
                                             label = { Text(stringResource(R.string.advanced_max_age_label)) },
                                             singleLine = true,
+                                            enabled = !isReadOnly,
                                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                             modifier = Modifier.weight(1f),
                                         )
@@ -1741,9 +1772,41 @@ fun RuleDetailScreen(
                                         placeholder = { Text(stringResource(R.string.advanced_exclude_placeholder)) },
                                         supportingText = { Text(stringResource(R.string.advanced_csv_hint)) },
                                         singleLine = true,
+                                        enabled = !isReadOnly,
                                         modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
+                            }
+                        }
+                    }
+
+                    if (isReadOnly && !isPortrait) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            FilePipeButton(
+                                onClick = { viewModel.restoreRule() },
+                                modifier = Modifier.weight(1f),
+                                shape = pillShape,
+                            ) {
+                                Text(stringResource(R.string.restore))
+                            }
+                            FilePipeOutlinedButton(
+                                onClick = { showDeleteForeverConfirm = true },
+                                modifier = Modifier.weight(1f),
+                                shape = pillShape,
+                                colors =
+                                    ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error,
+                                    ),
+                                border =
+                                    BorderStroke(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                                    ),
+                            ) {
+                                Text(stringResource(R.string.delete_forever))
                             }
                         }
                     }
@@ -1755,7 +1818,15 @@ fun RuleDetailScreen(
 
         TopAppBar(
             modifier = Modifier.align(Alignment.TopCenter),
-            title = { Text(if (viewModel.isNewRule) stringResource(R.string.new_rule) else stringResource(R.string.edit_rule)) },
+            title = {
+                Text(
+                    if (viewModel.isNewRule) {
+                        stringResource(R.string.new_rule)
+                    } else {
+                        stringResource(R.string.rule_details)
+                    },
+                )
+            },
             navigationIcon = {
                 if (showNavigateBack) {
                     TooltipBox(
@@ -1781,36 +1852,38 @@ fun RuleDetailScreen(
                 }
             },
             actions = {
-                TooltipBox(
-                    positionProvider =
-                        TooltipDefaults.rememberTooltipPositionProvider(
-                            TooltipAnchorPosition.Above,
-                        ),
-                    tooltip = {
-                        PlainTooltip {
-                            CenteredTooltipText(stringResource(R.string.preview_rule))
-                        }
-                    },
-                    state = rememberTooltipState(),
-                ) {
-                    FilePipeIconButton(
-                        onClick = { viewModel.loadPreview() },
-                        enabled =
-                            state.sourceFolderPaths.isNotEmpty() &&
-                                state.destinationFolderPath.isNotBlank() &&
-                                state.fileExtensions.isNotEmpty(),
+                if (!isReadOnly) {
+                    TooltipBox(
+                        positionProvider =
+                            TooltipDefaults.rememberTooltipPositionProvider(
+                                TooltipAnchorPosition.Above,
+                            ),
+                        tooltip = {
+                            PlainTooltip {
+                                CenteredTooltipText(stringResource(R.string.preview_rule))
+                            }
+                        },
+                        state = rememberTooltipState(),
                     ) {
-                        FilePipeMaterialRoundedSymbol(
-                            name = "visibility",
-                            contentDescription = stringResource(R.string.preview_rule),
-                        )
+                        FilePipeIconButton(
+                            onClick = { viewModel.loadPreview() },
+                            enabled =
+                                state.sourceFolderPaths.isNotEmpty() &&
+                                    state.destinationFolderPath.isNotBlank() &&
+                                    state.fileExtensions.isNotEmpty(),
+                        ) {
+                            FilePipeMaterialRoundedSymbol(
+                                name = "visibility",
+                                contentDescription = stringResource(R.string.preview_rule),
+                            )
+                        }
                     }
                 }
             },
             colors = gradientOverlayTopAppBarColors(),
         )
 
-        if (!state.isLoading && (showBottomBar || showBottomActions)) {
+        if (!state.isLoading && (showBottomBar || showBottomActions || showReadOnlyBottomActions)) {
             Surface(
                 modifier =
                     Modifier
@@ -1860,6 +1933,55 @@ fun RuleDetailScreen(
                             onOpenFaq = onOpenFaq,
                             onDismiss = { dismissedBottomBarKey = bottomBarKey },
                         )
+                    }
+
+                    AnimatedVisibility(
+                        visible = showReadOnlyBottomActions,
+                        enter =
+                            reducedMotionEnterTransition(
+                                fadeIn(animationSpec = bottomBarFadeInSpec) +
+                                    expandVertically(
+                                        animationSpec = bottomBarSpatialSpec,
+                                        clip = false,
+                                    ),
+                            ),
+                        exit =
+                            reducedMotionExitTransition(
+                                fadeOut(animationSpec = bottomBarFadeOutSpec) +
+                                    shrinkVertically(
+                                        animationSpec = bottomBarSpatialSpec,
+                                        clip = false,
+                                    ),
+                            ),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            FilePipeButton(
+                                onClick = { viewModel.restoreRule() },
+                                modifier = Modifier.weight(1f),
+                                shape = pillShape,
+                            ) {
+                                Text(stringResource(R.string.restore))
+                            }
+                            FilePipeOutlinedButton(
+                                onClick = { showDeleteForeverConfirm = true },
+                                modifier = Modifier.weight(1f),
+                                shape = pillShape,
+                                colors =
+                                    ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error,
+                                    ),
+                                border =
+                                    BorderStroke(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                                    ),
+                            ) {
+                                Text(stringResource(R.string.delete_forever))
+                            }
+                        }
                     }
 
                     AnimatedVisibility(
@@ -1924,6 +2046,36 @@ fun RuleDetailScreen(
         )
     }
 
+    if (showDeleteForeverConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteForeverConfirm = false },
+            title = { Text(stringResource(R.string.history_trash_delete_forever_confirm_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.history_trash_delete_forever_confirm_message,
+                        state.name,
+                    ),
+                )
+            },
+            confirmButton = {
+                FilePipeTextButton(
+                    onClick = {
+                        showDeleteForeverConfirm = false
+                        viewModel.deleteRuleForever()
+                    },
+                ) {
+                    Text(stringResource(R.string.delete_forever))
+                }
+            },
+            dismissButton = {
+                FilePipeTextButton(onClick = { showDeleteForeverConfirm = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
     if (pendingFilesystemFolderPick != null) {
         val pickRequest = pendingFilesystemFolderPick!!
         val pickedIntent = pickRequest.intent
@@ -1935,8 +2087,11 @@ fun RuleDetailScreen(
         LaunchedEffect(pickRequest) {
             folderPickerSheetState.expand()
         }
+        val fontScale = LocalDensity.current.fontScale
+        val showTitle = fontScale <= 1.15f
         AppBottomSheet(
             title = stringResource(R.string.filesystem_folder_picker_title),
+            showTitleBar = showTitle,
             onDismiss = { pendingFilesystemFolderPick = null },
             sheetState = folderPickerSheetState,
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -1970,23 +2125,27 @@ fun RuleDetailScreen(
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier =
+                Modifier
+                    .widthIn(min = 320.dp, max = 560.dp)
+                    .fillMaxWidth(0.9f),
             title = { Text(stringResource(R.string.unsaved_changes_title)) },
             text = { Text(stringResource(R.string.unsaved_changes_message)) },
             confirmButton = {
-                FilePipeTextButton(
-                    onClick = {
-                        showDiscardDialog = false
-                        viewModel.discardChanges()
-                        onNavigateBack()
-                    },
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(R.string.discard_changes))
-                }
-            },
-            dismissButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilePipeTextButton(onClick = { showDiscardDialog = false }) {
-                        Text(stringResource(R.string.keep_editing))
+                        Text(
+                            text = stringResource(R.string.keep_editing),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
                     }
                     FilePipeTextButton(
                         onClick = {
@@ -1995,7 +2154,26 @@ fun RuleDetailScreen(
                             viewModel.save()
                         },
                     ) {
-                        Text(stringResource(R.string.save_and_exit))
+                        Text(
+                            text = stringResource(R.string.save_and_exit),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
+                    }
+                    FilePipeTextButton(
+                        onClick = {
+                            showDiscardDialog = false
+                            viewModel.discardChanges()
+                            onNavigateBack()
+                        },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.discard_changes),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
                     }
                 }
             },

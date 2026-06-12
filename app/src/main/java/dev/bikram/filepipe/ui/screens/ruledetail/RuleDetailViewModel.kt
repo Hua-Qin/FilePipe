@@ -88,6 +88,7 @@ data class RuleDetailUiState(
     val destinationFolderAccessIssue: FolderAccessResult? = null,
     val folderAccessMode: FolderAccessMode = FolderAccessMode.SAF_ONLY,
     val allFilesAccessGranted: Boolean = false,
+    val isTrashed: Boolean = false,
 )
 
 private data class RuleSnapshot(
@@ -217,7 +218,7 @@ class RuleDetailViewModel
 
         private fun loadRule() =
             viewModelScope.launch {
-                val rule = ruleRepository.getRuleById(ruleId)
+                val rule = ruleRepository.getRuleByIdIncludingTrashed(ruleId)
                 if (rule != null) {
                     _uiState.update {
                         it.copy(
@@ -243,6 +244,7 @@ class RuleDetailViewModel
                             maxAgeDays = rule.maxAgeDays?.toString() ?: "",
                             excludePatternsText = rule.excludePatterns.joinToString(", "),
                             isLoading = false,
+                            isTrashed = rule.trashedAt != null,
                         )
                     }
                     _baseline.value = _uiState.value.toSnapshot()
@@ -577,6 +579,24 @@ class RuleDetailViewModel
                     it.copy(id = savedId, errors = emptyList())
                 }
                 _baseline.value = _uiState.value.toSnapshot()
+                rulesAutoExportTrigger.maybeExportAfterRuleChange()
+                _uiState.update { it.copy(isSaved = true) }
+            }
+
+        fun restoreRule() =
+            viewModelScope.launch {
+                ruleRepository.restoreRuleFromTrash(ruleId)
+                val rule = ruleRepository.getRuleById(ruleId)
+                if (rule != null && rule.isEnabled && rule.schedule != null) {
+                    scheduleRulesUseCase.scheduleRule(rule)
+                }
+                rulesAutoExportTrigger.maybeExportAfterRuleChange()
+                _uiState.update { it.copy(isSaved = true) }
+            }
+
+        fun deleteRuleForever() =
+            viewModelScope.launch {
+                ruleRepository.deleteRuleForever(ruleId)
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
                 _uiState.update { it.copy(isSaved = true) }
             }
