@@ -103,8 +103,9 @@
     <string name="schedule_dialog_title">Set schedule</string>
     <string name="schedule_hourly">Hourly</string>
     <string name="schedule_interval_hours">Every (hours)</string>
-    <string name="schedule_interval_hours_helper">1–24 hours. For anything longer, use \"Daily\".</string>
-    <string name="schedule_interval_positive_error">Enter 1 or more.</string>
+    <string name="schedule_interval_hours_helper">1-24 hours. For anything longer, use \"Days\".</string>
+    <string name="schedule_interval_days_helper">1-365 days.</string>
+    <string name="schedule_interval_weeks_helper">1-52 weeks.</string>
     <string name="schedule_remove_short">Remove</string>
     <string name="schedule_every">Every</string>
     <string name="schedule_unit_hours">Hours</string>
@@ -112,6 +113,8 @@
     <string name="schedule_unit_weeks">Weeks</string>
     <string name="schedule_choose_start_time">Choose start time</string>
     <string name="schedule_start_time">Start time</string>
+    <string name="schedule_every_hour">Every hour</string>
+    <string name="schedule_every_hours">Every %1$d hours</string>
     <string name="schedule_every_hour_starting">Every hour starting at %1$s</string>
     <string name="schedule_every_hours_starting">Every %1$d hours starting at %2$s</string>
     <string name="schedule_daily_at">Daily at %1$s</string>

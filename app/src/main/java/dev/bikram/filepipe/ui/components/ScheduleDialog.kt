@@ -79,7 +79,7 @@ fun ScheduleDialog(
 
     var intervalText by remember {
         mutableStateOf(
-            (initialSchedule?.intervalHours ?: 1).toString(),
+            (initialSchedule?.repeatInterval ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL).toString(),
         )
     }
     var intervalFieldError by remember { mutableStateOf(false) }
@@ -95,8 +95,7 @@ fun ScheduleDialog(
         text: String = intervalText,
     ): Boolean {
         val parsed = text.toIntOrNull()
-        if (parsed == null || parsed < 1) return false
-        return type != ScheduleType.EVERY_N_HOURS || parsed <= 24
+        return RuleSchedule.isRepeatIntervalValid(type, parsed)
     }
 
     fun validateIntervalText(): Boolean {
@@ -241,10 +240,10 @@ fun ScheduleDialog(
 
                     if (intervalFieldError) {
                         val intervalErrorText =
-                            if (scheduleType == ScheduleType.EVERY_N_HOURS) {
-                                R.string.schedule_interval_hours_helper
-                            } else {
-                                R.string.schedule_interval_positive_error
+                            when (scheduleType) {
+                                ScheduleType.EVERY_N_HOURS -> R.string.schedule_interval_hours_helper
+                                ScheduleType.DAILY -> R.string.schedule_interval_days_helper
+                                ScheduleType.WEEKLY -> R.string.schedule_interval_weeks_helper
                             }
                         Text(
                             text = stringResource(intervalErrorText),
@@ -366,7 +365,7 @@ fun ScheduleDialog(
                     val validInterval = validateIntervalText()
                     val validDays = scheduleType != ScheduleType.WEEKLY || selectedDays.isNotEmpty()
                     if (validInterval && validDays) {
-                        val intervalParsed = intervalText.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                        val intervalParsed = intervalText.toIntOrNull() ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL
                         onSave(
                             RuleSchedule(
                                 type = scheduleType,
@@ -378,7 +377,7 @@ fun ScheduleDialog(
                                     },
                                 hour = hour,
                                 minute = minute,
-                                intervalHours = intervalParsed,
+                                repeatInterval = intervalParsed,
                             ),
                         )
                     }

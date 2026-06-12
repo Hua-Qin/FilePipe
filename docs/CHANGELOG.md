@@ -1,4 +1,4 @@
-## v3.8.1 Adaptive layout, richer schedule, alert FAB
+## v3.8.2 Adaptive layout, richer schedule, alert FAB
 
 ## ✨ New Features
 - **Alerts button** near the navigation bar replaces the old update button. Tap it to expand update status (available, downloading, ready to install).

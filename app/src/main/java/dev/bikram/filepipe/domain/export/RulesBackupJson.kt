@@ -189,7 +189,7 @@ fun RuleSchedule.toBackupDto(): ScheduleBackupDto =
         dayOfWeek = dayOfWeek,
         hour = hour,
         minute = minute,
-        intervalHours = intervalHours,
+        intervalHours = repeatInterval,
     )
 
 fun RunHistory.toBackupDto(
@@ -295,7 +295,7 @@ fun ScheduleBackupDto.toDomain(): RuleSchedule? {
         dayOfWeek = dayOfWeek,
         hour = hour,
         minute = minute,
-        intervalHours = intervalHours,
+        repeatInterval = intervalHours,
     )
 }
 

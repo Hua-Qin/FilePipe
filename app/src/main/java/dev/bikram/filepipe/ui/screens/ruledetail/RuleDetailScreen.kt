@@ -560,18 +560,18 @@ private fun RuleSectionCard(
 
 private fun isScheduleInvalid(schedule: RuleSchedule?): Boolean {
     if (schedule == null) return false
-    val interval = schedule.intervalHours ?: 1
-    if (interval < 1) return true
+    val interval = schedule.repeatInterval ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL
+    if (!RuleSchedule.isRepeatIntervalValid(schedule.type, interval)) return true
     return when (schedule.type) {
         ScheduleType.EVERY_N_HOURS -> {
-            interval !in 1..24 ||
-                schedule.hour !in 0..23 ||
+            schedule.hour !in 0..23 ||
                 schedule.minute !in 0..59
         }
 
         ScheduleType.WEEKLY -> {
             val days = RuleSchedule.bitmaskToDaysOfWeek(schedule.dayOfWeek)
-            days.isEmpty() ||
+            schedule.dayOfWeek == null ||
+                days.isEmpty() ||
                 schedule.hour !in 0..23 ||
                 schedule.minute !in 0..59
         }

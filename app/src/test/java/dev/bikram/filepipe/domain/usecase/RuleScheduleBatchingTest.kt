@@ -12,7 +12,7 @@ class RuleScheduleBatchingTest {
     @Test
     fun coalescedGroupsIncludeOnlyEnabledScheduledRulesWithIdenticalSchedules() {
         val dailyNine = RuleSchedule(ScheduleType.DAILY, hour = 9, minute = 0)
-        val everyTwoHours = RuleSchedule(ScheduleType.EVERY_N_HOURS, hour = 0, minute = 0, intervalHours = 2)
+        val everyTwoHours = RuleSchedule(ScheduleType.EVERY_N_HOURS, hour = 0, minute = 0, repeatInterval = 2)
         val groups =
             coalescedRuleScheduleGroups(
                 listOf(
@@ -63,7 +63,7 @@ class RuleScheduleBatchingTest {
     @Test
     fun nextIntervalRunCanBeImmediateForNewSchedulesAndDelayedForRecurringAlarms() {
         val now = millisFor(day = 10, hour = 8, minute = 30)
-        val schedule = RuleSchedule(ScheduleType.EVERY_N_HOURS, hour = 0, minute = 0, intervalHours = 3)
+        val schedule = RuleSchedule(ScheduleType.EVERY_N_HOURS, hour = 0, minute = 0, repeatInterval = 3)
 
         assertEquals(now, nextRunAtMillis(schedule, nowMillis = now, allowImmediateIntervalRun = true))
         assertEquals(
@@ -77,7 +77,7 @@ class RuleScheduleBatchingTest {
         val now = millisFor(day = 10, hour = 10, minute = 0)
         val next =
             nextRunAtMillis(
-                RuleSchedule(ScheduleType.DAILY, hour = 9, minute = 0, intervalHours = 2),
+                RuleSchedule(ScheduleType.DAILY, hour = 9, minute = 0, repeatInterval = 2),
                 nowMillis = now,
             )
         // 9:00 today has passed, so it runs on day 12 at 9:00 AM (2 days later)
@@ -110,7 +110,7 @@ class RuleScheduleBatchingTest {
                 dayOfWeek = bitmask,
                 hour = 9,
                 minute = 0,
-                intervalHours = 2,
+                repeatInterval = 2,
             )
         val next = nextRunAtMillis(schedule, nowMillis = now)
 
@@ -124,6 +124,25 @@ class RuleScheduleBatchingTest {
                 }.timeInMillis
 
         assertEquals(expected, next)
+    }
+
+    @Test
+    fun nextLegacyIntervalRunWithoutStartTimeUsesRelativeDelay() {
+        val now = millisFor(day = 10, hour = 8, minute = 30)
+        val schedule =
+            RuleSchedule(
+                type = ScheduleType.EVERY_N_HOURS,
+                hour = 0,
+                minute = 0,
+                repeatInterval = 3,
+                usesStartTime = false,
+            )
+
+        assertEquals(now, nextRunAtMillis(schedule, nowMillis = now, allowImmediateIntervalRun = true))
+        assertEquals(
+            now + TimeUnit.HOURS.toMillis(3),
+            nextRunAtMillis(schedule, nowMillis = now, allowImmediateIntervalRun = false),
+        )
     }
 
     private fun rule(

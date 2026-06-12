@@ -3,7 +3,7 @@
 activityCompose = "1.13.0"
 agp = "9.3.0-alpha12"
 appcompat = "1.7.1"
-composeBom = "2026.05.01"
+composeBom = "2026.05.02"
 composeMaterial3Adaptive = "1.2.0"
 composeMaterial3Expressive = "1.5.0-alpha21"
 coreKtx = "1.19.0"
@@ -35,7 +35,7 @@ work = "2.11.2"
 [libraries]
 activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
+compose-bom = { module = "androidx.compose:compose-bom-alpha", version.ref = "composeBom" }
 compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-material3-adaptive = { module = "androidx.compose.material3.adaptive:adaptive", version.ref = "composeMaterial3Adaptive" }
 compose-material3-adaptive-layout = { module = "androidx.compose.material3.adaptive:adaptive-layout", version.ref = "composeMaterial3Adaptive" }

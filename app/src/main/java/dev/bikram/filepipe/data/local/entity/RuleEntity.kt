@@ -65,12 +65,14 @@ fun RuleEntity.toDomain(): Rule =
         trashedAt = trashedAt,
         schedule =
             if (scheduleType != null) {
+                val hasStoredStartTime = scheduleHour != null && scheduleMinute != null
                 RuleSchedule(
                     type = scheduleType,
                     dayOfWeek = scheduleDayOfWeek,
                     hour = scheduleHour ?: 0,
                     minute = scheduleMinute ?: 0,
-                    intervalHours = scheduleIntervalHours,
+                    repeatInterval = scheduleIntervalHours,
+                    usesStartTime = scheduleType != ScheduleType.EVERY_N_HOURS || hasStoredStartTime,
                 )
             } else {
                 null
@@ -105,9 +107,19 @@ fun Rule.toEntity(): RuleEntity =
         trashedAt = trashedAt,
         scheduleType = schedule?.type,
         scheduleDayOfWeek = schedule?.dayOfWeek,
-        scheduleHour = schedule?.hour,
-        scheduleMinute = schedule?.minute,
-        scheduleIntervalHours = schedule?.intervalHours,
+        scheduleHour =
+            schedule?.let { ruleSchedule ->
+                ruleSchedule.hour.takeIf {
+                    ruleSchedule.type != ScheduleType.EVERY_N_HOURS || ruleSchedule.usesStartTime
+                }
+            },
+        scheduleMinute =
+            schedule?.let { ruleSchedule ->
+                ruleSchedule.minute.takeIf {
+                    ruleSchedule.type != ScheduleType.EVERY_N_HOURS || ruleSchedule.usesStartTime
+                }
+            },
+        scheduleIntervalHours = schedule?.repeatInterval,
         workManagerTag = if (id != 0L) "rule_$id" else null,
         conflictPolicy = conflictPolicy.name,
         operationMode = operationMode.name,

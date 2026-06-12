@@ -33,7 +33,7 @@ internal fun scheduledRuleRunWorkName(ruleId: Long): String = "scheduled_rule_ru
 
 internal fun scheduledBatchRunWorkName(ruleIds: LongArray): String = "scheduled_${batchTagForRuleIds(ruleIds)}"
 
-internal fun scheduleKey(schedule: RuleSchedule): String = "${schedule.type}_${schedule.hour}_${schedule.minute}_${schedule.dayOfWeek}_${schedule.intervalHours}"
+internal fun scheduleKey(schedule: RuleSchedule): String = "${schedule.type}_${schedule.hour}_${schedule.minute}_${schedule.dayOfWeek}_${schedule.repeatInterval}_${schedule.usesStartTime}"
 
 private fun getLocalEpochMonday(): Long =
     Calendar
@@ -95,6 +95,19 @@ internal fun nextRunAtMillis(
 ): Long {
     when (schedule.type) {
         ScheduleType.EVERY_N_HOURS -> {
+            val intervalHours =
+                schedule.repeatInterval
+                    ?.coerceIn(RuleSchedule.DEFAULT_REPEAT_INTERVAL, RuleSchedule.maxRepeatIntervalFor(schedule.type))
+                    ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL
+            val intervalMillis = TimeUnit.HOURS.toMillis(intervalHours.toLong())
+            if (!schedule.usesStartTime) {
+                return if (allowImmediateIntervalRun) {
+                    nowMillis
+                } else {
+                    nowMillis + intervalMillis
+                }
+            }
+
             val anchor =
                 Calendar.getInstance().apply {
                     timeInMillis = nowMillis
@@ -104,8 +117,6 @@ internal fun nextRunAtMillis(
                     set(Calendar.MILLISECOND, 0)
                 }
             val anchorMillis = anchor.timeInMillis
-            val intervalHours = schedule.intervalHours?.coerceAtLeast(1) ?: 1
-            val intervalMillis = TimeUnit.HOURS.toMillis(intervalHours.toLong())
 
             if (nowMillis <= anchorMillis) {
                 return anchorMillis
@@ -116,8 +127,8 @@ internal fun nextRunAtMillis(
             }
 
             val diffMillis = nowMillis - anchorMillis
-            val k = (diffMillis / intervalMillis) + 1
-            return anchorMillis + k * intervalMillis
+            val intervalSteps = (diffMillis / intervalMillis) + 1
+            return anchorMillis + intervalSteps * intervalMillis
         }
 
         ScheduleType.DAILY -> {
@@ -130,7 +141,10 @@ internal fun nextRunAtMillis(
                     set(Calendar.MILLISECOND, 0)
                 }
             val anchorMillis = anchor.timeInMillis
-            val days = schedule.intervalHours?.coerceAtLeast(1) ?: 1
+            val days =
+                schedule.repeatInterval
+                    ?.coerceIn(RuleSchedule.DEFAULT_REPEAT_INTERVAL, RuleSchedule.maxRepeatIntervalFor(schedule.type))
+                    ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL
             val intervalMillis = TimeUnit.DAYS.toMillis(days.toLong())
 
             if (nowMillis <= anchorMillis) {
@@ -138,13 +152,16 @@ internal fun nextRunAtMillis(
             }
 
             val diffMillis = nowMillis - anchorMillis
-            val k = (diffMillis / intervalMillis) + 1
-            return anchorMillis + k * intervalMillis
+            val intervalSteps = (diffMillis / intervalMillis) + 1
+            return anchorMillis + intervalSteps * intervalMillis
         }
 
         ScheduleType.WEEKLY -> {
             val selectedDays = RuleSchedule.bitmaskToDaysOfWeek(schedule.dayOfWeek)
-            val intervalWeeks = schedule.intervalHours?.coerceAtLeast(1) ?: 1
+            val intervalWeeks =
+                schedule.repeatInterval
+                    ?.coerceIn(RuleSchedule.DEFAULT_REPEAT_INTERVAL, RuleSchedule.maxRepeatIntervalFor(schedule.type))
+                    ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL
             val localEpoch = getLocalEpochMonday()
             val currentWeek = getWeeksBetween(localEpoch, nowMillis)
 

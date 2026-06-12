@@ -27,7 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -393,7 +393,7 @@ fun FilesystemFolderPickerSheetContent(
         Spacer(Modifier.height(8.dp))
         val fontScale = LocalDensity.current.fontScale
         val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        val windowAdaptiveInfo = currentWindowAdaptiveInfo()
+        val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
         val isTwoPane = calculatePaneScaffoldDirective(windowAdaptiveInfo).maxHorizontalPartitions > 1
         if (fontScale > 1.15f) {
             if (isLandscape || isTwoPane) {

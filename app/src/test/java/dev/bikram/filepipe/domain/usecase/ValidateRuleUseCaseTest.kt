@@ -54,7 +54,7 @@ class ValidateRuleUseCaseTest {
         val intervalErrors =
             validate(
                 baseRule().copy(
-                    schedule = RuleSchedule(ScheduleType.EVERY_N_HOURS, hour = 0, minute = 0, intervalHours = 25),
+                    schedule = RuleSchedule(ScheduleType.EVERY_N_HOURS, hour = 0, minute = 0, repeatInterval = 25),
                 ),
             ) as ValidateRuleUseCase.Result.Invalid
 
@@ -62,6 +62,25 @@ class ValidateRuleUseCaseTest {
         assertTrue(weeklyErrors.errors.contains("Invalid hour in schedule"))
         assertTrue(weeklyErrors.errors.contains("Invalid minute in schedule"))
         assertEquals(listOf("Interval must be between 1 and 24 hours"), intervalErrors.errors)
+    }
+
+    @Test
+    fun scheduledRulesValidateRepeatIntervalsForTheirUnits() {
+        val dailyErrors =
+            validate(
+                baseRule().copy(
+                    schedule = RuleSchedule(ScheduleType.DAILY, hour = 9, minute = 0, repeatInterval = 366),
+                ),
+            ) as ValidateRuleUseCase.Result.Invalid
+        val weeklyErrors =
+            validate(
+                baseRule().copy(
+                    schedule = RuleSchedule(ScheduleType.WEEKLY, dayOfWeek = 2, hour = 9, minute = 0, repeatInterval = 53),
+                ),
+            ) as ValidateRuleUseCase.Result.Invalid
+
+        assertEquals(listOf("Interval must be between 1 and 365 days"), dailyErrors.errors)
+        assertEquals(listOf("Interval must be between 1 and 52 weeks"), weeklyErrors.errors)
     }
 
     private fun baseRule(): Rule =

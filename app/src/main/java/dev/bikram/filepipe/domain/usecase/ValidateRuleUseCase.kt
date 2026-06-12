@@ -29,31 +29,33 @@ class ValidateRuleUseCase
                         add("Source and destination folders cannot be the same")
                     }
                     rule.schedule?.let { schedule ->
-                        val interval = schedule.intervalHours ?: 1
-                        if (interval < 1) {
-                            add("Interval must be a positive number")
-                        }
+                        val interval = schedule.repeatInterval ?: RuleSchedule.DEFAULT_REPEAT_INTERVAL
                         if (schedule.hour !in 0..23) add("Invalid hour in schedule")
                         if (schedule.minute !in 0..59) add("Invalid minute in schedule")
 
                         when (schedule.type) {
                             ScheduleType.EVERY_N_HOURS -> {
-                                if (interval !in 1..24) {
+                                if (!RuleSchedule.isRepeatIntervalValid(schedule.type, interval)) {
                                     add("Interval must be between 1 and 24 hours")
                                 }
                             }
 
+                            ScheduleType.DAILY -> {
+                                if (!RuleSchedule.isRepeatIntervalValid(schedule.type, interval)) {
+                                    add("Interval must be between 1 and 365 days")
+                                }
+                            }
+
                             ScheduleType.WEEKLY -> {
+                                if (!RuleSchedule.isRepeatIntervalValid(schedule.type, interval)) {
+                                    add("Interval must be between 1 and 52 weeks")
+                                }
                                 if (schedule.dayOfWeek == null) {
                                     add("Weekday is required for weekly schedule")
                                 } else {
                                     val days = RuleSchedule.bitmaskToDaysOfWeek(schedule.dayOfWeek)
                                     if (days.isEmpty()) add("At least one weekday is required for weekly schedule")
                                 }
-                            }
-
-                            ScheduleType.DAILY -> {
-                                // No additional restrictions
                             }
                         }
                     }

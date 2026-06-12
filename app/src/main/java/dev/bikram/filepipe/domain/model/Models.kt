@@ -52,8 +52,9 @@ data class RuleSchedule(
     val dayOfWeek: Int? = null, // Calendar.MONDAY (2) … Calendar.SUNDAY (1) — null for DAILY / EVERY_N_HOURS
     val hour: Int,
     val minute: Int,
-    /** Required when [type] is [ScheduleType.EVERY_N_HOURS]; UI allows 1–24 hours (use daily for longer gaps). */
-    val intervalHours: Int? = null,
+    /** Repeat count in the unit implied by [type]: hours, days, or weeks. */
+    val repeatInterval: Int? = null,
+    val usesStartTime: Boolean = true,
 ) {
     fun toReadableString(context: Context): String {
         val isSystem24Hour =
@@ -71,10 +72,16 @@ data class RuleSchedule(
                 val amPm = if (hour < 12) "AM" else "PM"
                 "%d:%02d %s".format(hour12, minute, amPm)
             }
-        val interval = intervalHours ?: 1
+        val interval = repeatInterval ?: DEFAULT_REPEAT_INTERVAL
         return when (type) {
             ScheduleType.EVERY_N_HOURS -> {
-                if (interval == 1) {
+                if (!usesStartTime) {
+                    if (interval == 1) {
+                        context.getString(R.string.schedule_every_hour)
+                    } else {
+                        context.getString(R.string.schedule_every_hours, interval)
+                    }
+                } else if (interval == 1) {
                     context.getString(R.string.schedule_every_hour_starting, timeStr)
                 } else {
                     context.getString(R.string.schedule_every_hours_starting, interval, timeStr)
@@ -116,6 +123,26 @@ data class RuleSchedule(
     }
 
     companion object {
+        const val DEFAULT_REPEAT_INTERVAL = 1
+        const val MAX_HOURLY_REPEAT_INTERVAL = 24
+        const val MAX_DAILY_REPEAT_INTERVAL = 365
+        const val MAX_WEEKLY_REPEAT_INTERVAL = 52
+
+        fun isRepeatIntervalValid(
+            type: ScheduleType,
+            interval: Int?,
+        ): Boolean {
+            val repeatInterval = interval ?: DEFAULT_REPEAT_INTERVAL
+            return repeatInterval in DEFAULT_REPEAT_INTERVAL..maxRepeatIntervalFor(type)
+        }
+
+        fun maxRepeatIntervalFor(type: ScheduleType): Int =
+            when (type) {
+                ScheduleType.EVERY_N_HOURS -> MAX_HOURLY_REPEAT_INTERVAL
+                ScheduleType.DAILY -> MAX_DAILY_REPEAT_INTERVAL
+                ScheduleType.WEEKLY -> MAX_WEEKLY_REPEAT_INTERVAL
+            }
+
         fun bitmaskToDaysOfWeek(bitmask: Int?): List<Int> {
             if (bitmask == null) return listOf(Calendar.MONDAY)
             if (bitmask and (1 shl 8) == 0) {

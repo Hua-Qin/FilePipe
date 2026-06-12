@@ -72,7 +72,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.ToggleFloatingActionButtonDefaults
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.AnimatedPane
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffold
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
@@ -257,16 +257,13 @@ fun AppNavigation(
         bottomNavItems.any {
             currentDestination?.hierarchy?.any { destination -> destination.route == it.screen.route } == true
         }
-    val windowAdaptiveInfo = currentWindowAdaptiveInfo()
+    val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
     val navigationSuiteType =
         NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(windowAdaptiveInfo)
     // Derive the pane directive directly instead of allocating a throwaway navigator (each
     // two-pane route creates its own). Matches the navigator's default directive.
     val paneScaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
-    val canUseListDetailPanes = navigationSuiteType != NavigationSuiteType.NavigationBar
-    val useListDetailPanes =
-        canUseListDetailPanes &&
-            paneScaffoldDirective.maxHorizontalPartitions > 1
+    val useListDetailPanes = paneScaffoldDirective.maxHorizontalPartitions > 1
     val useNavigationSuiteScaffold = useListDetailPanes
     val showFloatingBottomBar = showBottomBar && !useNavigationSuiteScaffold
 
@@ -1247,7 +1244,7 @@ fun AppNavigation(
         }
         if (showNavigationSuiteScaffold) {
             NavigationSuiteScaffold(
-                layoutType = navigationSuiteType,
+                layoutType = NavigationSuiteType.NavigationRail,
                 containerColor = Color.Transparent,
                 navigationSuiteItems = {
                     bottomNavItems.forEach { navItem ->
