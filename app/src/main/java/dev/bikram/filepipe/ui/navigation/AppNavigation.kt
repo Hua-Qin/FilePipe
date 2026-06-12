@@ -109,6 +109,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -1677,12 +1678,10 @@ private fun RulesSelectionActionPane(
     onCancelRun: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && LocalConfiguration.current.screenHeightDp < 480
     Box(
-        modifier =
-            modifier
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(24.dp),
+        modifier = modifier,
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -1692,7 +1691,15 @@ private fun RulesSelectionActionPane(
                     .widthIn(max = 360.dp)
                     // Low-height windows (landscape phones / low-res tablets) can't fit the
                     // whole stack; scroll instead of truncating the bottom buttons.
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState())
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(
+                        top = if (isSmallLandscape) 12.dp else 24.dp,
+                        bottom = if (isSmallLandscape) 12.dp else 24.dp,
+                        start = 24.dp,
+                        end = 24.dp,
+                    ),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
@@ -1836,7 +1843,6 @@ private fun HistoryTwoPaneRoute(
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val detailPaneContentPadding =
         PaddingValues(
-            top = statusBarPadding,
             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
         )
     val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
@@ -2032,7 +2038,6 @@ private fun SettingsTwoPaneRoute(
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val paneContentPadding =
         PaddingValues(
-            top = statusBarPadding,
             bottom = contentPadding.calculateBottomPadding(),
         )
     // The detail pane has no FAB/bottom bar, so the list-pane FAB clearance baked into
@@ -2040,7 +2045,6 @@ private fun SettingsTwoPaneRoute(
     // inset (plus a little breathing room) instead.
     val detailPaneContentPadding =
         PaddingValues(
-            top = statusBarPadding,
             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
         )
     val scope = rememberCoroutineScope()
@@ -2590,18 +2594,27 @@ private fun MainNavFabSlot(
                         R.string.history_clear
                     },
                 )
-            SimpleNavFab(
-                icon = { tint ->
-                    FilePipeMaterialRoundedSymbol(
-                        name = "delete_forever",
-                        contentDescription = null,
-                        tint = tint,
-                    )
-                },
-                description = description,
-                enabled = if (inTrash) hasAnyTrashedRules else hasAnyHistory,
-                onClick = if (inTrash) onEmptyTrash else onClearHistory,
-            )
+            val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val isSmallLandscape = isLandscape && LocalConfiguration.current.screenHeightDp < 480
+            val shouldShowFab = if (isSmallLandscape) {
+                if (inTrash) hasAnyTrashedRules else hasAnyHistory
+            } else {
+                true
+            }
+            if (shouldShowFab) {
+                SimpleNavFab(
+                    icon = { tint ->
+                        FilePipeMaterialRoundedSymbol(
+                            name = "delete_forever",
+                            contentDescription = null,
+                            tint = tint,
+                        )
+                    },
+                    description = description,
+                    enabled = if (inTrash) hasAnyTrashedRules else hasAnyHistory,
+                    onClick = if (inTrash) onEmptyTrash else onClearHistory,
+                )
+            }
         }
 
         Screen.Settings -> {
@@ -2655,7 +2668,6 @@ private fun SimpleNavFab(
                         Modifier
                     } else {
                         Modifier
-                            .alpha(0.58f)
                             .semantics { disabled() }
                     },
                 ),

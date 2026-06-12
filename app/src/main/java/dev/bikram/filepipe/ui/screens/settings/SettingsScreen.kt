@@ -491,9 +491,13 @@ fun SettingsScreen(
         }
     }
     val scrollBlurModifier =
-        LocalProgressiveBlurStyle.current?.let { blurStyle ->
-            Modifier.progressiveBlurScrollableList(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
-        } ?: Modifier
+        if (selectedSectionKey == SettingsSectionKey.About) {
+            Modifier
+        } else {
+            LocalProgressiveBlurStyle.current?.let { blurStyle ->
+                Modifier.progressiveBlurScrollableList(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
+            } ?: Modifier
+        }
 
     val settingsExpandableSectionKeys =
         remember {
@@ -670,6 +674,7 @@ fun SettingsScreen(
     var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
     val heightFraction = if (isLandscape) 0.95f else 0.85f
     val maxUpdateSheetHeight = (configuration.screenHeightDp * heightFraction).dp
     val settingsScrollEnabled =
@@ -1777,56 +1782,67 @@ fun SettingsScreen(
                         }
                     var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
                     var developerOptionsTapCount by rememberSaveable { mutableIntStateOf(0) }
-                    Column(modifier = Modifier.padding(top = if (developerOptionsEnabled) 0.dp else 24.dp)) {
-                        if (showAboutHeader) {
-                            if (showSectionHeaders) {
-                                SettingsSectionHeader(
-                                    iconName = SettingsSectionKey.About.iconName,
-                                    title = stringResource(R.string.settings_about_section),
-                                ) {
-                                    FilePipeIconButton(
-                                        onClick = shareDiagnostics,
-                                        modifier = Modifier.size(40.dp),
-                                        tooltipLabel = diagnosticsTooltip,
-                                    ) {
-                                        FilePipeMaterialRoundedSymbol(
-                                            name = "bug_report",
-                                            contentDescription = diagnosticsTooltip,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
+                    val pillPadding = if (isSmallLandscape) PaddingValues(horizontal = 12.dp, vertical = 6.dp) else ButtonDefaults.ContentPadding
+                    val pillTextStyle = if (isSmallLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
+                    val pillIconSize = if (isSmallLandscape) 18.dp else 20.dp
+                    val pillIconSpacer = if (isSmallLandscape) 6.dp else 8.dp
+                    Column(modifier = Modifier.padding(top = if (isSmallLandscape) 12.dp else if (developerOptionsEnabled) 0.dp else 24.dp)) {
+                        if (showAboutHeader && showSectionHeaders) {
+                            SettingsSectionHeader(
+                                iconName = SettingsSectionKey.About.iconName,
+                                title = stringResource(R.string.settings_about_section),
+                                trailingContent = if (!isLandscape) {
+                                    {
+                                        FilePipeIconButton(
+                                            onClick = shareDiagnostics,
+                                            modifier = Modifier.size(40.dp),
+                                            tooltipLabel = diagnosticsTooltip,
+                                        ) {
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = "bug_report",
+                                                contentDescription = diagnosticsTooltip,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
                                     }
+                                } else {
+                                    null
                                 }
-                                Spacer(Modifier.height(8.dp))
-                            } else {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End,
-                                ) {
-                                    FilePipeIconButton(
-                                        onClick = shareDiagnostics,
-                                        modifier = Modifier.size(40.dp),
-                                        tooltipLabel = diagnosticsTooltip,
-                                    ) {
-                                        FilePipeMaterialRoundedSymbol(
-                                            name = "bug_report",
-                                            contentDescription = diagnosticsTooltip,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                    }
-                                }
-                                Spacer(Modifier.height(4.dp))
-                            }
+                            )
+                            Spacer(Modifier.height(8.dp))
                         }
                         GroupedListColumn {
                             GroupedListItem(position = GroupPosition.ONLY) {
-                                Column(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 20.dp)
-                                            .padding(top = 24.dp, bottom = 8.dp),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                ) {
+                                Box(modifier = Modifier.fillMaxWidth()) {
+                                    if (isLandscape) {
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .align(Alignment.TopEnd)
+                                                    .padding(top = if (isSmallLandscape) 4.dp else 8.dp, end = if (isSmallLandscape) 4.dp else 8.dp)
+                                        ) {
+                                            FilePipeIconButton(
+                                                onClick = shareDiagnostics,
+                                                modifier = Modifier.size(40.dp),
+                                                tooltipLabel = diagnosticsTooltip,
+                                            ) {
+                                                FilePipeMaterialRoundedSymbol(
+                                                    name = "bug_report",
+                                                    contentDescription = diagnosticsTooltip,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Column(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = if (isSmallLandscape) 16.dp else 20.dp)
+                                                .padding(top = if (isSmallLandscape) 20.dp else 24.dp, bottom = if (isSmallLandscape) 16.dp else 8.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
                                     Text(
                                         text =
                                             stringResource(
@@ -1874,20 +1890,20 @@ fun SettingsScreen(
                                                         .show()
                                                 },
                                             ),
-                                        style = MaterialTheme.typography.displaySmall,
+                                        style = if (isSmallLandscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.displaySmall,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         textAlign = TextAlign.Center,
                                         maxLines = 2,
                                         overflow = TextOverflow.Ellipsis,
                                     )
-                                    Spacer(Modifier.height(10.dp))
+                                    Spacer(Modifier.height(if (isSmallLandscape) 8.dp else 10.dp))
                                     Text(
                                         text = stringResource(R.string.app_tagline),
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        style = if (isSmallLandscape) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         textAlign = TextAlign.Center,
                                     )
-                                    Spacer(Modifier.height(20.dp))
+                                    Spacer(Modifier.height(if (isSmallLandscape) 12.dp else 20.dp))
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.Center,
@@ -1896,15 +1912,15 @@ fun SettingsScreen(
                                         AppIconImage(
                                             modifier =
                                                 Modifier
-                                                    .size(84.dp)
+                                                    .size(if (isSmallLandscape) 64.dp else 84.dp)
                                                     .clip(RoundedCornerShape(percent = 25))
                                                     .tapSoundClickable(onClick = onOpenIntro),
                                         )
-                                        Spacer(Modifier.width(20.dp))
+                                        Spacer(Modifier.width(if (isSmallLandscape) 16.dp else 20.dp))
                                         AboutAuthorPhoto(
                                             modifier =
                                                 Modifier
-                                                    .size(84.dp)
+                                                    .size(if (isSmallLandscape) 64.dp else 84.dp)
                                                     .clip(RoundedCornerShape(16.dp))
                                                     .tapSoundClickable {
                                                         runCatching {
@@ -1915,18 +1931,18 @@ fun SettingsScreen(
                                                     },
                                         )
                                     }
-                                    Spacer(Modifier.height(20.dp))
+                                    Spacer(Modifier.height(if (isSmallLandscape) 12.dp else 20.dp))
                                     Text(
                                         text = stringResource(R.string.settings_byline),
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = if (isSmallLandscape) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         textAlign = TextAlign.Center,
                                     )
-                                    Spacer(Modifier.height(24.dp))
+                                    Spacer(Modifier.height(if (isSmallLandscape) 14.dp else 24.dp))
                                     FlowRow(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.Center,
-                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(if (isSmallLandscape) 8.dp else 12.dp),
                                         itemVerticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         val hostActivity = context as? ComponentActivity
@@ -1957,15 +1973,18 @@ fun SettingsScreen(
                                                         ),
                                             ) {
                                                 Row(
-                                                    modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                    modifier = Modifier.padding(pillPadding),
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     horizontalArrangement = Arrangement.Center,
                                                 ) {
-                                                    AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primary)
-                                                    Spacer(Modifier.width(8.dp))
+                                                    AboutPlayStoreIcon(
+                                                        tint = MaterialTheme.colorScheme.primary,
+                                                        modifier = Modifier.size(pillIconSize)
+                                                    )
+                                                    Spacer(Modifier.width(pillIconSpacer))
                                                     Text(
                                                         text = stringResource(R.string.settings_rate_on_play_store),
-                                                        style = MaterialTheme.typography.labelLarge,
+                                                        style = pillTextStyle,
                                                         color = MaterialTheme.colorScheme.primary,
                                                         maxLines = 1,
                                                         overflow = TextOverflow.Ellipsis,
@@ -1974,7 +1993,7 @@ fun SettingsScreen(
                                                 }
                                             }
                                             if (githubRepoForSourceLink.isNotEmpty()) {
-                                                Spacer(Modifier.width(12.dp))
+                                                Spacer(Modifier.width(if (isSmallLandscape) 10.dp else 12.dp))
                                                 Surface(
                                                     shape = aboutPillShape,
                                                     color = MaterialTheme.colorScheme.primary,
@@ -2000,20 +2019,20 @@ fun SettingsScreen(
                                                             ),
                                                 ) {
                                                     Row(
-                                                        modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                        modifier = Modifier.padding(pillPadding),
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.Center,
                                                     ) {
                                                         Icon(
                                                             painter = painterResource(R.drawable.ic_github_mark),
                                                             contentDescription = null,
-                                                            modifier = Modifier.size(20.dp),
+                                                            modifier = Modifier.size(pillIconSize),
                                                             tint = MaterialTheme.colorScheme.onPrimary,
                                                         )
-                                                        Spacer(Modifier.width(8.dp))
+                                                        Spacer(Modifier.width(pillIconSpacer))
                                                         Text(
                                                             text = stringResource(R.string.settings_star_on_github),
-                                                            style = MaterialTheme.typography.labelLarge,
+                                                            style = pillTextStyle,
                                                             color = MaterialTheme.colorScheme.onPrimary,
                                                             maxLines = 1,
                                                             overflow = TextOverflow.Ellipsis,
@@ -2049,15 +2068,18 @@ fun SettingsScreen(
                                                             ),
                                                 ) {
                                                     Row(
-                                                        modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                        modifier = Modifier.padding(pillPadding),
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.Center,
                                                     ) {
-                                                        AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primaryContainer)
-                                                        Spacer(Modifier.width(8.dp))
+                                                        AboutPlayStoreIcon(
+                                                            tint = MaterialTheme.colorScheme.primaryContainer,
+                                                            modifier = Modifier.size(pillIconSize)
+                                                        )
+                                                        Spacer(Modifier.width(pillIconSpacer))
                                                         Text(
                                                             text = stringResource(R.string.settings_rate_on_play_store),
-                                                            style = MaterialTheme.typography.labelLarge,
+                                                            style = pillTextStyle,
                                                             color = MaterialTheme.colorScheme.onPrimary,
                                                             maxLines = 1,
                                                             overflow = TextOverflow.Ellipsis,
@@ -2090,15 +2112,18 @@ fun SettingsScreen(
                                                             ),
                                                 ) {
                                                     Row(
-                                                        modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                        modifier = Modifier.padding(pillPadding),
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.Center,
                                                     ) {
-                                                        AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primaryContainer)
-                                                        Spacer(Modifier.width(8.dp))
+                                                        AboutPlayStoreIcon(
+                                                            tint = MaterialTheme.colorScheme.primaryContainer,
+                                                            modifier = Modifier.size(pillIconSize)
+                                                        )
+                                                        Spacer(Modifier.width(pillIconSpacer))
                                                         Text(
                                                             text = stringResource(R.string.settings_rate_on_play_store),
-                                                            style = MaterialTheme.typography.labelLarge,
+                                                            style = pillTextStyle,
                                                             color = MaterialTheme.colorScheme.onPrimary,
                                                             maxLines = 1,
                                                             overflow = TextOverflow.Ellipsis,
@@ -2108,7 +2133,7 @@ fun SettingsScreen(
                                                 }
                                             }
                                             if (githubRepoForSourceLink.isNotEmpty()) {
-                                                Spacer(Modifier.width(12.dp))
+                                                Spacer(Modifier.width(if (isSmallLandscape) 10.dp else 12.dp))
                                                 Surface(
                                                     shape = aboutPillShape,
                                                     color = Color.Transparent,
@@ -2134,20 +2159,20 @@ fun SettingsScreen(
                                                             ),
                                                 ) {
                                                     Row(
-                                                        modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                                        modifier = Modifier.padding(pillPadding),
                                                         verticalAlignment = Alignment.CenterVertically,
                                                         horizontalArrangement = Arrangement.Center,
                                                     ) {
                                                         Icon(
                                                             painter = painterResource(R.drawable.ic_github_mark),
                                                             contentDescription = null,
-                                                            modifier = Modifier.size(20.dp),
+                                                            modifier = Modifier.size(pillIconSize),
                                                             tint = MaterialTheme.colorScheme.primary,
                                                         )
-                                                        Spacer(Modifier.width(8.dp))
+                                                        Spacer(Modifier.width(pillIconSpacer))
                                                         Text(
                                                             text = stringResource(R.string.settings_star_on_github),
-                                                            style = MaterialTheme.typography.labelLarge,
+                                                            style = pillTextStyle,
                                                             color = MaterialTheme.colorScheme.primary,
                                                             maxLines = 1,
                                                             overflow = TextOverflow.Ellipsis,
@@ -2158,13 +2183,15 @@ fun SettingsScreen(
                                             }
                                         }
                                     }
-                                    Spacer(Modifier.height(24.dp))
+                                    Spacer(Modifier.height(if (isSmallLandscape) 16.dp else 24.dp))
                                     AboutOtherAppsAndLinks(
                                         context = aboutContext,
                                         copyLinkToClipboard = copyAboutLinkToClipboard,
+                                        isSmallLandscape = isSmallLandscape,
                                     )
                                 }
                             }
+                        }
                         }
                     }
                 }
@@ -2174,11 +2201,14 @@ fun SettingsScreen(
 }
 
 @Composable
-private fun AboutPlayStoreIcon(tint: Color) {
+private fun AboutPlayStoreIcon(
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
     Icon(
         painter = painterResource(R.drawable.ic_google_play_mark),
         contentDescription = null,
-        modifier = Modifier.size(20.dp),
+        modifier = modifier,
         tint = tint,
     )
 }
@@ -2187,6 +2217,7 @@ private fun AboutPlayStoreIcon(tint: Color) {
 private fun AboutOtherAppsAndLinks(
     context: Context,
     copyLinkToClipboard: (String) -> Unit,
+    isSmallLandscape: Boolean,
 ) {
     val rememberStoreUrl =
         stringResource(
@@ -2204,11 +2235,11 @@ private fun AboutOtherAppsAndLinks(
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.settings_about_other_apps),
-            style = MaterialTheme.typography.labelMedium,
+            style = if (isSmallLandscape) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
         AboutAppStoreButton(
             iconResId = R.drawable.remember_logo,
             name = stringResource(R.string.settings_about_remember_name),
@@ -2217,9 +2248,10 @@ private fun AboutOtherAppsAndLinks(
             accentColor = Color(0xFF4F7D43),
             context = context,
             copyLinkToClipboard = copyLinkToClipboard,
+            isSmallLandscape = isSmallLandscape,
         )
         if (BuildConfig.FLAVOR == "github") {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
             AboutAppStoreButton(
                 iconResId = R.drawable.obtainx_logo,
                 name = stringResource(R.string.settings_about_obtainx_name),
@@ -2228,12 +2260,13 @@ private fun AboutOtherAppsAndLinks(
                 accentColor = Color(0xFF7C55D9),
                 context = context,
                 copyLinkToClipboard = copyLinkToClipboard,
+                isSmallLandscape = isSmallLandscape,
             )
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(if (isSmallLandscape) 12.dp else 14.dp))
         Row(
             modifier = Modifier.align(Alignment.CenterHorizontally),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isSmallLandscape) 6.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AboutTextLink(
@@ -2241,6 +2274,7 @@ private fun AboutOtherAppsAndLinks(
                 url = websiteUrl,
                 context = context,
                 copyLinkToClipboard = copyLinkToClipboard,
+                isSmallLandscape = isSmallLandscape,
             )
             AboutLinkSeparator()
             AboutTextLink(
@@ -2248,6 +2282,7 @@ private fun AboutOtherAppsAndLinks(
                 url = privacyUrl,
                 context = context,
                 copyLinkToClipboard = copyLinkToClipboard,
+                isSmallLandscape = isSmallLandscape,
             )
             AboutLinkSeparator()
             AboutTextLink(
@@ -2255,6 +2290,7 @@ private fun AboutOtherAppsAndLinks(
                 url = termsUrl,
                 context = context,
                 copyLinkToClipboard = copyLinkToClipboard,
+                isSmallLandscape = isSmallLandscape,
             )
         }
     }
@@ -2269,6 +2305,7 @@ private fun AboutAppStoreButton(
     accentColor: Color,
     context: Context,
     copyLinkToClipboard: (String) -> Unit,
+    isSmallLandscape: Boolean,
 ) {
     val shape = MaterialTheme.shapes.large
     Surface(
@@ -2286,7 +2323,10 @@ private fun AboutAppStoreButton(
                 ),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(
+                horizontal = if (isSmallLandscape) 12.dp else 12.dp,
+                vertical = if (isSmallLandscape) 8.dp else 10.dp
+            ),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
@@ -2294,14 +2334,14 @@ private fun AboutAppStoreButton(
                 contentDescription = null,
                 modifier =
                     Modifier
-                        .size(40.dp)
+                        .size(if (isSmallLandscape) 36.dp else 40.dp)
                         .clip(compactControlShape),
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(if (isSmallLandscape) 8.dp else 10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = name,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = if (isSmallLandscape) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -2311,7 +2351,7 @@ private fun AboutAppStoreButton(
                     text = tagline,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = if (isSmallLandscape) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -2319,7 +2359,7 @@ private fun AboutAppStoreButton(
             FilePipeMaterialRoundedSymbol(
                 name = "chevron_right",
                 contentDescription = null,
-                size = 20.dp,
+                size = if (isSmallLandscape) 18.dp else 20.dp,
                 tint = accentColor.copy(alpha = 0.86f),
             )
         }
@@ -2341,6 +2381,7 @@ private fun AboutTextLink(
     url: String,
     context: Context,
     copyLinkToClipboard: (String) -> Unit,
+    isSmallLandscape: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Text(
@@ -2352,7 +2393,7 @@ private fun AboutTextLink(
                     onLongClick = { copyLinkToClipboard(url) },
                     role = Role.Button,
                 ).padding(horizontal = 4.dp, vertical = 2.dp),
-        style = MaterialTheme.typography.labelMedium,
+        style = if (isSmallLandscape) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
         textAlign = TextAlign.Center,
         maxLines = 1,

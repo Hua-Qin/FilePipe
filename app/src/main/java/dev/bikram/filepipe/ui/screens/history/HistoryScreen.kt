@@ -59,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -133,6 +134,9 @@ fun HistoryScreen(
     val pagingItems = viewModel.historyPagingFlow.collectAsLazyPagingItems()
     val filteredItems by viewModel.filteredHistoryItems.collectAsStateWithLifecycle()
     val userMessage by viewModel.userMessage.collectAsStateWithLifecycle()
+    val hasAnyHistory by viewModel.hasAnyHistory.collectAsStateWithLifecycle()
+    val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && LocalConfiguration.current.screenHeightDp < 480
 
     var showClearConfirm by remember { mutableStateOf(false) }
     var pendingDeleteForeverRule by remember { mutableStateOf<Rule?>(null) }
@@ -251,6 +255,7 @@ fun HistoryScreen(
     Scaffold(
         containerColor = if (LocalUseGradientBackground.current) Color.Transparent else MaterialTheme.colorScheme.background,
         topBar = {
+            val showTopBar = !(isSmallLandscape && !hasAnyHistory)
             val navigationIcon: @Composable () -> Unit = {
                 if (onNavigateBack != null) {
                     val backLabel = stringResource(R.string.nav_back)
@@ -267,126 +272,169 @@ fun HistoryScreen(
                 }
             }
             Column(Modifier.fillMaxWidth()) {
-                TopAppBar(
-                    title = {},
-                    colors = gradientOverlayTopAppBarColors(),
-                    navigationIcon = navigationIcon,
-                    actions = {
-                        if (section == HistorySection.RUNS) {
-                            Box {
-                                val groupMenuLabel = stringResource(R.string.history_group_menu)
-                                FilePipeFilledTonalIconButton(
-                                    onClick = { groupMenuExpanded = true },
-                                    tooltipLabel = groupMenuLabel,
-                                ) {
-                                    val groupIcon =
-                                        when (uiState.viewMode) {
-                                            HistoryViewMode.BY_DATE -> "calendar_month"
-                                            HistoryViewMode.BY_RULE -> "list"
-                                            HistoryViewMode.BY_STATUS -> "category"
-                                        }
-                                    FilePipeMaterialRoundedSymbol(
-                                        name = groupIcon,
-                                        contentDescription = groupMenuLabel,
-                                        autoMirror = uiState.viewMode == HistoryViewMode.BY_RULE,
-                                    )
+                if (showTopBar) {
+                    TopAppBar(
+                        title = {},
+                        colors = gradientOverlayTopAppBarColors(),
+                        navigationIcon = navigationIcon,
+                        actions = {
+                            if (section == HistorySection.RUNS) {
+                                Box {
+                                    val groupMenuLabel = stringResource(R.string.history_group_menu)
+                                    FilePipeFilledTonalIconButton(
+                                        onClick = { groupMenuExpanded = true },
+                                        enabled = hasAnyHistory,
+                                        tooltipLabel = groupMenuLabel,
+                                    ) {
+                                        val groupIcon =
+                                            when (uiState.viewMode) {
+                                                HistoryViewMode.BY_DATE -> "calendar_month"
+                                                HistoryViewMode.BY_RULE -> "list"
+                                                HistoryViewMode.BY_STATUS -> "category"
+                                            }
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = groupIcon,
+                                            contentDescription = groupMenuLabel,
+                                            autoMirror = uiState.viewMode == HistoryViewMode.BY_RULE,
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = groupMenuExpanded,
+                                        onDismissRequest = { groupMenuExpanded = false },
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    ) {
+                                        FilePipeDropdownMenuItem(
+                                            text = { Text(stringResource(R.string.history_group_by_date)) },
+                                            leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_DATE, onClick = null) },
+                                            onClick = {
+                                                viewModel.setViewMode(HistoryViewMode.BY_DATE)
+                                                groupMenuExpanded = false
+                                            },
+                                        )
+                                        FilePipeDropdownMenuItem(
+                                            text = { Text(stringResource(R.string.history_group_by_rule)) },
+                                            leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_RULE, onClick = null) },
+                                            onClick = {
+                                                viewModel.setViewMode(HistoryViewMode.BY_RULE)
+                                                groupMenuExpanded = false
+                                            },
+                                        )
+                                        FilePipeDropdownMenuItem(
+                                            text = { Text(stringResource(R.string.history_group_by_status)) },
+                                            leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_STATUS, onClick = null) },
+                                            onClick = {
+                                                viewModel.setViewMode(HistoryViewMode.BY_STATUS)
+                                                groupMenuExpanded = false
+                                            },
+                                        )
+                                    }
                                 }
-                                DropdownMenu(
-                                    expanded = groupMenuExpanded,
-                                    onDismissRequest = { groupMenuExpanded = false },
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                ) {
-                                    FilePipeDropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_group_by_date)) },
-                                        leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_DATE, onClick = null) },
-                                        onClick = {
-                                            viewModel.setViewMode(HistoryViewMode.BY_DATE)
-                                            groupMenuExpanded = false
-                                        },
-                                    )
-                                    FilePipeDropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_group_by_rule)) },
-                                        leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_RULE, onClick = null) },
-                                        onClick = {
-                                            viewModel.setViewMode(HistoryViewMode.BY_RULE)
-                                            groupMenuExpanded = false
-                                        },
-                                    )
-                                    FilePipeDropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_group_by_status)) },
-                                        leadingIcon = { RadioButton(selected = uiState.viewMode == HistoryViewMode.BY_STATUS, onClick = null) },
-                                        onClick = {
-                                            viewModel.setViewMode(HistoryViewMode.BY_STATUS)
-                                            groupMenuExpanded = false
-                                        },
-                                    )
+                                Box {
+                                    val sortMenuLabel = stringResource(R.string.history_sort_menu)
+                                    FilePipeFilledTonalIconButton(
+                                        onClick = { sortMenuExpanded = true },
+                                        enabled = hasAnyHistory,
+                                        tooltipLabel = sortMenuLabel,
+                                    ) {
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "sort",
+                                            contentDescription = sortMenuLabel,
+                                            autoMirror = true,
+                                        )
+                                    }
+                                    DropdownMenu(
+                                        expanded = sortMenuExpanded,
+                                        onDismissRequest = { sortMenuExpanded = false },
+                                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    ) {
+                                        FilePipeDropdownMenuItem(
+                                            text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
+                                            leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
+                                            onClick = {
+                                                viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
+                                                sortMenuExpanded = false
+                                            },
+                                        )
+                                        FilePipeDropdownMenuItem(
+                                            text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
+                                            leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
+                                            onClick = {
+                                                viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
+                                                sortMenuExpanded = false
+                                            },
+                                        )
+                                        FilePipeDropdownMenuItem(
+                                            text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
+                                            leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
+                                            onClick = {
+                                                viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
+                                                sortMenuExpanded = false
+                                            },
+                                        )
+                                        FilePipeDropdownMenuItem(
+                                            text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
+                                            leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
+                                            onClick = {
+                                                viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)
+                                                sortMenuExpanded = false
+                                            },
+                                        )
+                                    }
                                 }
                             }
-                            Box {
-                                val sortMenuLabel = stringResource(R.string.history_sort_menu)
-                                FilePipeFilledTonalIconButton(
-                                    onClick = { sortMenuExpanded = true },
-                                    tooltipLabel = sortMenuLabel,
-                                ) {
-                                    FilePipeMaterialRoundedSymbol(
-                                        name = "sort",
-                                        contentDescription = sortMenuLabel,
-                                        autoMirror = true,
-                                    )
-                                }
-                                DropdownMenu(
-                                    expanded = sortMenuExpanded,
-                                    onDismissRequest = { sortMenuExpanded = false },
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                                ) {
-                                    FilePipeDropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_sort_last_ran_newest)) },
-                                        leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
-                                        onClick = {
-                                            viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.DESCENDING)
-                                            sortMenuExpanded = false
-                                        },
-                                    )
-                                    FilePipeDropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_sort_last_ran_oldest)) },
-                                        leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.LAST_RAN && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
-                                        onClick = {
-                                            viewModel.setSort(HistorySortKey.LAST_RAN, HistorySortDirection.ASCENDING)
-                                            sortMenuExpanded = false
-                                        },
-                                    )
-                                    FilePipeDropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_sort_rule_name_az)) },
-                                        leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.ASCENDING, onClick = null) },
-                                        onClick = {
-                                            viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.ASCENDING)
-                                            sortMenuExpanded = false
-                                        },
-                                    )
-                                    FilePipeDropdownMenuItem(
-                                        text = { Text(stringResource(R.string.history_sort_rule_name_za)) },
-                                        leadingIcon = { RadioButton(selected = uiState.sortKey == HistorySortKey.RULE_NAME && uiState.sortDirection == HistorySortDirection.DESCENDING, onClick = null) },
-                                        onClick = {
-                                            viewModel.setSort(HistorySortKey.RULE_NAME, HistorySortDirection.DESCENDING)
-                                            sortMenuExpanded = false
-                                        },
-                                    )
-                                }
-                            }
+                        },
+                    )
+                }
+                if (!showTopBar && onNavigateBack != null) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = 8.dp,
+                                    end = listEndPadding,
+                                    top = 8.dp,
+                                    bottom = 8.dp,
+                                ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val backLabel = stringResource(R.string.nav_back)
+                        FilePipeIconButton(
+                            onClick = onNavigateBack,
+                            tooltipLabel = backLabel,
+                        ) {
+                            FilePipeMaterialRoundedSymbol(
+                                name = "arrow_back",
+                                contentDescription = backLabel,
+                                autoMirror = true,
+                            )
                         }
-                    },
-                )
-                HistorySectionSegmentedRow(
-                    selected = section,
-                    onSelect = { nextSection ->
-                        viewModel.setSection(nextSection)
-                    },
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(start = listStartPadding, end = listEndPadding),
-                )
-                if (section == HistorySection.RUNS) {
+                        Spacer(Modifier.width(8.dp))
+                        HistorySectionSegmentedRow(
+                            selected = section,
+                            onSelect = { nextSection ->
+                                viewModel.setSection(nextSection)
+                            },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                } else {
+                    HistorySectionSegmentedRow(
+                        selected = section,
+                        onSelect = { nextSection ->
+                            viewModel.setSection(nextSection)
+                        },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = listStartPadding,
+                                    end = listEndPadding,
+                                    top = if (!showTopBar) 16.dp else 0.dp,
+                                ),
+                    )
+                }
+                if (section == HistorySection.RUNS && hasAnyHistory) {
                     LazyRow(
                         modifier =
                             Modifier
@@ -510,7 +558,6 @@ fun HistoryScreen(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .then(scrollBlurModifier)
                                 .verticalScroll(rememberScrollState())
                                 .padding(top = innerPadding.calculateTopPadding())
                                 .padding(bottom = contentPadding.calculateBottomPadding())

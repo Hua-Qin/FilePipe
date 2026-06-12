@@ -27,7 +27,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -201,13 +203,17 @@ fun OnboardingPermissionsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    BoxWithConstraints(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .systemBarsPadding(),
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = scheme.background,
     ) {
-        val baseDensity = LocalDensity.current
+        BoxWithConstraints(
+            modifier =
+                Modifier
+                    .fillMaxSize(),
+        ) {
+            val screenHeight = maxHeight
+            val baseDensity = LocalDensity.current
         val baselineHeight = 980.dp
         // Only downscale to fit on genuinely small (compact-width) phones. Wider screens
         // (tablets, foldables, landscape) have room to spare, so keep full size — better for
@@ -234,6 +240,7 @@ fun OnboardingPermissionsScreen(
         val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
         CompositionLocalProvider(LocalDensity provides responsiveDensity) {
+            val isSmallLandscape = isLandscape && screenHeight < 480.dp
             val scrollContent: @Composable () -> Unit = {
                 PermissionsHeroIllustration(
                     modifier =
@@ -292,8 +299,6 @@ fun OnboardingPermissionsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        ChangeAnytimeFooter()
-                        Spacer(Modifier.height(16.dp))
                         if (selected == FolderAccessMode.SAF_ONLY) {
                             val selectiveActionColor = MaterialTheme.colorScheme.surfaceContainerHighest
                             PrimaryPermissionActionButton(
@@ -309,6 +314,7 @@ fun OnboardingPermissionsScreen(
                                         contentColor = MaterialTheme.colorScheme.onSurface,
                                     ),
                                 fontWeight = FontWeight.Normal,
+                                compact = isSmallLandscape,
                             )
                         } else {
                             val allFilesButtonLabel =
@@ -336,7 +342,12 @@ fun OnboardingPermissionsScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 label = allFilesButtonLabel,
+                                compact = isSmallLandscape,
                             )
+                        }
+                        if (!isLandscape) {
+                            Spacer(Modifier.height(16.dp))
+                            ChangeAnytimeFooter()
                         }
                     }
                 }
@@ -359,9 +370,10 @@ fun OnboardingPermissionsScreen(
                                 Modifier
                                     .weight(1f)
                                     .fillMaxHeight()
-                                    .verticalScroll(rememberScrollState()),
+                                    .verticalScroll(rememberScrollState())
+                                    .heightIn(min = screenHeight - 24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.Center,
                         ) {
                             PermissionsHeroIllustration(
                                 modifier =
@@ -369,6 +381,7 @@ fun OnboardingPermissionsScreen(
                                         .fillMaxWidth()
                                         .height(180.dp),
                             )
+                            Spacer(Modifier.height(16.dp))
                             AccessModeSwitcher(
                                 selected = selected,
                                 onSelectAllFiles = {
@@ -380,6 +393,8 @@ fun OnboardingPermissionsScreen(
                                     resetGrantFlowUi()
                                 },
                             )
+                            Spacer(Modifier.height(16.dp))
+                            ChangeAnytimeFooter()
                         }
 
                         // Right column
@@ -388,14 +403,21 @@ fun OnboardingPermissionsScreen(
                                 Modifier
                                     .weight(1.2f)
                                     .fillMaxHeight()
-                                    .verticalScroll(rememberScrollState()),
+                                    .verticalScroll(rememberScrollState())
+                                    .heightIn(min = screenHeight - 24.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement = Arrangement.Center,
                         ) {
                             if (selected == FolderAccessMode.SAF_ONLY) {
-                                SelectiveAccessPitch(onLearnMore = onOpenStorageAccessFaq)
+                                SelectiveAccessPitch(
+                                    onLearnMore = onOpenStorageAccessFaq,
+                                    compact = isSmallLandscape,
+                                )
                             } else {
-                                AllFilesAccessPitch(onLearnMore = onOpenStorageAccessFaq)
+                                AllFilesAccessPitch(
+                                    onLearnMore = onOpenStorageAccessFaq,
+                                    compact = isSmallLandscape,
+                                )
                             }
 
                             AnimatedVisibility(
@@ -403,22 +425,24 @@ fun OnboardingPermissionsScreen(
                                 enter = reducedMotionEnterTransition(fadeIn(animationSpec = visibilityFadeInSpec)),
                                 exit = reducedMotionExitTransition(fadeOut(animationSpec = visibilityFadeOutSpec)),
                             ) {
-                                AllFilesInstructionPanel(
-                                    showOpenSettingsButton = showOpenSettingsInPanel,
-                                    showNotGrantedHint = showAccessNotGrantedHint,
-                                    onOpenSettings = {
-                                        awaitingSettingsReturn = true
-                                        showAccessNotGrantedHint = false
-                                        val manageIntent =
-                                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                                                data = "package:${context.packageName}".toUri()
-                                            }
-                                        context.startActivity(manageIntent)
-                                    },
-                                )
+                                Column(modifier = Modifier.padding(top = 16.dp)) {
+                                    AllFilesInstructionPanel(
+                                        showOpenSettingsButton = showOpenSettingsInPanel,
+                                        showNotGrantedHint = showAccessNotGrantedHint,
+                                        onOpenSettings = {
+                                            awaitingSettingsReturn = true
+                                            showAccessNotGrantedHint = false
+                                            val manageIntent =
+                                                Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                                    data = "package:${context.packageName}".toUri()
+                                                }
+                                            context.startActivity(manageIntent)
+                                        },
+                                    )
+                                }
                             }
 
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(24.dp))
 
                             bottomActionsCluster()
                         }
@@ -432,6 +456,8 @@ fun OnboardingPermissionsScreen(
                                 .align(Alignment.TopCenter)
                                 .widthIn(max = OnboardingMaxContentWidth)
                                 .fillMaxSize()
+                                .statusBarsPadding()
+                                .navigationBarsPadding()
                                 .verticalScroll(rememberScrollState())
                                 .padding(top = 12.dp, bottom = 24.dp),
                     ) {
@@ -450,6 +476,8 @@ fun OnboardingPermissionsScreen(
                                 .align(Alignment.TopCenter)
                                 .widthIn(max = OnboardingMaxContentWidth)
                                 .fillMaxSize()
+                                .statusBarsPadding()
+                                .navigationBarsPadding()
                                 .padding(top = 12.dp, bottom = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
@@ -477,6 +505,7 @@ fun OnboardingPermissionsScreen(
             }
         }
     }
+}
 }
 
 @Composable
@@ -718,18 +747,21 @@ private fun PrimaryPermissionActionButton(
     label: String,
     colors: ButtonColors = ButtonDefaults.buttonColors(),
     fontWeight: FontWeight = FontWeight.Bold,
+    compact: Boolean = false,
 ) {
+    val height = if (compact) 48.dp else 66.dp
+    val verticalPadding = if (compact) 10.dp else 16.dp
     FilePipeButton(
         onClick = onClick,
-        modifier = modifier.height(66.dp),
+        modifier = modifier.height(height),
         shape = pillShape,
         colors = colors,
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(horizontal = 24.dp, vertical = verticalPadding),
     ) {
         Text(
             text = label,
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleMedium,
+            style = if (compact) MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
             fontWeight = fontWeight,
         )
         FilePipeMaterialRoundedSymbol(
@@ -741,7 +773,10 @@ private fun PrimaryPermissionActionButton(
 }
 
 @Composable
-private fun AllFilesAccessPitch(onLearnMore: () -> Unit) {
+private fun AllFilesAccessPitch(
+    onLearnMore: () -> Unit,
+    compact: Boolean = false,
+) {
     val scheme = MaterialTheme.colorScheme
     Column(
         modifier =
@@ -752,7 +787,7 @@ private fun AllFilesAccessPitch(onLearnMore: () -> Unit) {
     ) {
         Text(
             text = stringResource(R.string.onboarding_permissions_all_files_pitch_title),
-            style = MaterialTheme.typography.headlineLarge,
+            style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = scheme.onPrimaryContainer,
             textAlign = TextAlign.Center,
@@ -763,27 +798,34 @@ private fun AllFilesAccessPitch(onLearnMore: () -> Unit) {
             text = stringResource(R.string.onboarding_permissions_all_files_pitch_subtitle),
             modifier = Modifier.fillMaxWidth(),
             onLearnMore = onLearnMore,
+            compact = compact,
         )
         Spacer(Modifier.height(28.dp))
         CheckCopyLine(
             leading = stringResource(R.string.onboarding_permissions_all_files_hook_once),
             rest = stringResource(R.string.onboarding_permissions_all_files_rest_once),
+            compact = compact,
         )
         Spacer(Modifier.height(20.dp))
         CheckCopyLine(
             leading = stringResource(R.string.onboarding_permissions_all_files_hook_everywhere),
             rest = stringResource(R.string.onboarding_permissions_all_files_rest_everywhere),
+            compact = compact,
         )
         Spacer(Modifier.height(20.dp))
         CheckCopyLine(
             leading = stringResource(R.string.onboarding_permissions_all_files_hook_device),
             rest = stringResource(R.string.onboarding_permissions_all_files_rest_device),
+            compact = compact,
         )
     }
 }
 
 @Composable
-private fun SelectiveAccessPitch(onLearnMore: () -> Unit) {
+private fun SelectiveAccessPitch(
+    onLearnMore: () -> Unit,
+    compact: Boolean = false,
+) {
     val scheme = MaterialTheme.colorScheme
     Column(
         modifier =
@@ -794,7 +836,7 @@ private fun SelectiveAccessPitch(onLearnMore: () -> Unit) {
     ) {
         Text(
             text = stringResource(R.string.onboarding_permissions_selective_pitch_title),
-            style = MaterialTheme.typography.headlineLarge,
+            style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = scheme.onPrimaryContainer,
             textAlign = TextAlign.Center,
@@ -805,22 +847,26 @@ private fun SelectiveAccessPitch(onLearnMore: () -> Unit) {
             text = stringResource(R.string.onboarding_permissions_selective_pitch_subtitle),
             modifier = Modifier.fillMaxWidth(),
             onLearnMore = onLearnMore,
+            compact = compact,
         )
         Spacer(Modifier.height(28.dp))
         CheckCopyLine(
             leading = stringResource(R.string.onboarding_permissions_selective_hook_privacy),
             rest = stringResource(R.string.onboarding_permissions_selective_rest_privacy),
+            compact = compact,
         )
         Spacer(Modifier.height(18.dp))
         CheckCopyLine(
             leading = stringResource(R.string.onboarding_permissions_selective_hook_control),
             rest = stringResource(R.string.onboarding_permissions_selective_rest_control),
+            compact = compact,
         )
         Spacer(Modifier.height(18.dp))
         CopyLine(
             marker = "close",
             leading = stringResource(R.string.onboarding_permissions_selective_hook_limits),
             rest = stringResource(R.string.onboarding_permissions_selective_rest_limits),
+            compact = compact,
         )
     }
 }
@@ -830,6 +876,7 @@ private fun PitchSubtitleText(
     text: String,
     onLearnMore: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
     val learnMore = stringResource(R.string.onboarding_permissions_learn_more)
@@ -856,7 +903,7 @@ private fun PitchSubtitleText(
                 }
             },
         modifier = modifier,
-        style = MaterialTheme.typography.bodyLarge,
+        style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyLarge,
         fontWeight = FontWeight.Normal,
         color = scheme.onPrimaryContainer.copy(alpha = 0.92f),
         textAlign = TextAlign.Center,
@@ -867,11 +914,13 @@ private fun PitchSubtitleText(
 private fun CheckCopyLine(
     leading: String,
     rest: String,
+    compact: Boolean = false,
 ) {
     CopyLine(
         marker = "check",
         leading = leading,
         rest = rest,
+        compact = compact,
     )
 }
 
@@ -880,6 +929,7 @@ private fun CopyLine(
     marker: String,
     leading: String,
     rest: String,
+    compact: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
     Row(
@@ -897,6 +947,7 @@ private fun CopyLine(
             leading = leading,
             rest = rest,
             modifier = Modifier.weight(1f),
+            compact = compact,
         )
     }
 }
@@ -906,6 +957,7 @@ private fun CopyLineText(
     leading: String,
     rest: String,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
     Text(
@@ -920,7 +972,7 @@ private fun CopyLineText(
                 }
             },
         modifier = modifier,
-        style = MaterialTheme.typography.bodyLarge,
+        style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyLarge,
         fontWeight = FontWeight.Normal,
         color = scheme.onPrimaryContainer.copy(alpha = 0.92f),
     )

@@ -1,14 +1,17 @@
-## v3.8.2 Adaptive layout, richer schedule, alert FAB
+## v3.8.3 Adaptive layout, richer schedule, alert FAB
 
-## ✨ New Features
+### ✨ New Features
+
 - **Alerts button** near the navigation bar replaces the old update button. Tap it to expand update status (available, downloading, ready to install).
 - **Richer schedules**: set "every N hours/days/weeks", pick multiple weekdays, and choose a start time.
 
-## 🛠 Improved Features
+### 🛠 Improved Features
+
 - Better layouts in **landscape**, on **tablets**, and on **large text/display** devices. The app now adapts dynamically when your device uses extra-large font or display size settings.
 - Trashed rules can now be opened to view their details.
 
-## 🐛 Bug Fixes
+### 🐛 Bug Fixes
+
 - Fixed update alert dismissal and re-show behavior after manual update checks.
 
 ---

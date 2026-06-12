@@ -534,8 +534,7 @@ fun RulesScreen(
                 },
                 modifier =
                     Modifier
-                        .fillMaxSize()
-                        .then(scrollBlurModifier),
+                        .fillMaxSize(),
                 // Clearances ride inside the scroll container (see RulesEmptyState) so
                 // they never become a hard wall that clips the empty state.
                 contentPadding =
