@@ -6,6 +6,7 @@ import androidx.work.Configuration
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
@@ -29,7 +30,7 @@ class FilePipeApp :
     lateinit var workerFactory: HiltWorkerFactory
 
     @Inject
-    lateinit var userPreferencesRepository: UserPreferencesRepository
+    lateinit var userPreferencesRepository: Lazy<UserPreferencesRepository>
 
     @Inject
     lateinit var updateApkCacheMaintenance: UpdateApkCacheMaintenance
@@ -55,10 +56,11 @@ class FilePipeApp :
         DiagnosticLog.record(this, "FilePipeApp.onCreate started")
         preferencesMigrationScope.launch {
             runCatching {
-                userPreferencesRepository.migrateLegacyEnhancedShadingPreferenceIfNeeded()
-                userPreferencesRepository.migrateLegacyCustomSeedIfNeeded()
-                userPreferencesRepository.migrateLegacyAutoCheckToScheduleIfNeeded()
-                userPreferencesRepository.migrateDeferredFolderAccessIfNeeded()
+                val prefs = userPreferencesRepository.get()
+                prefs.migrateLegacyEnhancedShadingPreferenceIfNeeded()
+                prefs.migrateLegacyCustomSeedIfNeeded()
+                prefs.migrateLegacyAutoCheckToScheduleIfNeeded()
+                prefs.migrateDeferredFolderAccessIfNeeded()
                 updateCheckWorkScheduler.syncFromPreferences()
             }.onFailure { error ->
                 DiagnosticLog.record(this@FilePipeApp, "Startup preference migration/update scheduling failed", error)

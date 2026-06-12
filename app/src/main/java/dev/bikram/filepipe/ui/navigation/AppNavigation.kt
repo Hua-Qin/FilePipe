@@ -1166,8 +1166,7 @@ fun AppNavigation(
                                 Modifier
                                     .align(Alignment.BottomStart)
                                     .windowInsetsPadding(WindowInsets.navigationBars)
-                                    // Same 24dp baseline as the list-pane FABs.
-                                    .padding(start = 24.dp, bottom = 24.dp),
+                                    .padding(start = 24.dp, bottom = compactLandscapeFabBottomPadding()),
                         )
                     }
                 }
@@ -1316,12 +1315,24 @@ private fun TwoPaneListPaneWithFab(
                         Modifier
                             .align(Alignment.BottomEnd)
                             .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(end = 24.dp, bottom = 24.dp),
+                            .padding(end = 24.dp, bottom = compactLandscapeFabBottomPadding()),
                 ) {
                     fabContent()
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun compactLandscapeFabBottomPadding(): Dp {
+    val configuration = LocalConfiguration.current
+    val isLandscape =
+        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    return if (isLandscape && configuration.screenHeightDp < 480) {
+        12.dp
+    } else {
+        24.dp
     }
 }
 
@@ -1363,7 +1374,7 @@ private fun RulesTwoPaneRoute(
                     Modifier
                         .align(Alignment.BottomEnd)
                         .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(end = 24.dp, bottom = 24.dp),
+                        .padding(end = 24.dp, bottom = compactLandscapeFabBottomPadding()),
             ) {
                 SimpleNavFab(
                     icon = { tint ->
@@ -1862,7 +1873,7 @@ private fun HistoryTwoPaneRoute(
                         Modifier
                             .align(Alignment.BottomEnd)
                             .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(end = 24.dp, bottom = 24.dp),
+                            .padding(end = 24.dp, bottom = compactLandscapeFabBottomPadding()),
                 ) {
                     paneFabContent()
                 }
@@ -2083,7 +2094,7 @@ private fun SettingsTwoPaneRoute(
                         Modifier
                             .align(Alignment.BottomEnd)
                             .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(end = 24.dp, bottom = 24.dp),
+                            .padding(end = 24.dp, bottom = compactLandscapeFabBottomPadding()),
                 ) {
                     paneFabContent()
                 }
@@ -2325,6 +2336,11 @@ private fun FloatingNavBar(
     modifier: Modifier = Modifier,
     leadingFab: (@Composable () -> Unit)? = null,
 ) {
+    val configuration = LocalConfiguration.current
+    val isLandscape =
+        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val fabBottomInset = if (isSmallLandscape) 8.dp else 0.dp
     CenteredPillWithSideFab(
         pill = {
             FilePipeFloatingNavPill(
@@ -2336,11 +2352,17 @@ private fun FloatingNavBar(
         leadingFab = leadingFab,
         fab = fabContent,
         fabGap = 12.dp,
+        fabBottomInset = fabBottomInset,
+        leadingFabBottomInset = fabBottomInset,
         modifier =
             modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
+                .padding(
+                    bottom = if (isSmallLandscape) 6.dp else 12.dp,
+                    start = 24.dp,
+                    end = 24.dp,
+                ),
     )
 }
 
@@ -2594,13 +2616,16 @@ private fun MainNavFabSlot(
                         R.string.history_clear
                     },
                 )
-            val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-            val isSmallLandscape = isLandscape && LocalConfiguration.current.screenHeightDp < 480
-            val shouldShowFab = if (isSmallLandscape) {
-                if (inTrash) hasAnyTrashedRules else hasAnyHistory
-            } else {
-                true
-            }
+            val configuration = LocalConfiguration.current
+            val isLandscape =
+                configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+            val shouldShowFab =
+                if (isSmallLandscape) {
+                    if (inTrash) hasAnyTrashedRules else hasAnyHistory
+                } else {
+                    true
+                }
             if (shouldShowFab) {
                 SimpleNavFab(
                     icon = { tint ->

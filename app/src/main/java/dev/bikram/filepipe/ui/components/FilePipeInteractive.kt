@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonElevation
@@ -51,12 +52,35 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.performLongPressHaptic
 import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
+
+@Composable
+fun rememberResponsiveActionButtonSize(
+    defaultSize: Dp = 40.dp,
+    compactSize: Dp = 34.dp,
+    ultraCompactSize: Dp = 30.dp,
+): Dp {
+    val screenWidth =
+        with(LocalDensity.current) {
+            LocalWindowInfo.current.containerSize.width
+                .toDp()
+        }
+    val targetSize =
+        when {
+            screenWidth < 360.dp -> ultraCompactSize
+            screenWidth < 430.dp -> compactSize
+            else -> defaultSize
+        }
+    return targetSize
+}
 
 @Composable
 fun FilePipeIconButton(
@@ -426,6 +450,16 @@ fun FilePipeFloatingActionButton(
     tooltipLabel: String? = null,
     content: @Composable () -> Unit,
 ) {
+    val configuration = LocalConfiguration.current
+    val isLandscape =
+        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val sizeModifier =
+        if (isSmallLandscape) {
+            Modifier.size(rememberResponsiveActionButtonSize())
+        } else {
+            Modifier
+        }
     val playTap = rememberPlayTapSound()
     val clickAction = {
         if (enabled) {
@@ -458,7 +492,7 @@ fun FilePipeFloatingActionButton(
         ) {
             FloatingActionButton(
                 onClick = clickAction,
-                modifier = modifier,
+                modifier = modifier.then(sizeModifier),
                 shape = shape,
                 containerColor = containerColor,
                 contentColor = contentColor,
@@ -475,7 +509,7 @@ fun FilePipeFloatingActionButton(
     } else {
         FloatingActionButton(
             onClick = clickAction,
-            modifier = modifier,
+            modifier = modifier.then(sizeModifier),
             shape = shape,
             containerColor = containerColor,
             contentColor = contentColor,

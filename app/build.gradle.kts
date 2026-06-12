@@ -248,7 +248,6 @@ dependencies {
 
     // Core
     implementation(libs.core.ktx)
-    implementation(libs.appcompat)
     implementation(libs.splashscreen)
 
     // DocumentFile (SAF helper)

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
@@ -24,14 +25,14 @@ class UpdateCheckWorkScheduler
     constructor(
         @param:ApplicationContext private val context: Context,
         private val workManager: WorkManager,
-        private val userPreferencesRepository: UserPreferencesRepository,
+        private val userPreferencesRepository: Lazy<UserPreferencesRepository>,
     ) {
         suspend fun syncFromPreferences() {
             if (!BuildConfig.SHOW_UPDATES) {
                 workManager.cancelUniqueWork(UpdateCheckWorker.UNIQUE_WORK_NAME)
                 return
             }
-            val schedule = userPreferencesRepository.getPreferencesSnapshot().updateCheckSchedule
+            val schedule = userPreferencesRepository.get().getPreferencesSnapshot().updateCheckSchedule
             when (schedule) {
                 UpdateCheckSchedule.DAILY_AT_21 -> {
                     enqueueOneTime(delayMillis = millisUntilNextDailyNinePm())

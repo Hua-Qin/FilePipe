@@ -95,8 +95,6 @@ class SettingsViewModel
         private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
         private val ruleRepository: RuleRepository,
     ) : ViewModel() {
-        private val updateMocksAvailable = BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease"
-
         private enum class DevReleasePlayBannerMockStage {
             OFF,
             STARTING,
@@ -157,24 +155,20 @@ class SettingsViewModel
         val manualUpdateCheckTrigger: StateFlow<Int> = _manualUpdateCheckTrigger.asStateFlow()
 
         val playInAppUpdateBannerUiState: StateFlow<PlayInAppUpdateBannerUiState> =
-            if (updateMocksAvailable) {
-                combine(
-                    playInAppUpdateProgressController.bannerUiState,
-                    devReleasePlayBannerMockStage,
-                ) { realState, mockStage ->
-                    mergeDevReleasePlayBannerMock(realState, mockStage)
-                }.stateIn(
-                    scope = viewModelScope,
-                    started = SharingStarted.WhileSubscribed(5_000),
-                    initialValue =
-                        mergeDevReleasePlayBannerMock(
-                            playInAppUpdateProgressController.bannerUiState.value,
-                            devReleasePlayBannerMockStage.value,
-                        ),
-                )
-            } else {
-                playInAppUpdateProgressController.bannerUiState
-            }
+            combine(
+                playInAppUpdateProgressController.bannerUiState,
+                devReleasePlayBannerMockStage,
+            ) { realState, mockStage ->
+                mergeDevReleasePlayBannerMock(realState, mockStage)
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue =
+                    mergeDevReleasePlayBannerMock(
+                        playInAppUpdateProgressController.bannerUiState.value,
+                        devReleasePlayBannerMockStage.value,
+                    ),
+            )
 
         private val _manualExportPickerRequested =
             MutableSharedFlow<String>(
@@ -462,7 +456,7 @@ class SettingsViewModel
          * Dev release: arms the global update promo (Rules / History / Settings). Swipe the card to dismiss.
          */
         fun devReleaseMockArmRulesUpdatePromoForRulesTab() {
-            if (!updateMocksAvailable || !BuildConfig.SHOW_UPDATES) return
+            if (!BuildConfig.SHOW_UPDATES) return
             _updateInfo.value =
                 UpdateInfo(
                     versionName = "9.9.9",
@@ -483,7 +477,6 @@ class SettingsViewModel
          * Dev release: global Play-style banner as downloading, then ready to install (all flavors; GitHub uses no-op real).
          */
         fun devReleaseMockStartPlayUpdateBannerSequence() {
-            if (!updateMocksAvailable) return
             devReleasePlayBannerMockSequenceJob?.cancel()
             devReleasePlayBannerMockSequenceJob =
                 viewModelScope.launch {
@@ -502,9 +495,7 @@ class SettingsViewModel
         }
 
         fun completePlayFlexibleUpdateIfReady(activity: Activity?) {
-            if (updateMocksAvailable &&
-                devReleasePlayBannerMockStage.value == DevReleasePlayBannerMockStage.READY
-            ) {
+            if (devReleasePlayBannerMockStage.value == DevReleasePlayBannerMockStage.READY) {
                 devReleasePlayBannerMockSequenceJob?.cancel()
                 devReleasePlayBannerMockStage.value = DevReleasePlayBannerMockStage.OFF
                 if (_updateInfo.value?.isDevReleaseMock == true) {
@@ -1013,9 +1004,6 @@ class SettingsViewModel
             }
 
         private fun resolvePlayBannerUiStateForSessionLogic(): PlayInAppUpdateBannerUiState {
-            if (!updateMocksAvailable) {
-                return playInAppUpdateProgressController.bannerUiState.value
-            }
             return mergeDevReleasePlayBannerMock(
                 playInAppUpdateProgressController.bannerUiState.value,
                 devReleasePlayBannerMockStage.value,

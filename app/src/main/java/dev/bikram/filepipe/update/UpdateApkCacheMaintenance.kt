@@ -2,6 +2,7 @@ package dev.bikram.filepipe.update
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
@@ -24,7 +25,7 @@ class UpdateApkCacheMaintenance
     @Inject
     constructor(
         @param:ApplicationContext private val context: Context,
-        private val userPreferencesRepository: UserPreferencesRepository,
+        private val userPreferencesRepository: Lazy<UserPreferencesRepository>,
     ) {
         fun enqueueStartupCleanup(backgroundScope: CoroutineScope) {
             if (BuildConfig.FLAVOR != "github") return
@@ -34,7 +35,7 @@ class UpdateApkCacheMaintenance
         }
 
         private suspend fun runCleanupIfNeeded() {
-            val prefs = userPreferencesRepository.getPreferencesSnapshot()
+            val prefs = userPreferencesRepository.get().getPreferencesSnapshot()
             if (!prefs.saveUpdateApkToDownloads) return
             if (!prefs.updateApkDownloadsCopySucceeded) return
             val cacheFile = File(context.cacheDir, FILEPIPE_UPDATE_APK_CACHE_NAME)

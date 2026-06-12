@@ -368,7 +368,7 @@ fun DevOptionsScreen(
                                     ),
                                     DevAction(
                                         label = stringResource(R.string.dev_options_action_arm_update_promo),
-                                        enabled = state.updateMocksAvailable && state.showUpdates,
+                                        enabled = state.showUpdates,
                                         onClick = {
                                             settingsViewModel.devReleaseMockArmRulesUpdatePromoForRulesTab()
                                             onNavigateBack()
@@ -376,7 +376,6 @@ fun DevOptionsScreen(
                                     ),
                                     DevAction(
                                         label = stringResource(R.string.dev_options_action_start_play_bar),
-                                        enabled = state.updateMocksAvailable,
                                         onClick = {
                                             settingsViewModel.devReleaseMockStartPlayUpdateBannerSequence()
                                             onNavigateBack()

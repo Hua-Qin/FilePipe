@@ -9,6 +9,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.MainActivity
 import dev.bikram.filepipe.R
@@ -23,7 +24,7 @@ class UpdateAvailableNotifier
     @Inject
     constructor(
         @param:ApplicationContext private val context: Context,
-        private val userPreferencesRepository: UserPreferencesRepository,
+        private val userPreferencesRepository: Lazy<UserPreferencesRepository>,
     ) {
         fun ensureNotificationChannel() {
             val manager = context.getSystemService(NotificationManager::class.java) ?: return
@@ -98,7 +99,7 @@ class UpdateAvailableNotifier
             runCatching {
                 NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
                 if (updateDedupe) {
-                    userPreferencesRepository.setUpdateLastNotifiedDedupeKey(dedupeKey)
+                    userPreferencesRepository.get().setUpdateLastNotifiedDedupeKey(dedupeKey)
                 }
             }
         }

@@ -11,9 +11,11 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
@@ -39,6 +41,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -91,6 +94,10 @@ fun AlertFloatingFab(
 ) {
     if (summary.count <= 0) return
 
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+
     val label = stringResource(R.string.main_alert_fab_label)
     val scheme = MaterialTheme.colorScheme
     val closedContainerColor =
@@ -117,11 +124,17 @@ fun AlertFloatingFab(
         label = "alert_fab_shape_morph",
     )
     val fabShape = MorphPolygonShape(fabMorph, shapeProgress)
+    val fabSize = if (isSmallLandscape) rememberResponsiveActionButtonSize() else 56.dp
+    val scaleFactor = if (isSmallLandscape) fabSize.value / 56f else 1f
     val density = LocalDensity.current
-    val iconTravelPx = with(density) { 14.dp.toPx() }
+    val iconTravelPx = with(density) { (14.dp * scaleFactor).toPx() }
     val alertIconAlpha = 1f - shapeProgress
     val chevronAlpha = shapeProgress
-    Box(modifier = modifier) {
+
+    Box(
+        modifier = modifier.size(fabSize),
+        contentAlignment = Alignment.Center,
+    ) {
         ToggleFloatingActionButton(
             checked = expanded,
             onCheckedChange = { onClick() },
@@ -132,6 +145,7 @@ fun AlertFloatingFab(
                 ),
             modifier =
                 Modifier
+                    .size(fabSize)
                     .shadow(
                         elevation = 2.dp,
                         shape = fabShape,
@@ -139,10 +153,13 @@ fun AlertFloatingFab(
                     ).clip(fabShape)
                     .semantics { contentDescription = label },
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
                 FilePipeMaterialRoundedSymbol(
                     name = summary.iconName,
-                    size = 28.dp,
+                    size = 28.dp * scaleFactor,
                     tint = contentColor,
                     weight = FontWeight.Medium,
                     modifier =
@@ -153,12 +170,12 @@ fun AlertFloatingFab(
                 )
                 FilePipeMaterialRoundedSymbol(
                     name = "chevron_right",
-                    size = 28.dp,
+                    size = 28.dp * scaleFactor,
                     tint = contentColor,
                     weight = FontWeight.Medium,
                     modifier =
                         Modifier
-                            .offset(y = 1.dp)
+                            .offset(y = 1.dp * scaleFactor)
                             .graphicsLayer {
                                 alpha = chevronAlpha
                                 rotationZ = 90f
@@ -174,7 +191,7 @@ fun AlertFloatingFab(
             modifier =
                 Modifier
                     .align(Alignment.BottomStart)
-                    .offset(x = (-4).dp, y = 4.dp),
+                    .offset(x = (-4).dp * scaleFactor, y = 4.dp * scaleFactor),
         )
     }
 }
@@ -243,6 +260,11 @@ fun AlertFloatingActionButtonMenu(
     // must extend left of the FAB, which is impossible inside that clip. The FAB anchors
     // a plain Box instead, and the bars render as an unclipped sibling placed above it.
     BackHandler(enabled = expanded) { onExpandedChange(false) }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val barIconSize = if (isSmallLandscape) rememberResponsiveActionButtonSize() else 44.dp
+    val barContentScale = if (isSmallLandscape) barIconSize.value / 44f else 1f
     val density = LocalDensity.current
     val windowWidthPx = LocalWindowInfo.current.containerSize.width
     var anchorLeftInWindow by remember { mutableIntStateOf(0) }
@@ -298,18 +320,30 @@ fun AlertFloatingActionButtonMenu(
                 transition.currentState == EnterExitState.Visible &&
                     transition.targetState == EnterExitState.PostExit
             val barAlpha = if (exiting) progress else 1f
-            val barsMinWidth = if (barsMaxWidth.isSpecified) minOf(332.dp, barsMaxWidth) else 332.dp
-            val barsCapWidth = if (barsMaxWidth.isSpecified) minOf(392.dp, barsMaxWidth) else 392.dp
+            val barsMinWidth =
+                if (barsMaxWidth.isSpecified) {
+                    minOf(332.dp * barContentScale, barsMaxWidth)
+                } else {
+                    332.dp * barContentScale
+                }
+            val barsCapWidth =
+                if (barsMaxWidth.isSpecified) {
+                    minOf(392.dp * barContentScale, barsMaxWidth)
+                } else {
+                    392.dp * barContentScale
+                }
             Column(
                 modifier =
                     Modifier
                         .widthIn(min = barsMinWidth, max = barsCapWidth)
-                        .padding(start = 6.dp, end = 6.dp)
-                        .graphicsLayer {
+                        .padding(
+                            start = 6.dp * barContentScale,
+                            end = 6.dp * barContentScale,
+                        ).graphicsLayer {
                             translationY = with(density) { 18.dp.toPx() } * (1f - progress)
                             alpha = if (centerBarsInWindow && !anchorPlaced) 0f else 1f
                         },
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp * barContentScale),
             ) {
                 if (updateState != UpdateChromeState.Hidden) {
                     UpdateFloatingBar(
@@ -319,6 +353,8 @@ fun AlertFloatingActionButtonMenu(
                         onInstallClick = onInstallUpdate,
                         contentAlpha = barAlpha,
                         shadowAlpha = barAlpha,
+                        iconContainerSize = barIconSize,
+                        contentScale = barContentScale,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
