@@ -35,11 +35,29 @@ internal fun scheduledBatchRunWorkName(ruleIds: LongArray): String = "scheduled_
 
 internal fun scheduleKey(schedule: RuleSchedule): String = "${schedule.type}_${schedule.hour}_${schedule.minute}_${schedule.dayOfWeek}_${schedule.intervalHours}"
 
-private const val EPOCH_MONDAY_MILLIS = 345600000L // January 5, 1970 (Monday)
+private fun getLocalEpochMonday(): Long =
+    Calendar
+        .getInstance()
+        .apply {
+            firstDayOfWeek = Calendar.MONDAY
+            set(1970, Calendar.JANUARY, 5, 0, 0, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
 
-private fun getWeeksBetween(startMillis: Long, endMillis: Long): Int {
-    val startCal = Calendar.getInstance().apply { timeInMillis = startMillis }
-    val endCal = Calendar.getInstance().apply { timeInMillis = endMillis }
+private fun getWeeksBetween(
+    startMillis: Long,
+    endMillis: Long,
+): Int {
+    val startCal =
+        Calendar.getInstance().apply {
+            firstDayOfWeek = Calendar.MONDAY
+            timeInMillis = startMillis
+        }
+    val endCal =
+        Calendar.getInstance().apply {
+            firstDayOfWeek = Calendar.MONDAY
+            timeInMillis = endMillis
+        }
 
     // Align both to the Monday of their respective weeks
     startCal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
@@ -58,8 +76,8 @@ private fun getWeeksBetween(startMillis: Long, endMillis: Long): Int {
     return (diffDays / 7).toInt()
 }
 
-private fun getDayOffsetFromMonday(dayOfWeek: Int): Int {
-    return when (dayOfWeek) {
+private fun getDayOffsetFromMonday(dayOfWeek: Int): Int =
+    when (dayOfWeek) {
         Calendar.MONDAY -> 0
         Calendar.TUESDAY -> 1
         Calendar.WEDNESDAY -> 2
@@ -69,7 +87,6 @@ private fun getDayOffsetFromMonday(dayOfWeek: Int): Int {
         Calendar.SUNDAY -> 6
         else -> 0
     }
-}
 
 internal fun nextRunAtMillis(
     schedule: RuleSchedule,
@@ -78,13 +95,14 @@ internal fun nextRunAtMillis(
 ): Long {
     when (schedule.type) {
         ScheduleType.EVERY_N_HOURS -> {
-            val anchor = Calendar.getInstance().apply {
-                timeInMillis = nowMillis
-                set(Calendar.HOUR_OF_DAY, schedule.hour)
-                set(Calendar.MINUTE, schedule.minute)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
+            val anchor =
+                Calendar.getInstance().apply {
+                    timeInMillis = nowMillis
+                    set(Calendar.HOUR_OF_DAY, schedule.hour)
+                    set(Calendar.MINUTE, schedule.minute)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
             val anchorMillis = anchor.timeInMillis
             val intervalHours = schedule.intervalHours?.coerceAtLeast(1) ?: 1
             val intervalMillis = TimeUnit.HOURS.toMillis(intervalHours.toLong())
@@ -103,13 +121,14 @@ internal fun nextRunAtMillis(
         }
 
         ScheduleType.DAILY -> {
-            val anchor = Calendar.getInstance().apply {
-                timeInMillis = nowMillis
-                set(Calendar.HOUR_OF_DAY, schedule.hour)
-                set(Calendar.MINUTE, schedule.minute)
-                set(Calendar.SECOND, 0)
-                set(Calendar.MILLISECOND, 0)
-            }
+            val anchor =
+                Calendar.getInstance().apply {
+                    timeInMillis = nowMillis
+                    set(Calendar.HOUR_OF_DAY, schedule.hour)
+                    set(Calendar.MINUTE, schedule.minute)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }
             val anchorMillis = anchor.timeInMillis
             val days = schedule.intervalHours?.coerceAtLeast(1) ?: 1
             val intervalMillis = TimeUnit.DAYS.toMillis(days.toLong())
@@ -126,7 +145,8 @@ internal fun nextRunAtMillis(
         ScheduleType.WEEKLY -> {
             val selectedDays = RuleSchedule.bitmaskToDaysOfWeek(schedule.dayOfWeek)
             val intervalWeeks = schedule.intervalHours?.coerceAtLeast(1) ?: 1
-            val currentWeek = getWeeksBetween(EPOCH_MONDAY_MILLIS, nowMillis)
+            val localEpoch = getLocalEpochMonday()
+            val currentWeek = getWeeksBetween(localEpoch, nowMillis)
 
             var weekOffset = 0
             while (true) {
@@ -134,15 +154,17 @@ internal fun nextRunAtMillis(
                 if (candidateWeek % intervalWeeks == 0) {
                     val candidates = mutableListOf<Long>()
                     for (day in selectedDays) {
-                        val candidate = Calendar.getInstance().apply {
-                            timeInMillis = EPOCH_MONDAY_MILLIS
-                            add(Calendar.WEEK_OF_YEAR, candidateWeek)
-                            add(Calendar.DAY_OF_YEAR, getDayOffsetFromMonday(day))
-                            set(Calendar.HOUR_OF_DAY, schedule.hour)
-                            set(Calendar.MINUTE, schedule.minute)
-                            set(Calendar.SECOND, 0)
-                            set(Calendar.MILLISECOND, 0)
-                        }
+                        val candidate =
+                            Calendar.getInstance().apply {
+                                firstDayOfWeek = Calendar.MONDAY
+                                timeInMillis = localEpoch
+                                add(Calendar.WEEK_OF_YEAR, candidateWeek)
+                                add(Calendar.DAY_OF_YEAR, getDayOffsetFromMonday(day))
+                                set(Calendar.HOUR_OF_DAY, schedule.hour)
+                                set(Calendar.MINUTE, schedule.minute)
+                                set(Calendar.SECOND, 0)
+                                set(Calendar.MILLISECOND, 0)
+                            }
                         if (candidate.timeInMillis > nowMillis) {
                             candidates.add(candidate.timeInMillis)
                         }

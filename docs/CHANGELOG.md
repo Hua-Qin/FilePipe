@@ -1,13 +1,28 @@
-## v3.8.0 - Landscape layouts, Improved theming, better schedules
+## v3.8.1 Adaptive layout, richer schedule, alert FAB
 
-### 🚀 New Features
+## ✨ New Features
+- **Alerts button** near the navigation bar replaces the old update button. Tap it to expand update status (available, downloading, ready to install).
+- **Richer schedules**: set "every N hours/days/weeks", pick multiple weekdays, and choose a start time.
+
+## 🛠 Improved Features
+- Better layouts in **landscape**, on **tablets**, and on **large text/display** devices. The app now adapts dynamically when your device uses extra-large font or display size settings.
+- Trashed rules can now be opened to view their details.
+
+## 🐛 Bug Fixes
+- Fixed update alert dismissal and re-show behavior after manual update checks.
+
+---
+
+## v3.8.0 - Landscape layouts, improved theming, better schedules
+
+### ✨ New Features
 
 - Added a new two-panel and landscape layouts for phones, foldables and large tablets.
 - Added a Surface shading slider so you can fine-tune how much color tint appears in app backgrounds and surfaces.
 - Added separate custom color controls for primary, secondary, and tertiary theme colors.
 - Custom themes can now show and save multi-color accent palettes.
 
-### ✨ Improved Features
+### 🛠 Improved Features
 
 - Rules, History & Settings screens remember sort order and expanded/collapsed state after restart.
 - Those preferences are now included in backup and restore.
@@ -38,7 +53,7 @@
 - **Developer options** - Hidden tools screen for debugging and testing.
 - **More from Bikram** - About section now showcases my other apps.
 
-### 🔧 Improved Features
+### 🛠 Improved Features
 
 - **Flexible Extension Input** - Add multiple file extensions at once. Separate them with commas, semicolons, or spaces, and enter them with or without a leading dot (e.g. `jpg, png, .mp3`).
 - **Subfolder controls** - "Scan subfolders" and "Mirror subfolders to destination" are now separate toggles.
@@ -63,7 +78,7 @@
 
 ## v3.1.1 UI consistency
 
-### 🔧 Improved Features
+### 🛠 Improved Features
 
 - In Play Store flavor, tapping `check update` in banner won't open double bottom sheets.
 - Update and install banner layout made consistent.
@@ -83,7 +98,7 @@
 - **Rate/Review the app**: You can now rate/review FilePipe directly from Settings.
 - **Share FilePipe**: Share a link to FilePipe with friends from the Settings screen.
 
-### 🔧 Improved Features
+### 🛠 Improved Features
 
 - **Help always one tap away**: A new  ❔ button in the Settings header takes you straight to the FAQ and help section.
 - Adjusted how the app works with **edge-to-edge** on newer Android versions.
@@ -102,7 +117,7 @@
 - **All Files Access mode**: a new access option that lets FilePipe work with any folder, including `Download`, SD card root, and internal storage root, folders that are restricted by Android in "Selective Access" mode. Now you can add folders without extra prompts per folder. Choose between `All Files Access` and `Selective Access` during setup or in Settings at any time.
 - **Help & FAQs**: a searchable help/FAQ section covering common questions about rules, storage access, scheduling, privacy, and backup. Accessible from Settings and from rule error banners.
 
-### 🔧 Improved Features
+### 🛠 Improved Features
 
 - **Onboarding permissions screen** — You now choose between `Selective Access` and `All Files Access` with a clear side-by-side explanation. It walks you through granting required access.
 - **Folder access indicators** — the rule editor now distinguishes between a folder that's completely inaccessible in your current mode (🚫) and one that's allowed but may have a permission issue (⚠️).
@@ -118,14 +133,14 @@
 
 ## v2.2.0: Smart updates, Import & Restore
 
-### 🆕 New features
+### ✨ New features
 
 - **Import and Restore**: Now in addition to `restore` that wipes everything before restoring the backup, you can choose `import`, which adds new rules from the backup and updates matching ones.
 - **Smart updates**: Update checks now compare asset timestamps. This ensures you get hotfixes even when the version number hasn't changed.
 - **Scheduled update checks**: Added scheduled update checks (At startup/Daily/Weekly) with optional push notifications, so you stay current without manual refreshing.
 - **Save apks**: Added support for saving update APKs to Downloads folder.
 
-### 🔧 Improvements
+### 🛠 Improvements
 
 - Clearer alerts about folder issues. Different alerts for missing folder vs lost permission
 - New option to suppress missing source folder alerts
@@ -137,14 +152,14 @@
 
 ## v2.1.0: Custom colors, Custom rule order, Granular history & sorting
 
-### 🆕 New features
+### ✨ New features
 
 - **Cancel a running job**: A Cancel button now appears inline on whichever rule is running. Tap it to stop the operation mid-batch; the partial result (including a count of files that were queued but not touched) is saved to history.
 - **Custom rule order**: A new "My Order" sort option lets you drag and drop rules into any order you like. Long-press and drag a card to reorder; long-press and hold (without dragging) to enter multi-select.
 - **Custom accent colors**: You can now add your own accent color using any hex code, alongside the built-in presets.
 - **Fixed card colors**: New toggle in Appearance settings: use neutral grey card surfaces instead of accent-tinted ones.
 
-### 🔧 Improvements
+### 🛠 Improvements
 
 - **History: Cancelled and Undone filters**: Two new filter chips in the History screen to show only cancelled or undone runs.
 - **Maintain subdirectory structure**: When a rule scans subfolders, the destination now mirrors the source folder structure instead of flattening everything into one folder.
@@ -176,7 +191,7 @@
 - **Gradient background**: instead of solid color, get subtle gradient behind the app content, toggleable in Settings.
 - **In-app updates**: check for updates right from Settings. GitHub installs get APK updates from GitHub Releases; Play Store installs use Google Play's in-app update flow.
 
-### 🔧 Improvements
+### 🛠 Improvements
 - **Smarter storage access**: the app no longer requires the broad "manage all files" permission. Folder access is granted individually via the system folder picker and remembered per folder. Cards now show an amber hint if a previously picked folder is no longer accessible.
 - **History depth**: history now loads progressively as you scroll (no more loading everything at once). Filter by outcome (including "no changes" runs), group by date or rule.
 - **Richer notifications**: scheduled-run notifications show the first few filenames that were  moved, so you know at a glance what happened.

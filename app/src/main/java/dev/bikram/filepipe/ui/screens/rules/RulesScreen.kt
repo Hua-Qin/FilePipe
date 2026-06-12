@@ -336,6 +336,11 @@ fun RulesScreen(
                                 FilePipeFilledTonalIconButton(
                                     onClick = { viewModel.clearSelection() },
                                     tooltipLabel = deselectAllLabel,
+                                    colors =
+                                        IconButtonDefaults.filledTonalIconButtonColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        ),
                                 ) {
                                     FilePipeMaterialRoundedSymbol(name = "deselect", contentDescription = deselectAllLabel)
                                 }
@@ -465,6 +470,11 @@ fun RulesScreen(
                                     FilePipeFilledTonalIconButton(
                                         onClick = { viewModel.clearSelection() },
                                         tooltipLabel = cancelSelectionLabel,
+                                        colors =
+                                            IconButtonDefaults.filledTonalIconButtonColors(
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            ),
                                     ) {
                                         FilePipeMaterialRoundedSymbol(name = "close", contentDescription = cancelSelectionLabel)
                                     }

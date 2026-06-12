@@ -20,9 +20,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -67,6 +69,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -228,6 +231,7 @@ fun OnboardingPermissionsScreen(
                 )
             }
         val compactHeight = maxHeight < 560.dp
+        val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
         CompositionLocalProvider(LocalDensity provides responsiveDensity) {
             val scrollContent: @Composable () -> Unit = {
@@ -339,11 +343,89 @@ fun OnboardingPermissionsScreen(
             }
 
             Box(Modifier.fillMaxSize()) {
-                if (compactHeight) {
-                    // Short screens (e.g. phones in landscape): a single scroll with the actions
-                    // inline at the end. The tall layout's bottom overlay would otherwise collide
-                    // with the hero illustration and the access-mode options. Use a wider cap than
-                    // portrait so the bullet rows stay on a single line with the extra width.
+                if (isLandscape) {
+                    Row(
+                        modifier =
+                            Modifier
+                                .align(Alignment.Center)
+                                .widthIn(max = 800.dp)
+                                .fillMaxSize()
+                                .padding(horizontal = 24.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    ) {
+                        // Left column
+                        Column(
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .verticalScroll(rememberScrollState()),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            PermissionsHeroIllustration(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(180.dp),
+                            )
+                            AccessModeSwitcher(
+                                selected = selected,
+                                onSelectAllFiles = {
+                                    viewModel.setOnboardingFolderAccessSelection(FolderAccessMode.ALL_FILES_PREFERRED)
+                                    resetGrantFlowUi()
+                                },
+                                onSelectSelective = {
+                                    viewModel.setOnboardingFolderAccessSelection(FolderAccessMode.SAF_ONLY)
+                                    resetGrantFlowUi()
+                                },
+                            )
+                        }
+
+                        // Right column
+                        Column(
+                            modifier =
+                                Modifier
+                                    .weight(1.2f)
+                                    .fillMaxHeight()
+                                    .verticalScroll(rememberScrollState()),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            if (selected == FolderAccessMode.SAF_ONLY) {
+                                SelectiveAccessPitch(onLearnMore = onOpenStorageAccessFaq)
+                            } else {
+                                AllFilesAccessPitch(onLearnMore = onOpenStorageAccessFaq)
+                            }
+
+                            AnimatedVisibility(
+                                visible = grantPanelVisible,
+                                enter = reducedMotionEnterTransition(fadeIn(animationSpec = visibilityFadeInSpec)),
+                                exit = reducedMotionExitTransition(fadeOut(animationSpec = visibilityFadeOutSpec)),
+                            ) {
+                                AllFilesInstructionPanel(
+                                    showOpenSettingsButton = showOpenSettingsInPanel,
+                                    showNotGrantedHint = showAccessNotGrantedHint,
+                                    onOpenSettings = {
+                                        awaitingSettingsReturn = true
+                                        showAccessNotGrantedHint = false
+                                        val manageIntent =
+                                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                                                data = "package:${context.packageName}".toUri()
+                                            }
+                                        context.startActivity(manageIntent)
+                                    },
+                                )
+                            }
+
+                            Spacer(Modifier.height(8.dp))
+
+                            bottomActionsCluster()
+                        }
+                    }
+                } else if (compactHeight) {
+                    // Short screens (e.g. phones in landscape/short portrait): a single scroll with the actions
+                    // inline at the end.
                     Column(
                         modifier =
                             Modifier
@@ -368,28 +450,28 @@ fun OnboardingPermissionsScreen(
                                 .align(Alignment.TopCenter)
                                 .widthIn(max = OnboardingMaxContentWidth)
                                 .fillMaxSize()
-                                .padding(horizontal = 24.dp)
                                 .padding(top = 12.dp, bottom = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Column(
                             modifier =
                                 Modifier
                                     .weight(1f)
                                     .fillMaxWidth()
-                                    .verticalScroll(rememberScrollState()),
+                                    .verticalScroll(rememberScrollState())
+                                    .padding(horizontal = 24.dp),
                         ) {
                             scrollContent()
-                            Spacer(Modifier.height(120.dp))
+                            Spacer(Modifier.height(16.dp))
                         }
-                    }
-
-                    OnboardingBottomActions(
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 40.dp),
-                    ) {
-                        bottomActionsCluster()
+                        OnboardingBottomActions(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 40.dp),
+                        ) {
+                            bottomActionsCluster()
+                        }
                     }
                 }
             }
@@ -443,110 +525,189 @@ private fun AccessModeSwitcher(
             checkedContainerColor = stateBAccentColor,
             checkedContentColor = scheme.onSurface,
         )
-    ButtonGroup(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-        overflowIndicator = { menuState ->
-            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
-        },
-    ) {
-        customItem(
-            buttonGroupContent = {
-                FilePipeToggleButton(
-                    checked = allFilesSelected,
-                    onCheckedChange = { checked -> if (checked) onSelectAllFiles() },
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .height(54.dp)
-                            .semantics { role = Role.RadioButton },
-                    shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
-                    colors =
-                        if (allFilesSelected) {
-                            ToggleButtonDefaults.toggleButtonColors()
-                        } else {
-                            transparentInactiveColors
-                        },
-                    border =
-                        if (allFilesSelected) {
-                            null
-                        } else {
-                            BorderStroke(1.dp, allFilesActiveFillColor.copy(alpha = 0.82f))
-                        },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.onboarding_permissions_mode_all_files),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            },
-            menuContent = { menuState ->
-                FilePipeOutlinedButton(
-                    onClick = {
-                        onSelectAllFiles()
-                        menuState.dismiss()
+    val configuration = LocalConfiguration.current
+    val isPortrait = configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+    val fontScale = LocalDensity.current.fontScale
+    val useVertical = !isPortrait || fontScale > 1.2f
+    if (useVertical) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            FilePipeToggleButton(
+                checked = allFilesSelected,
+                onCheckedChange = { checked -> if (checked) onSelectAllFiles() },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 54.dp)
+                        .semantics { role = Role.RadioButton },
+                shapes = ToggleButtonDefaults.shapes(pillShape),
+                colors =
+                    if (allFilesSelected) {
+                        ToggleButtonDefaults.toggleButtonColors()
+                    } else {
+                        transparentInactiveColors
                     },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.onboarding_permissions_mode_all_files))
-                }
-            },
-        )
-        customItem(
-            buttonGroupContent = {
-                FilePipeToggleButton(
-                    checked = !allFilesSelected,
-                    onCheckedChange = { checked -> if (checked) onSelectSelective() },
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .height(54.dp)
-                            .semantics { role = Role.RadioButton },
-                    shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
-                    colors =
-                        if (allFilesSelected) {
-                            transparentInactiveColors
-                        } else {
-                            selectiveActiveColors
-                        },
-                    border =
-                        if (allFilesSelected) {
-                            BorderStroke(1.5.dp, stateBAccentColor)
-                        } else {
-                            null
-                        },
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.onboarding_permissions_mode_selective),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Normal,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            },
-            menuContent = { menuState ->
-                FilePipeOutlinedButton(
-                    onClick = {
-                        onSelectSelective()
-                        menuState.dismiss()
+                border =
+                    if (allFilesSelected) {
+                        null
+                    } else {
+                        BorderStroke(1.dp, allFilesActiveFillColor.copy(alpha = 0.82f))
                     },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.onboarding_permissions_mode_all_files),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
                     modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.onboarding_permissions_mode_selective))
-                }
+                )
+            }
+            FilePipeToggleButton(
+                checked = !allFilesSelected,
+                onCheckedChange = { checked -> if (checked) onSelectSelective() },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 54.dp)
+                        .semantics { role = Role.RadioButton },
+                shapes = ToggleButtonDefaults.shapes(pillShape),
+                colors =
+                    if (allFilesSelected) {
+                        transparentInactiveColors
+                    } else {
+                        selectiveActiveColors
+                    },
+                border =
+                    if (allFilesSelected) {
+                        BorderStroke(1.5.dp, stateBAccentColor)
+                    } else {
+                        null
+                    },
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.onboarding_permissions_mode_selective),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+    } else {
+        ButtonGroup(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            overflowIndicator = { menuState ->
+                ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
             },
-        )
+        ) {
+            customItem(
+                buttonGroupContent = {
+                    FilePipeToggleButton(
+                        checked = allFilesSelected,
+                        onCheckedChange = { checked -> if (checked) onSelectAllFiles() },
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .height(54.dp)
+                                .semantics { role = Role.RadioButton },
+                        shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
+                        colors =
+                            if (allFilesSelected) {
+                                ToggleButtonDefaults.toggleButtonColors()
+                            } else {
+                                transparentInactiveColors
+                            },
+                        border =
+                            if (allFilesSelected) {
+                                null
+                            } else {
+                                BorderStroke(1.dp, allFilesActiveFillColor.copy(alpha = 0.82f))
+                            },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.onboarding_permissions_mode_all_files),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+                menuContent = { menuState ->
+                    FilePipeOutlinedButton(
+                        onClick = {
+                            onSelectAllFiles()
+                            menuState.dismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.onboarding_permissions_mode_all_files))
+                    }
+                },
+            )
+            customItem(
+                buttonGroupContent = {
+                    FilePipeToggleButton(
+                        checked = !allFilesSelected,
+                        onCheckedChange = { checked -> if (checked) onSelectSelective() },
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .height(54.dp)
+                                .semantics { role = Role.RadioButton },
+                        shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
+                        colors =
+                            if (allFilesSelected) {
+                                transparentInactiveColors
+                            } else {
+                                selectiveActiveColors
+                            },
+                        border =
+                            if (allFilesSelected) {
+                                BorderStroke(1.5.dp, stateBAccentColor)
+                            } else {
+                                null
+                            },
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.onboarding_permissions_mode_selective),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Normal,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                },
+                menuContent = { menuState ->
+                    FilePipeOutlinedButton(
+                        onClick = {
+                            onSelectSelective()
+                            menuState.dismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.onboarding_permissions_mode_selective))
+                    }
+                },
+            )
+        }
     }
 }
 

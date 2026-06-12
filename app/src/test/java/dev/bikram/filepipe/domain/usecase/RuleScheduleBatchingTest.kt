@@ -75,10 +75,11 @@ class RuleScheduleBatchingTest {
     @Test
     fun nextDailyRunEveryTwoDaysTimePassed() {
         val now = millisFor(day = 10, hour = 10, minute = 0)
-        val next = nextRunAtMillis(
-            RuleSchedule(ScheduleType.DAILY, hour = 9, minute = 0, intervalHours = 2),
-            nowMillis = now
-        )
+        val next =
+            nextRunAtMillis(
+                RuleSchedule(ScheduleType.DAILY, hour = 9, minute = 0, intervalHours = 2),
+                nowMillis = now,
+            )
         // 9:00 today has passed, so it runs on day 12 at 9:00 AM (2 days later)
         assertEquals(millisFor(day = 12, hour = 9, minute = 0), next)
     }
@@ -93,27 +94,34 @@ class RuleScheduleBatchingTest {
         // Since all selected days in week 0 have passed, it must run in week 2 (since week 1 is inactive).
         // Week 2 Monday is Jan 19, Friday is Jan 23.
         // First candidate is Jan 19 at 9:00 AM.
-        val now = Calendar.getInstance().apply {
-            clear()
-            set(2026, Calendar.JANUARY, 10, 10, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+        val now =
+            Calendar
+                .getInstance()
+                .apply {
+                    clear()
+                    set(2026, Calendar.JANUARY, 10, 10, 0, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
 
         val bitmask = RuleSchedule.daysOfWeekToBitmask(listOf(Calendar.MONDAY, Calendar.FRIDAY))
-        val schedule = RuleSchedule(
-            type = ScheduleType.WEEKLY,
-            dayOfWeek = bitmask,
-            hour = 9,
-            minute = 0,
-            intervalHours = 2
-        )
+        val schedule =
+            RuleSchedule(
+                type = ScheduleType.WEEKLY,
+                dayOfWeek = bitmask,
+                hour = 9,
+                minute = 0,
+                intervalHours = 2,
+            )
         val next = nextRunAtMillis(schedule, nowMillis = now)
-        
-        val expected = Calendar.getInstance().apply {
-            clear()
-            set(2026, Calendar.JANUARY, 19, 9, 0, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
+
+        val expected =
+            Calendar
+                .getInstance()
+                .apply {
+                    clear()
+                    set(2026, Calendar.JANUARY, 19, 9, 0, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
 
         assertEquals(expected, next)
     }

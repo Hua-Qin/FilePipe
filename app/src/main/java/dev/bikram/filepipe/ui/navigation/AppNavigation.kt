@@ -23,6 +23,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -1454,14 +1455,26 @@ private fun RulesTwoPaneRoute(
         }
         val targetRuleId =
             when {
-                currentRuleId == Screen.RuleDetail.NEW_RULE_ID -> currentRuleId
-                currentRuleId != null && currentRuleId == pendingSavedRuleId -> currentRuleId
-                currentRuleId != null && currentRuleId in ruleIds -> currentRuleId
+                currentRuleId == Screen.RuleDetail.NEW_RULE_ID -> {
+                    currentRuleId
+                }
+
+                currentRuleId != null && currentRuleId == pendingSavedRuleId -> {
+                    currentRuleId
+                }
+
+                currentRuleId != null && currentRuleId in ruleIds -> {
+                    currentRuleId
+                }
+
                 else -> {
                     if (currentRuleId != null && currentRuleId in previousRuleIds) {
                         val prevIndex = previousRuleIds.indexOf(currentRuleId)
                         when {
-                            ruleIds.isEmpty() -> null
+                            ruleIds.isEmpty() -> {
+                                null
+                            }
+
                             prevIndex in 0 until previousRuleIds.size -> {
                                 if (prevIndex < ruleIds.size) {
                                     ruleIds[prevIndex]
@@ -1469,7 +1482,10 @@ private fun RulesTwoPaneRoute(
                                     ruleIds.last()
                                 }
                             }
-                            else -> ruleIds.firstOrNull()
+
+                            else -> {
+                                ruleIds.firstOrNull()
+                            }
                         }
                     } else {
                         ruleIds.firstOrNull()
@@ -1578,6 +1594,7 @@ private fun RulesTwoPaneRoute(
                             showTopBar = false,
                             showSectionHeaders = false,
                             showAboutHeader = false,
+                            centerSelectedSectionContent = true,
                         )
                     } else {
                         RuleDetailPaneHost(
@@ -1724,6 +1741,12 @@ private fun RulesSelectionActionPane(
                     enabled = !isRunning,
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     shape = pillShape,
+                    colors =
+                        ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                        ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                     contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
                 ) {
                     RulesSelectionActionContent(
@@ -1851,13 +1874,14 @@ private fun HistoryTwoPaneRoute(
     val scope = rememberCoroutineScope()
     var activeHistoryId by rememberSaveable { mutableStateOf<Long?>(null) }
 
-    val currentIds = remember(section, visibleRunIds, trashedRules) {
-        if (section == HistorySection.TRASH) {
-            trashedRules.map { it.id }
-        } else {
-            visibleRunIds
+    val currentIds =
+        remember(section, visibleRunIds, trashedRules) {
+            if (section == HistorySection.TRASH) {
+                trashedRules.map { it.id }
+            } else {
+                visibleRunIds
+            }
         }
-    }
 
     fun showHistoryInDetailPane(historyId: Long) {
         activeHistoryId = historyId
@@ -1884,17 +1908,24 @@ private fun HistoryTwoPaneRoute(
             }
         } else if (currentHistoryId != null && currentHistoryId !in currentIds) {
             val prevIndex = previousIds.indexOf(currentHistoryId)
-            val nextHistoryId = when {
-                currentIds.isEmpty() -> null
-                prevIndex in 0 until previousIds.size -> {
-                    if (prevIndex < currentIds.size) {
-                        currentIds[prevIndex]
-                    } else {
-                        currentIds.last()
+            val nextHistoryId =
+                when {
+                    currentIds.isEmpty() -> {
+                        null
+                    }
+
+                    prevIndex in 0 until previousIds.size -> {
+                        if (prevIndex < currentIds.size) {
+                            currentIds[prevIndex]
+                        } else {
+                            currentIds.last()
+                        }
+                    }
+
+                    else -> {
+                        currentIds.firstOrNull()
                     }
                 }
-                else -> currentIds.firstOrNull()
-            }
             activeHistoryId = nextHistoryId
             if (nextHistoryId != null) {
                 navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, nextHistoryId)
@@ -1927,11 +1958,12 @@ private fun HistoryTwoPaneRoute(
                             onHistoryClick = { historyId -> showHistoryInDetailPane(historyId) },
                             onNavigateBack = onNavigateBack,
                             activeHistoryId = activeHistoryId.takeIf { showPaneSelectionState },
-                            onActivateTrashedRuleInDetailPane = if (showPaneSelectionState) {
-                                { ruleId -> showHistoryInDetailPane(ruleId) }
-                            } else {
-                                null
-                            },
+                            onActivateTrashedRuleInDetailPane =
+                                if (showPaneSelectionState) {
+                                    { ruleId -> showHistoryInDetailPane(ruleId) }
+                                } else {
+                                    null
+                                },
                             viewModel = viewModel,
                         )
                     }
@@ -1951,6 +1983,7 @@ private fun HistoryTwoPaneRoute(
                             showTopBar = false,
                             showSectionHeaders = false,
                             showAboutHeader = false,
+                            centerSelectedSectionContent = true,
                         )
                     } else if (section == HistorySection.TRASH) {
                         RuleDetailPaneHost(
@@ -2406,17 +2439,13 @@ private fun CenteredPillWithSideFab(
     modifier: Modifier = Modifier,
     leadingFab: (@Composable () -> Unit)? = null,
     fabCoreSize: androidx.compose.ui.unit.Dp = 56.dp,
-    fabRightInset: androidx.compose.ui.unit.Dp = 0.dp,
     fabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
     leadingFabGap: androidx.compose.ui.unit.Dp = fabGap,
-    leadingFabLeftInset: androidx.compose.ui.unit.Dp = 0.dp,
     leadingFabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
-    // Ported from Remember's pill strip: side FABs are measured with infinite height so
-    // a hosted FloatingActionButtonMenu can unfurl above the strip, anchored by the FAB
-    // *element* (wrapper bottom/side minus the menu's 16dp internal padding, passed as
-    // the inset params). The strip's reported height stays clamped to the FAB core size
-    // so the expanded menu overflows upward without re-centering the pill.
+    // Side FABs are measured at their natural width and with infinite height so hosted
+    // menus can unfurl above the strip. The strip reports only the scaled FAB core
+    // height, so expanded menus overflow upward without re-centering the pill.
     androidx.compose.ui.layout.Layout(
         modifier = modifier,
         content = {
@@ -2427,7 +2456,12 @@ private fun CenteredPillWithSideFab(
             }
         },
     ) { measurables, constraints ->
-        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val loose =
+            constraints.copy(
+                minWidth = 0,
+                minHeight = 0,
+                maxWidth = androidx.compose.ui.unit.Constraints.Infinity,
+            )
         val pillPlaceable = measurables[0].measure(loose)
         val fabPlaceable =
             measurables[1].measure(
@@ -2440,9 +2474,7 @@ private fun CenteredPillWithSideFab(
         val gapPx = fabGap.roundToPx()
         val leadingGapPx = leadingFabGap.roundToPx()
         val fabCorePx = fabCoreSize.roundToPx()
-        val fabRightInsetPx = fabRightInset.roundToPx()
         val fabBottomInsetPx = fabBottomInset.roundToPx()
-        val leadingFabLeftInsetPx = leadingFabLeftInset.roundToPx()
         val leadingFabBottomInsetPx = leadingFabBottomInset.roundToPx()
 
         val width =
@@ -2451,10 +2483,17 @@ private fun CenteredPillWithSideFab(
             } else {
                 pillPlaceable.width + gapPx + fabPlaceable.width
             }
+        val trailingSideRoomPx = gapPx + maxOf(fabCorePx, fabPlaceable.width)
+        val leadingSideRoomPx =
+            if (leadingFabPlaceable != null) {
+                leadingGapPx + maxOf(fabCorePx, leadingFabPlaceable.width)
+            } else {
+                0
+            }
         val sideRoomPx =
             maxOf(
-                gapPx + fabCorePx,
-                if (leadingFabPlaceable != null) leadingGapPx + fabCorePx else 0,
+                trailingSideRoomPx,
+                leadingSideRoomPx,
             )
         val rowNaturalWidth = pillPlaceable.width + sideRoomPx * 2
         val chromeScale =
@@ -2469,10 +2508,8 @@ private fun CenteredPillWithSideFab(
         val scaledFabHeight = (fabPlaceable.height * chromeScale).roundToInt()
         val scaledFabCore = (fabCorePx * chromeScale).roundToInt()
         val scaledGap = (gapPx * chromeScale).roundToInt()
-        val scaledFabRightInset = (fabRightInsetPx * chromeScale).roundToInt()
         val scaledFabBottomInset = (fabBottomInsetPx * chromeScale).roundToInt()
         val scaledLeadingGap = (leadingGapPx * chromeScale).roundToInt()
-        val scaledLeadingFabLeftInset = (leadingFabLeftInsetPx * chromeScale).roundToInt()
         val scaledLeadingFabBottomInset = (leadingFabBottomInsetPx * chromeScale).roundToInt()
         // Strip height tracks the FAB's *core* size rather than the wrapper's measured
         // height so the expanded menu never re-flows the strip.
@@ -2487,9 +2524,10 @@ private fun CenteredPillWithSideFab(
                 transformOrigin = TransformOrigin(0f, 0f)
             }
 
-            val desiredFabElementRight = pillX + scaledPillWidth + scaledGap + scaledFabCore
-            val fabElementRight = desiredFabElementRight.coerceAtMost(width)
-            val fabX = (fabElementRight - scaledFabWidth + scaledFabRightInset).coerceAtLeast(0)
+            val fabX =
+                (pillX + scaledPillWidth + scaledGap)
+                    .coerceAtMost(width - scaledFabWidth)
+                    .coerceAtLeast(0)
             val fabBottomY = (stripHeight + scaledFabCore) / 2 + scaledFabBottomInset
             val fabY = fabBottomY - scaledFabHeight
             fabPlaceable.placeWithLayer(fabX, fabY) {
@@ -2499,9 +2537,10 @@ private fun CenteredPillWithSideFab(
             }
 
             leadingFabPlaceable?.let { leadingPlaceable ->
-                val leadingFabElementLeft =
-                    (pillX - scaledLeadingGap - scaledFabCore).coerceAtLeast(0)
-                val leadingX = (leadingFabElementLeft - scaledLeadingFabLeftInset).coerceAtLeast(0)
+                val scaledLeadingFabWidth = (leadingPlaceable.width * chromeScale).roundToInt()
+                val leadingX =
+                    (pillX - scaledLeadingGap - scaledLeadingFabWidth)
+                        .coerceAtLeast(0)
                 val leadingFabBottomY = (stripHeight + scaledFabCore) / 2 + scaledLeadingFabBottomInset
                 val leadingY =
                     leadingFabBottomY -

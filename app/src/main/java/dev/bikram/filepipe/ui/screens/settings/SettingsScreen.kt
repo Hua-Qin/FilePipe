@@ -43,6 +43,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -108,9 +110,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
@@ -418,6 +420,7 @@ private fun SettingsSectionListRow(
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalFoundationApi::class,
+    ExperimentalLayoutApi::class,
     ExperimentalSharedTransitionApi::class,
 )
 @Composable
@@ -434,6 +437,7 @@ fun SettingsScreen(
     showTopBar: Boolean = true,
     showSectionHeaders: Boolean = true,
     showAboutHeader: Boolean = true,
+    centerSelectedSectionContent: Boolean = false,
 ) {
     val preferencesOrNull by viewModel.preferencesState.collectAsStateWithLifecycle()
     val preferences =
@@ -983,7 +987,12 @@ fun SettingsScreen(
                     top = innerPadding.calculateTopPadding() + contentPadding.calculateTopPadding() + 8.dp,
                     bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding() + 24.dp,
                 ),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement =
+                if (centerSelectedSectionContent && selectedSectionKey == SettingsSectionKey.About) {
+                    Arrangement.Center
+                } else {
+                    Arrangement.spacedBy(20.dp)
+                },
             userScrollEnabled = settingsScrollEnabled,
         ) {
             // Appearance
@@ -1914,10 +1923,11 @@ fun SettingsScreen(
                                         textAlign = TextAlign.Center,
                                     )
                                     Spacer(Modifier.height(24.dp))
-                                    Row(
+                                    FlowRow(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically,
+                                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                                        itemVerticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         val hostActivity = context as? ComponentActivity
                                         val aboutPillShape = pillShape
@@ -1957,6 +1967,9 @@ fun SettingsScreen(
                                                         text = stringResource(R.string.settings_rate_on_play_store),
                                                         style = MaterialTheme.typography.labelLarge,
                                                         color = MaterialTheme.colorScheme.primary,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis,
+                                                        softWrap = false,
                                                     )
                                                 }
                                             }
@@ -2002,6 +2015,9 @@ fun SettingsScreen(
                                                             text = stringResource(R.string.settings_star_on_github),
                                                             style = MaterialTheme.typography.labelLarge,
                                                             color = MaterialTheme.colorScheme.onPrimary,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            softWrap = false,
                                                         )
                                                     }
                                                 }
@@ -2043,6 +2059,9 @@ fun SettingsScreen(
                                                             text = stringResource(R.string.settings_rate_on_play_store),
                                                             style = MaterialTheme.typography.labelLarge,
                                                             color = MaterialTheme.colorScheme.onPrimary,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            softWrap = false,
                                                         )
                                                     }
                                                 }
@@ -2081,6 +2100,9 @@ fun SettingsScreen(
                                                             text = stringResource(R.string.settings_rate_on_play_store),
                                                             style = MaterialTheme.typography.labelLarge,
                                                             color = MaterialTheme.colorScheme.onPrimary,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            softWrap = false,
                                                         )
                                                     }
                                                 }
@@ -2127,6 +2149,9 @@ fun SettingsScreen(
                                                             text = stringResource(R.string.settings_star_on_github),
                                                             style = MaterialTheme.typography.labelLarge,
                                                             color = MaterialTheme.colorScheme.primary,
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis,
+                                                            softWrap = false,
                                                         )
                                                     }
                                                 }
@@ -2506,16 +2531,16 @@ private fun UpdateCheckBottomSheetContent(
     val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val isChangelogReady = changelogState is ChangelogUiState.Ready
     val outerScrollable = sheetScroll.maxValue > 0 && sheetScroll.maxValue != Int.MAX_VALUE
-    val outerModifier = Modifier
-        .fillMaxWidth()
-        .let { modifier ->
-            if (isLandscape && isChangelogReady) {
-                modifier.height(maxSheetHeight).verticalScroll(sheetScroll, enabled = outerScrollable)
-            } else {
-                modifier.heightIn(max = maxSheetHeight)
-            }
-        }
-        .padding(horizontal = 16.dp, vertical = 8.dp)
+    val outerModifier =
+        Modifier
+            .fillMaxWidth()
+            .let { modifier ->
+                if (isLandscape && isChangelogReady) {
+                    modifier.height(maxSheetHeight).verticalScroll(sheetScroll, enabled = outerScrollable)
+                } else {
+                    modifier.heightIn(max = maxSheetHeight)
+                }
+            }.padding(horizontal = 16.dp, vertical = 8.dp)
     Column(
         outerModifier,
     ) {
@@ -2693,15 +2718,16 @@ private fun UpdateCheckBottomSheetContent(
                     if (changelogPages.size <= 1) {
                         val singleScroll = rememberScrollState()
                         val singleScrollable = singleScroll.maxValue > 0 && singleScroll.maxValue != Int.MAX_VALUE
-                        val singleModifier = Modifier
-                            .fillMaxWidth()
-                            .let { modifier ->
-                                if (isLandscape) {
-                                    modifier.wrapContentHeight().padding(8.dp)
-                                } else {
-                                    modifier.heightIn(max = changelogPagerMaxHeight).padding(8.dp)
+                        val singleModifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .let { modifier ->
+                                    if (isLandscape) {
+                                        modifier.wrapContentHeight().padding(8.dp)
+                                    } else {
+                                        modifier.heightIn(max = changelogPagerMaxHeight).padding(8.dp)
+                                    }
                                 }
-                            }
                         Surface(
                             modifier = singleModifier,
                             shape = compactControlShape,
@@ -2709,14 +2735,15 @@ private fun UpdateCheckBottomSheetContent(
                             contentColor = scheme.onSurface,
                         ) {
                             Column(
-                                modifier = Modifier
-                                    .let { modifier ->
-                                        if (isLandscape) {
-                                            modifier.fillMaxWidth().wrapContentHeight().padding(16.dp)
-                                        } else {
-                                            modifier.fillMaxSize().verticalScroll(singleScroll, enabled = singleScrollable).padding(16.dp)
-                                        }
-                                    }
+                                modifier =
+                                    Modifier
+                                        .let { modifier ->
+                                            if (isLandscape) {
+                                                modifier.fillMaxWidth().wrapContentHeight().padding(16.dp)
+                                            } else {
+                                                modifier.fillMaxSize().verticalScroll(singleScroll, enabled = singleScrollable).padding(16.dp)
+                                            }
+                                        },
                             ) {
                                 SimpleMarkdown(
                                     content = readyMarkdown,
@@ -2725,15 +2752,16 @@ private fun UpdateCheckBottomSheetContent(
                             }
                         }
                     } else {
-                        val pagerModifier = Modifier
-                            .fillMaxWidth()
-                            .let { modifier ->
-                                if (isLandscape) {
-                                    modifier.wrapContentHeight().padding(horizontal = 8.dp, vertical = 2.dp)
-                                } else {
-                                    modifier.height(changelogPagerMaxHeight).padding(horizontal = 8.dp, vertical = 2.dp)
+                        val pagerModifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .let { modifier ->
+                                    if (isLandscape) {
+                                        modifier.wrapContentHeight().padding(horizontal = 8.dp, vertical = 2.dp)
+                                    } else {
+                                        modifier.height(changelogPagerMaxHeight).padding(horizontal = 8.dp, vertical = 2.dp)
+                                    }
                                 }
-                            }
                         Column(Modifier.fillMaxWidth()) {
                             Row(
                                 modifier =
@@ -2832,26 +2860,28 @@ private fun UpdateCheckBottomSheetContent(
                             ) {
                                 HorizontalPager(
                                     state = changelogPagerState,
-                                    modifier = Modifier
-                                        .let { modifier ->
-                                            if (isLandscape) {
-                                                modifier.fillMaxWidth().wrapContentHeight()
-                                            } else {
-                                                modifier.fillMaxSize()
-                                            }
-                                        },
+                                    modifier =
+                                        Modifier
+                                            .let { modifier ->
+                                                if (isLandscape) {
+                                                    modifier.fillMaxWidth().wrapContentHeight()
+                                                } else {
+                                                    modifier.fillMaxSize()
+                                                }
+                                            },
                                 ) { pageIndex ->
                                     val innerScroll = rememberScrollState()
                                     val innerScrollable = innerScroll.maxValue > 0 && innerScroll.maxValue != Int.MAX_VALUE
                                     Column(
-                                        modifier = Modifier
-                                            .let { modifier ->
-                                                if (isLandscape) {
-                                                    modifier.fillMaxWidth().wrapContentHeight().padding(16.dp)
-                                                } else {
-                                                    modifier.fillMaxSize().verticalScroll(innerScroll, enabled = innerScrollable).padding(16.dp)
-                                                }
-                                            }
+                                        modifier =
+                                            Modifier
+                                                .let { modifier ->
+                                                    if (isLandscape) {
+                                                        modifier.fillMaxWidth().wrapContentHeight().padding(16.dp)
+                                                    } else {
+                                                        modifier.fillMaxSize().verticalScroll(innerScroll, enabled = innerScrollable).padding(16.dp)
+                                                    }
+                                                },
                                     ) {
                                         SimpleMarkdown(content = changelogPages[pageIndex])
                                     }
@@ -3149,13 +3179,8 @@ private fun SettingsExpandableSectionHeader(
             modifier =
                 Modifier
                     .size(iconContainerSize)
-                    .then(
-                        if (collapsed) {
-                            Modifier.clip(MaterialTheme.shapes.extraExtraLarge)
-                        } else {
-                            Modifier
-                        },
-                    ).background(iconContainerColor),
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(iconContainerColor),
             contentAlignment = Alignment.Center,
         ) {
             FilePipeMaterialRoundedSymbol(

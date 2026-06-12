@@ -104,6 +104,7 @@
     <string name="schedule_hourly">Hourly</string>
     <string name="schedule_interval_hours">Every (hours)</string>
     <string name="schedule_interval_hours_helper">1–24 hours. For anything longer, use \"Daily\".</string>
+    <string name="schedule_interval_positive_error">Enter 1 or more.</string>
     <string name="schedule_remove_short">Remove</string>
     <string name="schedule_every">Every</string>
     <string name="schedule_unit_hours">Hours</string>

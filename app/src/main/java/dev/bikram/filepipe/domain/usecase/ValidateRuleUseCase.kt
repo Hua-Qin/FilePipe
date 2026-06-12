@@ -42,6 +42,7 @@ class ValidateRuleUseCase
                                     add("Interval must be between 1 and 24 hours")
                                 }
                             }
+
                             ScheduleType.WEEKLY -> {
                                 if (schedule.dayOfWeek == null) {
                                     add("Weekday is required for weekly schedule")
@@ -50,6 +51,7 @@ class ValidateRuleUseCase
                                     if (days.isEmpty()) add("At least one weekday is required for weekly schedule")
                                 }
                             }
+
                             ScheduleType.DAILY -> {
                                 // No additional restrictions
                             }

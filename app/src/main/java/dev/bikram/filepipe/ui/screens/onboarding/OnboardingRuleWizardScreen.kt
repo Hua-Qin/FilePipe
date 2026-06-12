@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -73,12 +74,12 @@ fun OnboardingRuleWizardScreen(
     }
 
     val actionButtons: @Composable () -> Unit = {
+        val onboardingCtaPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val onboardingCtaPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
             FilePipeOutlinedButton(
                 onClick = onBackToPermissions,
                 modifier = Modifier.weight(1f),

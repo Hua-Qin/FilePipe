@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -111,6 +112,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.graphics.ColorUtils
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -1114,6 +1116,7 @@ fun RuleDetailScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = compactControlShape,
                                         enabled = unusedBookmarks.isNotEmpty(),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                                     ) {
                                         FilePipeMaterialRoundedSymbol(
                                             name = "bookmark",
@@ -1121,7 +1124,12 @@ fun RuleDetailScreen(
                                             size = 18.dp,
                                             filled = false,
                                         )
-                                        Text("  ${stringResource(R.string.bookmarks_choose)}")
+                                        Text(
+                                            text = "  ${stringResource(R.string.bookmarks_choose)}",
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
                                     }
                                     DropdownMenu(
                                         expanded = bookmarkDropdownExpanded,
@@ -1359,6 +1367,7 @@ fun RuleDetailScreen(
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = compactControlShape,
                                         enabled = unusedDestBookmarks.isNotEmpty(),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                                     ) {
                                         FilePipeMaterialRoundedSymbol(
                                             name = "bookmark",
@@ -1366,7 +1375,12 @@ fun RuleDetailScreen(
                                             size = 18.dp,
                                             filled = false,
                                         )
-                                        Text("  ${stringResource(R.string.bookmarks_choose)}")
+                                        Text(
+                                            text = "  ${stringResource(R.string.bookmarks_choose)}",
+                                            maxLines = 1,
+                                            softWrap = false,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
                                     }
                                     DropdownMenu(
                                         expanded = destBookmarkDropdownExpanded,
@@ -1547,13 +1561,19 @@ fun RuleDetailScreen(
                                     enabled = !isReadOnly,
                                     modifier = Modifier.weight(1f),
                                     shape = compactControlShape,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                                 ) {
                                     FilePipeMaterialRoundedSymbol(
                                         name = "calendar_month",
                                         contentDescription = null,
                                         size = 18.dp,
                                     )
-                                    Text(text = "  $scheduleText")
+                                    Text(
+                                        text = "  $scheduleText",
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
                                 }
                                 if (!isReadOnly) {
                                     TooltipBox(
@@ -1776,13 +1796,15 @@ fun RuleDetailScreen(
                                 onClick = { showDeleteForeverConfirm = true },
                                 modifier = Modifier.weight(1f),
                                 shape = pillShape,
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                                ),
-                                border = BorderStroke(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-                                )
+                                colors =
+                                    ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error,
+                                    ),
+                                border =
+                                    BorderStroke(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                                    ),
                             ) {
                                 Text(stringResource(R.string.delete_forever))
                             }
@@ -1802,7 +1824,7 @@ fun RuleDetailScreen(
                         stringResource(R.string.new_rule)
                     } else {
                         stringResource(R.string.rule_details)
-                    }
+                    },
                 )
             },
             navigationIcon = {
@@ -1912,6 +1934,7 @@ fun RuleDetailScreen(
                             onDismiss = { dismissedBottomBarKey = bottomBarKey },
                         )
                     }
+
                     AnimatedVisibility(
                         visible = showReadOnlyBottomActions,
                         enter =
@@ -1946,13 +1969,15 @@ fun RuleDetailScreen(
                                 onClick = { showDeleteForeverConfirm = true },
                                 modifier = Modifier.weight(1f),
                                 shape = pillShape,
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                                ),
-                                border = BorderStroke(
-                                    width = 1.dp,
-                                    color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-                                )
+                                colors =
+                                    ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error,
+                                    ),
+                                border =
+                                    BorderStroke(
+                                        width = 1.dp,
+                                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.5f),
+                                    ),
                             ) {
                                 Text(stringResource(R.string.delete_forever))
                             }
@@ -1967,8 +1992,8 @@ fun RuleDetailScreen(
                                     expandVertically(
                                         animationSpec = bottomBarSpatialSpec,
                                         clip = false,
-                                        ),
-                                ),
+                                    ),
+                            ),
                         exit =
                             reducedMotionExitTransition(
                                 fadeOut(animationSpec = bottomBarFadeOutSpec) +
@@ -2029,8 +2054,8 @@ fun RuleDetailScreen(
                 Text(
                     stringResource(
                         R.string.history_trash_delete_forever_confirm_message,
-                        state.name
-                    )
+                        state.name,
+                    ),
                 )
             },
             confirmButton = {
@@ -2062,8 +2087,11 @@ fun RuleDetailScreen(
         LaunchedEffect(pickRequest) {
             folderPickerSheetState.expand()
         }
+        val fontScale = LocalDensity.current.fontScale
+        val showTitle = fontScale <= 1.15f
         AppBottomSheet(
             title = stringResource(R.string.filesystem_folder_picker_title),
+            showTitleBar = showTitle,
             onDismiss = { pendingFilesystemFolderPick = null },
             sheetState = folderPickerSheetState,
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -2097,23 +2125,27 @@ fun RuleDetailScreen(
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+            modifier =
+                Modifier
+                    .widthIn(min = 320.dp, max = 560.dp)
+                    .fillMaxWidth(0.9f),
             title = { Text(stringResource(R.string.unsaved_changes_title)) },
             text = { Text(stringResource(R.string.unsaved_changes_message)) },
             confirmButton = {
-                FilePipeTextButton(
-                    onClick = {
-                        showDiscardDialog = false
-                        viewModel.discardChanges()
-                        onNavigateBack()
-                    },
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(R.string.discard_changes))
-                }
-            },
-            dismissButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilePipeTextButton(onClick = { showDiscardDialog = false }) {
-                        Text(stringResource(R.string.keep_editing))
+                        Text(
+                            text = stringResource(R.string.keep_editing),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
                     }
                     FilePipeTextButton(
                         onClick = {
@@ -2122,7 +2154,26 @@ fun RuleDetailScreen(
                             viewModel.save()
                         },
                     ) {
-                        Text(stringResource(R.string.save_and_exit))
+                        Text(
+                            text = stringResource(R.string.save_and_exit),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
+                    }
+                    FilePipeTextButton(
+                        onClick = {
+                            showDiscardDialog = false
+                            viewModel.discardChanges()
+                            onNavigateBack()
+                        },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.discard_changes),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
                     }
                 }
             },

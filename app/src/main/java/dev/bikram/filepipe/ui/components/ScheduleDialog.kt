@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -43,6 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -70,13 +73,13 @@ fun ScheduleDialog(
     // selectedDays bitmask initialized from model helper
     var selectedDays by remember {
         mutableStateOf(
-            RuleSchedule.bitmaskToDaysOfWeek(initialSchedule?.dayOfWeek).toSet()
+            RuleSchedule.bitmaskToDaysOfWeek(initialSchedule?.dayOfWeek).toSet(),
         )
     }
 
     var intervalText by remember {
         mutableStateOf(
-            (initialSchedule?.intervalHours ?: 1).toString()
+            (initialSchedule?.intervalHours ?: 1).toString(),
         )
     }
     var intervalFieldError by remember { mutableStateOf(false) }
@@ -84,9 +87,20 @@ fun ScheduleDialog(
     var typeExpanded by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
 
+    val configuration = LocalConfiguration.current
+    val screenHeight = configuration.screenHeightDp.dp
+
+    fun isIntervalTextValid(
+        type: ScheduleType,
+        text: String = intervalText,
+    ): Boolean {
+        val parsed = text.toIntOrNull()
+        if (parsed == null || parsed < 1) return false
+        return type != ScheduleType.EVERY_N_HOURS || parsed <= 24
+    }
+
     fun validateIntervalText(): Boolean {
-        val parsed = intervalText.toIntOrNull()
-        val valid = parsed != null && parsed >= 1
+        val valid = isIntervalTextValid(scheduleType)
         intervalFieldError = !valid
         return valid
     }
@@ -114,10 +128,14 @@ fun ScheduleDialog(
             modifier =
                 Modifier
                     .widthIn(max = 400.dp)
-                    .padding(24.dp),
+                    .heightIn(max = screenHeight - 32.dp)
+                    .padding(16.dp),
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier =
+                    Modifier
+                        .padding(horizontal = 16.dp, vertical = 20.dp)
+                        .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
@@ -125,52 +143,51 @@ fun ScheduleDialog(
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
+                val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+                val useVerticalLayout = fontScale > 1.15f
+
                 Column(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                    val inputContent = @Composable { modifier1: Modifier, modifier2: Modifier ->
                         OutlinedTextField(
                             value = intervalText,
                             onValueChange = { newValue ->
-                                intervalText = newValue.filter { character -> character.isDigit() }.take(3)
-                                intervalFieldError = false
+                                val filteredText = newValue.filter { character -> character.isDigit() }.take(3)
+                                intervalText = filteredText
+                                intervalFieldError = !isIntervalTextValid(scheduleType, filteredText)
                             },
                             isError = intervalFieldError,
                             label = { Text(stringResource(R.string.schedule_every)) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f),
+                            modifier = modifier1,
                         )
 
                         ExposedDropdownMenuBox(
                             expanded = typeExpanded,
                             onExpandedChange = { typeExpanded = it },
-                            modifier = Modifier.weight(1.2f),
+                            modifier = modifier2,
                         ) {
-                            val selectedLabel = stringResource(
-                                when (scheduleType) {
-                                    ScheduleType.EVERY_N_HOURS -> R.string.schedule_unit_hours
-                                    ScheduleType.DAILY -> R.string.schedule_unit_days
-                                    ScheduleType.WEEKLY -> R.string.schedule_unit_weeks
-                                }
-                            )
+                            val selectedLabel =
+                                stringResource(
+                                    when (scheduleType) {
+                                        ScheduleType.EVERY_N_HOURS -> R.string.schedule_unit_hours
+                                        ScheduleType.DAILY -> R.string.schedule_unit_days
+                                        ScheduleType.WEEKLY -> R.string.schedule_unit_weeks
+                                    },
+                                )
                             OutlinedTextField(
                                 value = selectedLabel,
                                 onValueChange = {},
                                 readOnly = true,
                                 label = { Text(stringResource(R.string.schedule_frequency)) },
                                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(typeExpanded) },
-                                modifier = Modifier
-                                    .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
-                                    .fillMaxWidth(),
+                                modifier =
+                                    Modifier
+                                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
+                                        .fillMaxWidth(),
                             )
                             ExposedDropdownMenu(
                                 expanded = typeExpanded,
@@ -181,6 +198,7 @@ fun ScheduleDialog(
                                     text = { Text(stringResource(R.string.schedule_unit_hours)) },
                                     onClick = {
                                         scheduleType = ScheduleType.EVERY_N_HOURS
+                                        intervalFieldError = !isIntervalTextValid(ScheduleType.EVERY_N_HOURS)
                                         typeExpanded = false
                                     },
                                 )
@@ -188,6 +206,7 @@ fun ScheduleDialog(
                                     text = { Text(stringResource(R.string.schedule_unit_days)) },
                                     onClick = {
                                         scheduleType = ScheduleType.DAILY
+                                        intervalFieldError = !isIntervalTextValid(ScheduleType.DAILY)
                                         typeExpanded = false
                                     },
                                 )
@@ -195,6 +214,7 @@ fun ScheduleDialog(
                                     text = { Text(stringResource(R.string.schedule_unit_weeks)) },
                                     onClick = {
                                         scheduleType = ScheduleType.WEEKLY
+                                        intervalFieldError = !isIntervalTextValid(ScheduleType.WEEKLY)
                                         typeExpanded = false
                                     },
                                 )
@@ -202,26 +222,65 @@ fun ScheduleDialog(
                         }
                     }
 
+                    if (useVerticalLayout) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            inputContent(Modifier.fillMaxWidth(), Modifier.fillMaxWidth())
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            inputContent(Modifier.weight(1f), Modifier.weight(1.2f))
+                        }
+                    }
+
+                    if (intervalFieldError) {
+                        val intervalErrorText =
+                            if (scheduleType == ScheduleType.EVERY_N_HOURS) {
+                                R.string.schedule_interval_hours_helper
+                            } else {
+                                R.string.schedule_interval_positive_error
+                            }
+                        Text(
+                            text = stringResource(intervalErrorText),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp),
+                        )
+                    }
+
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text(
                             text = stringResource(R.string.schedule_start_time),
                             style = MaterialTheme.typography.labelMedium,
                         )
                         val dialogContext = androidx.compose.ui.platform.LocalContext.current
-                        val isSystem24Hour = android.text.format.DateFormat.is24HourFormat(dialogContext)
-                        val timeStr = if (isSystem24Hour) {
-                            "%02d:%02d".format(hour, minute)
-                        } else {
-                            val hour12 = when (val hourMod = hour % 12) {
-                                0 -> 12
-                                else -> hourMod
+                        val isSystem24Hour =
+                            android.text.format.DateFormat
+                                .is24HourFormat(dialogContext)
+                        val timeStr =
+                            if (isSystem24Hour) {
+                                "%02d:%02d".format(hour, minute)
+                            } else {
+                                val hour12 =
+                                    when (val hourMod = hour % 12) {
+                                        0 -> 12
+                                        else -> hourMod
+                                    }
+                                val amPm = if (hour < 12) "AM" else "PM"
+                                "%d:%02d %s".format(hour12, minute, amPm)
                             }
-                            val amPm = if (hour < 12) "AM" else "PM"
-                            "%d:%02d %s".format(hour12, minute, amPm)
-                        }
                         FilePipeOutlinedButton(
                             onClick = { showTimePicker = true },
                             modifier = Modifier.fillMaxWidth(),
@@ -229,7 +288,7 @@ fun ScheduleDialog(
                         ) {
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 FilePipeMaterialRoundedSymbol(
                                     name = "schedule",
@@ -244,52 +303,54 @@ fun ScheduleDialog(
                     if (scheduleType == ScheduleType.WEEKLY) {
                         Column(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Text(
                                 text = stringResource(R.string.schedule_day),
                                 style = MaterialTheme.typography.labelMedium,
                             )
-                            val weekdays = listOf(
-                                Calendar.SUNDAY to stringResource(R.string.day_sun).first().toString(),
-                                Calendar.MONDAY to stringResource(R.string.day_mon).first().toString(),
-                                Calendar.TUESDAY to stringResource(R.string.day_tue).first().toString(),
-                                Calendar.WEDNESDAY to stringResource(R.string.day_wed).first().toString(),
-                                Calendar.THURSDAY to stringResource(R.string.day_thu).first().toString(),
-                                Calendar.FRIDAY to stringResource(R.string.day_fri).first().toString(),
-                                Calendar.SATURDAY to stringResource(R.string.day_sat).first().toString(),
-                            )
+                            val weekdays =
+                                listOf(
+                                    Calendar.SUNDAY to stringResource(R.string.day_sun).first().toString(),
+                                    Calendar.MONDAY to stringResource(R.string.day_mon).first().toString(),
+                                    Calendar.TUESDAY to stringResource(R.string.day_tue).first().toString(),
+                                    Calendar.WEDNESDAY to stringResource(R.string.day_wed).first().toString(),
+                                    Calendar.THURSDAY to stringResource(R.string.day_thu).first().toString(),
+                                    Calendar.FRIDAY to stringResource(R.string.day_fri).first().toString(),
+                                    Calendar.SATURDAY to stringResource(R.string.day_sat).first().toString(),
+                                )
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 weekdays.forEach { (calDay, shortLabel) ->
                                     val isSelected = selectedDays.contains(calDay)
-                                    val dayBoxModifier = Modifier
-                                        .size(38.dp)
-                                        .background(
-                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
-                                            shape = CircleShape
-                                        )
-                                        .clip(CircleShape)
-                                        .clickable {
-                                            selectedDays = if (isSelected) {
-                                                selectedDays - calDay
-                                            } else {
-                                                selectedDays + calDay
+                                    val dayBoxModifier =
+                                        Modifier
+                                            .size(36.dp)
+                                            .background(
+                                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
+                                                shape = CircleShape,
+                                            ).clip(CircleShape)
+                                            .clickable {
+                                                selectedDays =
+                                                    if (isSelected) {
+                                                        selectedDays - calDay
+                                                    } else {
+                                                        selectedDays + calDay
+                                                    }
                                             }
-                                        }
                                     Box(
                                         modifier = dayBoxModifier,
-                                        contentAlignment = Alignment.Center
+                                        contentAlignment = Alignment.Center,
                                     ) {
                                         Text(
                                             text = shortLabel,
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
                                     }
                                 }
@@ -300,57 +361,83 @@ fun ScheduleDialog(
 
                 Spacer(Modifier.height(8.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (initialSchedule != null) {
-                        FilePipeTextButton(
-                            onClick = {
-                                onSave(null)
-                            },
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.schedule_remove_short),
-                                color = MaterialTheme.colorScheme.error,
-                            )
-                        }
-                    }
-                    FilePipeOutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                        shape = compactControlShape,
-                    ) {
-                        Text(stringResource(R.string.cancel))
-                    }
-                    FilePipeButton(
-                        onClick = {
-                            val validInterval = validateIntervalText()
-                            val validDays = scheduleType != ScheduleType.WEEKLY || selectedDays.isNotEmpty()
-                            if (!validInterval || !validDays) {
-                                return@FilePipeButton
-                            }
-                            val intervalParsed = intervalText.toIntOrNull()?.coerceAtLeast(1) ?: 1
-                            onSave(
-                                RuleSchedule(
-                                    type = scheduleType,
-                                    dayOfWeek = if (scheduleType == ScheduleType.WEEKLY) {
+                val buttonModifier = Modifier.fillMaxWidth()
+                val onSaveClick = {
+                    val validInterval = validateIntervalText()
+                    val validDays = scheduleType != ScheduleType.WEEKLY || selectedDays.isNotEmpty()
+                    if (validInterval && validDays) {
+                        val intervalParsed = intervalText.toIntOrNull()?.coerceAtLeast(1) ?: 1
+                        onSave(
+                            RuleSchedule(
+                                type = scheduleType,
+                                dayOfWeek =
+                                    if (scheduleType == ScheduleType.WEEKLY) {
                                         RuleSchedule.daysOfWeekToBitmask(selectedDays.toList())
                                     } else {
                                         null
                                     },
-                                    hour = hour,
-                                    minute = minute,
-                                    intervalHours = intervalParsed,
-                                ),
-                            )
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = compactControlShape,
+                                hour = hour,
+                                minute = minute,
+                                intervalHours = intervalParsed,
+                            ),
+                        )
+                    }
+                }
+
+                if (useVerticalLayout || initialSchedule != null) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        Text(stringResource(R.string.save))
+                        FilePipeButton(
+                            onClick = onSaveClick,
+                            modifier = buttonModifier,
+                            shape = compactControlShape,
+                        ) {
+                            Text(stringResource(R.string.save))
+                        }
+                        FilePipeOutlinedButton(
+                            onClick = onDismiss,
+                            modifier = buttonModifier,
+                            shape = compactControlShape,
+                        ) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                        if (initialSchedule != null) {
+                            FilePipeTextButton(
+                                onClick = {
+                                    onSave(null)
+                                },
+                                modifier = buttonModifier,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.schedule_remove_short),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        FilePipeOutlinedButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f),
+                            shape = compactControlShape,
+                        ) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                        FilePipeButton(
+                            onClick = onSaveClick,
+                            modifier = Modifier.weight(1f),
+                            shape = compactControlShape,
+                        ) {
+                            Text(stringResource(R.string.save))
+                        }
                     }
                 }
             }

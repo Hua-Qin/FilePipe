@@ -64,16 +64,19 @@ fun FileExtensionChips(
                         selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         selectedTrailingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     ),
-                trailingIcon = if (enabled) {
-                    {
-                        FilePipeMaterialRoundedSymbol(
-                            name = "close",
-                            contentDescription = stringResource(R.string.file_type_remove_content_description, ext),
-                            size = InputChipDefaults.AvatarSize,
-                            modifier = Modifier.size(InputChipDefaults.AvatarSize),
-                        )
-                    }
-                } else null,
+                trailingIcon =
+                    if (enabled) {
+                        {
+                            FilePipeMaterialRoundedSymbol(
+                                name = "close",
+                                contentDescription = stringResource(R.string.file_type_remove_content_description, ext),
+                                size = InputChipDefaults.AvatarSize,
+                                modifier = Modifier.size(InputChipDefaults.AvatarSize),
+                            )
+                        }
+                    } else {
+                        null
+                    },
             )
         }
         if (enabled) {
