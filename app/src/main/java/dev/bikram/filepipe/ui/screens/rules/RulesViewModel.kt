@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
@@ -18,6 +17,7 @@ import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.data.storage.isFolderPathAllFilesAccessLocationForRules
 import dev.bikram.filepipe.devtools.DevMockFileMove
+import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.domain.RuleFolderSeverity
 import dev.bikram.filepipe.domain.assessRuleFolderAccess
 import dev.bikram.filepipe.domain.model.FileMoved
@@ -38,8 +38,8 @@ import dev.bikram.filepipe.manualrun.ManualRunForegroundCoordinator
 import dev.bikram.filepipe.shortcuts.AppShortcutsManager
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
@@ -52,11 +52,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
@@ -827,11 +827,18 @@ class RulesViewModel
                     isBlockedLocation = ::isFolderPathAllFilesAccessLocationForRules,
                 )
             return when (assessment.severity) {
-                RuleFolderSeverity.ERROR -> RuleFolderIssueSeverity.ERROR
+                RuleFolderSeverity.ERROR -> {
+                    RuleFolderIssueSeverity.ERROR
+                }
+
                 // Amber source warnings are the only severity the per-rule preference can hide.
-                RuleFolderSeverity.WARNING ->
+                RuleFolderSeverity.WARNING -> {
                     if (rule.suppressMissingSourceFolderCardWarning) null else RuleFolderIssueSeverity.WARNING
-                RuleFolderSeverity.NONE -> null
+                }
+
+                RuleFolderSeverity.NONE -> {
+                    null
+                }
             }
         }
 

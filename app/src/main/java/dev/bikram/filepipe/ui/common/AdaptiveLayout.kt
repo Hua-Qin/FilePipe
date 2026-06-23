@@ -1,3 +1,5 @@
+@file:Suppress("ConfigurationScreenWidthHeight")
+
 package dev.bikram.filepipe.ui.common
 
 import android.content.res.Configuration
@@ -5,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.platform.LocalConfiguration
 
-/**
+/*
  * Single source of truth for the app's responsive breakpoints. Screens used to each re-derive
  * "is this a short landscape window?" inline from [LocalConfiguration], duplicating the same
  * orientation + height check (and the magic 480 threshold). Everything now routes through the

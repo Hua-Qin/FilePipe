@@ -146,11 +146,11 @@ import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.components.AlertFloatingActionButtonMenu
 import dev.bikram.filepipe.ui.components.FilePipeButton
+import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFloatingActionButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
-import dev.bikram.filepipe.ui.components.FilePipeConfirmDialog
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyHistoryIllustration
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyTrashIllustration
 import dev.bikram.filepipe.ui.components.UpdateChromeState
@@ -1309,13 +1309,12 @@ private fun TwoPaneListPaneWithFab(
 }
 
 @Composable
-private fun compactLandscapeFabBottomPadding(): Dp {
-    return if (isSmallLandscape()) {
+private fun compactLandscapeFabBottomPadding(): Dp =
+    if (isSmallLandscape()) {
         12.dp
     } else {
         24.dp
     }
-}
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
 @Composable

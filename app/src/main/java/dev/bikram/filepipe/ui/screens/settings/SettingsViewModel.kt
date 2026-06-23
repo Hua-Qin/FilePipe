@@ -17,8 +17,6 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dev.bikram.filepipe.di.IoDispatcher
-import dev.bikram.filepipe.di.MainDispatcher
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
@@ -32,6 +30,8 @@ import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.treeUriFromDocumentUri
+import dev.bikram.filepipe.di.IoDispatcher
+import dev.bikram.filepipe.di.MainDispatcher
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.backupFileTimestamp
 import dev.bikram.filepipe.domain.model.Rule
@@ -53,12 +53,12 @@ import dev.bikram.filepipe.update.copyUpdateApkToMediaStoreDownloads
 import dev.bikram.filepipe.update.notificationDedupeKey
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -201,7 +201,6 @@ class SettingsViewModel
                 }
             }
         }
-
 
         fun setFolderAccessMode(mode: FolderAccessMode) {
             viewModelScope.launch {
@@ -1015,12 +1014,11 @@ class SettingsViewModel
                 }
             }
 
-        private fun resolvePlayBannerUiStateForSessionLogic(): PlayInAppUpdateBannerUiState {
-            return mergeDevReleasePlayBannerMock(
+        private fun resolvePlayBannerUiStateForSessionLogic(): PlayInAppUpdateBannerUiState =
+            mergeDevReleasePlayBannerMock(
                 playInAppUpdateProgressController.bannerUiState.value,
                 devReleasePlayBannerMockStage.value,
             )
-        }
 
         override fun onCleared() {
             devReleasePlayBannerMockSequenceJob?.cancel()
