@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.data.preferences
 
+import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 
@@ -22,6 +23,13 @@ fun SwipeAction.materialSymbolName(): String =
 
 /** Surface-shading intensity used when nothing is stored yet. 1.0 == the slider's "medium" notch. */
 const val DEFAULT_SHADING_INTENSITY = 1.0f
+
+fun defaultUpdateCheckSchedule(): UpdateCheckSchedule =
+    if (BuildConfig.FLAVOR == "fdroid") {
+        UpdateCheckSchedule.NEVER
+    } else {
+        UpdateCheckSchedule.AT_APP_START
+    }
 
 data class AppPreferences(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
@@ -48,7 +56,7 @@ data class AppPreferences(
     val hasSeenIntro: Boolean = false,
     val hapticFeedbackEnabled: Boolean = true,
     val progressiveBlurEnabled: Boolean = true,
-    val updateCheckSchedule: UpdateCheckSchedule = UpdateCheckSchedule.AT_APP_START,
+    val updateCheckSchedule: UpdateCheckSchedule = defaultUpdateCheckSchedule(),
     val notifyOnNewUpdates: Boolean = false,
     /** Last [UpdateInfo.notificationDedupeKey] we posted an update notification for. */
     val updateLastNotifiedDedupeKey: String = "",

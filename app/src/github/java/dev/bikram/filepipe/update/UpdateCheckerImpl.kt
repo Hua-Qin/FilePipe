@@ -1,11 +1,19 @@
 package dev.bikram.filepipe.update
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.longOrNull
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -27,12 +35,16 @@ private data class GithubAsset(
 class UpdateCheckerImpl
     @Inject
     constructor(
+        @param:ApplicationContext private val context: Context,
         private val userPreferencesRepository: UserPreferencesRepository,
     ) : UpdateChecker {
         private val json = Json { ignoreUnknownKeys = true }
 
         override suspend fun checkForUpdate(): UpdateInfo? =
             withContext(Dispatchers.IO) {
+                if (BuildConfig.FLAVOR == "fdroid") {
+                    return@withContext checkFdroidForUpdate()
+                }
                 runCatching {
                     val url = URL("https://api.github.com/repos/${BuildConfig.GITHUB_REPO}/releases/latest")
                     val connection = url.openConnection() as HttpURLConnection
@@ -75,7 +87,53 @@ class UpdateCheckerImpl
                     )
                 }.getOrNull()
             }
+
+        private fun checkFdroidForUpdate(): UpdateInfo? =
+            runCatching {
+                val url = URL("https://f-droid.org/api/v1/packages/${context.packageName}")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.setRequestProperty("Accept", "application/json")
+                val responseText =
+                    try {
+                        connection.inputStream.use { it.readBytes().decodeToString() }
+                    } finally {
+                        connection.disconnect()
+                    }
+                val packageJson = json.parseToJsonElement(responseText).jsonObject
+                val packages =
+                    (packageJson["packages"] as? JsonArray)
+                        ?: (packageJson["versions"] as? JsonArray)
+                        ?: return@runCatching null
+                val latestPackage =
+                    packages
+                        .mapNotNull { element -> element as? JsonObject }
+                        .mapNotNull { element ->
+                            val versionCode = element.longOrNull("versionCode") ?: return@mapNotNull null
+                            val versionName = element.stringOrNull("versionName").orEmpty()
+                            FdroidPackageVersion(versionCode = versionCode, versionName = versionName)
+                        }.filter { version -> version.versionCode > BuildConfig.VERSION_CODE.toLong() }
+                        .maxByOrNull { version -> version.versionCode }
+                        ?: return@runCatching null
+
+                UpdateInfo(
+                    versionName = latestPackage.versionName.ifBlank { latestPackage.versionCode.toString() },
+                    downloadUrl = "",
+                    releaseNotes = "",
+                )
+            }.getOrNull()
     }
+
+private data class FdroidPackageVersion(
+    val versionCode: Long,
+    val versionName: String,
+)
+
+private fun JsonObject.stringOrNull(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
+
+private fun JsonObject.longOrNull(key: String): Long? {
+    val element = this[key] as? JsonPrimitive ?: return null
+    return element.longOrNull ?: element.contentOrNull?.toLongOrNull()
+}
 
 internal fun isGithubReleaseUpdateAvailable(
     remoteVersion: String,

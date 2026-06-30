@@ -1,31 +1,32 @@
 # FilePipe Flavor Differences
 
-FilePipe is built using two product flavors under the `distribution` dimension: **`github`** and **`playstore`**. 
+FilePipe is built using three product flavors under the `distribution` dimension: **`github`**, **`fdroid`**, and **`playstore`**.
 
-| Feature / Characteristic | GitHub Flavor (`github`) | Play Store Flavor (`playstore`) |
-| :--- | :--- | :--- |
-| **Application ID** | `dev.bikram.filepipe.gh` | `dev.bikram.filepipe` |
-| **Side-by-Side Installation** | Yes (due to different package ID suffixes) | Yes (due to different package ID suffixes) |
-| **Update Mechanism** | Checks GitHub Release API (`/releases/latest`), downloads APK to cache, and launches system installer intent. | Leverages Google Play Core In-App Updates (flexible or immediate options). |
-| **Manifest Permissions** | Requests `android.permission.REQUEST_INSTALL_PACKAGES` to allow APK installation. | No installation permissions requested. |
-| **Save Update to Downloads** | Yes, settings toggle (`saveUpdateApkToDownloads`) to save a copy of the downloaded APK to the public Downloads folder. | No. |
-| **Startup Cache Cleanup** | Yes, running `UpdateApkCacheMaintenance` deletes the cached APK once the installed package matches the cached version. | N/A. |
-| **In-App Rating / Review** | Stubbed out (`GithubPlayUpdateNoOp`); does not prompt for ratings. | Integrates Google Play In-App Review API with automated prompt scheduling (`InAppRatingAutoPromptHost`). |
-| **"Star on GitHub" Button** | Primary visual treatment (solid color background). | Secondary visual treatment (outlined border). |
-| **"Rate on Play Store" Button** | Secondary visual treatment (outlined border, launches store listing URL in browser). | Primary visual treatment (solid color background, triggers native In-App Review dialog). |
-| **Play Service Dependencies** | None. | Imports `com.google.android.play:app-update` and `com.google.android.play:review` libraries. |
+| Feature / Characteristic | GitHub Flavor (`github`) | F-Droid Flavor (`fdroid`) | Play Store Flavor (`playstore`) |
+| :--- | :--- | :--- | :--- |
+| **Application ID** | `dev.bikram.filepipe.gh` | `dev.bikram.filepipe.gh` | `dev.bikram.filepipe` |
+| **Side-by-Side Installation** | Can be installed beside Play Store. Cannot be installed beside F-Droid because both use the `.gh` package ID. | Can be installed beside Play Store. Cannot be installed beside GitHub because both use the `.gh` package ID. | Can be installed beside GitHub or F-Droid because those use the `.gh` package ID. |
+| **Update Check Source** | GitHub Release API for `bikram-agarwal/filepipe`. | F-Droid package API for the installed package ID. | Google Play Core In-App Updates. |
+| **Update Action** | Downloads the release APK to app cache and launches the system package installer. | Opens `fdroid.app:dev.bikram.filepipe.gh` so the user's installed FOSS package client handles the update. If no FOSS client handles that deep link, the app falls back to the app web page. | Starts the Play Core in-app update flow. |
+| **Manifest Permissions** | Requests `REQUEST_INSTALL_PACKAGES` and `USE_EXACT_ALARM`. | Requests `USE_EXACT_ALARM`. Does not request install-package permission. | Requests `SCHEDULE_EXACT_ALARM`. Does not request install-package permission. |
+| **Save Update APK to Downloads** | Yes, via the `saveUpdateApkToDownloads` setting. | No. Updates are delegated to the user's F-Droid-compatible client. | No. Updates are delegated to Play Core. |
+| **In-App Rating / Review** | Stubbed out. Does not prompt for Play ratings. | Stubbed out. Does not prompt for Play ratings. | Uses the Google Play In-App Review API with automated prompt scheduling. |
+| **Cross-Promo Cards** | Shows Remember and ObtainX cards. Tapping opens each app's webpage. | Shows Remember and ObtainX cards. Tapping first tries `fdroid.app:<target_package_id>`, then falls back to the target app's webpage. | Shows Remember only. Tapping opens the Remember Play Store listing. |
 
 ---
 
 ## Backup Portability FAQ
 
-### Are backups portable between the GitHub and Play Store flavors?
-**Yes, the backup files (`filepipe_backup_*.json`) are fully portable between both flavors.**
+### Are backups portable between the GitHub, F-Droid, and Play Store flavors?
 
-Both flavors share the same data domain representation, Room database schema, and JSON serialization DTOs (using `ignoreUnknownKeys = true` to safely handle fields such as `saveUpdateApkToDownloads` if imported into the Play Store version).
+**Yes, the backup files (`filepipe_backup_*.json`) are fully portable between all three flavors.**
+
+All flavors share the same data domain representation, Room database schema, and JSON serialization DTOs. Backup import uses `ignoreUnknownKeys = true`, so flavor-specific preference fields can be safely ignored by a flavor that does not use them.
 
 > [!WARNING]
 > **Storage Access Permissions (SAF/Document Trees) Do Not Transfer:**
-> Android manages Storage Access Framework (SAF) folder permissions (granted via `takePersistableUriPermission`) at the package name level. Because the GitHub flavor (`dev.bikram.filepipe.gh`) and Play Store flavor (`dev.bikram.filepipe`) have different Application IDs, any folder permissions stored in settings (e.g., local backup destination or customized rule source/destination directories) will **not** be accessible by the other flavor upon restore.
-> 
-> **How to resolve:** After restoring a backup on a different flavor, you will need to re-pick those folders using the system folder picker to grant permission to the new application package.
+> Android manages Storage Access Framework (SAF) folder permissions granted through `takePersistableUriPermission` at the package-name level.
+>
+> The GitHub and F-Droid flavors share `dev.bikram.filepipe.gh`, so their SAF grants are tied to the same package ID. The Play Store flavor uses `dev.bikram.filepipe`, so SAF grants from GitHub or F-Droid are not available to the Play Store build, and Play Store grants are not available to GitHub or F-Droid.
+>
+> **How to resolve:** After restoring a backup on a flavor with a different package ID, re-pick affected folders with the system folder picker so Android grants access to the active package.

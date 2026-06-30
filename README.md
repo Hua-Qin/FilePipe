@@ -1,12 +1,20 @@
 # FilePipe
 
-<img alt="FilePipe Banner" src="./fastlane/metadata/android/en-US/images/featureGraphic.png" />
+<img alt="FilePipe Banner" src="fastlane/metadata/android/en-US/images/featureGraphic.png" />
 
 FilePipe turns your chaotic storage into a perfectly organized library — automatically.
 
 Ever wish your Downloads folder would just sort itself? Or that all your videos would gather in one place regardless of which app saved them?
 
 That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let the pipes do the work. Move or copy any media to its rightful place.
+
+## 📦 Downloads
+
+[<img src="app/src/main/res/drawable-nodpi/badge_playstore.png" alt="Get FilePipe on Play Store" height="80">](https://play.google.com/store/apps/details?id=dev.bikram.filepipe)
+[<img src="app/src/main/res/drawable-nodpi/badge_github.png" alt="Get FilePipe on GitHub" height="80">](https://github.com/bikram-agarwal/FilePipe/releases/latest)
+<!-- Coming soon. Placeholder code.
+[<img src="app/src/main/res/drawable-nodpi/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.filepipe)
+-->
 
 ## 🛠️ How to use
 
@@ -61,34 +69,34 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 <table>
 <tr>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/1_rules.jpg" alt="Home Page: Rules" width="300" /><br />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/1_rules.jpg" alt="Home Page: Rules" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/2_multiselect.jpg" alt="Light & Dark themes." width="300" /><br />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/2_multiselect.jpg" alt="Light & Dark themes." width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/8_settings.jpg" alt="Extensive theming options. Make it your own." width="300" /><br />
-</td>
-</tr>
-
-<tr>
-<td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/3_templates.jpg" alt="Rule creation templates" width="300" /><br />
-</td>
-<td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/4_edit.jpg" alt="Rule editing" width="300" /><br />
-</td>
-<td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/5_icons.jpg" alt="Set icons or your choice of emoji" width="300" /><br />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/8_settings.jpg" alt="Extensive theming options. Make it your own." width="300" /><br />
 </td>
 </tr>
 
 <tr>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/6_history.jpg" alt="All runs saved in history." width="300" /><br />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/3_templates.jpg" alt="Rule creation templates" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/7_history.jpg" alt="Per file list. Option to undo." width="300" /><br />
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/4_edit.jpg" alt="Rule editing" width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/5_icons.jpg" alt="Set icons or your choice of emoji" width="300" /><br />
+</td>
+</tr>
+
+<tr>
+<td width="33%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/6_history.jpg" alt="All runs saved in history" width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/7_history.jpg" alt="Per file list. Option to undo." width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
 <video src="https://github.com/user-attachments/assets/99e8bd81-65b2-4961-908d-1d8a5a79b981" controls alt="FilePipe Intro." width="300" /><br />
@@ -96,15 +104,25 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 </tr>
 </table>
 
----
+<table>
+<tr>
+<td width="50%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/tablet_1_rules.jpg" alt="Home Page: Rules" width="450" /><br />
+</td>
+<td width="50%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/tablet_2_multiselect.jpg" alt="Home Page: Rules Multi-select" width="450" /><br />
+</td>
+</tr>
 
-## 📥 Download / links
-
-- [**Play Store**](https://play.google.com/store/apps/details?id=dev.bikram.filepipe)
-- [**GitHub**](https://github.com/bikram-agarwal/FilePipe/releases/latest) 
-
-- [Project site](https://bikram-agarwal.github.io/filepipe/)
-- [Privacy policy](https://bikram-agarwal.github.io/filepipe/privacy)
+<tr>
+<td width="50%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/tablet_3_history.jpg" alt="All runs saved in history" width="450" /><br />
+</td>
+<td width="50%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/tablet_4_settings.jpg" alt="Extensive theming options. Make it your own." width="450" /><br />
+</td>
+</tr>
+</table>
 
 ---
 

@@ -1,4 +1,4 @@
-## v3.8.5 Multiple filename patterns
+## v3.8.6 Multiple filename patterns
 
 ### 🛠 Improved Features
 - **Match several filename patterns in one rule.** A rule's advanced filters now accept multiple comma-separated filename (and exclude) patterns — a file matches if any one of them matches.

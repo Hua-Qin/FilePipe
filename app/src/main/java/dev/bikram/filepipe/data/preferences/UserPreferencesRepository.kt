@@ -234,7 +234,8 @@ class UserPreferencesRepository
                             runCatching { UpdateCheckSchedule.valueOf(raw) }.getOrNull()
                         } ?: when (prefs[PrefKeys.AUTO_CHECK_UPDATES]) {
                             false -> UpdateCheckSchedule.NEVER
-                            else -> UpdateCheckSchedule.AT_APP_START
+                            true -> UpdateCheckSchedule.AT_APP_START
+                            null -> defaultUpdateCheckSchedule()
                         },
                     notifyOnNewUpdates = prefs[PrefKeys.NOTIFY_ON_NEW_UPDATES] ?: false,
                     updateLastNotifiedDedupeKey = prefs[PrefKeys.UPDATE_LAST_NOTIFIED_DEDUPE_KEY].orEmpty(),
@@ -431,7 +432,8 @@ class UserPreferencesRepository
                 val scheduleName =
                     when (legacy) {
                         false -> UpdateCheckSchedule.NEVER.name
-                        else -> UpdateCheckSchedule.AT_APP_START.name
+                        true -> UpdateCheckSchedule.AT_APP_START.name
+                        null -> defaultUpdateCheckSchedule().name
                     }
                 prefs[PrefKeys.UPDATE_CHECK_SCHEDULE] = scheduleName
                 prefs.remove(PrefKeys.AUTO_CHECK_UPDATES)
@@ -750,7 +752,7 @@ class UserPreferencesRepository
                     when {
                         !dto.updateCheckSchedule.isNullOrBlank() -> {
                             runCatching { UpdateCheckSchedule.valueOf(dto.updateCheckSchedule) }.getOrNull()
-                                ?: UpdateCheckSchedule.AT_APP_START
+                                ?: defaultUpdateCheckSchedule()
                         }
 
                         dto.autoCheckForUpdates == false -> {
@@ -758,7 +760,7 @@ class UserPreferencesRepository
                         }
 
                         else -> {
-                            UpdateCheckSchedule.AT_APP_START
+                            defaultUpdateCheckSchedule()
                         }
                     }
                 prefs[PrefKeys.UPDATE_CHECK_SCHEDULE] = resolvedSchedule.name

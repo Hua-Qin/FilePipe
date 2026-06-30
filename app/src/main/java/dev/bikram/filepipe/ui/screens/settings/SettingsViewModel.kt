@@ -857,6 +857,9 @@ class SettingsViewModel
 
         fun downloadAndInstall(updateInfo: UpdateInfo) =
             viewModelScope.launch {
+                if (BuildConfig.FLAVOR == "fdroid") {
+                    return@launch
+                }
                 val downloadUrl = updateInfo.downloadUrl
                 _downloadProgress.value = 0f
                 val result =

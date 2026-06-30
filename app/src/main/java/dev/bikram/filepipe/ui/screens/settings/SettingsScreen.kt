@@ -3,6 +3,7 @@ package dev.bikram.filepipe.ui.screens.settings
 import android.Manifest
 import android.app.Activity
 import android.app.AlarmManager
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -198,6 +199,8 @@ private const val SETTINGS_LIST_INDEX_SCHEDULE = 2
 private const val SETTINGS_SECTION_HIGHLIGHT_DURATION_MS = 4_500L
 private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
 private const val DEVELOPER_OPTIONS_UNLOCK_TAPS = 7
+private const val REMEMBER_FDROID_PACKAGE_ID = "dev.bikram.remember.gh"
+private const val OBTAINX_FDROID_PACKAGE_ID = "dev.bikram.obtainx"
 
 enum class SettingsSectionKey(
     val routeKey: String,
@@ -238,6 +241,20 @@ fun settingsSectionKeyForHighlight(highlightSectionKey: String?): SettingsSectio
 private enum class BackupFolderTarget {
     Local,
     Cloud,
+}
+
+private data class AboutAppRoute(
+    val packageId: String,
+    val portfolioUrl: String,
+    val playStoreUrl: String = "",
+) {
+    val copyUrl: String
+        get() =
+            when (BuildConfig.FLAVOR) {
+                "fdroid" -> "fdroid.app:$packageId"
+                "playstore" -> playStoreUrl.ifBlank { portfolioUrl }
+                else -> portfolioUrl
+            }
 }
 
 private enum class SwipeDirectionCue(
@@ -798,7 +815,7 @@ fun SettingsScreen(
     LaunchedEffect(openUpdateSheetFromRulesPromo) {
         if (!openUpdateSheetFromRulesPromo || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
         showUpdateSheet = true
-        if (BuildConfig.FLAVOR == "github" && BuildConfig.CHANGELOG_GITHUB_REPO.isNotBlank()) {
+        if (BuildConfig.CHANGELOG_GITHUB_REPO.isNotBlank()) {
             viewModel.loadChangelogForUpdateSheet()
         }
         viewModel.consumeOpenUpdateSheetFromRulesPromo()
@@ -845,9 +862,12 @@ fun SettingsScreen(
                 downloadProgress = downloadProgress,
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
+                useFdroidUpdates = BuildConfig.FLAVOR == "fdroid",
                 usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
                 onDownloadClick = { info ->
-                    if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.downloadUrl.isBlank()) {
+                    if (BuildConfig.FLAVOR == "fdroid") {
+                        openFdroidPackagePage(context)
+                    } else if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.downloadUrl.isBlank()) {
                         val hostActivity = context as? ComponentActivity
                         viewModel.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
                     } else {
@@ -1732,10 +1752,12 @@ fun SettingsScreen(
                         BuildConfig.GITHUB_REPO
                             .trim()
                             .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
+                    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
                     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
                     val buildFlavorLabel =
                         when (BuildConfig.FLAVOR) {
                             "github" -> stringResource(R.string.build_flavor_github)
+                            "fdroid" -> stringResource(R.string.build_flavor_fdroid)
                             "playstore" -> stringResource(R.string.build_flavor_playstore)
                             else -> BuildConfig.FLAVOR
                         }
@@ -1952,7 +1974,7 @@ fun SettingsScreen(
                                         ) {
                                             val hostActivity = context as? ComponentActivity
                                             val aboutPillShape = pillShape
-                                            if (BuildConfig.FLAVOR == "github") {
+                                            if (useGithubLikeAboutLinks) {
                                                 Surface(
                                                     shape = aboutPillShape,
                                                     color = Color.Transparent,
@@ -2224,15 +2246,18 @@ private fun AboutOtherAppsAndLinks(
     copyLinkToClipboard: (String) -> Unit,
     isSmallLandscape: Boolean,
 ) {
-    val rememberStoreUrl =
-        stringResource(
-            if (BuildConfig.FLAVOR == "github") {
-                R.string.settings_about_remember_github_url
-            } else {
-                R.string.settings_about_remember_play_store_url
-            },
+    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
+    val rememberRoute =
+        AboutAppRoute(
+            packageId = REMEMBER_FDROID_PACKAGE_ID,
+            portfolioUrl = stringResource(R.string.settings_about_remember_website_url),
+            playStoreUrl = stringResource(R.string.settings_about_remember_play_store_url),
         )
-    val obtainXStoreUrl = stringResource(R.string.settings_about_obtainx_github_url)
+    val obtainXRoute =
+        AboutAppRoute(
+            packageId = OBTAINX_FDROID_PACKAGE_ID,
+            portfolioUrl = stringResource(R.string.settings_about_obtainx_website_url),
+        )
     val websiteUrl = stringResource(R.string.settings_about_filepipe_website_url)
     val privacyUrl = stringResource(R.string.settings_about_filepipe_privacy_url)
     val termsUrl = stringResource(R.string.settings_about_filepipe_terms_url)
@@ -2246,22 +2271,22 @@ private fun AboutOtherAppsAndLinks(
         )
         Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
         AboutAppStoreButton(
-            iconResId = R.drawable.remember_logo,
+            iconResId = R.drawable.logo_remember,
             name = stringResource(R.string.settings_about_remember_name),
             tagline = stringResource(R.string.settings_about_remember_tagline),
-            url = rememberStoreUrl,
+            route = rememberRoute,
             accentColor = Color(0xFF4F7D43),
             context = context,
             copyLinkToClipboard = copyLinkToClipboard,
             isSmallLandscape = isSmallLandscape,
         )
-        if (BuildConfig.FLAVOR == "github") {
+        if (useGithubLikeAboutLinks) {
             Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
             AboutAppStoreButton(
-                iconResId = R.drawable.obtainx_logo,
+                iconResId = R.drawable.logo_obtainx,
                 name = stringResource(R.string.settings_about_obtainx_name),
                 tagline = stringResource(R.string.settings_about_obtainx_tagline),
-                url = obtainXStoreUrl,
+                route = obtainXRoute,
                 accentColor = Color(0xFF7C55D9),
                 context = context,
                 copyLinkToClipboard = copyLinkToClipboard,
@@ -2306,7 +2331,7 @@ private fun AboutAppStoreButton(
     iconResId: Int,
     name: String,
     tagline: String,
-    url: String,
+    route: AboutAppRoute,
     accentColor: Color,
     context: Context,
     copyLinkToClipboard: (String) -> Unit,
@@ -2322,8 +2347,8 @@ private fun AboutAppStoreButton(
                 .fillMaxWidth()
                 .clip(shape)
                 .tapSoundCombinedClickable(
-                    onClick = { openAboutUrl(context, url) },
-                    onLongClick = { copyLinkToClipboard(url) },
+                    onClick = { openAboutAppRoute(context, route) },
+                    onLongClick = { copyLinkToClipboard(route.copyUrl) },
                     role = Role.Button,
                 ),
     ) {
@@ -2416,6 +2441,32 @@ private fun openAboutUrl(
     }
 }
 
+private fun openAboutAppRoute(
+    context: Context,
+    route: AboutAppRoute,
+) {
+    when (BuildConfig.FLAVOR) {
+        "fdroid" -> {
+            val fdroidIntent =
+                Intent(Intent.ACTION_VIEW, "fdroid.app:${route.packageId}".toUri())
+            try {
+                context.startActivity(fdroidIntent)
+            } catch (_: ActivityNotFoundException) {
+                context.startActivity(Intent(Intent.ACTION_VIEW, route.portfolioUrl.toUri()))
+            }
+        }
+
+        "playstore" -> {
+            val targetUrl = route.playStoreUrl.ifBlank { route.portfolioUrl }
+            context.startActivity(Intent(Intent.ACTION_VIEW, targetUrl.toUri()))
+        }
+
+        else -> {
+            context.startActivity(Intent(Intent.ACTION_VIEW, route.portfolioUrl.toUri()))
+        }
+    }
+}
+
 /**
  * Opens the system share sheet with the same link and message as the Settings About section used for sharing.
  */
@@ -2424,11 +2475,16 @@ fun launchAppShareChooser(context: Context) {
         BuildConfig.GITHUB_REPO
             .trim()
             .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
+    val portfolioUrl = context.getString(R.string.settings_about_filepipe_website_url)
     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
     val shareUrl =
         when {
             BuildConfig.FLAVOR == "playstore" -> {
                 playStoreListingUrl
+            }
+
+            BuildConfig.FLAVOR == "fdroid" || BuildConfig.FLAVOR == "github" -> {
+                portfolioUrl
             }
 
             githubRepoForSourceLink.isNotEmpty() -> {
@@ -2568,6 +2624,7 @@ private fun UpdateCheckBottomSheetContent(
     downloadProgress: Float?,
     changelogState: ChangelogUiState,
     showGithubExtraUi: Boolean,
+    useFdroidUpdates: Boolean,
     usePlayInAppUpdates: Boolean,
     onDownloadClick: (UpdateInfo) -> Unit,
     onSkipVersionClick: () -> Unit,
@@ -2675,13 +2732,21 @@ private fun UpdateCheckBottomSheetContent(
                         ) {
                             Text(
                                 text =
-                                    if (usePlayInAppUpdates && availableUpdate.isPlayStoreUpdateInProgress) {
-                                        stringResource(R.string.settings_update_resume_play)
-                                    } else {
-                                        stringResource(
-                                            R.string.settings_download_install,
-                                            availableUpdate.versionName,
-                                        )
+                                    when {
+                                        useFdroidUpdates -> {
+                                            stringResource(R.string.settings_open_fdroid)
+                                        }
+
+                                        usePlayInAppUpdates && availableUpdate.isPlayStoreUpdateInProgress -> {
+                                            stringResource(R.string.settings_update_resume_play)
+                                        }
+
+                                        else -> {
+                                            stringResource(
+                                                R.string.settings_download_install,
+                                                availableUpdate.versionName,
+                                            )
+                                        }
                                     },
                                 maxLines = 1,
                             )
@@ -3784,6 +3849,25 @@ private fun SwipeAction.settingsSwipeAccent(): Color = swipeActionAccent()
 private fun SwipeAction.settingsSwipeIconContainerColor(): Color = settingsSwipeAccent()
 
 private fun SwipeAction.settingsSwipeIconColor(): Color = Color.White
+
+private fun openFdroidPackagePage(context: Context) {
+    val fdroidIntent =
+        Intent(Intent.ACTION_VIEW, "fdroid.app:${context.packageName}".toUri()).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    try {
+        context.startActivity(fdroidIntent)
+    } catch (_: ActivityNotFoundException) {
+        val webIntent =
+            Intent(
+                Intent.ACTION_VIEW,
+                "https://f-droid.org/packages/${context.packageName}/".toUri(),
+            ).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        context.startActivity(webIntent)
+    }
+}
 
 @Composable
 private fun SwipePanelDivider() {

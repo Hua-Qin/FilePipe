@@ -56,8 +56,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = filePipeApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 385
-        versionName = "3.8.5"
+        versionCode = 386
+        versionName = "3.8.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -127,9 +127,29 @@ extensions.configure<ApplicationExtension>("android") {
         buildConfig = true
     }
 
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
+    packaging {
+        jniLibs {
+            keepDebugSymbols += "**/libdatastore_shared_counter.so"
+        }
+    }
+
     flavorDimensions += "distribution"
     productFlavors {
         create("github") {
+            dimension = "distribution"
+            applicationIdSuffix = ".gh"
+            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
+        }
+        create("fdroid") {
             dimension = "distribution"
             applicationIdSuffix = ".gh"
             buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
@@ -145,6 +165,13 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "true")
             buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/filepipe\"")
             buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
+        }
+    }
+
+    sourceSets {
+        getByName("fdroid") {
+            java.directories.add("src/github/java")
+            kotlin.directories.add("src/github/java")
         }
     }
 
@@ -223,6 +250,7 @@ dependencies {
 
     // Hilt
     implementation(libs.hilt.android)
+    compileOnly(libs.errorprone.annotations)
     ksp(libs.hilt.compiler)
 
     // Room
