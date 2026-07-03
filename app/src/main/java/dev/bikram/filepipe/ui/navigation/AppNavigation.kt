@@ -170,9 +170,9 @@ import dev.bikram.filepipe.ui.screens.ruledetail.RuleDetailScreen
 import dev.bikram.filepipe.ui.screens.rules.ManualRunCancelAnchor
 import dev.bikram.filepipe.ui.screens.rules.RulesScreen
 import dev.bikram.filepipe.ui.screens.rules.RulesViewModel
+import dev.bikram.filepipe.ui.screens.settings.FilePipeUpdateViewModel
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
 import dev.bikram.filepipe.ui.screens.settings.SettingsSectionKey
-import dev.bikram.filepipe.ui.screens.settings.SettingsSectionListPane
 import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
 import dev.bikram.filepipe.ui.screens.settings.launchAppShareChooser
 import dev.bikram.filepipe.ui.screens.settings.settingsSectionKeyForHighlight
@@ -298,14 +298,15 @@ fun AppNavigation(
     // Activity-scoped VMs for nav bar FAB actions
     val historyVm: HistoryViewModel = hiltViewModel()
     val settingsVm: SettingsViewModel = hiltViewModel()
+    val updateVm: FilePipeUpdateViewModel = hiltViewModel()
     val hasAnyHistory by historyVm.hasAnyHistory.collectAsStateWithLifecycle()
     val historySection by historyVm.section.collectAsStateWithLifecycle()
     val trashedRules by historyVm.trashedRules.collectAsStateWithLifecycle()
     val hasAnyTrashedRules = trashedRules.isNotEmpty()
-    val updateInfo by settingsVm.updateInfo.collectAsStateWithLifecycle()
-    val openUpdateSheetFromNotification by settingsVm.openUpdateSheetFromNotification.collectAsStateWithLifecycle()
-    val playBannerState by settingsVm.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
-    val updatePromoDismissed by settingsVm.updatePromoBannerDismissedThisSession.collectAsStateWithLifecycle()
+    val updateInfo by updateVm.updateInfo.collectAsStateWithLifecycle()
+    val openSheetRequested by updateVm.openSheetRequested.collectAsStateWithLifecycle()
+    val playBannerState by updateVm.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
+    val updatePromoDismissed by updateVm.updatePromoBannerDismissedThisSession.collectAsStateWithLifecycle()
     var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
     var openNewRuleInPane by remember { mutableStateOf<(() -> Unit)?>(null) }
     var alertBarsExpanded by rememberSaveable { mutableStateOf(false) }
@@ -350,7 +351,7 @@ fun AppNavigation(
         }
     // A user-initiated update check forgets the presented alert, so the chrome pops
     // again for the re-checked result even when the alert state itself is unchanged.
-    val manualUpdateCheckTrigger by settingsVm.manualUpdateCheckTrigger.collectAsStateWithLifecycle()
+    val manualUpdateCheckTrigger by updateVm.manualUpdateCheckTrigger.collectAsStateWithLifecycle()
     LaunchedEffect(manualUpdateCheckTrigger) {
         if (manualUpdateCheckTrigger > 0) {
             lastPresentedAlertKey = null
@@ -445,19 +446,19 @@ fun AppNavigation(
             BuildConfig.SHOW_UPDATES &&
             preferences.updateCheckSchedule == UpdateCheckSchedule.AT_APP_START
         ) {
-            settingsVm.checkForUpdate(silent = true)
+            updateVm.checkForUpdate(silent = true)
         }
     }
 
     LaunchedEffect(hasSeenIntro, pendingOpenSettingsUpdates, navController) {
         if (!pendingOpenSettingsUpdates || !hasSeenIntro) return@LaunchedEffect
         openSettingsRoot()
-        settingsVm.flagOpenUpdateSheetFromNotification()
+        updateVm.requestOpenSheet()
         pendingShortcutRepository.clearPendingOpenSettingsForUpdates()
     }
 
-    LaunchedEffect(hasSeenIntro, openUpdateSheetFromNotification, navController, currentDestination?.route) {
-        if (!openUpdateSheetFromNotification || !hasSeenIntro) return@LaunchedEffect
+    LaunchedEffect(hasSeenIntro, openSheetRequested, navController, currentDestination?.route) {
+        if (!openSheetRequested || !hasSeenIntro) return@LaunchedEffect
         openSettingsRoot()
     }
 
@@ -605,7 +606,7 @@ fun AppNavigation(
         val navigationContent: @Composable () -> Unit = {
             val hostContext = LocalContext.current
             val openUpdateSheetFromChrome = {
-                settingsVm.flagOpenUpdateSheetFromChrome()
+                updateVm.requestOpenSheet()
                 navController.navigate(Screen.Settings.route) {
                     popUpTo(navController.graph.findStartDestination().id) {
                         saveState = true
@@ -615,7 +616,7 @@ fun AppNavigation(
                 }
             }
             val installReadyUpdate = {
-                settingsVm.completePlayFlexibleUpdateIfReady(hostContext as? Activity)
+                updateVm.completePlayFlexibleUpdateIfReady(hostContext as? Activity)
             }
             Box(Modifier.fillMaxSize()) {
                 Column(Modifier.fillMaxSize()) {
@@ -778,6 +779,7 @@ fun AppNavigation(
                                         },
                                         onRegisterOpenNewRuleInPane = { openNewRuleInPane = it },
                                         settingsViewModel = settingsVm,
+                                        updateVm = updateVm,
                                     )
                                 } else {
                                     RulesScreen(
@@ -857,6 +859,7 @@ fun AppNavigation(
                                             )
                                         },
                                         viewModel = historyVm,
+                                        updateVm = updateVm,
                                     )
                                 } else {
                                     HistoryScreen(
@@ -952,6 +955,8 @@ fun AppNavigation(
                                                 )
                                             },
                                             viewModel = settingsVm,
+                                            updateVm = updateVm,
+                                            onUpdateCheckStarted = { lastPresentedAlertKey = null },
                                             highlightSectionKey = settingsHighlightSection,
                                             onHighlightHandled = { settingsHighlightSection = null },
                                         )
@@ -973,6 +978,8 @@ fun AppNavigation(
                                                 }
                                             },
                                             viewModel = settingsVm,
+                                            updateVm = updateVm,
+                                            onUpdateCheckStarted = { lastPresentedAlertKey = null },
                                             highlightSectionKey = settingsHighlightSection,
                                             onHighlightHandled = { settingsHighlightSection = null },
                                         )
@@ -1017,7 +1024,7 @@ fun AppNavigation(
                                     DevOptionsScreen(
                                         contentPadding = primaryTabContentPadding,
                                         onNavigateBack = { navController.popBackStack() },
-                                        settingsViewModel = settingsVm,
+                                        updateVm = updateVm,
                                     )
                                 }
                             }
@@ -1096,6 +1103,7 @@ fun AppNavigation(
                                                 launchSingleTop = true
                                             }
                                         },
+                                        updateVm = updateVm,
                                     )
                                 } else {
                                     HistoryScreen(
@@ -1128,7 +1136,7 @@ fun AppNavigation(
                 // Same as Remember: Check dismisses the alert chrome (a re-check or new
                 // delivery resurrects it) and surfaces the update sheet.
                 val checkUpdateFromAlertBar = {
-                    settingsVm.dismissUpdatePromoBanner()
+                    updateVm.dismissUpdatePromoBanner()
                     openUpdateSheetFromChrome()
                 }
                 if (showNavigationSuiteScaffold) {
@@ -1143,7 +1151,7 @@ fun AppNavigation(
                             summary = alertSummary,
                             updateState = updateBarState,
                             onUpdateClick = checkUpdateFromAlertBar,
-                            onDismissUpdateAvailable = settingsVm::dismissUpdatePromoBanner,
+                            onDismissUpdateAvailable = updateVm::dismissUpdatePromoBanner,
                             onInstallUpdate = installReadyUpdate,
                             barsMaxWidth = railBarsMaxWidth,
                             modifier =
@@ -1188,7 +1196,7 @@ fun AppNavigation(
                                                 summary = alertSummary,
                                                 updateState = updateBarState,
                                                 onUpdateClick = checkUpdateFromAlertBar,
-                                                onDismissUpdateAvailable = settingsVm::dismissUpdatePromoBanner,
+                                                onDismissUpdateAvailable = updateVm::dismissUpdatePromoBanner,
                                                 onInstallUpdate = installReadyUpdate,
                                                 centerBarsInWindow = true,
                                             )
@@ -1274,48 +1282,6 @@ fun AppNavigation(
     }
 }
 
-@Composable
-private fun TwoPaneListPaneWithFab(
-    fabContent: (@Composable () -> Unit)?,
-    content: @Composable () -> Unit,
-) {
-    BoxWithConstraints(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter,
-    ) {
-        val centeredContentModifier =
-            if (maxWidth > 720.dp) {
-                Modifier
-                    .width(720.dp)
-                    .fillMaxHeight()
-            } else {
-                Modifier.fillMaxSize()
-            }
-        Box(centeredContentModifier) {
-            content()
-            if (fabContent != null) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(end = 24.dp, bottom = compactLandscapeFabBottomPadding()),
-                ) {
-                    fabContent()
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun compactLandscapeFabBottomPadding(): Dp =
-    if (isSmallLandscape()) {
-        12.dp
-    } else {
-        24.dp
-    }
-
 @OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 private fun RulesTwoPaneRoute(
@@ -1329,6 +1295,7 @@ private fun RulesTwoPaneRoute(
     onRegisterOpenNewRuleInPane: ((() -> Unit)?) -> Unit,
     viewModel: RulesViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel(),
+    updateVm: FilePipeUpdateViewModel = hiltViewModel(),
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
@@ -1579,6 +1546,7 @@ private fun RulesTwoPaneRoute(
                             contentPadding = detailPaneContentPadding,
                             onOpenHelp = onOpenFaq,
                             viewModel = settingsViewModel,
+                            updateVm = updateVm,
                             selectedSectionKey = SettingsSectionKey.About,
                             showTopBar = false,
                             showSectionHeaders = false,
@@ -1809,6 +1777,7 @@ private fun HistoryTwoPaneRoute(
     paneFabContent: (@Composable () -> Unit)? = null,
     viewModel: HistoryViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel(),
+    updateVm: FilePipeUpdateViewModel = hiltViewModel(),
 ) {
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val detailPaneContentPadding =
@@ -1952,6 +1921,7 @@ private fun HistoryTwoPaneRoute(
                             onOpenHelp = onOpenHelp,
                             onOpenDevOptions = onOpenDevOptions,
                             viewModel = settingsViewModel,
+                            updateVm = updateVm,
                             selectedSectionKey = SettingsSectionKey.About,
                             showTopBar = false,
                             showSectionHeaders = false,
@@ -1988,166 +1958,6 @@ private fun HistoryTwoPaneRoute(
             paneExpansionState = balancedPaneExpansionState,
         )
     }
-}
-
-@OptIn(ExperimentalMaterial3AdaptiveApi::class, ExperimentalMaterial3Api::class)
-@Composable
-private fun SettingsTwoPaneRoute(
-    contentPadding: PaddingValues,
-    onOpenIntro: () -> Unit,
-    onOpenFaqStorageSection: () -> Unit,
-    onOpenHelp: () -> Unit,
-    onOpenDevOptions: () -> Unit,
-    paneFabContent: (@Composable () -> Unit)? = null,
-    viewModel: SettingsViewModel = hiltViewModel(),
-    highlightSectionKey: String? = null,
-    onHighlightHandled: () -> Unit = {},
-) {
-    val developerOptionsEnabled by viewModel.developerOptionsEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
-    val navigator = rememberListDetailPaneScaffoldNavigator<String>()
-    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val paneContentPadding =
-        PaddingValues(
-            bottom = contentPadding.calculateBottomPadding(),
-        )
-    // The detail pane has no FAB/bottom bar, so the list-pane FAB clearance baked into
-    // contentPadding would just be dead space at the bottom. Use a plain navigation-bar
-    // inset (plus a little breathing room) instead.
-    val detailPaneContentPadding =
-        PaddingValues(
-            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
-        )
-    val scope = rememberCoroutineScope()
-    var selectedSectionKey by rememberSaveable { mutableStateOf(SettingsSectionKey.Appearance) }
-    val showDetailNavigateBack = navigator.scaffoldDirective.maxHorizontalPartitions <= 1
-    val showPaneSelectionState = !showDetailNavigateBack
-
-    fun showSettingsSection(sectionKey: SettingsSectionKey) {
-        selectedSectionKey = sectionKey
-        scope.launch {
-            navigator.navigateTo(ListDetailPaneScaffoldRole.Detail, sectionKey.routeKey)
-        }
-    }
-
-    LaunchedEffect(highlightSectionKey, showPaneSelectionState) {
-        if (!showPaneSelectionState) return@LaunchedEffect
-        val highlightedSectionKey = settingsSectionKeyForHighlight(highlightSectionKey) ?: return@LaunchedEffect
-        showSettingsSection(highlightedSectionKey)
-    }
-
-    if (!showPaneSelectionState) {
-        Box(Modifier.fillMaxSize()) {
-            SettingsScreen(
-                contentPadding = contentPadding,
-                onOpenIntro = onOpenIntro,
-                onOpenFaqStorageSection = onOpenFaqStorageSection,
-                onOpenHelp = onOpenHelp,
-                onOpenDevOptions = onOpenDevOptions,
-                viewModel = viewModel,
-                highlightSectionKey = highlightSectionKey,
-                onHighlightHandled = onHighlightHandled,
-            )
-            if (paneFabContent != null) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(end = 24.dp, bottom = compactLandscapeFabBottomPadding()),
-                ) {
-                    paneFabContent()
-                }
-            }
-        }
-        return
-    }
-
-    Box(Modifier.fillMaxSize()) {
-        val balancedPaneExpansionState =
-            rememberFlatScreenBalancedPaneExpansionState(
-                directive = navigator.scaffoldDirective,
-            )
-        ListDetailPaneScaffold(
-            directive = navigator.scaffoldDirective,
-            scaffoldState = navigator.scaffoldState,
-            listPane = {
-                AnimatedPane {
-                    TwoPaneListPaneWithFab(fabContent = paneFabContent) {
-                        SettingsSectionListPane(
-                            contentPadding = paneContentPadding,
-                            selectedSectionKey = selectedSectionKey,
-                            developerOptionsEnabled = developerOptionsEnabled,
-                            onSectionSelected = ::showSettingsSection,
-                            showSelectedState = showPaneSelectionState,
-                            extraTopPadding = 52.dp,
-                        )
-                    }
-                }
-            },
-            detailPane = {
-                AnimatedPane {
-                    if (selectedSectionKey == SettingsSectionKey.DeveloperOptions) {
-                        DevOptionsScreen(
-                            contentPadding = detailPaneContentPadding,
-                            onNavigateBack = { showSettingsSection(SettingsSectionKey.About) },
-                            settingsViewModel = viewModel,
-                            showNavigateBack = showDetailNavigateBack,
-                        )
-                    } else {
-                        SettingsScreen(
-                            contentPadding = detailPaneContentPadding,
-                            onOpenIntro = onOpenIntro,
-                            onOpenFaqStorageSection = onOpenFaqStorageSection,
-                            onOpenHelp = onOpenHelp,
-                            onOpenDevOptions = { showSettingsSection(SettingsSectionKey.DeveloperOptions) },
-                            viewModel = viewModel,
-                            highlightSectionKey = highlightSectionKey,
-                            onHighlightHandled = onHighlightHandled,
-                            selectedSectionKey = selectedSectionKey,
-                            showTopBar = false,
-                            showSectionHeaders = false,
-                        )
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-            paneExpansionState = balancedPaneExpansionState,
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3AdaptiveApi::class)
-@Composable
-private fun rememberFlatScreenBalancedPaneExpansionState(
-    directive: PaneScaffoldDirective,
-): PaneExpansionState {
-    val targetFirstPaneProportion: Float? =
-        if (directive.excludedBounds.isEmpty() && directive.maxHorizontalPartitions > 1) {
-            0.4f
-        } else {
-            null
-        }
-    val paneExpansionAnchors =
-        remember(targetFirstPaneProportion) {
-            if (targetFirstPaneProportion == null) {
-                emptyList()
-            } else {
-                listOf(PaneExpansionAnchor.Proportion(targetFirstPaneProportion))
-            }
-        }
-    val paneExpansionState =
-        rememberPaneExpansionState(
-            key = PaneExpansionStateKey.Default,
-            anchors = paneExpansionAnchors,
-        )
-    LaunchedEffect(paneExpansionState, targetFirstPaneProportion) {
-        if (targetFirstPaneProportion == null) {
-            paneExpansionState.clear()
-        } else {
-            paneExpansionState.setFirstPaneProportion(targetFirstPaneProportion)
-        }
-    }
-    return paneExpansionState
 }
 
 @Composable

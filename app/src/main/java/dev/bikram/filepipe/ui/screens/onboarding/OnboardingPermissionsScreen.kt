@@ -206,7 +206,7 @@ fun OnboardingPermissionsScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = scheme.background,
+        color = Color.Transparent,
     ) {
         BoxWithConstraints(
             modifier =
@@ -790,7 +790,7 @@ private fun AllFilesAccessPitch(
             text = stringResource(R.string.onboarding_permissions_all_files_pitch_title),
             style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = scheme.onPrimaryContainer,
+            color = scheme.onSurface,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -839,7 +839,7 @@ private fun SelectiveAccessPitch(
             text = stringResource(R.string.onboarding_permissions_selective_pitch_title),
             style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
-            color = scheme.onPrimaryContainer,
+            color = scheme.onSurface,
             textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -906,7 +906,7 @@ private fun PitchSubtitleText(
         modifier = modifier,
         style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyLarge,
         fontWeight = FontWeight.Normal,
-        color = scheme.onPrimaryContainer.copy(alpha = 0.92f),
+        color = scheme.onSurfaceVariant,
         textAlign = TextAlign.Center,
     )
 }
@@ -975,7 +975,7 @@ private fun CopyLineText(
         modifier = modifier,
         style = if (compact) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyLarge,
         fontWeight = FontWeight.Normal,
-        color = scheme.onPrimaryContainer.copy(alpha = 0.92f),
+        color = scheme.onSurfaceVariant,
     )
 }
 
@@ -1118,13 +1118,13 @@ private fun FullAccessHighlightCard(
                     text = title,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = scheme.onPrimaryContainer,
+                    color = scheme.onSurface,
                 )
                 Spacer(Modifier.height(8.dp))
                 PermissionTextWithBullets(
                     text = body,
                     style = MaterialTheme.typography.bodySmall,
-                    color = scheme.onPrimaryContainer.copy(alpha = 0.92f),
+                    color = scheme.onSurfaceVariant,
                 )
             }
             RadioButton(

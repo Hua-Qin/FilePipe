@@ -56,8 +56,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = filePipeApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 386
-        versionName = "3.8.6"
+        versionCode = 387
+        versionName = "3.8.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

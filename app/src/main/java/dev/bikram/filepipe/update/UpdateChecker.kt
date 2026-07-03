@@ -21,7 +21,7 @@ data class UpdateInfo(
      */
     val isPlayStoreUpdateInProgress: Boolean = false,
     /**
-     * Dev release only: [SettingsViewModel] arms a fake update for the global promo without Play or GitHub.
+     * Dev release only: [FilePipeUpdateViewModel] arms a fake update for the global promo without Play or GitHub.
      */
     val isDevReleaseMock: Boolean = false,
 )

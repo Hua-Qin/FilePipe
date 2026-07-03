@@ -95,7 +95,7 @@ import dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList
 import dev.bikram.filepipe.ui.navigation.DEV_OPTIONS_SHARED_BOUNDS_KEY
 import dev.bikram.filepipe.ui.navigation.LocalNavAnimatedVisibilityScope
 import dev.bikram.filepipe.ui.navigation.LocalSharedTransitionScope
-import dev.bikram.filepipe.ui.screens.settings.SettingsViewModel
+import dev.bikram.filepipe.ui.screens.settings.FilePipeUpdateViewModel
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 
@@ -108,7 +108,7 @@ import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 fun DevOptionsScreen(
     contentPadding: PaddingValues,
     onNavigateBack: () -> Unit,
-    settingsViewModel: SettingsViewModel,
+    updateVm: FilePipeUpdateViewModel,
     showNavigateBack: Boolean = true,
     viewModel: DevOptionsViewModel = hiltViewModel(),
 ) {
@@ -359,14 +359,14 @@ fun DevOptionsScreen(
                                         label = stringResource(R.string.dev_options_action_arm_update_promo),
                                         enabled = state.showUpdates,
                                         onClick = {
-                                            settingsViewModel.devReleaseMockArmRulesUpdatePromoForRulesTab()
+                                            updateVm.devReleaseMockArmRulesUpdatePromoForRulesTab()
                                             onNavigateBack()
                                         },
                                     ),
                                     DevAction(
                                         label = stringResource(R.string.dev_options_action_start_play_bar),
                                         onClick = {
-                                            settingsViewModel.devReleaseMockStartPlayUpdateBannerSequence()
+                                            updateVm.devReleaseMockStartPlayUpdateBannerSequence()
                                             onNavigateBack()
                                         },
                                     ),
@@ -374,7 +374,7 @@ fun DevOptionsScreen(
                                         label = stringResource(R.string.dev_options_action_post_mock_update_notification),
                                         enabled = state.showUpdates,
                                         onClick = {
-                                            settingsViewModel.devReleaseMockArmRulesUpdatePromoForRulesTab()
+                                            updateVm.devReleaseMockArmRulesUpdatePromoForRulesTab()
                                             viewModel.postMockUpdateNotification()
                                         },
                                     ),
@@ -1046,25 +1046,20 @@ private fun DevInfoRow(row: DevOptionsInfoRow) {
 @Composable
 private fun DevActionRow(action: DevAction) {
     ListItem(
-        headlineContent = {
-            Text(
-                text = action.label,
-                color =
-                    if (action.enabled) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    },
-            )
-        },
-        modifier =
-            if (action.enabled) {
-                Modifier.tapSoundClickable(onClick = action.onClick)
-            } else {
-                Modifier
-            },
+        onClick = action.onClick,
+        enabled = action.enabled,
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-    )
+    ) {
+        Text(
+            text = action.label,
+            color =
+                if (action.enabled) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                },
+        )
+    }
 }
 
 @Composable

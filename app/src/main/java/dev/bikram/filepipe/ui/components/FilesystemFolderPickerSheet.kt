@@ -365,13 +365,6 @@ fun FilesystemFolderPickerSheetContent(
                     items(childDirectories, key = { it.listKey }) { entry ->
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                            headlineContent = {
-                                Text(
-                                    text = entry.name,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
                             leadingContent = {
                                 FilePipeMaterialRoundedSymbol(
                                     name = "folder",
@@ -385,7 +378,13 @@ fun FilesystemFolderPickerSheetContent(
                                 Modifier.tapSoundClickable {
                                     currentPath = entry.path
                                 },
-                        )
+                        ) {
+                            Text(
+                                text = entry.name,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 }
             }

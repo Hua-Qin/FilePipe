@@ -124,6 +124,13 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 </tr>
 </table>
 
+
+## ⚖️ License & Trademark Notice
+
+The source code of this project is licensed under the GNU General Public License v3.0 (see the [LICENSE](LICENSE) file). 
+
+However, the application names "Remember", "FilePipe", and "ObtainX", along with all original branding artwork, logos, and custom launcher icons, are the exclusive intellectual property and trademarks of the author. Redistribution or modification of the source code under the GPLv3 does not grant permission to use these brand assets in derivative works. All forks must be entirely rebranded.
+
 ---
 
 Made with ❤️ by Bikram Agarwal

@@ -1,3 +1,10 @@
+## v3.8.7 Housekeeping
+
+### 📦 Others
+- Some backend changes for housekeeping.
+
+---
+
 ## v3.8.6 Multiple filename patterns
 
 ### 🛠 Improved Features

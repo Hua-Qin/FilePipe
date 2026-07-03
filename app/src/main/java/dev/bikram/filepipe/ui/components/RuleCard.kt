@@ -349,14 +349,6 @@ private fun CompactContent(
         longClickLabel = longClickLabel,
     ) {
         ListItem(
-            headlineContent = {
-                Text(
-                    text = rule.name,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            },
             supportingContent =
                 if (infoText.isNotBlank()) {
                     {
@@ -473,7 +465,14 @@ private fun CompactContent(
                     null
                 },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        )
+        ) {
+            Text(
+                text = rule.name,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

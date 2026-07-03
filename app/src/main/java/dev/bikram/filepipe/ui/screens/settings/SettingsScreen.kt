@@ -196,11 +196,7 @@ import kotlinx.coroutines.launch
  */
 private const val SETTINGS_LIST_INDEX_FOLDER_ACCESS = 1
 private const val SETTINGS_LIST_INDEX_SCHEDULE = 2
-private const val SETTINGS_SECTION_HIGHLIGHT_DURATION_MS = 4_500L
 private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
-private const val DEVELOPER_OPTIONS_UNLOCK_TAPS = 7
-private const val REMEMBER_FDROID_PACKAGE_ID = "dev.bikram.remember.gh"
-private const val OBTAINX_FDROID_PACKAGE_ID = "dev.bikram.obtainx"
 
 enum class SettingsSectionKey(
     val routeKey: String,
@@ -243,196 +239,10 @@ private enum class BackupFolderTarget {
     Cloud,
 }
 
-private data class AboutAppRoute(
-    val packageId: String,
-    val portfolioUrl: String,
-    val playStoreUrl: String = "",
-) {
-    val copyUrl: String
-        get() =
-            when (BuildConfig.FLAVOR) {
-                "fdroid" -> "fdroid.app:$packageId"
-                "playstore" -> playStoreUrl.ifBlank { portfolioUrl }
-                else -> portfolioUrl
-            }
-}
-
-private enum class SwipeDirectionCue(
-    val iconName: String,
-) {
-    LEFT("arrow_back"),
-    RIGHT("arrow_forward"),
-}
-
-@Composable
-private fun rememberSectionHighlightPulseAlpha(active: Boolean): Float {
-    val infiniteTransition = rememberInfiniteTransition(label = "settingsSectionHighlight")
-    val pulse by infiniteTransition.animateFloat(
-        initialValue = 0.42f,
-        targetValue = 1f,
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(durationMillis = 850, easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-        label = "pulse",
-    )
-    return if (active) pulse else 1f
-}
-
-private fun Modifier.pulsingSectionHighlightOutline(
-    active: Boolean,
-    outlineColor: Color,
-    expandDp: Dp = 10.dp,
-    cornerRadiusDp: Dp = 18.dp,
-    strokeWidthDp: Dp = 3.dp,
-): Modifier {
-    if (!active) return this
-    return this
-        .graphicsLayer { clip = false }
-        .drawBehind {
-            val expandPx = expandDp.toPx()
-            val strokeWidthPx = strokeWidthDp.toPx()
-            val cornerPx = cornerRadiusDp.toPx()
-            drawRoundRect(
-                color = outlineColor,
-                topLeft = Offset(-expandPx, -expandPx),
-                size = Size(size.width + 2f * expandPx, size.height + 2f * expandPx),
-                cornerRadius = CornerRadius(cornerPx, cornerPx),
-                style = Stroke(width = strokeWidthPx),
-            )
-        }
-}
-
-@Composable
-fun SettingsSectionListPane(
-    contentPadding: PaddingValues,
-    selectedSectionKey: SettingsSectionKey,
-    developerOptionsEnabled: Boolean,
-    onSectionSelected: (SettingsSectionKey) -> Unit,
-    showSelectedState: Boolean = true,
-    modifier: Modifier = Modifier,
-    startPadding: Dp = 16.dp,
-    endPadding: Dp = 16.dp,
-    extraTopPadding: Dp = 16.dp,
-) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding =
-            PaddingValues(
-                start = startPadding,
-                end = endPadding,
-                top = contentPadding.calculateTopPadding() + extraTopPadding,
-                bottom = contentPadding.calculateBottomPadding() + 24.dp,
-            ),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(
-            items = settingsPaneSections,
-            key = { sectionKey -> sectionKey.routeKey },
-        ) { sectionKey ->
-            SettingsSectionListRow(
-                iconName = sectionKey.iconName,
-                title = stringResource(sectionKey.titleRes),
-                selected = showSelectedState && sectionKey == selectedSectionKey,
-                onClick = { onSectionSelected(sectionKey) },
-            )
-        }
-        if (developerOptionsEnabled) {
-            item(key = "developer_options") {
-                SettingsSectionListRow(
-                    iconName = "developer_board",
-                    title = stringResource(R.string.settings_developer_options_section),
-                    selected = showSelectedState && selectedSectionKey == SettingsSectionKey.DeveloperOptions,
-                    onClick = { onSectionSelected(SettingsSectionKey.DeveloperOptions) },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun SettingsSectionListRow(
-    iconName: String,
-    title: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-    trailingIconName: String = "chevron_right",
-) {
-    val colorSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
-    val containerColor by animateColorAsState(
-        targetValue =
-            if (selected) {
-                MaterialTheme.colorScheme.secondaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerHigh
-            },
-        animationSpec = colorSpec,
-        label = "settings_section_list_container",
-    )
-    val contentColor =
-        if (selected) {
-            MaterialTheme.colorScheme.onSecondaryContainer
-        } else {
-            MaterialTheme.colorScheme.onSurface
-        }
-    Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(28.dp))
-                .tapSoundClickable(
-                    onClick = onClick,
-                    indication = null,
-                ),
-        shape = RoundedCornerShape(28.dp),
-        color = containerColor,
-        contentColor = contentColor,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(36.dp)
-                        .clip(MaterialTheme.shapes.extraExtraLarge)
-                        .background(
-                            if (selected) {
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-                            } else {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
-                            },
-                        ),
-                contentAlignment = Alignment.Center,
-            ) {
-                FilePipeMaterialRoundedSymbol(
-                    name = iconName,
-                    contentDescription = null,
-                    size = 21.dp,
-                    tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            FilePipeMaterialRoundedSymbol(
-                name = trailingIconName,
-                contentDescription = null,
-                size = 20.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                autoMirror = trailingIconName == "chevron_right",
-            )
-        }
-    }
+private object SettingsScreenSessionState {
+    var collapsedSectionKeys: Set<String> = emptySet()
+    var listFirstVisibleItemIndex: Int = 0
+    var listFirstVisibleItemScrollOffset: Int = 0
 }
 
 @OptIn(
@@ -450,6 +260,8 @@ fun SettingsScreen(
     onOpenHelp: () -> Unit = {},
     onOpenDevOptions: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel(),
+    updateVm: FilePipeUpdateViewModel = hiltViewModel(),
+    onUpdateCheckStarted: () -> Unit = {},
     highlightSectionKey: String? = null,
     onHighlightHandled: () -> Unit = {},
     selectedSectionKey: SettingsSectionKey? = null,
@@ -469,10 +281,16 @@ fun SettingsScreen(
             return
         }
     val developerOptionsEnabled by viewModel.developerOptionsEnabledFlow.collectAsStateWithLifecycle(initialValue = false)
-    val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
-    val playInAppUpdateBannerUiState by viewModel.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
-    val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsStateWithLifecycle()
-    val downloadProgress by viewModel.downloadProgress.collectAsStateWithLifecycle()
+    val updateInfo by updateVm.updateInfo.collectAsStateWithLifecycle()
+    val playInAppUpdateBannerUiState by updateVm.playInAppUpdateBannerUiState.collectAsStateWithLifecycle()
+    val isCheckingUpdate by updateVm.isCheckingUpdate.collectAsStateWithLifecycle()
+    val downloadProgress by updateVm.downloadProgress.collectAsStateWithLifecycle()
+    val showUpdateSheet by updateVm.showUpdateSheet.collectAsStateWithLifecycle()
+    val updateCheckFinishedWithoutResult by updateVm.updateCheckFinishedWithoutResult.collectAsStateWithLifecycle()
+    val updateSheetChangelog by updateVm.updateSheetChangelog.collectAsStateWithLifecycle()
+    val openSheetRequested by updateVm.openSheetRequested.collectAsStateWithLifecycle()
+    val openUpdateSheetFromRulesPromo by updateVm.openUpdateSheetFromRulesPromo.collectAsStateWithLifecycle()
+    val startPlayAfterRulesPromoSheet by updateVm.startPlayInAppUpdateAfterRulesPromoSheet.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val resources = LocalResources.current
     val density = LocalDensity.current
@@ -492,7 +310,11 @@ fun SettingsScreen(
     var pendingEnableUpdateNotificationsAfterPermission by remember { mutableStateOf(false) }
     val snackbarHostState = LocalSnackbarHostState.current
     val coroutineScope = rememberCoroutineScope()
-    val settingsLazyListState = rememberLazyListState()
+    val settingsLazyListState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = SettingsScreenSessionState.listFirstVisibleItemIndex,
+            initialFirstVisibleItemScrollOffset = SettingsScreenSessionState.listFirstVisibleItemScrollOffset,
+        )
     val forceExpandedSections = selectedSectionKey != null
 
     fun shouldRenderSection(sectionKey: SettingsSectionKey): Boolean = selectedSectionKey == null || selectedSectionKey == sectionKey
@@ -534,6 +356,7 @@ fun SettingsScreen(
             preferences.settingsCollapsedSectionKeys
                 .filter { sectionKey -> sectionKey in settingsExpandableSectionKeys }
                 .toSet()
+                .ifEmpty { SettingsScreenSessionState.collapsedSectionKeys }
         }
 
     fun updateCollapsedSettingsSectionKeys(sectionKeys: Set<String>) {
@@ -686,10 +509,6 @@ fun SettingsScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
-    val updateSheetChangelog by viewModel.updateSheetChangelog.collectAsStateWithLifecycle()
-    val manualUpdateNoResult by viewModel.manualUpdateNoResult.collectAsStateWithLifecycle()
-    val openUpdateSheetFromNotification by viewModel.openUpdateSheetFromNotification.collectAsStateWithLifecycle()
-    var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val isLandscape = isLandscape()
     val isSmallLandscape = isSmallLandscape()
@@ -709,6 +528,28 @@ fun SettingsScreen(
                 duration = SnackbarDuration.Short,
             )
         }
+    }
+
+    LaunchedEffect(Unit) {
+        updateVm.userMessages.collect { message ->
+            snackbarHostState.showSnackbar(
+                message = message,
+                duration = SnackbarDuration.Short,
+            )
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, settingsLazyListState) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) {
+                    SettingsScreenSessionState.collapsedSectionKeys = collapsedSettingsSectionKeys
+                    SettingsScreenSessionState.listFirstVisibleItemIndex = settingsLazyListState.firstVisibleItemIndex
+                    SettingsScreenSessionState.listFirstVisibleItemScrollOffset = settingsLazyListState.firstVisibleItemScrollOffset
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     DisposableEffect(lifecycleOwner, snackbarHostState) {
@@ -783,7 +624,7 @@ fun SettingsScreen(
             contract = ActivityResultContracts.StartIntentSenderForResult(),
         ) { result ->
             if (result.resultCode == Activity.RESULT_CANCELED) {
-                viewModel.onPlayInAppUpdateUserCanceled()
+                updateVm.onPlayInAppUpdateUserCanceled()
             }
         }
 
@@ -793,40 +634,32 @@ fun SettingsScreen(
             is PlayInAppUpdateBannerUiState.Downloading,
             PlayInAppUpdateBannerUiState.ReadyToInstall,
             -> {
-                showUpdateSheet = false
-                viewModel.dismissUpdateSheet()
+                updateVm.closeSheetForPlayProgress()
             }
 
             else -> {}
         }
     }
 
-    val openUpdateSheetFromRulesPromo by viewModel.openUpdateSheetFromRulesPromo.collectAsStateWithLifecycle()
-    val startPlayAfterRulesPromoSheet by viewModel.startPlayInAppUpdateAfterRulesPromoSheet.collectAsStateWithLifecycle()
-
-    LaunchedEffect(openUpdateSheetFromNotification) {
-        if (!openUpdateSheetFromNotification || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
-        showUpdateSheet = true
-        viewModel.loadChangelogForUpdateSheet()
-        viewModel.beginManualUpdateCheckFromSheet()
-        viewModel.consumeOpenUpdateSheetFromNotification()
+    LaunchedEffect(openSheetRequested) {
+        if (!openSheetRequested || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
+        onUpdateCheckStarted()
+        updateVm.markOpenSheetHandled()
+        updateVm.openSheetAndCheck()
     }
 
     LaunchedEffect(openUpdateSheetFromRulesPromo) {
         if (!openUpdateSheetFromRulesPromo || !BuildConfig.SHOW_UPDATES) return@LaunchedEffect
-        showUpdateSheet = true
-        if (BuildConfig.CHANGELOG_GITHUB_REPO.isNotBlank()) {
-            viewModel.loadChangelogForUpdateSheet()
-        }
-        viewModel.consumeOpenUpdateSheetFromRulesPromo()
+        updateVm.openSheetFromRulesPromo()
+        updateVm.consumeOpenUpdateSheetFromRulesPromo()
     }
 
     LaunchedEffect(startPlayAfterRulesPromoSheet) {
         if (!startPlayAfterRulesPromoSheet || !BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
         delay(400)
         val hostActivity = context as? ComponentActivity
-        viewModel.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
-        viewModel.consumeStartPlayInAppUpdateAfterRulesPromoSheet()
+        updateVm.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
+        updateVm.consumeStartPlayInAppUpdateAfterRulesPromoSheet()
     }
 
     if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
@@ -844,8 +677,7 @@ fun SettingsScreen(
         AppBottomSheet(
             title = "",
             onDismiss = {
-                showUpdateSheet = false
-                viewModel.dismissUpdateSheet()
+                updateVm.dismissUpdateSheet()
             },
             sheetState = updateSheetState,
             showTitleBar = false,
@@ -858,7 +690,7 @@ fun SettingsScreen(
                 maxSheetHeight = maxUpdateSheetHeight,
                 isCheckingUpdate = isCheckingUpdate,
                 updateInfo = updateInfo,
-                manualUpdateNoResult = manualUpdateNoResult,
+                manualUpdateNoResult = updateCheckFinishedWithoutResult,
                 downloadProgress = downloadProgress,
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
@@ -869,16 +701,15 @@ fun SettingsScreen(
                         openFdroidPackagePage(context)
                     } else if (BuildConfig.USE_PLAY_IN_APP_UPDATES && info.downloadUrl.isBlank()) {
                         val hostActivity = context as? ComponentActivity
-                        viewModel.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
+                        updateVm.tryStartPlayInAppUpdate(hostActivity, playInAppUpdateLauncher)
                     } else {
-                        viewModel.downloadAndInstall(info)
+                        updateVm.downloadAndInstall(info)
                     }
                 },
                 onSkipVersionClick = {
                     updateInfo?.let { info ->
-                        viewModel.skipAcknowledgedGithubRelease(info)
-                        showUpdateSheet = false
-                        viewModel.dismissUpdateSheet()
+                        updateVm.skipAcknowledgedGithubRelease(info)
+                        updateVm.dismissUpdateSheet()
                     }
                 },
             )
@@ -1084,12 +915,6 @@ fun SettingsScreen(
                             GroupedListColumn {
                                 GroupedListItem(position = GroupPosition.FIRST) {
                                     ListItem(
-                                        headlineContent = {
-                                            Text(
-                                                stringResource(R.string.settings_folder_access_saf_only),
-                                                style = MaterialTheme.typography.bodyLarge,
-                                            )
-                                        },
                                         trailingContent = {
                                             RadioButton(
                                                 selected = preferences.folderAccessMode == FolderAccessMode.SAF_ONLY,
@@ -1101,16 +926,15 @@ fun SettingsScreen(
                                                 applyFolderAccessMode(FolderAccessMode.SAF_ONLY)
                                             },
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    )
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.settings_folder_access_saf_only),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                        )
+                                    }
                                 }
                                 GroupedListItem(position = GroupPosition.LAST) {
                                     ListItem(
-                                        headlineContent = {
-                                            Text(
-                                                stringResource(R.string.settings_folder_access_all_files),
-                                                style = MaterialTheme.typography.bodyLarge,
-                                            )
-                                        },
                                         trailingContent = {
                                             RadioButton(
                                                 selected = preferences.folderAccessMode == FolderAccessMode.ALL_FILES_PREFERRED,
@@ -1122,7 +946,12 @@ fun SettingsScreen(
                                                 applyFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
                                             },
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    )
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.settings_folder_access_all_files),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                        )
+                                    }
                                 }
                             }
                             Spacer(Modifier.height(8.dp))
@@ -1241,12 +1070,6 @@ fun SettingsScreen(
                             GroupedListColumn {
                                 GroupedListItem(position = GroupPosition.FIRST) {
                                     ListItem(
-                                        headlineContent = {
-                                            Text(
-                                                stringResource(R.string.settings_notifications),
-                                                style = MaterialTheme.typography.bodyLarge,
-                                            )
-                                        },
                                         supportingContent = {
                                             Text(
                                                 stringResource(R.string.settings_notifications_desc),
@@ -1305,10 +1128,15 @@ fun SettingsScreen(
                                                 }
                                             },
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    )
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.settings_notifications),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                        )
+                                    }
                                 }
                                 GroupedListItem(position = GroupPosition.MIDDLE) {
-                                    SettingsToggleItem(
+                                    SettingsToggleRow(
                                         iconName = "alarm_on",
                                         title = stringResource(R.string.settings_reliable_schedules),
                                         subtitle =
@@ -1331,12 +1159,6 @@ fun SettingsScreen(
                                                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
                                         },
-                                        headlineContent = {
-                                            Text(
-                                                stringResource(R.string.settings_log_retention),
-                                                style = MaterialTheme.typography.bodyLarge,
-                                            )
-                                        },
                                         supportingContent = {
                                             Text(
                                                 stringResource(R.string.settings_log_retention_hint),
@@ -1351,7 +1173,12 @@ fun SettingsScreen(
                                             )
                                         },
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    )
+                                    ) {
+                                        Text(
+                                            stringResource(R.string.settings_log_retention),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1373,7 +1200,7 @@ fun SettingsScreen(
                     ) {
                         GroupedListColumn {
                             GroupedListItem(position = GroupPosition.ONLY) {
-                                SettingsToggleItem(
+                                SettingsToggleRow(
                                     iconName = "vibration",
                                     title = stringResource(R.string.settings_haptic_feedback),
                                     subtitle = stringResource(R.string.settings_haptic_feedback_desc),
@@ -1426,186 +1253,31 @@ fun SettingsScreen(
                         showHeader = showSectionHeaders,
                         forceExpanded = forceExpandedSections,
                     ) {
-                        val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
-                        val localFolderLabel =
-                            preferences.exportFolderUri
-                                .takeIf { it.isNotBlank() }
-                                ?.let { displayPath(it, internalStorageDisplayName) }
-                                ?: stringResource(R.string.settings_choose_local_backup_folder)
-                        val cloudFolderLabel =
-                            preferences.cloudExportFolderUri
-                                .takeIf { it.isNotBlank() }
-                                ?.let { backupDestinationDisplayLabel(context, it, internalStorageDisplayName) }
-                                ?: stringResource(R.string.settings_choose_cloud_backup_file)
-
-                        val exportFolderReady =
-                            preferences.exportFolderUri.isNotBlank() ||
-                                preferences.cloudExportFolderUri.isNotBlank()
-                        val autoExportSwitchEnabled = exportFolderReady || preferences.autoExportOnRuleChange
-                        val scheduledExportSwitchEnabled = exportFolderReady || preferences.scheduledExportEnabled
-
-                        GroupedListColumn {
-                            GroupedListItem(position = GroupPosition.FIRST) {
-                                BackupFolderPickerItem(
-                                    title = localFolderLabel,
-                                    subtitle = stringResource(R.string.settings_local_backup_folder_hint),
-                                    onClick = {
-                                        pendingBackupFolderTarget = BackupFolderTarget.Local
-                                        folderLauncher.launch(null)
-                                    },
-                                    onLongClick = {
-                                        if (preferences.exportFolderUri.isNotBlank()) {
-                                            viewModel.setExportFolderUri("")
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar(
-                                                    message = resources.getString(R.string.settings_local_backup_folder_cleared),
-                                                    duration = SnackbarDuration.Short,
-                                                )
-                                            }
-                                        }
-                                    },
-                                )
-                            }
-                            GroupedListItem(position = GroupPosition.MIDDLE) {
-                                BackupFolderPickerItem(
-                                    title = cloudFolderLabel,
-                                    subtitle = stringResource(R.string.settings_cloud_backup_folder_hint),
-                                    onClick = {
-                                        cloudBackupDocumentLauncher.launch("filepipe_cloud_backup.json")
-                                    },
-                                    onLongClick = {
-                                        if (preferences.cloudExportFolderUri.isNotBlank()) {
-                                            viewModel.setCloudExportFolderUri("")
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar(
-                                                    message = resources.getString(R.string.settings_cloud_backup_file_cleared),
-                                                    duration = SnackbarDuration.Short,
-                                                )
-                                            }
-                                        }
-                                    },
-                                )
-                            }
-                            GroupedListItem(position = GroupPosition.MIDDLE) {
-                                SettingsToggleItem(
-                                    title = stringResource(R.string.settings_auto_export_on_change),
-                                    subtitle = stringResource(R.string.settings_auto_export_on_change_hint),
-                                    checked = preferences.autoExportOnRuleChange,
-                                    switchEnabled = autoExportSwitchEnabled,
-                                    onDisabledInteraction = {
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                message = resources.getString(R.string.settings_export_select_folder_first),
-                                                duration = SnackbarDuration.Short,
-                                            )
-                                        }
-                                    },
-                                    onCheckedChange = viewModel::setAutoExportOnChange,
-                                )
-                            }
-                            GroupedListItem(position = GroupPosition.MIDDLE) {
-                                SettingsToggleItem(
-                                    title = stringResource(R.string.settings_scheduled_export),
-                                    subtitle = stringResource(R.string.settings_scheduled_export_hint),
-                                    checked = preferences.scheduledExportEnabled,
-                                    switchEnabled = scheduledExportSwitchEnabled,
-                                    onDisabledInteraction = {
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar(
-                                                message = resources.getString(R.string.settings_export_select_folder_first),
-                                                duration = SnackbarDuration.Short,
-                                            )
-                                        }
-                                    },
-                                    onCheckedChange = viewModel::setScheduledExportEnabled,
-                                )
-                            }
-                            GroupedListItem(position = GroupPosition.LAST) {
-                                Column(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                    ) {
-                                        FilePipeOutlinedButton(
-                                            onClick = {
-                                                pendingBackupPickAction = BackupImportPickAction.ImportMerge
-                                                importLauncher.launch("application/json")
-                                            },
-                                            modifier = Modifier.weight(1f),
-                                        ) {
-                                            Text(stringResource(R.string.settings_import_rules))
-                                        }
-                                        FilePipeOutlinedButton(
-                                            onClick = {
-                                                if (exportFolderReady) {
-                                                    viewModel.exportToConfiguredBackupFolders()
-                                                } else {
-                                                    coroutineScope.launch {
-                                                        snackbarHostState.showSnackbar(
-                                                            message = resources.getString(R.string.settings_export_select_folder_first),
-                                                            duration = SnackbarDuration.Short,
-                                                        )
-                                                    }
-                                                }
-                                            },
-                                            modifier = Modifier.weight(1f),
-                                        ) {
-                                            Text(stringResource(R.string.settings_export_now))
-                                        }
-                                    }
-                                    val restoreOutline = MaterialTheme.colorScheme.error.copy(alpha = 0.45f)
-                                    val restoreLabelColor = MaterialTheme.colorScheme.error
-                                    val restoreButtonShape = ButtonDefaults.outlinedShape
-                                    Box(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .height(40.dp)
-                                                .clip(restoreButtonShape)
-                                                .border(BorderStroke(1.dp, restoreOutline), restoreButtonShape),
-                                    ) {
-                                        Box(
-                                            modifier =
-                                                Modifier
-                                                    .matchParentSize()
-                                                    .tapSoundClickable {
-                                                        pendingBackupPickAction = BackupImportPickAction.RestoreFull
-                                                        importLauncher.launch("application/json")
-                                                    },
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            Text(
-                                                text = stringResource(R.string.settings_restore_backup),
-                                                style = MaterialTheme.typography.labelLarge,
-                                                color = restoreLabelColor,
-                                            )
-                                        }
-                                        Box(
-                                            modifier =
-                                                Modifier
-                                                    .align(Alignment.CenterEnd)
-                                                    .fillMaxHeight()
-                                                    .width(40.dp),
-                                            contentAlignment = Alignment.Center,
-                                        ) {
-                                            SettingsInfoDropdown(
-                                                title = stringResource(R.string.settings_backup_import_restore_help_title),
-                                                tipText = stringResource(R.string.settings_backup_import_restore_help_body),
-                                                contentDescription = stringResource(R.string.settings_backup_help_icon_cd),
-                                                iconTint = restoreLabelColor.copy(alpha = 0.75f),
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        BackupSection(
+                            preferences = preferences,
+                            snackbarHostState = snackbarHostState,
+                            scope = coroutineScope,
+                            onPickLocalFolder = {
+                                pendingBackupFolderTarget = BackupFolderTarget.Local
+                                folderLauncher.launch(null)
+                            },
+                            onPickCloudFolder = {
+                                cloudBackupDocumentLauncher.launch("filepipe_cloud_backup.json")
+                            },
+                            onLaunchImportMerge = {
+                                pendingBackupPickAction = BackupImportPickAction.ImportMerge
+                                importLauncher.launch("application/json")
+                            },
+                            onLaunchImportReplace = {
+                                pendingBackupPickAction = BackupImportPickAction.RestoreFull
+                                importLauncher.launch("application/json")
+                            },
+                            onClearLocalFolder = { viewModel.setExportFolderUri("") },
+                            onClearCloudFolder = { viewModel.setCloudExportFolderUri("") },
+                            onAutoExportChange = viewModel::setAutoExportOnChange,
+                            onScheduledExportChange = viewModel::setScheduledExportEnabled,
+                            onExportNow = { viewModel.exportToConfiguredBackupFolders() },
+                        )
                     }
                 }
             }
@@ -1638,7 +1310,7 @@ fun SettingsScreen(
                                 }
                                 if (BuildConfig.FLAVOR == "github") {
                                     GroupedListItem(position = GroupPosition.MIDDLE) {
-                                        SettingsToggleItem(
+                                        SettingsToggleRow(
                                             title = stringResource(R.string.settings_save_update_apk_to_downloads),
                                             checked = preferences.saveUpdateApkToDownloads,
                                             onCheckedChange = viewModel::setSaveUpdateApkToDownloads,
@@ -1646,7 +1318,7 @@ fun SettingsScreen(
                                     }
                                 }
                                 GroupedListItem(position = GroupPosition.MIDDLE) {
-                                    SettingsToggleItem(
+                                    SettingsToggleRow(
                                         title = stringResource(R.string.settings_notify_new_updates),
                                         checked = preferences.notifyOnNewUpdates,
                                         onCheckedChange = { enabled ->
@@ -1695,22 +1367,6 @@ fun SettingsScreen(
                                 }
                                 GroupedListItem(position = GroupPosition.LAST) {
                                     ListItem(
-                                        headlineContent = {
-                                            val available = updateInfo
-                                            Text(
-                                                text =
-                                                    if (available != null) {
-                                                        stringResource(
-                                                            R.string.settings_update_available_button,
-                                                            available.versionName,
-                                                        )
-                                                    } else {
-                                                        stringResource(R.string.settings_check_for_updates)
-                                                    },
-                                                style = MaterialTheme.typography.bodyLarge,
-                                                fontWeight = FontWeight.SemiBold,
-                                            )
-                                        },
                                         leadingContent = {
                                             FilePipeMaterialRoundedSymbol(
                                                 name = "new_releases",
@@ -1720,12 +1376,26 @@ fun SettingsScreen(
                                         },
                                         modifier =
                                             Modifier.tapSoundClickable {
-                                                viewModel.beginManualUpdateCheckFromSheet()
-                                                viewModel.loadChangelogForUpdateSheet()
-                                                showUpdateSheet = true
+                                                onUpdateCheckStarted()
+                                                updateVm.openSheetFromSettingsRow()
                                             },
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    )
+                                    ) {
+                                        val available = updateInfo
+                                        Text(
+                                            text =
+                                                if (available != null) {
+                                                    stringResource(
+                                                        R.string.settings_update_available_button,
+                                                        available.versionName,
+                                                    )
+                                                } else {
+                                                    stringResource(R.string.settings_check_for_updates)
+                                                },
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -1746,61 +1416,7 @@ fun SettingsScreen(
             // ── About ─────────────────────────────────────────────────────────
             if (shouldRenderSection(SettingsSectionKey.About)) {
                 item {
-                    val aboutContext = LocalContext.current
-                    val aboutResources = LocalResources.current
-                    val githubRepoForSourceLink =
-                        BuildConfig.GITHUB_REPO
-                            .trim()
-                            .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
-                    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
-                    val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
-                    val buildFlavorLabel =
-                        when (BuildConfig.FLAVOR) {
-                            "github" -> stringResource(R.string.build_flavor_github)
-                            "fdroid" -> stringResource(R.string.build_flavor_fdroid)
-                            "playstore" -> stringResource(R.string.build_flavor_playstore)
-                            else -> BuildConfig.FLAVOR
-                        }
-                    val buildTypeLabel =
-                        when (BuildConfig.BUILD_TYPE) {
-                            "debug" -> stringResource(R.string.build_type_debug)
-                            "devRelease" -> stringResource(R.string.build_type_dev_release)
-                            "release" -> stringResource(R.string.build_type_release)
-                            else -> BuildConfig.BUILD_TYPE
-                        }
-                    val buildVariantToastText = stringResource(R.string.about_build_variant_format, buildFlavorLabel, buildTypeLabel)
-                    val developerOptionsUnlockedToast = stringResource(R.string.settings_developer_options_unlocked)
-                    val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
-                    val diagnosticsTooltip = stringResource(R.string.settings_share_diagnostics)
-                    val aboutLinkCopiedToast = stringResource(R.string.toast_about_link_copied)
-                    val authorGithubProfileUrl = stringResource(R.string.about_author_github_profile_url)
-                    val shareDiagnostics =
-                        rememberDiagnosticsShareAction(
-                            context = aboutContext,
-                            chooserTitle = diagnosticsChooserTitle,
-                            preferences = preferences,
-                        )
-                    val copyAboutLinkToClipboard =
-                        remember(aboutContext, aboutLinkCopiedToast) {
-                            { url: String ->
-                                val clipboard =
-                                    aboutContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("link", url))
-                                Toast
-                                    .makeText(
-                                        aboutContext,
-                                        aboutLinkCopiedToast,
-                                        Toast.LENGTH_SHORT,
-                                    ).show()
-                            }
-                        }
-                    var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
-                    var developerOptionsTapCount by rememberSaveable { mutableIntStateOf(0) }
-                    val pillPadding = if (isSmallLandscape) PaddingValues(horizontal = 12.dp, vertical = 6.dp) else ButtonDefaults.ContentPadding
-                    val pillTextStyle = if (isSmallLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
-                    val pillIconSize = if (isSmallLandscape) 18.dp else 20.dp
-                    val pillIconSpacer = if (isSmallLandscape) 6.dp else 8.dp
-                    Column(
+                    AboutSection(
                         modifier =
                             Modifier.padding(
                                 top =
@@ -1812,2133 +1428,22 @@ fun SettingsScreen(
                                         24.dp
                                     },
                             ),
-                    ) {
-                        if (showAboutHeader && showSectionHeaders) {
-                            SettingsSectionHeader(
-                                iconName = SettingsSectionKey.About.iconName,
-                                title = stringResource(R.string.settings_about_section),
-                                trailingContent =
-                                    if (!isLandscape) {
-                                        {
-                                            FilePipeIconButton(
-                                                onClick = shareDiagnostics,
-                                                modifier = Modifier.size(40.dp),
-                                                tooltipLabel = diagnosticsTooltip,
-                                            ) {
-                                                FilePipeMaterialRoundedSymbol(
-                                                    name = "bug_report",
-                                                    contentDescription = diagnosticsTooltip,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                )
-                                            }
-                                        }
-                                    } else {
-                                        null
-                                    },
-                            )
-                            Spacer(Modifier.height(8.dp))
-                        }
-                        GroupedListColumn {
-                            GroupedListItem(position = GroupPosition.ONLY) {
-                                Box(modifier = Modifier.fillMaxWidth()) {
-                                    if (isLandscape) {
-                                        Box(
-                                            modifier =
-                                                Modifier
-                                                    .align(Alignment.TopEnd)
-                                                    .padding(top = if (isSmallLandscape) 4.dp else 8.dp, end = if (isSmallLandscape) 4.dp else 8.dp),
-                                        ) {
-                                            FilePipeIconButton(
-                                                onClick = shareDiagnostics,
-                                                modifier = Modifier.size(40.dp),
-                                                tooltipLabel = diagnosticsTooltip,
-                                            ) {
-                                                FilePipeMaterialRoundedSymbol(
-                                                    name = "bug_report",
-                                                    contentDescription = diagnosticsTooltip,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Column(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .padding(horizontal = if (isSmallLandscape) 16.dp else 20.dp)
-                                                .padding(top = if (isSmallLandscape) 20.dp else 24.dp, bottom = if (isSmallLandscape) 16.dp else 8.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                    ) {
-                                        Text(
-                                            text =
-                                                stringResource(
-                                                    R.string.app_version_format,
-                                                    stringResource(R.string.app_name),
-                                                    BuildConfig.VERSION_NAME,
-                                                ),
-                                            modifier =
-                                                Modifier.combinedClickable(
-                                                    interactionSource = remember { MutableInteractionSource() },
-                                                    indication = null,
-                                                    onClick = {
-                                                        if (developerOptionsEnabled) {
-                                                            onOpenDevOptions()
-                                                            return@combinedClickable
-                                                        }
-                                                        developerOptionsTapCount += 1
-                                                        val remaining = DEVELOPER_OPTIONS_UNLOCK_TAPS - developerOptionsTapCount
-                                                        if (remaining > 0) {
-                                                            Toast
-                                                                .makeText(
-                                                                    aboutContext,
-                                                                    aboutResources.getQuantityString(
-                                                                        R.plurals.settings_developer_options_taps_remaining,
-                                                                        remaining,
-                                                                        remaining,
-                                                                    ),
-                                                                    Toast.LENGTH_SHORT,
-                                                                ).show()
-                                                        } else {
-                                                            developerOptionsTapCount = 0
-                                                            viewModel.setDeveloperOptionsEnabled(true)
-                                                            Toast
-                                                                .makeText(
-                                                                    aboutContext,
-                                                                    developerOptionsUnlockedToast,
-                                                                    Toast.LENGTH_SHORT,
-                                                                ).show()
-                                                            onOpenDevOptions()
-                                                        }
-                                                    },
-                                                    onLongClick = {
-                                                        Toast
-                                                            .makeText(aboutContext, buildVariantToastText, Toast.LENGTH_SHORT)
-                                                            .show()
-                                                    },
-                                                ),
-                                            style = if (isSmallLandscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.displaySmall,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            textAlign = TextAlign.Center,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                        Spacer(Modifier.height(if (isSmallLandscape) 8.dp else 10.dp))
-                                        Text(
-                                            text = stringResource(R.string.app_tagline),
-                                            style = if (isSmallLandscape) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            textAlign = TextAlign.Center,
-                                        )
-                                        Spacer(Modifier.height(if (isSmallLandscape) 12.dp else 20.dp))
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.Center,
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            AppIconImage(
-                                                modifier =
-                                                    Modifier
-                                                        .size(if (isSmallLandscape) 64.dp else 84.dp)
-                                                        .clip(RoundedCornerShape(percent = 25))
-                                                        .tapSoundClickable(onClick = onOpenIntro),
-                                            )
-                                            Spacer(Modifier.width(if (isSmallLandscape) 16.dp else 20.dp))
-                                            AboutAuthorPhoto(
-                                                modifier =
-                                                    Modifier
-                                                        .size(if (isSmallLandscape) 64.dp else 84.dp)
-                                                        .clip(RoundedCornerShape(16.dp))
-                                                        .tapSoundClickable {
-                                                            runCatching {
-                                                                aboutContext.startActivity(
-                                                                    Intent(Intent.ACTION_VIEW, authorGithubProfileUrl.toUri()),
-                                                                )
-                                                            }
-                                                        },
-                                            )
-                                        }
-                                        Spacer(Modifier.height(if (isSmallLandscape) 12.dp else 20.dp))
-                                        Text(
-                                            text = stringResource(R.string.settings_byline),
-                                            style = if (isSmallLandscape) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
-                                            color = MaterialTheme.colorScheme.onSurface,
-                                            textAlign = TextAlign.Center,
-                                        )
-                                        Spacer(Modifier.height(if (isSmallLandscape) 14.dp else 24.dp))
-                                        FlowRow(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.Center,
-                                            verticalArrangement = Arrangement.spacedBy(if (isSmallLandscape) 8.dp else 12.dp),
-                                            itemVerticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            val hostActivity = context as? ComponentActivity
-                                            val aboutPillShape = pillShape
-                                            if (useGithubLikeAboutLinks) {
-                                                Surface(
-                                                    shape = aboutPillShape,
-                                                    color = Color.Transparent,
-                                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                                                    modifier =
-                                                        Modifier
-                                                            .clip(aboutPillShape)
-                                                            .tapSoundCombinedClickable(
-                                                                onClick = {
-                                                                    runCatching {
-                                                                        aboutContext.startActivity(
-                                                                            Intent(
-                                                                                Intent.ACTION_VIEW,
-                                                                                playStoreListingUrl.toUri(),
-                                                                            ),
-                                                                        )
-                                                                    }
-                                                                },
-                                                                onLongClick = {
-                                                                    copyAboutLinkToClipboard(playStoreListingUrl)
-                                                                },
-                                                                role = Role.Button,
-                                                            ),
-                                                ) {
-                                                    Row(
-                                                        modifier = Modifier.padding(pillPadding),
-                                                        verticalAlignment = Alignment.CenterVertically,
-                                                        horizontalArrangement = Arrangement.Center,
-                                                    ) {
-                                                        AboutPlayStoreIcon(
-                                                            tint = MaterialTheme.colorScheme.primary,
-                                                            modifier = Modifier.size(pillIconSize),
-                                                        )
-                                                        Spacer(Modifier.width(pillIconSpacer))
-                                                        Text(
-                                                            text = stringResource(R.string.settings_rate_on_play_store),
-                                                            style = pillTextStyle,
-                                                            color = MaterialTheme.colorScheme.primary,
-                                                            maxLines = 1,
-                                                            overflow = TextOverflow.Ellipsis,
-                                                            softWrap = false,
-                                                        )
-                                                    }
-                                                }
-                                                if (githubRepoForSourceLink.isNotEmpty()) {
-                                                    Spacer(Modifier.width(if (isSmallLandscape) 10.dp else 12.dp))
-                                                    Surface(
-                                                        shape = aboutPillShape,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                                                        modifier =
-                                                            Modifier
-                                                                .clip(aboutPillShape)
-                                                                .tapSoundCombinedClickable(
-                                                                    onClick = {
-                                                                        val repoUrl = "https://github.com/$githubRepoForSourceLink"
-                                                                        runCatching {
-                                                                            aboutContext.startActivity(
-                                                                                Intent(Intent.ACTION_VIEW, repoUrl.toUri()),
-                                                                            )
-                                                                        }
-                                                                    },
-                                                                    onLongClick = {
-                                                                        copyAboutLinkToClipboard(
-                                                                            "https://github.com/$githubRepoForSourceLink",
-                                                                        )
-                                                                    },
-                                                                    role = Role.Button,
-                                                                ),
-                                                    ) {
-                                                        Row(
-                                                            modifier = Modifier.padding(pillPadding),
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.Center,
-                                                        ) {
-                                                            Icon(
-                                                                painter = painterResource(R.drawable.ic_github_mark),
-                                                                contentDescription = null,
-                                                                modifier = Modifier.size(pillIconSize),
-                                                                tint = MaterialTheme.colorScheme.onPrimary,
-                                                            )
-                                                            Spacer(Modifier.width(pillIconSpacer))
-                                                            Text(
-                                                                text = stringResource(R.string.settings_star_on_github),
-                                                                style = pillTextStyle,
-                                                                color = MaterialTheme.colorScheme.onPrimary,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis,
-                                                                softWrap = false,
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            } else {
-                                                if (playStoreAboutUsesListingOnly) {
-                                                    Surface(
-                                                        shape = aboutPillShape,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                                                        modifier =
-                                                            Modifier
-                                                                .clip(aboutPillShape)
-                                                                .tapSoundCombinedClickable(
-                                                                    onClick = {
-                                                                        runCatching {
-                                                                            aboutContext.startActivity(
-                                                                                Intent(
-                                                                                    Intent.ACTION_VIEW,
-                                                                                    playStoreListingUrl.toUri(),
-                                                                                ),
-                                                                            )
-                                                                        }
-                                                                    },
-                                                                    onLongClick = {
-                                                                        copyAboutLinkToClipboard(playStoreListingUrl)
-                                                                    },
-                                                                    role = Role.Button,
-                                                                ),
-                                                    ) {
-                                                        Row(
-                                                            modifier = Modifier.padding(pillPadding),
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.Center,
-                                                        ) {
-                                                            AboutPlayStoreIcon(
-                                                                tint = MaterialTheme.colorScheme.primaryContainer,
-                                                                modifier = Modifier.size(pillIconSize),
-                                                            )
-                                                            Spacer(Modifier.width(pillIconSpacer))
-                                                            Text(
-                                                                text = stringResource(R.string.settings_rate_on_play_store),
-                                                                style = pillTextStyle,
-                                                                color = MaterialTheme.colorScheme.onPrimary,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis,
-                                                                softWrap = false,
-                                                            )
-                                                        }
-                                                    }
-                                                } else {
-                                                    Surface(
-                                                        shape = aboutPillShape,
-                                                        color = MaterialTheme.colorScheme.primary,
-                                                        contentColor = MaterialTheme.colorScheme.onPrimary,
-                                                        modifier =
-                                                            Modifier
-                                                                .clip(aboutPillShape)
-                                                                .tapSoundCombinedClickable(
-                                                                    onClick = {
-                                                                        if (hostActivity != null) {
-                                                                            viewModel.launchPlayInAppReviewFromSettings(
-                                                                                hostActivity,
-                                                                            ) {
-                                                                                playStoreAboutUsesListingOnly = true
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    onLongClick = {
-                                                                        copyAboutLinkToClipboard(playStoreListingUrl)
-                                                                    },
-                                                                    role = Role.Button,
-                                                                ),
-                                                    ) {
-                                                        Row(
-                                                            modifier = Modifier.padding(pillPadding),
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.Center,
-                                                        ) {
-                                                            AboutPlayStoreIcon(
-                                                                tint = MaterialTheme.colorScheme.primaryContainer,
-                                                                modifier = Modifier.size(pillIconSize),
-                                                            )
-                                                            Spacer(Modifier.width(pillIconSpacer))
-                                                            Text(
-                                                                text = stringResource(R.string.settings_rate_on_play_store),
-                                                                style = pillTextStyle,
-                                                                color = MaterialTheme.colorScheme.onPrimary,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis,
-                                                                softWrap = false,
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                                if (githubRepoForSourceLink.isNotEmpty()) {
-                                                    Spacer(Modifier.width(if (isSmallLandscape) 10.dp else 12.dp))
-                                                    Surface(
-                                                        shape = aboutPillShape,
-                                                        color = Color.Transparent,
-                                                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                                                        modifier =
-                                                            Modifier
-                                                                .clip(aboutPillShape)
-                                                                .tapSoundCombinedClickable(
-                                                                    onClick = {
-                                                                        val repoUrl = "https://github.com/$githubRepoForSourceLink"
-                                                                        runCatching {
-                                                                            aboutContext.startActivity(
-                                                                                Intent(Intent.ACTION_VIEW, repoUrl.toUri()),
-                                                                            )
-                                                                        }
-                                                                    },
-                                                                    onLongClick = {
-                                                                        copyAboutLinkToClipboard(
-                                                                            "https://github.com/$githubRepoForSourceLink",
-                                                                        )
-                                                                    },
-                                                                    role = Role.Button,
-                                                                ),
-                                                    ) {
-                                                        Row(
-                                                            modifier = Modifier.padding(pillPadding),
-                                                            verticalAlignment = Alignment.CenterVertically,
-                                                            horizontalArrangement = Arrangement.Center,
-                                                        ) {
-                                                            Icon(
-                                                                painter = painterResource(R.drawable.ic_github_mark),
-                                                                contentDescription = null,
-                                                                modifier = Modifier.size(pillIconSize),
-                                                                tint = MaterialTheme.colorScheme.primary,
-                                                            )
-                                                            Spacer(Modifier.width(pillIconSpacer))
-                                                            Text(
-                                                                text = stringResource(R.string.settings_star_on_github),
-                                                                style = pillTextStyle,
-                                                                color = MaterialTheme.colorScheme.primary,
-                                                                maxLines = 1,
-                                                                overflow = TextOverflow.Ellipsis,
-                                                                softWrap = false,
-                                                            )
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        Spacer(Modifier.height(if (isSmallLandscape) 16.dp else 24.dp))
-                                        AboutOtherAppsAndLinks(
-                                            context = aboutContext,
-                                            copyLinkToClipboard = copyAboutLinkToClipboard,
-                                            isSmallLandscape = isSmallLandscape,
-                                        )
-                                    }
-                                }
+                        onOpenIntro = onOpenIntro,
+                        onOpenDevOptions = onOpenDevOptions,
+                        onDeveloperOptionsUnlocked = { viewModel.setDeveloperOptionsEnabled(true) },
+                        onLaunchPlayReview = { onFlowFinished ->
+                            val hostActivity = context as? ComponentActivity
+                            if (hostActivity != null) {
+                                updateVm.launchPlayInAppReviewFromSettings(hostActivity, onFlowFinished)
+                            } else {
+                                onFlowFinished()
                             }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AboutPlayStoreIcon(
-    tint: Color,
-    modifier: Modifier = Modifier,
-) {
-    Icon(
-        painter = painterResource(R.drawable.ic_google_play_mark),
-        contentDescription = null,
-        modifier = modifier,
-        tint = tint,
-    )
-}
-
-@Composable
-private fun AboutOtherAppsAndLinks(
-    context: Context,
-    copyLinkToClipboard: (String) -> Unit,
-    isSmallLandscape: Boolean,
-) {
-    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
-    val rememberRoute =
-        AboutAppRoute(
-            packageId = REMEMBER_FDROID_PACKAGE_ID,
-            portfolioUrl = stringResource(R.string.settings_about_remember_website_url),
-            playStoreUrl = stringResource(R.string.settings_about_remember_play_store_url),
-        )
-    val obtainXRoute =
-        AboutAppRoute(
-            packageId = OBTAINX_FDROID_PACKAGE_ID,
-            portfolioUrl = stringResource(R.string.settings_about_obtainx_website_url),
-        )
-    val websiteUrl = stringResource(R.string.settings_about_filepipe_website_url)
-    val privacyUrl = stringResource(R.string.settings_about_filepipe_privacy_url)
-    val termsUrl = stringResource(R.string.settings_about_filepipe_terms_url)
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.settings_about_other_apps),
-            style = if (isSmallLandscape) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
-        AboutAppStoreButton(
-            iconResId = R.drawable.logo_remember,
-            name = stringResource(R.string.settings_about_remember_name),
-            tagline = stringResource(R.string.settings_about_remember_tagline),
-            route = rememberRoute,
-            accentColor = Color(0xFF4F7D43),
-            context = context,
-            copyLinkToClipboard = copyLinkToClipboard,
-            isSmallLandscape = isSmallLandscape,
-        )
-        if (useGithubLikeAboutLinks) {
-            Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
-            AboutAppStoreButton(
-                iconResId = R.drawable.logo_obtainx,
-                name = stringResource(R.string.settings_about_obtainx_name),
-                tagline = stringResource(R.string.settings_about_obtainx_tagline),
-                route = obtainXRoute,
-                accentColor = Color(0xFF7C55D9),
-                context = context,
-                copyLinkToClipboard = copyLinkToClipboard,
-                isSmallLandscape = isSmallLandscape,
-            )
-        }
-        Spacer(Modifier.height(if (isSmallLandscape) 12.dp else 14.dp))
-        Row(
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-            horizontalArrangement = Arrangement.spacedBy(if (isSmallLandscape) 6.dp else 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AboutTextLink(
-                label = stringResource(R.string.settings_about_website),
-                url = websiteUrl,
-                context = context,
-                copyLinkToClipboard = copyLinkToClipboard,
-                isSmallLandscape = isSmallLandscape,
-            )
-            AboutLinkSeparator()
-            AboutTextLink(
-                label = stringResource(R.string.settings_about_privacy_policy),
-                url = privacyUrl,
-                context = context,
-                copyLinkToClipboard = copyLinkToClipboard,
-                isSmallLandscape = isSmallLandscape,
-            )
-            AboutLinkSeparator()
-            AboutTextLink(
-                label = stringResource(R.string.settings_about_terms),
-                url = termsUrl,
-                context = context,
-                copyLinkToClipboard = copyLinkToClipboard,
-                isSmallLandscape = isSmallLandscape,
-            )
-        }
-    }
-}
-
-@Composable
-private fun AboutAppStoreButton(
-    iconResId: Int,
-    name: String,
-    tagline: String,
-    route: AboutAppRoute,
-    accentColor: Color,
-    context: Context,
-    copyLinkToClipboard: (String) -> Unit,
-    isSmallLandscape: Boolean,
-) {
-    val shape = MaterialTheme.shapes.large
-    Surface(
-        shape = shape,
-        color = accentColor.copy(alpha = 0.13f),
-        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.16f)),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(shape)
-                .tapSoundCombinedClickable(
-                    onClick = { openAboutAppRoute(context, route) },
-                    onLongClick = { copyLinkToClipboard(route.copyUrl) },
-                    role = Role.Button,
-                ),
-    ) {
-        Row(
-            modifier =
-                Modifier.padding(
-                    horizontal = if (isSmallLandscape) 12.dp else 12.dp,
-                    vertical = if (isSmallLandscape) 8.dp else 10.dp,
-                ),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Image(
-                painter = painterResource(iconResId),
-                contentDescription = null,
-                modifier =
-                    Modifier
-                        .size(if (isSmallLandscape) 36.dp else 40.dp)
-                        .clip(compactControlShape),
-            )
-            Spacer(Modifier.width(if (isSmallLandscape) 8.dp else 10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = name,
-                    style = if (isSmallLandscape) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = tagline,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = if (isSmallLandscape) 1 else 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Spacer(Modifier.width(8.dp))
-            FilePipeMaterialRoundedSymbol(
-                name = "chevron_right",
-                contentDescription = null,
-                size = if (isSmallLandscape) 18.dp else 20.dp,
-                tint = accentColor.copy(alpha = 0.86f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun AboutLinkSeparator() {
-    Text(
-        text = "•",
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-    )
-}
-
-@Composable
-private fun AboutTextLink(
-    label: String,
-    url: String,
-    context: Context,
-    copyLinkToClipboard: (String) -> Unit,
-    isSmallLandscape: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Text(
-        text = label,
-        modifier =
-            modifier
-                .tapSoundCombinedClickable(
-                    onClick = { openAboutUrl(context, url) },
-                    onLongClick = { copyLinkToClipboard(url) },
-                    role = Role.Button,
-                ).padding(horizontal = 4.dp, vertical = 2.dp),
-        style = if (isSmallLandscape) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.primary,
-        textAlign = TextAlign.Center,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-}
-
-private fun openAboutUrl(
-    context: Context,
-    url: String,
-) {
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-    }
-}
-
-private fun openAboutAppRoute(
-    context: Context,
-    route: AboutAppRoute,
-) {
-    when (BuildConfig.FLAVOR) {
-        "fdroid" -> {
-            val fdroidIntent =
-                Intent(Intent.ACTION_VIEW, "fdroid.app:${route.packageId}".toUri())
-            try {
-                context.startActivity(fdroidIntent)
-            } catch (_: ActivityNotFoundException) {
-                context.startActivity(Intent(Intent.ACTION_VIEW, route.portfolioUrl.toUri()))
-            }
-        }
-
-        "playstore" -> {
-            val targetUrl = route.playStoreUrl.ifBlank { route.portfolioUrl }
-            context.startActivity(Intent(Intent.ACTION_VIEW, targetUrl.toUri()))
-        }
-
-        else -> {
-            context.startActivity(Intent(Intent.ACTION_VIEW, route.portfolioUrl.toUri()))
-        }
-    }
-}
-
-/**
- * Opens the system share sheet with the same link and message as the Settings About section used for sharing.
- */
-fun launchAppShareChooser(context: Context) {
-    val githubRepoForSourceLink =
-        BuildConfig.GITHUB_REPO
-            .trim()
-            .ifEmpty { BuildConfig.CHANGELOG_GITHUB_REPO.trim() }
-    val portfolioUrl = context.getString(R.string.settings_about_filepipe_website_url)
-    val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
-    val shareUrl =
-        when {
-            BuildConfig.FLAVOR == "playstore" -> {
-                playStoreListingUrl
-            }
-
-            BuildConfig.FLAVOR == "fdroid" || BuildConfig.FLAVOR == "github" -> {
-                portfolioUrl
-            }
-
-            githubRepoForSourceLink.isNotEmpty() -> {
-                "https://github.com/$githubRepoForSourceLink/releases/latest"
-            }
-
-            else -> {
-                ""
-            }
-        }
-    if (shareUrl.isEmpty()) return
-    val message =
-        context.getString(
-            R.string.about_share_text,
-            context.getString(R.string.app_name),
-            shareUrl,
-        )
-    val sendIntent =
-        Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, message)
-            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.app_name))
-        }
-    runCatching {
-        context.startActivity(
-            Intent.createChooser(sendIntent, context.getString(R.string.settings_share_app)),
-        )
-    }
-}
-
-@Composable
-private fun rememberDiagnosticsShareAction(
-    context: Context,
-    chooserTitle: String,
-    preferences: AppPreferences,
-): () -> Unit =
-    remember(context, chooserTitle, preferences) {
-        {
-            runCatching {
-                DiagnosticLog.record(context, "Diagnostic log shared from Settings")
-                val diagnosticsFile = DiagnosticLog.createShareFile(context, preferences)
-                val uri =
-                    FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        diagnosticsFile,
-                    )
-                val sendIntent =
-                    Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.settings_share_diagnostics_subject))
-                        putExtra(Intent.EXTRA_TITLE, context.getString(R.string.settings_share_diagnostics))
-                        clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                context.startActivity(Intent.createChooser(sendIntent, chooserTitle))
-            }.onFailure { error ->
-                DiagnosticLog.record(context, "Diagnostic log share failed", error)
-                Toast
-                    .makeText(
-                        context,
-                        context.getString(R.string.settings_share_diagnostics_failed),
-                        Toast.LENGTH_SHORT,
-                    ).show()
-            }
-        }
-    }
-
-@Composable
-private fun UpdateCheckScheduleDropdown(
-    selected: UpdateCheckSchedule,
-    onSelect: (UpdateCheckSchedule) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val options = remember { UpdateCheckSchedule.entries }
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.settings_update_check_frequency),
-            style = MaterialTheme.typography.bodyLarge,
-            modifier = Modifier.weight(1f),
-        )
-        FilePipeOutlinedButton(onClick = { expanded = true }) {
-            Text(updateScheduleSummaryBeforeColon(selected))
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            ) {
-                options.forEach { option ->
-                    FilePipeDropdownMenuItem(
-                        text = { Text(updateScheduleLabel(option)) },
-                        onClick = {
-                            onSelect(option)
-                            expanded = false
                         },
+                        developerOptionsEnabled = developerOptionsEnabled,
+                        preferences = preferences,
+                        showHeader = showAboutHeader && showSectionHeaders,
                     )
                 }
-            }
-        }
-    }
-}
-
-private fun summaryLabelBeforeColon(fullScheduleLabel: String): String {
-    val colonIndex = fullScheduleLabel.indexOf(':')
-    return if (colonIndex >= 0) {
-        fullScheduleLabel.substring(0, colonIndex).trim()
-    } else {
-        fullScheduleLabel
-    }
-}
-
-@Composable
-private fun updateScheduleSummaryBeforeColon(schedule: UpdateCheckSchedule): String = summaryLabelBeforeColon(updateScheduleLabel(schedule))
-
-@Composable
-private fun updateScheduleLabel(schedule: UpdateCheckSchedule): String =
-    when (schedule) {
-        UpdateCheckSchedule.AT_APP_START -> stringResource(R.string.settings_update_schedule_app_start)
-        UpdateCheckSchedule.DAILY_AT_21 -> stringResource(R.string.settings_update_schedule_daily_21)
-        UpdateCheckSchedule.WEEKLY_MONDAY_AT_21 -> stringResource(R.string.settings_update_schedule_monday_21)
-        UpdateCheckSchedule.NEVER -> stringResource(R.string.settings_update_schedule_never)
-    }
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
-@Composable
-private fun UpdateCheckBottomSheetContent(
-    maxSheetHeight: Dp,
-    isCheckingUpdate: Boolean,
-    updateInfo: UpdateInfo?,
-    manualUpdateNoResult: Boolean,
-    downloadProgress: Float?,
-    changelogState: ChangelogUiState,
-    showGithubExtraUi: Boolean,
-    useFdroidUpdates: Boolean,
-    usePlayInAppUpdates: Boolean,
-    onDownloadClick: (UpdateInfo) -> Unit,
-    onSkipVersionClick: () -> Unit,
-) {
-    val sheetScroll = rememberScrollState()
-    val pagerCoroutineScope = rememberCoroutineScope()
-    val scheme = MaterialTheme.colorScheme
-    val isLandscape = isLandscape()
-    val isChangelogReady = changelogState is ChangelogUiState.Ready
-    val outerScrollable = sheetScroll.maxValue > 0 && sheetScroll.maxValue != Int.MAX_VALUE
-    val outerModifier =
-        Modifier
-            .fillMaxWidth()
-            .let { modifier ->
-                if (isLandscape && isChangelogReady) {
-                    modifier.height(maxSheetHeight).verticalScroll(sheetScroll, enabled = outerScrollable)
-                } else {
-                    modifier.heightIn(max = maxSheetHeight)
-                }
-            }.padding(horizontal = 16.dp, vertical = 8.dp)
-    Column(
-        outerModifier,
-    ) {
-        if (isCheckingUpdate) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(240.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                LoadingIndicator(modifier = Modifier.size(48.dp))
-            }
-        } else {
-            when {
-                downloadProgress != null -> {
-                    UpdateSheetDownloadProgressBar(downloadProgress = downloadProgress)
-                }
-
-                updateInfo != null -> {
-                    val availableUpdate = updateInfo
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        FilePipeMaterialRoundedSymbol(
-                            name = "system_update",
-                            contentDescription = null,
-                            size = 40.dp,
-                            tint = MaterialTheme.colorScheme.primary,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        if (usePlayInAppUpdates && availableUpdate.isPlayStoreUpdateInProgress) {
-                            Text(
-                                text = stringResource(R.string.settings_update_play_in_progress_body),
-                                style = MaterialTheme.typography.bodyMedium,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                            Spacer(Modifier.height(12.dp))
-                        }
-                        if (showGithubExtraUi) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Spacer(Modifier.width(48.dp))
-                                Text(
-                                    text =
-                                        stringResource(
-                                            R.string.settings_update_available,
-                                            availableUpdate.versionName,
-                                        ),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                ToggleLabelHelpDropdown(
-                                    tipText = stringResource(R.string.settings_update_sheet_false_positive_tooltip),
-                                    contentDescription = stringResource(R.string.rule_toggle_tip_show_help),
-                                )
-                            }
-                        } else {
-                            Text(
-                                text =
-                                    stringResource(
-                                        R.string.settings_update_available,
-                                        availableUpdate.versionName,
-                                    ),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        FilePipeButton(
-                            onClick = { onDownloadClick(availableUpdate) },
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp),
-                            shape = pillShape,
-                        ) {
-                            Text(
-                                text =
-                                    when {
-                                        useFdroidUpdates -> {
-                                            stringResource(R.string.settings_open_fdroid)
-                                        }
-
-                                        usePlayInAppUpdates && availableUpdate.isPlayStoreUpdateInProgress -> {
-                                            stringResource(R.string.settings_update_resume_play)
-                                        }
-
-                                        else -> {
-                                            stringResource(
-                                                R.string.settings_download_install,
-                                                availableUpdate.versionName,
-                                            )
-                                        }
-                                    },
-                                maxLines = 1,
-                            )
-                        }
-                        if (showGithubExtraUi && availableUpdate.remoteApkAssetUpdatedAt.isNotBlank()) {
-                            Spacer(Modifier.height(8.dp))
-                            FilePipeTextButton(onClick = onSkipVersionClick) {
-                                Text(stringResource(R.string.settings_update_skip_version))
-                            }
-                        }
-                    }
-                }
-
-                manualUpdateNoResult -> {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        UpToDatePhoneIcon()
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            text = stringResource(R.string.settings_up_to_date),
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
-            }
-        }
-
-        if (changelogState != ChangelogUiState.Hidden) {
-            Spacer(Modifier.height(12.dp))
-        }
-        when (changelogState) {
-            ChangelogUiState.Hidden -> {}
-
-            ChangelogUiState.Loading -> {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    color = scheme.surfaceContainerHigh,
-                    contentColor = scheme.onSurface,
-                    tonalElevation = 1.dp,
-                    shadowElevation = 0.dp,
-                ) {
-                    Surface(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(120.dp)
-                                .padding(8.dp),
-                        shape = compactControlShape,
-                        color = scheme.surfaceContainerLow,
-                        contentColor = scheme.onSurface,
-                    ) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            LoadingIndicator(modifier = Modifier.size(40.dp))
-                        }
-                    }
-                }
-            }
-
-            is ChangelogUiState.Ready -> {
-                val readyMarkdown = changelogState.text
-                val changelogPages = remember(readyMarkdown) { splitChangelogIntoPages(readyMarkdown) }
-                val changelogPagerState = rememberPagerState(pageCount = { changelogPages.size })
-                val changelogPagerMaxHeight = maxSheetHeight * 0.72f
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    color = scheme.surfaceContainerHigh,
-                    contentColor = scheme.onSurface,
-                    tonalElevation = 1.dp,
-                    shadowElevation = 0.dp,
-                ) {
-                    if (changelogPages.size <= 1) {
-                        val singleScroll = rememberScrollState()
-                        val singleScrollable = singleScroll.maxValue > 0 && singleScroll.maxValue != Int.MAX_VALUE
-                        val singleModifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .let { modifier ->
-                                    if (isLandscape) {
-                                        modifier.wrapContentHeight().padding(8.dp)
-                                    } else {
-                                        modifier.heightIn(max = changelogPagerMaxHeight).padding(8.dp)
-                                    }
-                                }
-                        Surface(
-                            modifier = singleModifier,
-                            shape = compactControlShape,
-                            color = scheme.surfaceContainerLow,
-                            contentColor = scheme.onSurface,
-                        ) {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .let { modifier ->
-                                            if (isLandscape) {
-                                                modifier.fillMaxWidth().wrapContentHeight().padding(16.dp)
-                                            } else {
-                                                modifier.fillMaxSize().verticalScroll(singleScroll, enabled = singleScrollable).padding(16.dp)
-                                            }
-                                        },
-                            ) {
-                                SimpleMarkdown(
-                                    content = readyMarkdown,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
-                        }
-                    } else {
-                        val pagerModifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .let { modifier ->
-                                    if (isLandscape) {
-                                        modifier.wrapContentHeight().padding(horizontal = 8.dp, vertical = 2.dp)
-                                    } else {
-                                        modifier.height(changelogPagerMaxHeight).padding(horizontal = 8.dp, vertical = 2.dp)
-                                    }
-                                }
-                        Column(Modifier.fillMaxWidth()) {
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(32.dp)
-                                        .padding(horizontal = 2.dp, vertical = 0.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                val canGoBack = changelogPagerState.currentPage > 0
-                                val canGoForward = changelogPagerState.currentPage < changelogPages.lastIndex
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .tapSoundClickable(
-                                                enabled = canGoBack,
-                                                onClick = {
-                                                    pagerCoroutineScope.launch {
-                                                        changelogPagerState.animateScrollToPage(
-                                                            changelogPagerState.currentPage - 1,
-                                                        )
-                                                    }
-                                                },
-                                            ),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    FilePipeMaterialRoundedSymbol(
-                                        name = "arrow_back",
-                                        contentDescription = stringResource(R.string.settings_changelog_previous),
-                                        size = 20.dp,
-                                        autoMirror = true,
-                                        tint =
-                                            if (canGoBack) {
-                                                scheme.primary
-                                            } else {
-                                                scheme.onSurface.copy(alpha = 0.38f)
-                                            },
-                                    )
-                                }
-                                Text(
-                                    text =
-                                        stringResource(
-                                            R.string.settings_changelog_page_indicator,
-                                            changelogPagerState.currentPage + 1,
-                                            changelogPages.size,
-                                        ),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = scheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center,
-                                    modifier =
-                                        Modifier
-                                            .weight(1f)
-                                            .padding(horizontal = 6.dp),
-                                )
-                                Box(
-                                    modifier =
-                                        Modifier
-                                            .size(32.dp)
-                                            .clip(CircleShape)
-                                            .tapSoundClickable(
-                                                enabled = canGoForward,
-                                                onClick = {
-                                                    pagerCoroutineScope.launch {
-                                                        changelogPagerState.animateScrollToPage(
-                                                            changelogPagerState.currentPage + 1,
-                                                        )
-                                                    }
-                                                },
-                                            ),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    FilePipeMaterialRoundedSymbol(
-                                        name = "arrow_forward",
-                                        contentDescription = stringResource(R.string.settings_changelog_next),
-                                        size = 20.dp,
-                                        autoMirror = true,
-                                        tint =
-                                            if (canGoForward) {
-                                                scheme.primary
-                                            } else {
-                                                scheme.onSurface.copy(alpha = 0.38f)
-                                            },
-                                    )
-                                }
-                            }
-                            Surface(
-                                modifier = pagerModifier,
-                                shape = compactControlShape,
-                                color = scheme.surfaceContainerLow,
-                                contentColor = scheme.onSurface,
-                            ) {
-                                HorizontalPager(
-                                    state = changelogPagerState,
-                                    modifier =
-                                        Modifier
-                                            .let { modifier ->
-                                                if (isLandscape) {
-                                                    modifier.fillMaxWidth().wrapContentHeight()
-                                                } else {
-                                                    modifier.fillMaxSize()
-                                                }
-                                            },
-                                ) { pageIndex ->
-                                    val innerScroll = rememberScrollState()
-                                    val innerScrollable = innerScroll.maxValue > 0 && innerScroll.maxValue != Int.MAX_VALUE
-                                    Column(
-                                        modifier =
-                                            Modifier
-                                                .let { modifier ->
-                                                    if (isLandscape) {
-                                                        modifier.fillMaxWidth().wrapContentHeight().padding(16.dp)
-                                                    } else {
-                                                        modifier.fillMaxSize().verticalScroll(innerScroll, enabled = innerScrollable).padding(16.dp)
-                                                    }
-                                                },
-                                    ) {
-                                        SimpleMarkdown(content = changelogPages[pageIndex])
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            is ChangelogUiState.Failed -> {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = MaterialTheme.shapes.medium,
-                    color = scheme.surfaceContainerHigh,
-                    contentColor = scheme.onSurface,
-                    tonalElevation = 1.dp,
-                    shadowElevation = 0.dp,
-                ) {
-                    Surface(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                        shape = compactControlShape,
-                        color = scheme.surfaceContainerLow,
-                        contentColor = scheme.onSurface,
-                    ) {
-                        Text(
-                            text = changelogState.message,
-                            color = scheme.error,
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(16.dp),
-                        )
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-    }
-}
-
-@Composable
-private fun UpToDatePhoneIcon() {
-    val primary = MaterialTheme.colorScheme.primary
-    Box(
-        modifier = Modifier.size(56.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        FilePipeMaterialRoundedSymbol(
-            name = "smartphone",
-            contentDescription = null,
-            size = 40.dp,
-            filled = false,
-            tint = primary,
-        )
-        FilePipeMaterialRoundedSymbol(
-            name = "check_circle",
-            contentDescription = null,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .offset(x = 2.dp, y = 2.dp),
-            size = 22.dp,
-            tint = primary,
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
-    val scheme = MaterialTheme.colorScheme
-    val buttonHeight = 48.dp
-    val shape = pillShape
-    val label =
-        when {
-            downloadProgress == -1f -> {
-                stringResource(R.string.settings_installing)
-            }
-
-            downloadProgress == -2f -> {
-                stringResource(R.string.settings_downloading)
-            }
-
-            else -> {
-                stringResource(
-                    R.string.settings_downloading_percent,
-                    downloadProgress.toInt().coerceIn(0, 100),
-                )
-            }
-        }
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(buttonHeight)
-                .clip(shape),
-    ) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(scheme.onSurface.copy(alpha = 0.12f)),
-        )
-        when {
-            downloadProgress >= 0f && downloadProgress <= 100f -> {
-                Box(
-                    Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth((downloadProgress / 100f).coerceIn(0f, 1f))
-                        .align(Alignment.CenterStart)
-                        .background(scheme.primary.copy(alpha = 0.85f)),
-                )
-            }
-
-            downloadProgress == -1f || downloadProgress == -2f -> {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .background(scheme.primary.copy(alpha = 0.22f)),
-                )
-            }
-        }
-        if (downloadProgress == -1f || downloadProgress == -2f) {
-            LinearWavyProgressIndicator(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .height(4.dp),
-                color = scheme.primary.copy(alpha = 0.48f),
-                trackColor = Color.Transparent,
-            )
-        }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = scheme.onSurface.copy(alpha = 0.78f),
-            modifier = Modifier.align(Alignment.Center),
-        )
-    }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun SettingsExpandableSection(
-    sectionKey: String,
-    iconName: String,
-    title: String,
-    collapsedSectionKeys: Set<String>,
-    onCollapsedSectionKeysChange: (Set<String>) -> Unit,
-    modifier: Modifier = Modifier,
-    showHeader: Boolean = true,
-    forceExpanded: Boolean = false,
-    content: @Composable () -> Unit,
-) {
-    val collapsed = !forceExpanded && sectionKey in collapsedSectionKeys
-    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<IntSize>())
-    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
-    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
-    Column(modifier = modifier) {
-        if (showHeader) {
-            SettingsExpandableSectionHeader(
-                iconName = iconName,
-                title = title,
-                collapsed = collapsed,
-                onToggle = {
-                    onCollapsedSectionKeysChange(
-                        if (collapsed) {
-                            collapsedSectionKeys - sectionKey
-                        } else {
-                            collapsedSectionKeys + sectionKey
-                        },
-                    )
-                },
-            )
-            AnimatedVisibility(
-                visible = !collapsed,
-                enter =
-                    expandVertically(
-                        animationSpec = spatialSpec,
-                        expandFrom = Alignment.Top,
-                    ) + fadeIn(fadeInSpec),
-                exit =
-                    shrinkVertically(
-                        animationSpec = spatialSpec,
-                        shrinkTowards = Alignment.Top,
-                    ) + fadeOut(fadeOutSpec),
-            ) {
-                Column {
-                    Spacer(Modifier.height(8.dp))
-                    content()
-                }
-            }
-        } else {
-            Column {
-                content()
-            }
-        }
-    }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun SettingsExpandableSectionHeader(
-    iconName: String,
-    title: String,
-    collapsed: Boolean,
-    onToggle: () -> Unit,
-) {
-    val rotation by androidx.compose.animation.core.animateFloatAsState(
-        targetValue = if (collapsed) 0f else 90f,
-        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
-        label = "settings_section_chevron_rotation",
-    )
-    val cdExpand = stringResource(R.string.settings_section_expand_cd, title)
-    val cdCollapse = stringResource(R.string.settings_section_collapse_cd, title)
-    val interactionSource = remember { MutableInteractionSource() }
-    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Dp>())
-    val colorSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
-    val headerCorner by animateDpAsState(
-        targetValue = if (collapsed) 28.dp else 4.dp,
-        animationSpec = spatialSpec,
-        label = "settings_section_header_corner",
-    )
-    val headerColor by animateColorAsState(
-        targetValue = if (collapsed) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
-        animationSpec = colorSpec,
-        label = "settings_section_header_color",
-    )
-    val horizontalPadding by animateDpAsState(
-        targetValue = if (collapsed) 12.dp else 0.dp,
-        animationSpec = spatialSpec,
-        label = "settings_section_header_horizontal_padding",
-    )
-    val verticalPadding by animateDpAsState(
-        targetValue = if (collapsed) 8.dp else 4.dp,
-        animationSpec = spatialSpec,
-        label = "settings_section_header_vertical_padding",
-    )
-    val iconContainerSize by animateDpAsState(
-        targetValue = if (collapsed) 36.dp else 20.dp,
-        animationSpec = spatialSpec,
-        label = "settings_section_icon_container_size",
-    )
-    val iconSize by animateDpAsState(
-        targetValue = if (collapsed) 21.dp else 19.dp,
-        animationSpec = spatialSpec,
-        label = "settings_section_icon_size",
-    )
-    val iconContainerColor by animateColorAsState(
-        targetValue =
-            if (collapsed) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
-            } else {
-                Color.Transparent
-            },
-        animationSpec = colorSpec,
-        label = "settings_section_icon_container_color",
-    )
-    val chevronContainerSize by animateDpAsState(
-        targetValue = if (collapsed) 32.dp else 20.dp,
-        animationSpec = spatialSpec,
-        label = "settings_section_chevron_container_size",
-    )
-    val chevronSize by animateDpAsState(
-        targetValue = if (collapsed) 20.dp else 18.dp,
-        animationSpec = spatialSpec,
-        label = "settings_section_chevron_size",
-    )
-    val chevronContainerColor by animateColorAsState(
-        targetValue = if (collapsed) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
-        animationSpec = colorSpec,
-        label = "settings_section_chevron_container_color",
-    )
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(headerCorner))
-                .background(headerColor)
-                .semantics { contentDescription = if (collapsed) cdExpand else cdCollapse }
-                .tapSoundClickable(
-                    onClick = onToggle,
-                    indication = null,
-                    interactionSource = interactionSource,
-                ).padding(
-                    horizontal = horizontalPadding.coerceAtLeast(0.dp),
-                    vertical = verticalPadding.coerceAtLeast(0.dp),
-                ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(iconContainerSize)
-                    .clip(MaterialTheme.shapes.extraExtraLarge)
-                    .background(iconContainerColor),
-            contentAlignment = Alignment.Center,
-        ) {
-            FilePipeMaterialRoundedSymbol(
-                name = iconName,
-                contentDescription = null,
-                size = iconSize,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .size(chevronContainerSize)
-                    .clip(MaterialTheme.shapes.extraExtraLarge)
-                    .background(chevronContainerColor),
-            contentAlignment = Alignment.Center,
-        ) {
-            FilePipeMaterialRoundedSymbol(
-                name = "chevron_right",
-                contentDescription = null,
-                modifier =
-                    Modifier
-                        .graphicsLayer { rotationZ = rotation },
-                size = chevronSize,
-                autoMirror = true,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-@OptIn(ExperimentalSharedTransitionApi::class)
-private fun SettingsStandaloneNavigationRow(
-    iconName: String,
-    title: String,
-    onClick: () -> Unit,
-) {
-    val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
-    val sharedBoundsModifier =
-        if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-            with(sharedTransitionScope) {
-                Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState(DEV_OPTIONS_SHARED_BOUNDS_KEY),
-                    animatedVisibilityScope = animatedVisibilityScope,
-                )
-            }
-        } else {
-            Modifier
-        }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .then(sharedBoundsModifier)
-                .clip(RoundedCornerShape(28.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .tapSoundClickable(
-                    onClick = onClick,
-                    indication = null,
-                ).padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(36.dp)
-                    .clip(MaterialTheme.shapes.extraExtraLarge)
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)),
-            contentAlignment = Alignment.Center,
-        ) {
-            FilePipeMaterialRoundedSymbol(
-                name = iconName,
-                contentDescription = null,
-                size = 21.dp,
-                tint = MaterialTheme.colorScheme.primary,
-            )
-        }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.primary,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .clip(MaterialTheme.shapes.extraExtraLarge)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center,
-        ) {
-            FilePipeMaterialRoundedSymbol(
-                name = "arrow_outward",
-                contentDescription = null,
-                size = 20.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun SettingsSectionHeader(
-    iconName: String,
-    title: String,
-    trailingContent: (@Composable RowScope.() -> Unit)? = null,
-) {
-    Row(
-        modifier = if (trailingContent != null) Modifier.fillMaxWidth() else Modifier,
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        FilePipeMaterialRoundedSymbol(
-            name = iconName,
-            contentDescription = null,
-            size = 18.dp,
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        if (trailingContent != null) {
-            Spacer(Modifier.weight(1f))
-            trailingContent()
-        }
-    }
-}
-
-@Composable
-private fun SettingsToggleItem(
-    title: String,
-    subtitle: String? = null,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    iconName: String? = null,
-    switchEnabled: Boolean = true,
-    onDisabledInteraction: (() -> Unit)? = null,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .tapSoundClickable {
-                    if (!switchEnabled) {
-                        onDisabledInteraction?.invoke()
-                    } else {
-                        onCheckedChange(!checked)
-                    }
-                }.padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (iconName != null) {
-            FilePipeMaterialRoundedSymbol(
-                name = iconName,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.width(16.dp))
-        }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            if (subtitle != null) {
-                Text(
-                    subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        Spacer(Modifier.width(16.dp))
-        val switchInteractive = switchEnabled || onDisabledInteraction != null
-        FilePipeSwitch(
-            checked = checked,
-            onCheckedChange = { enabled ->
-                when {
-                    switchEnabled -> {
-                        onCheckedChange(enabled)
-                    }
-
-                    onDisabledInteraction != null && enabled -> {
-                        onDisabledInteraction.invoke()
-                    }
-
-                    else -> { }
-                }
-            },
-            enabled = switchInteractive,
-        )
-    }
-}
-
-@Composable
-private fun BackupFolderPickerItem(
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .tapSoundCombinedClickable(
-                    onClick = onClick,
-                    onLongClick = onLongClick,
-                ).padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Spacer(Modifier.width(16.dp))
-        FilePipeOutlinedButton(
-            onClick = {
-                onClick()
-            },
-        ) {
-            FilePipeMaterialRoundedSymbol(
-                name = "folder_open",
-                contentDescription = null,
-                size = 18.dp,
-            )
-        }
-    }
-}
-
-private val LOG_RETENTION_OPTIONS = listOf(7, 14, 30, 90, -1)
-
-private fun backupDestinationDisplayLabel(
-    context: Context,
-    uriString: String,
-    internalStorageRootDisplayName: String,
-): String {
-    if (uriString.isBlank()) return ""
-    val uri = uriString.toUri()
-    if (!DocumentsContract.isTreeUri(uri)) {
-        providerDisplayName(context, uri.authority)?.let { return it }
-    }
-    val documentName = DocumentFile.fromTreeUri(context, uri)?.name
-    return documentName?.takeIf { it.isNotBlank() }
-        ?: displayPath(uriString, internalStorageRootDisplayName)
-}
-
-private fun providerDisplayName(
-    context: Context,
-    authority: String?,
-): String? {
-    val providerAuthority = authority?.takeIf { it.isNotBlank() } ?: return null
-    val normalizedAuthority = providerAuthority.lowercase()
-    return when {
-        normalizedAuthority.contains("google.android.apps.docs") -> {
-            context.getString(R.string.cloud_provider_google_drive)
-        }
-
-        normalizedAuthority.contains("skydrive") || normalizedAuthority.contains("onedrive") -> {
-            context.getString(R.string.cloud_provider_onedrive)
-        }
-
-        normalizedAuthority.contains("dropbox") -> {
-            context.getString(R.string.cloud_provider_dropbox)
-        }
-
-        normalizedAuthority.contains("box.android") -> {
-            context.getString(R.string.cloud_provider_box)
-        }
-
-        else -> {
-            providerAuthority
-        }
-    }
-}
-
-@Composable
-private fun logRetentionLabel(days: Int): String =
-    when (days) {
-        7 -> stringResource(R.string.log_retention_7_days)
-        14 -> stringResource(R.string.log_retention_14_days)
-        30 -> stringResource(R.string.log_retention_30_days)
-        90 -> stringResource(R.string.log_retention_90_days)
-        else -> stringResource(R.string.log_retention_never)
-    }
-
-@Composable
-private fun LogRetentionDropdown(
-    currentDays: Int,
-    onSelect: (Int) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    FilePipeOutlinedButton(onClick = { expanded = true }) {
-        Text(logRetentionLabel(currentDays))
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        ) {
-            LOG_RETENTION_OPTIONS.forEach { option ->
-                FilePipeDropdownMenuItem(
-                    text = { Text(logRetentionLabel(option)) },
-                    onClick = {
-                        onSelect(option)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun swipeActionLabel(action: SwipeAction): String =
-    when (action) {
-        SwipeAction.EDIT -> stringResource(R.string.action_expand_collapse)
-        SwipeAction.DELETE -> stringResource(R.string.settings_swipe_action_trash)
-        SwipeAction.DUPLICATE -> stringResource(R.string.action_duplicate)
-        SwipeAction.PREVIEW -> stringResource(R.string.preview_title)
-        SwipeAction.VIEW_HISTORY -> stringResource(R.string.settings_swipe_action_history)
-    }
-
-@Composable
-private fun SwipeExecuteOneActionsEditor(
-    startTitle: String,
-    endTitle: String,
-    startAction: SwipeAction,
-    endAction: SwipeAction,
-    onStartActionChange: (SwipeAction) -> Unit,
-    onEndActionChange: (SwipeAction) -> Unit,
-) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SwipeExecuteDirectionColumn(
-                title = startTitle,
-                direction = SwipeDirectionCue.RIGHT,
-                action = startAction,
-                availableActions = SwipeAction.entries.filter { it != endAction },
-                onActionChange = onStartActionChange,
-                modifier = Modifier.weight(1f),
-            )
-            SwipeExecuteDirectionColumn(
-                title = endTitle,
-                direction = SwipeDirectionCue.LEFT,
-                action = endAction,
-                availableActions = SwipeAction.entries.filter { it != startAction },
-                onActionChange = onEndActionChange,
-                modifier = Modifier.weight(1f),
-            )
-        }
-        SwipePanelDivider()
-        SwipeHintText(text = stringResource(R.string.settings_swipe_execute_hint))
-    }
-}
-
-@Composable
-private fun SwipeExecuteDirectionColumn(
-    title: String,
-    direction: SwipeDirectionCue,
-    action: SwipeAction,
-    availableActions: List<SwipeAction>,
-    onActionChange: (SwipeAction) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(7.dp),
-    ) {
-        SwipeExecuteDirectionHeader(
-            title = title,
-            direction = direction,
-        )
-        SwipeExecuteActionPicker(
-            action = action,
-            availableActions = availableActions,
-            onActionChange = onActionChange,
-        )
-    }
-}
-
-@Composable
-private fun SwipeExecuteDirectionHeader(
-    title: String,
-    direction: SwipeDirectionCue,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement =
-            if (direction == SwipeDirectionCue.LEFT) {
-                Arrangement.End
-            } else {
-                Arrangement.Start
-            },
-    ) {
-        if (direction == SwipeDirectionCue.RIGHT) {
-            SwipeDirectionIcon(direction = direction)
-            Spacer(Modifier.size(7.dp))
-        }
-        Text(
-            text = title,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (direction == SwipeDirectionCue.LEFT) {
-            Spacer(Modifier.size(7.dp))
-            SwipeDirectionIcon(direction = direction)
-        }
-    }
-}
-
-@Composable
-private fun SwipeDirectionIcon(direction: SwipeDirectionCue) {
-    Box(
-        modifier =
-            Modifier
-                .size(28.dp)
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-        contentAlignment = Alignment.Center,
-    ) {
-        FilePipeMaterialRoundedSymbol(
-            name = direction.iconName,
-            size = 15.dp,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            weight = FontWeight.Medium,
-        )
-    }
-}
-
-@Composable
-private fun SwipeExecuteActionPicker(
-    action: SwipeAction,
-    availableActions: List<SwipeAction>,
-    onActionChange: (SwipeAction) -> Unit,
-) {
-    var expanded by remember { mutableStateOf(false) }
-    val shape = MaterialTheme.shapes.medium
-    val actionAccent = action.settingsSwipeAccent()
-    Box {
-        Surface(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .clip(shape)
-                    .tapSoundClickable(role = Role.Button) { expanded = true },
-            shape = shape,
-            color = action.settingsSwipeTileColor(),
-            border = BorderStroke(1.dp, actionAccent.copy(alpha = 0.55f)),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(9.dp),
-            ) {
-                SwipeActionIcon(action = action)
-                Text(
-                    text = swipeActionLabel(action),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                FilePipeMaterialRoundedSymbol(
-                    name = "expand_more",
-                    size = 17.dp,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        ) {
-            availableActions.forEach { action ->
-                FilePipeDropdownMenuItem(
-                    text = { Text(swipeActionLabel(action)) },
-                    leadingIcon = { SwipeActionIcon(action = action) },
-                    onClick = {
-                        onActionChange(action)
-                        expanded = false
-                    },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SwipeActionIcon(action: SwipeAction) {
-    Box(
-        modifier =
-            Modifier
-                .size(28.dp)
-                .clip(MaterialTheme.shapes.medium)
-                .background(action.settingsSwipeIconContainerColor()),
-        contentAlignment = Alignment.Center,
-    ) {
-        FilePipeMaterialRoundedSymbol(
-            name = action.materialSymbolName(),
-            size = 15.dp,
-            tint = action.settingsSwipeIconColor(),
-            weight = FontWeight.Medium,
-        )
-    }
-}
-
-private fun SwipeAction.settingsSwipeTileColor(): Color = settingsSwipeAccent().copy(alpha = 0.14f)
-
-private fun SwipeAction.settingsSwipeAccent(): Color = swipeActionAccent()
-
-private fun SwipeAction.settingsSwipeIconContainerColor(): Color = settingsSwipeAccent()
-
-private fun SwipeAction.settingsSwipeIconColor(): Color = Color.White
-
-private fun openFdroidPackagePage(context: Context) {
-    val fdroidIntent =
-        Intent(Intent.ACTION_VIEW, "fdroid.app:${context.packageName}".toUri()).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        }
-    try {
-        context.startActivity(fdroidIntent)
-    } catch (_: ActivityNotFoundException) {
-        val webIntent =
-            Intent(
-                Intent.ACTION_VIEW,
-                "https://f-droid.org/packages/${context.packageName}/".toUri(),
-            ).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-        context.startActivity(webIntent)
-    }
-}
-
-@Composable
-private fun SwipePanelDivider() {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.34f)),
-    )
-}
-
-@Composable
-private fun SwipeHintText(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-}
-
-@Composable
-private fun SettingsInfoDropdown(
-    tipText: String,
-    contentDescription: String,
-    modifier: Modifier = Modifier,
-    title: String? = null,
-    iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
-) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    Box(modifier = modifier) {
-        FilePipeIconButton(
-            onClick = { menuExpanded = true },
-            modifier = Modifier.size(32.dp),
-        ) {
-            FilePipeMaterialRoundedSymbol(
-                name = "info",
-                size = 20.dp,
-                tint = iconTint,
-                weight = FontWeight.Medium,
-                filled = false,
-                modifier = Modifier.semantics { this.contentDescription = contentDescription },
-            )
-        }
-        DropdownMenu(
-            expanded = menuExpanded,
-            onDismissRequest = { menuExpanded = false },
-            modifier = Modifier.widthIn(max = 260.dp),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .widthIn(max = 236.dp)
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (title != null) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                }
-                Text(
-                    text = tipText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
             }
         }
     }
