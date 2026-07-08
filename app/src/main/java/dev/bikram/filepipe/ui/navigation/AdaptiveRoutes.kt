@@ -322,6 +322,7 @@ fun SettingsTwoPaneRoute(
                             onNavigateBack = { showSettingsSection(SettingsSectionKey.About) },
                             updateVm = updateVm,
                             showNavigateBack = showDetailNavigateBack,
+                            suppressBlur = true,
                         )
                     } else {
                         SettingsScreen(
@@ -338,6 +339,7 @@ fun SettingsTwoPaneRoute(
                             selectedSectionKey = selectedSectionKey,
                             showTopBar = false,
                             showSectionHeaders = false,
+                            suppressBlur = true,
                         )
                     }
                 }

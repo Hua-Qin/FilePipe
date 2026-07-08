@@ -110,6 +110,7 @@ fun DevOptionsScreen(
     onNavigateBack: () -> Unit,
     updateVm: FilePipeUpdateViewModel,
     showNavigateBack: Boolean = true,
+    suppressBlur: Boolean = false,
     viewModel: DevOptionsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -133,9 +134,13 @@ fun DevOptionsScreen(
         }
     }
     val scrollBlurModifier =
-        LocalProgressiveBlurStyle.current?.let { blurStyle ->
-            Modifier.progressiveBlurScrollableList(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
-        } ?: Modifier
+        if (suppressBlur) {
+            Modifier
+        } else {
+            LocalProgressiveBlurStyle.current?.let { blurStyle ->
+                Modifier.progressiveBlurScrollableList(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
+            } ?: Modifier
+        }
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
     val sharedBoundsModifier =

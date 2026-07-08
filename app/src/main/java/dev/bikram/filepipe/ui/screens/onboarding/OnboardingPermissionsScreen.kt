@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -111,6 +110,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 private val PermissionCardLeadingIconSlotWidth = 44.dp
+
+/** Scroll clearance so the last line of copy stays above the pinned bottom CTA overlay. */
+private val OnboardingPermissionsBottomOverlayClearance = 156.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -449,57 +451,86 @@ fun OnboardingPermissionsScreen(
                             }
                         }
                     } else if (compactHeight) {
-                        // Short screens (e.g. phones in landscape/short portrait): a single scroll with the actions
-                        // inline at the end.
-                        Column(
+                        // Short screens: one scroll; pin the CTA over the content only when it is shown.
+                        Box(
                             modifier =
                                 Modifier
                                     .align(Alignment.TopCenter)
                                     .widthIn(max = OnboardingMaxContentWidth)
-                                    .fillMaxSize()
-                                    .statusBarsPadding()
-                                    .navigationBarsPadding()
-                                    .verticalScroll(rememberScrollState())
-                                    .padding(top = 12.dp, bottom = 24.dp),
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-                                scrollContent()
-                            }
-                            Spacer(Modifier.height(24.dp))
-                            OnboardingBottomActions {
-                                bottomActionsCluster()
-                            }
-                        }
-                    } else {
-                        Column(
-                            modifier =
-                                Modifier
-                                    .align(Alignment.TopCenter)
-                                    .widthIn(max = OnboardingMaxContentWidth)
-                                    .fillMaxSize()
-                                    .statusBarsPadding()
-                                    .navigationBarsPadding()
-                                    .padding(top = 12.dp, bottom = 8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
+                                    .fillMaxSize(),
                         ) {
                             Column(
                                 modifier =
                                     Modifier
-                                        .weight(1f)
-                                        .fillMaxWidth()
+                                        .fillMaxSize()
                                         .verticalScroll(rememberScrollState())
-                                        .padding(horizontal = 24.dp),
+                                        .padding(horizontal = 24.dp)
+                                        .padding(top = 12.dp)
+                                        .then(
+                                            if (hideBottomPrimaryButton) {
+                                                Modifier.navigationBarsPadding().padding(bottom = 24.dp)
+                                            } else {
+                                                Modifier
+                                            },
+                                        ),
                             ) {
+                                Spacer(Modifier.statusBarsPadding())
                                 scrollContent()
-                                Spacer(Modifier.height(16.dp))
+                                if (!hideBottomPrimaryButton) {
+                                    Spacer(Modifier.height(OnboardingPermissionsBottomOverlayClearance))
+                                }
                             }
-                            OnboardingBottomActions(
+                            if (!hideBottomPrimaryButton) {
+                                OnboardingBottomActions(
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .navigationBarsPadding()
+                                            .padding(bottom = 24.dp),
+                                ) {
+                                    bottomActionsCluster()
+                                }
+                            }
+                        }
+                    } else {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .widthIn(max = OnboardingMaxContentWidth)
+                                    .fillMaxSize(),
+                        ) {
+                            Column(
                                 modifier =
                                     Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 40.dp),
+                                        .fillMaxSize()
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(horizontal = 24.dp)
+                                        .padding(top = 12.dp)
+                                        .then(
+                                            if (hideBottomPrimaryButton) {
+                                                Modifier.navigationBarsPadding().padding(bottom = 24.dp)
+                                            } else {
+                                                Modifier
+                                            },
+                                        ),
                             ) {
-                                bottomActionsCluster()
+                                Spacer(Modifier.statusBarsPadding())
+                                scrollContent()
+                                if (!hideBottomPrimaryButton) {
+                                    Spacer(Modifier.height(OnboardingPermissionsBottomOverlayClearance))
+                                }
+                            }
+                            if (!hideBottomPrimaryButton) {
+                                OnboardingBottomActions(
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .navigationBarsPadding()
+                                            .padding(bottom = 40.dp),
+                                ) {
+                                    bottomActionsCluster()
+                                }
                             }
                         }
                     }

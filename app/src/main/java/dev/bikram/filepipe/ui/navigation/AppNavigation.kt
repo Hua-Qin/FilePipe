@@ -1515,6 +1515,7 @@ private fun RulesTwoPaneRoute(
                             showPendingNewRuleInDetailPane =
                                 showPaneSelectionState && activeRuleId == Screen.RuleDetail.NEW_RULE_ID,
                             showSelectionActionBar = false,
+                            suppressBottomBlur = true,
                             viewModel = viewModel,
                         )
                     }
@@ -1940,6 +1941,7 @@ private fun HistoryTwoPaneRoute(
                             onSavedRule = { _ -> },
                             showNavigateBack = showDetailNavigateBack,
                             isReadOnly = true,
+                            compactTopBlur = !showDetailNavigateBack,
                         )
                     } else {
                         HistoryDetailPaneHost(
@@ -1968,39 +1970,42 @@ private fun RuleDetailPaneHost(
     onSavedRule: (Long) -> Unit,
     showNavigateBack: Boolean,
     isReadOnly: Boolean = false,
+    compactTopBlur: Boolean = false,
 ) {
     val detailRoute = Screen.RuleDetail.createRoute(ruleId)
     key(detailRoute) {
-        val detailNavController = rememberNavController()
-        NavHost(
-            navController = detailNavController,
-            startDestination = detailRoute,
-        ) {
-            composable(
-                route = Screen.RuleDetail.route,
-                arguments =
-                    listOf(
-                        navArgument(Screen.RuleDetail.ARG_RULE_ID) {
-                            type = NavType.LongType
-                        },
-                        navArgument(Screen.RuleDetail.ARG_TEMPLATE_INDEX) {
-                            type = NavType.IntType
-                            defaultValue = -1
-                        },
-                        navArgument(Screen.RuleDetail.ARG_SKIP_TEMPLATE_PICKER) {
-                            type = NavType.BoolType
-                            defaultValue = false
-                        },
-                    ),
+        HistoryDetailPaneProgressiveBlurProvider(compactTopBlur = compactTopBlur) {
+            val detailNavController = rememberNavController()
+            NavHost(
+                navController = detailNavController,
+                startDestination = detailRoute,
             ) {
-                RuleDetailScreen(
-                    onNavigateBack = onNavigateBack,
-                    onOpenFaq = onOpenFaq,
-                    onSavedRule = onSavedRule,
-                    showNavigateBack = showNavigateBack,
-                    allowInitialRuleNameFocus = false,
-                    isReadOnly = isReadOnly,
-                )
+                composable(
+                    route = Screen.RuleDetail.route,
+                    arguments =
+                        listOf(
+                            navArgument(Screen.RuleDetail.ARG_RULE_ID) {
+                                type = NavType.LongType
+                            },
+                            navArgument(Screen.RuleDetail.ARG_TEMPLATE_INDEX) {
+                                type = NavType.IntType
+                                defaultValue = -1
+                            },
+                            navArgument(Screen.RuleDetail.ARG_SKIP_TEMPLATE_PICKER) {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
+                        ),
+                ) {
+                    RuleDetailScreen(
+                        onNavigateBack = onNavigateBack,
+                        onOpenFaq = onOpenFaq,
+                        onSavedRule = onSavedRule,
+                        showNavigateBack = showNavigateBack,
+                        allowInitialRuleNameFocus = false,
+                        isReadOnly = isReadOnly,
+                    )
+                }
             }
         }
     }
@@ -2014,26 +2019,46 @@ private fun HistoryDetailPaneHost(
 ) {
     val detailRoute = Screen.HistoryDetail.createRoute(historyId)
     key(detailRoute) {
-        val detailNavController = rememberNavController()
-        NavHost(
-            navController = detailNavController,
-            startDestination = detailRoute,
-        ) {
-            composable(
-                route = Screen.HistoryDetail.route,
-                arguments =
-                    listOf(
-                        navArgument(Screen.HistoryDetail.ARG_HISTORY_ID) {
-                            type = NavType.LongType
-                        },
-                    ),
+        HistoryDetailPaneProgressiveBlurProvider(compactTopBlur = !showNavigateBack) {
+            val detailNavController = rememberNavController()
+            NavHost(
+                navController = detailNavController,
+                startDestination = detailRoute,
             ) {
-                HistoryDetailScreen(
-                    onNavigateBack = onNavigateBack,
-                    showNavigateBack = showNavigateBack,
-                )
+                composable(
+                    route = Screen.HistoryDetail.route,
+                    arguments =
+                        listOf(
+                            navArgument(Screen.HistoryDetail.ARG_HISTORY_ID) {
+                                type = NavType.LongType
+                            },
+                        ),
+                ) {
+                    HistoryDetailScreen(
+                        onNavigateBack = onNavigateBack,
+                        showNavigateBack = showNavigateBack,
+                    )
+                }
             }
         }
+    }
+}
+
+/** Halves top blur in History two-pane detail panes (list-pane filter-chip band is not present here). */
+@Composable
+private fun HistoryDetailPaneProgressiveBlurProvider(
+    compactTopBlur: Boolean,
+    content: @Composable () -> Unit,
+) {
+    val baseBlurStyle = LocalProgressiveBlurStyle.current
+    val providedBlurStyle =
+        if (compactTopBlur && baseBlurStyle != null) {
+            baseBlurStyle.copy(topHeightPx = baseBlurStyle.topHeightPx * 0.5f)
+        } else {
+            baseBlurStyle
+        }
+    CompositionLocalProvider(LocalProgressiveBlurStyle provides providedBlurStyle) {
+        content()
     }
 }
 
@@ -2446,6 +2471,33 @@ private fun SimpleNavFab(
         }
     val fabShape = remember { RoundedPolygonShape(MaterialShapes.Cookie9Sided) }
 
+    // Keep every elevation state equal. The FAB shape (Cookie9Sided) is concave, and Skia
+    // has no fast path for shadows on concave outlines — each shadow draw runs
+    // SkShadowTessellator::computeConcaveShadow. HWUI caches that tessellation keyed on
+    // (outline, elevation, light), so a static elevation is tessellated once and cached.
+    // The default FAB elevation set animates elevation up on press/hover/focus, and every
+    // intermediate value is a cache-miss → a fresh concave-shadow tessellation; rapid
+    // interaction turns that into a per-frame re-tessellation storm on the RenderThread
+    // that blocks the UI thread in drawFrame() and ANRs. Equal states keep the resting
+    // shadow while removing the animation that re-tessellates it.
+    //
+    // PARITY — FilePipe-ONLY. DO NOT propagate this flat-elevation change to Remember.
+    // Remember's FAB uses byte-identical code (same Cookie9Sided shape, same default
+    // FloatingActionButtonDefaults.elevation with an animated press elevation) yet does
+    // NOT exhibit this ANR in practice, so the parity baseline for the FAB remains the
+    // ANIMATED elevation. This pinned elevation is a deliberate, empirical ANR mitigation
+    // specific to FilePipe (the concave-shadow root cause is still not fully understood).
+    // A future FilePipe<->Remember parity sweep must treat this as an INTENTIONAL
+    // divergence: leave Remember's FAB untouched, and do NOT "restore parity" by re-adding
+    // the animated elevation here.
+    val fabElevation =
+        FloatingActionButtonDefaults.elevation(
+            defaultElevation = 2.dp,
+            pressedElevation = 2.dp,
+            focusedElevation = 2.dp,
+            hoveredElevation = 2.dp,
+        )
+
     FilePipeFloatingActionButton(
         onClick = onClick,
         enabled = enabled,
@@ -2462,7 +2514,7 @@ private fun SimpleNavFab(
         shape = fabShape,
         containerColor = containerColor,
         contentColor = contentColor,
-        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+        elevation = fabElevation,
         tooltipLabel = description,
     ) {
         Box(modifier = Modifier.semantics { contentDescription = description }) {

@@ -846,9 +846,19 @@ fun RuleDetailScreen(
             }
         }
     }
+    val bottomBlurAlphaMultiplier =
+        if (!showNavigateBack && !showBottomActions) {
+            0f
+        } else {
+            1f
+        }
     val fullBleedBlurModifier =
         LocalProgressiveBlurStyle.current?.let { blurStyle ->
-            Modifier.progressiveBlurFullBleedLayer(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
+            Modifier.progressiveBlurFullBleedLayer(
+                blurStyle,
+                topAlphaMultiplier = topAlphaMultiplier,
+                bottomAlphaMultiplier = bottomBlurAlphaMultiplier,
+            )
         } ?: Modifier
     val alertColors = ruleAlertColors(isErrorSeverity = alertIsErrorSeverity)
     val warningColors = ruleWarningColors()

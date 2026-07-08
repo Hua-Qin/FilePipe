@@ -269,6 +269,7 @@ fun SettingsScreen(
     showSectionHeaders: Boolean = true,
     showAboutHeader: Boolean = true,
     centerSelectedSectionContent: Boolean = false,
+    suppressBlur: Boolean = false,
 ) {
     val preferencesOrNull by viewModel.preferencesState.collectAsStateWithLifecycle()
     val preferences =
@@ -331,7 +332,7 @@ fun SettingsScreen(
         }
     }
     val scrollBlurModifier =
-        if (selectedSectionKey == SettingsSectionKey.About) {
+        if (suppressBlur || selectedSectionKey == SettingsSectionKey.About) {
             Modifier
         } else {
             LocalProgressiveBlurStyle.current?.let { blurStyle ->

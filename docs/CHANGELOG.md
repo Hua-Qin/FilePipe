@@ -1,7 +1,15 @@
-## v3.8.7 Housekeeping
+## v3.8.8 External storage support, auto open changelog
 
-### 📦 Others
-- Some backend changes for housekeeping.
+### ✨ New Features
+- **Pick folders on SD cards and other drives.** The in-app folder picker now has a "Devices" view that lists every storage volume — internal storage, SD cards, and USB drives — so you can set up rules for files anywhere.
+
+### 🛠 Improved Features
+- Tidier layout on tablets and in landscape: removed decorative blurs from few unnecessary screens.
+- Fully transparent status and navigation bars for a cleaner edge-to-edge look.
+- After the app updates, it now opens the changelog for you automatically.
+
+### 🐛 Bug Fixes
+- Fixed a freeze (and occasional "app isn't responding") when tapping + to create a new rule in landscape / two-panel mode.
 
 ---
 

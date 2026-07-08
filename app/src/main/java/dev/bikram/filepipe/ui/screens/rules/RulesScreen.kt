@@ -134,6 +134,7 @@ fun RulesScreen(
     onActivateRuleForRunInDetailPane: ((Long) -> Unit)? = null,
     showPendingNewRuleInDetailPane: Boolean = false,
     showSelectionActionBar: Boolean = true,
+    suppressBottomBlur: Boolean = false,
     listStartPadding: Dp = 16.dp,
     listEndPadding: Dp = 16.dp,
     viewModel: RulesViewModel = hiltViewModel(),
@@ -177,7 +178,11 @@ fun RulesScreen(
     }
     val scrollBlurModifier =
         LocalProgressiveBlurStyle.current?.let { blurStyle ->
-            Modifier.progressiveBlurScrollableList(blurStyle, topAlphaMultiplier = topAlphaMultiplier)
+            Modifier.progressiveBlurScrollableList(
+                blurStyle,
+                topAlphaMultiplier = topAlphaMultiplier,
+                bottomAlphaMultiplier = if (suppressBottomBlur) 0f else 1f,
+            )
         } ?: Modifier
     val listScrollEnabled =
         rememberContentOverflowScrollEnabled(

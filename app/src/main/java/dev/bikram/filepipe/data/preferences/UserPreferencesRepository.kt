@@ -77,6 +77,7 @@ private object PrefKeys {
     val UPDATE_LAST_NOTIFIED_DEDUPE_KEY = stringPreferencesKey("update_last_notified_dedupe_key")
     val GITHUB_ACK_FINGERPRINT = stringPreferencesKey("github_last_acknowledged_release_fingerprint")
     val GITHUB_ACK_INSTALLED_VERSION = stringPreferencesKey("github_acknowledged_for_installed_version")
+    val LAST_SEEN_APP_VERSION = stringPreferencesKey("last_seen_app_version")
     val SAVE_UPDATE_APK_TO_DOWNLOADS = booleanPreferencesKey("save_update_apk_to_downloads")
     val UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED = booleanPreferencesKey("update_apk_downloads_copy_succeeded")
     val USE_GRADIENT_BACKGROUND = booleanPreferencesKey("use_gradient_background")
@@ -417,6 +418,13 @@ class UserPreferencesRepository
                 prefs.remove(PrefKeys.GITHUB_ACK_FINGERPRINT)
                 prefs.remove(PrefKeys.GITHUB_ACK_INSTALLED_VERSION)
             }
+        }
+
+        /** Null means this install has never recorded a version, i.e. it's a fresh install. */
+        suspend fun getLastSeenAppVersion(): String? = dataStore.data.first()[PrefKeys.LAST_SEEN_APP_VERSION]
+
+        suspend fun setLastSeenAppVersion(version: String) {
+            dataStore.edit { it[PrefKeys.LAST_SEEN_APP_VERSION] = version }
         }
 
         /**

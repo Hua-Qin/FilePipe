@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,6 +77,12 @@ private data class FolderPickerDirectoryEntry(
     val listKey: String,
 )
 
+private data class StorageVolumeRoot(
+    val label: String,
+    val path: String,
+    val isPrimary: Boolean,
+)
+
 private fun folderPickerDirectoryEntry(file: File): FolderPickerDirectoryEntry? {
     if (!file.isDirectory || !file.canRead() || file.name.startsWith(".")) return null
     val resolvedPath =
@@ -95,14 +102,19 @@ private fun buildBreadcrumbSegments(
     primaryRoot: String,
     internalStorageLabel: String,
     sdCardLabel: String,
+    devicesLabel: String,
 ): List<BreadcrumbSegment> {
     val normalized = normalizeFilesystemFolderPath(canonicalPath) ?: return emptyList()
+    if (normalized == "/storage") {
+        return listOf(BreadcrumbSegment(devicesLabel, "/storage"))
+    }
     val primary = primaryRoot.trimEnd('/')
 
     if (normalized == primary || normalized.startsWith(primary + File.separator)) {
         val tail = if (normalized == primary) "" else normalized.removePrefix(primary + File.separator)
         val parts = if (tail.isEmpty()) emptyList() else tail.split('/').filter { it.isNotEmpty() }
         val out = ArrayList<BreadcrumbSegment>()
+        out.add(BreadcrumbSegment(devicesLabel, "/storage"))
         out.add(BreadcrumbSegment(internalStorageLabel, primary))
         var accumulated = primary
         for (part in parts) {
@@ -119,6 +131,7 @@ private fun buildBreadcrumbSegments(
         val rest = sdMatch.groupValues[2].orEmpty().trim('/')
         val parts = if (rest.isEmpty()) emptyList() else rest.split('/').filter { it.isNotEmpty() }
         val out = ArrayList<BreadcrumbSegment>()
+        out.add(BreadcrumbSegment(devicesLabel, "/storage"))
         out.add(BreadcrumbSegment(sdCardLabel, sdRoot))
         var accumulated = sdRoot
         for (part in parts) {
@@ -129,7 +142,10 @@ private fun buildBreadcrumbSegments(
     }
 
     val fallbackLabel = normalized.substringAfterLast(File.separator).ifEmpty { normalized }
-    return listOf(BreadcrumbSegment(fallbackLabel, normalized))
+    return listOf(
+        BreadcrumbSegment(devicesLabel, "/storage"),
+        BreadcrumbSegment(fallbackLabel, normalized),
+    )
 }
 
 /**
@@ -143,12 +159,56 @@ fun FilesystemFolderPickerSheetContent(
     onDismiss: () -> Unit,
     onFolderChosen: (normalizedAbsolutePath: String) -> Unit,
 ) {
+    // Keep these literals so that the font subset harvester detects them:
+    @Suppress("UNUSED_EXPRESSION")
+    if (false) {
+        FilePipeMaterialRoundedSymbol(name = "folder")
+        FilePipeMaterialRoundedSymbol(name = "mobile")
+        FilePipeMaterialRoundedSymbol(name = "sd_card")
+    }
+
     val internalStorageLabel = stringResource(R.string.filesystem_folder_picker_internal_storage)
     val sdCardLabel = stringResource(R.string.filesystem_folder_picker_sd_card)
+    val devicesLabel = stringResource(R.string.filesystem_folder_picker_devices)
     val primaryRoot =
         remember {
             runCatching { Environment.getExternalStorageDirectory().canonicalPath }.getOrNull()
                 ?: "/storage/emulated/0"
+        }
+
+    val context = LocalContext.current
+    val storageVolumes =
+        remember(context, internalStorageLabel, sdCardLabel) {
+            val list = mutableListOf<StorageVolumeRoot>()
+            val primaryPath =
+                runCatching { Environment.getExternalStorageDirectory().canonicalPath }.getOrNull()
+                    ?: "/storage/emulated/0"
+            list.add(StorageVolumeRoot(internalStorageLabel, primaryPath, isPrimary = true))
+
+            val externalDirs = context.getExternalFilesDirs(null)
+            for (dir in externalDirs) {
+                if (dir == null) continue
+                val path = dir.absolutePath
+                if (path.contains("/Android/data/")) {
+                    val rootPath = path.substringBefore("/Android/data/")
+                    if (rootPath != primaryPath && File(rootPath).exists()) {
+                        val sdName = rootPath.substringAfterLast('/')
+                        list.add(
+                            StorageVolumeRoot(
+                                label =
+                                    if (sdName.matches(Regex("^[0-9A-F]{4}-[0-9A-F]{4}$", RegexOption.IGNORE_CASE))) {
+                                        "$sdCardLabel ($sdName)"
+                                    } else {
+                                        sdCardLabel
+                                    },
+                                path = rootPath,
+                                isPrimary = false,
+                            ),
+                        )
+                    }
+                }
+            }
+            list.distinctBy { it.path }
         }
 
     val startPath =
@@ -168,8 +228,8 @@ fun FilesystemFolderPickerSheetContent(
     var newFolderDialogErrorResId by remember { mutableStateOf<Int?>(null) }
 
     val breadcrumbSegments =
-        remember(currentPath, primaryRoot, internalStorageLabel, sdCardLabel) {
-            buildBreadcrumbSegments(currentPath, primaryRoot, internalStorageLabel, sdCardLabel)
+        remember(currentPath, primaryRoot, internalStorageLabel, sdCardLabel, devicesLabel) {
+            buildBreadcrumbSegments(currentPath, primaryRoot, internalStorageLabel, sdCardLabel, devicesLabel)
         }
 
     var childDirectories by remember(currentPath, childListRefreshKey) {
@@ -178,12 +238,22 @@ fun FilesystemFolderPickerSheetContent(
     LaunchedEffect(currentPath, childListRefreshKey) {
         childDirectories =
             withContext(Dispatchers.IO) {
-                File(currentPath)
-                    .listFiles()
-                    ?.mapNotNull(::folderPickerDirectoryEntry)
-                    ?.distinctBy { entry -> entry.listKey }
-                    ?.sortedBy { entry -> entry.name.lowercase() }
-                    ?: emptyList()
+                if (currentPath == "/storage") {
+                    storageVolumes.map { volume ->
+                        FolderPickerDirectoryEntry(
+                            name = volume.label,
+                            path = volume.path,
+                            listKey = volume.path,
+                        )
+                    }
+                } else {
+                    File(currentPath)
+                        .listFiles()
+                        ?.mapNotNull(::folderPickerDirectoryEntry)
+                        ?.distinctBy { entry -> entry.listKey }
+                        ?.sortedBy { entry -> entry.name.lowercase() }
+                        ?: emptyList()
+                }
             }
     }
 
@@ -332,9 +402,11 @@ fun FilesystemFolderPickerSheetContent(
                     modifier =
                         Modifier.tapSoundClickable {
                             val target = normalizeFilesystemFolderPath(segment.path) ?: return@tapSoundClickable
-                            if (File(target).isDirectory &&
-                                File(target).canRead() &&
-                                isFilesystemFolderPathAllowedForRules(target)
+                            if (target == "/storage" || (
+                                    File(target).isDirectory &&
+                                        File(target).canRead() &&
+                                        isFilesystemFolderPathAllowedForRules(target)
+                                )
                             ) {
                                 currentPath = target
                             }
@@ -366,8 +438,17 @@ fun FilesystemFolderPickerSheetContent(
                         ListItem(
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                             leadingContent = {
+                                val isDrive =
+                                    entry.path == "/storage/emulated/0" ||
+                                        Regex("^/storage/[0-9A-F]{4}-[0-9A-F]{4}$", RegexOption.IGNORE_CASE).matches(entry.path)
+                                val iconName =
+                                    if (isDrive) {
+                                        if (entry.path == "/storage/emulated/0") "mobile" else "sd_card"
+                                    } else {
+                                        "folder"
+                                    }
                                 FilePipeMaterialRoundedSymbol(
-                                    name = "folder",
+                                    name = iconName,
                                     contentDescription = null,
                                     size = 24.dp,
                                     modifier = Modifier.size(24.dp),

@@ -55,10 +55,15 @@ class MainActivity : ComponentActivity() {
             statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT),
         )
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            window.isNavigationBarContrastEnforced = false
+            window.isStatusBarContrastEnforced = false
+        }
         handleShortcutIntent(intent)
         handleOpenHistoryIntent(intent)
         handleOpenHistoryDetailIntent(intent)
         handleOpenSettingsUpdatesIntent(intent)
+        openSettingsUpdatesIfAppWasUpdated()
 
         setContent {
             val preferencesState by userPreferencesRepository.preferencesFlow
@@ -163,6 +168,19 @@ class MainActivity : ComponentActivity() {
         if (sourceIntent.getBooleanExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES, false)) {
             pendingShortcutRepository.requestOpenSettingsForUpdates()
             sourceIntent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_SETTINGS_UPDATES)
+        }
+    }
+
+    /** First launch after an update (fresh installs are not announced): auto-opens the update sheet with the changelog. */
+    private fun openSettingsUpdatesIfAppWasUpdated() {
+        lifecycleScope.launch {
+            val lastSeenVersion = userPreferencesRepository.getLastSeenAppVersion()
+            val currentVersion = BuildConfig.VERSION_NAME
+            val wasUpdated = !lastSeenVersion.isNullOrBlank() && lastSeenVersion != currentVersion
+            if (wasUpdated && BuildConfig.SHOW_UPDATES) {
+                pendingShortcutRepository.requestOpenSettingsForUpdates()
+            }
+            userPreferencesRepository.setLastSeenAppVersion(currentVersion)
         }
     }
 }

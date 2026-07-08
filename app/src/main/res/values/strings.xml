@@ -53,6 +53,7 @@
     <string name="rule_detail_open_faq">FAQ</string>
     <string name="rule_open_all_files_settings">Open All files access settings</string>
     <string name="filesystem_folder_picker_title">Choose folder</string>
+    <string name="filesystem_folder_picker_devices">Devices</string>
     <string name="filesystem_folder_picker_internal_storage">Internal storage</string>
     <string name="filesystem_folder_picker_sd_card">SD card</string>
     <string name="filesystem_folder_picker_cancel">Cancel</string>
