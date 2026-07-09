@@ -749,7 +749,6 @@ class RulesViewModel
                         id = 0,
                         name = "${rule.name} (copy)",
                         isEnabled = false,
-                        schedule = null,
                     )
                 ruleRepository.saveRule(copy)
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()

@@ -55,6 +55,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.FloatingActionButtonMenu
@@ -1235,16 +1238,18 @@ fun AppNavigation(
             }
         }
         if (showNavigationSuiteScaffold) {
-            NavigationSuiteScaffold(
-                layoutType = NavigationSuiteType.NavigationRail,
-                containerColor = Color.Transparent,
-                navigationSuiteItems = {
+            Row(modifier = Modifier.fillMaxSize()) {
+                NavigationRail(
+                    containerColor = Color.Transparent,
+                    windowInsets = WindowInsets.systemBars,
+                    modifier = Modifier.padding(start = 24.dp),
+                ) {
                     bottomNavItems.forEach { navItem ->
                         val selected =
                             currentDestination
                                 ?.hierarchy
                                 ?.any { it.route == navItem.screen.route } == true
-                        item(
+                        NavigationRailItem(
                             selected = selected,
                             onClick = {
                                 playTap()
@@ -1272,9 +1277,10 @@ fun AppNavigation(
                             },
                         )
                     }
-                },
-            ) {
-                navigationContent()
+                }
+                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    navigationContent()
+                }
             }
         } else {
             navigationContent()

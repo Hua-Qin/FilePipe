@@ -528,9 +528,6 @@ class RuleDetailViewModel
                     state.copy(
                         name = if (state.name.isBlank()) template.name else state.name,
                         fileExtensions = template.extensions,
-                        operationMode = template.operationMode,
-                        scanSubdirectories = template.scanSubdirectories,
-                        recreateDestinationSubfolders = template.scanSubdirectories,
                         icon = template.suggestedIcon,
                         sourceFolderPaths = sourcePaths,
                         orientation = if (appliesToImageAndVideoOnly(template.extensions)) state.orientation else null,
