@@ -55,13 +55,31 @@
 ## Storage access modes
 
 ### All files access
-- Lets FilePipe work with Downloads, storage roots, and plain file paths.
-- Best when rules need broad file access or restored rules point to paths Android will not expose through the folder picker.
+
+#### Best for most people
+
+**Use this to:**
+- Organize your Download folder automatically
+- Work across your entire storage
+- Run rules without extra setup
+
+**Good to know**
+- No repeated permission prompts for every folder
+- FilePipe only acts on the rules you create
+- Fastest option — scans and moves run quicker, especially for large libraries and big files
 
 ### Selective access
-- Lets FilePipe see only folders you choose in the Android folder picker.
-- Good for narrow, private rules where you only want to grant specific folders.
-- Download and some storage roots may be blocked by Android in this mode.
+
+#### Best for individual folder control
+
+**Use this if you:**
+- Only want to organize a few folders
+- Prefer granting access one folder at a time
+
+**Limitations**
+- Some folders (like Download) can't be selected
+- You'll need to approve each folder manually
+- Can run slower than All files access on large libraries or big files
 
 ---
 

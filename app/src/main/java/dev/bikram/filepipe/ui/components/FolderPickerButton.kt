@@ -58,7 +58,16 @@ fun displayPath(
     }
     if (path.startsWith("content://")) {
         return try {
-            val docId = DocumentsContract.getTreeDocumentId(path.toUri())
+            val uri = path.toUri()
+            // A document (file) URI carries the item's own path in its document id; a plain tree (folder) URI
+            // only exposes the granted root. Prefer the document id when present so a file in a subdirectory
+            // shows its real location (e.g. "Downloads/sub/file.jpg") instead of collapsing to the rule's root.
+            val docId =
+                if ("document" in uri.pathSegments) {
+                    DocumentsContract.getDocumentId(uri)
+                } else {
+                    DocumentsContract.getTreeDocumentId(uri)
+                }
             val relative = docId.substringAfter(":", "")
             when {
                 relative.isBlank() && docId.startsWith("primary", ignoreCase = true) -> {

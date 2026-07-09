@@ -122,8 +122,8 @@ class FaqViewModel
                 buildString {
                     append(question)
                     append(' ')
-                    bullets.forEach { bullet ->
-                        append(bullet)
+                    body.forEach { line ->
+                        append(line.text)
                         append(' ')
                     }
                     append(searchHaystack)

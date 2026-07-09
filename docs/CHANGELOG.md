@@ -1,3 +1,19 @@
+## v3.8.9 Filter by orientation
+
+### ✨ New Features
+- **Filter by orientation** — image and video rules can now target only **Portrait** or only **Landscape** files, from Advanced filters. It reads real dimensions and honors rotation, so both photos and videos are matched correctly.
+
+### 🛠 Improved Features
+- **Faster scanning in Selective access** — folders accessed via the Android folder picker are read far more efficiently, so previews and runs over large libraries are noticeably quicker. (All files access remains the fastest option overall.)
+- **Templates keep your settings** — applying a template no longer resets your Move/Copy choice or subfolder options; it only fills in file types, name, icon, and sources.
+- **Clearer run history** — each moved or copied file now shows its real source and destination folder, including subfolders, instead of collapsing everything to the rule's root folder.
+- **Slimmer navigation rail** — refreshed side navigation on tablets and in landscape.
+
+### 🐛 Bug Fixes
+- **Onboarding layout in landscape** — titles and action buttons no longer clip under the status and navigation bars; the onboarding screens now render edge-to-edge correctly.
+
+---
+
 ## v3.8.8 External storage support, auto open changelog
 
 ### ✨ New Features

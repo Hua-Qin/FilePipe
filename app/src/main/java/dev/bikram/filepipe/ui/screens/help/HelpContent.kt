@@ -5,11 +5,11 @@ enum class FaqInlineAction {
     OPEN_APP_NOTIFICATION_SETTINGS,
 }
 
-enum class FaqItemBodyKind {
-    BULLETS,
-    STORAGE_FULL_MODE,
-    STORAGE_SELECTIVE_MODE,
-}
+data class FaqBodyLine(
+    val text: String,
+    val isBullet: Boolean,
+    val isHeading: Boolean = false,
+)
 
 data class FaqSectionContent(
     val sectionId: String,
@@ -22,9 +22,8 @@ data class FaqSectionContent(
 data class FaqItemContent(
     val id: String,
     val question: String,
-    val bullets: List<String>,
+    val body: List<FaqBodyLine>,
     val inlineActions: List<FaqInlineAction>,
-    val bodyKind: FaqItemBodyKind,
     val searchHaystack: String,
 )
 
@@ -37,7 +36,6 @@ private data class SectionOptions(
 private data class ItemOptions(
     val id: String,
     val actions: List<FaqInlineAction> = emptyList(),
-    val bodyKind: FaqItemBodyKind = FaqItemBodyKind.BULLETS,
 )
 
 private val folderAccessAction = listOf(FaqInlineAction.OPEN_FOLDER_ACCESS_IN_SETTINGS)
@@ -72,17 +70,9 @@ private val itemOptionsByTitle =
         "Files not moving?" to
             ItemOptions("files_not_moving_automatically", actions = notificationAndFolderAccessActions),
         "All files access" to
-            ItemOptions(
-                "storage_all_files",
-                actions = folderAccessAction,
-                bodyKind = FaqItemBodyKind.STORAGE_FULL_MODE,
-            ),
+            ItemOptions("storage_all_files", actions = folderAccessAction),
         "Selective access" to
-            ItemOptions(
-                "storage_selective",
-                actions = folderAccessAction,
-                bodyKind = FaqItemBodyKind.STORAGE_SELECTIVE_MODE,
-            ),
+            ItemOptions("storage_selective", actions = folderAccessAction),
         "How do I create a rule?" to ItemOptions("create_rule"),
         "What are templates?" to ItemOptions("templates"),
         "How do I run a rule manually?" to ItemOptions("run_manually"),
@@ -123,9 +113,8 @@ fun parseHelpContent(markdown: String): List<FaqSectionContent> {
             FaqItemContent(
                 id = heading.id,
                 question = heading.title,
-                bullets = body.toBulletLines(),
+                body = body.toBodyLines(),
                 inlineActions = heading.actions,
-                bodyKind = heading.bodyKind,
                 searchHaystack = body,
             ),
         )
@@ -190,7 +179,6 @@ private data class ParsedItemHeading(
     val title: String,
     val id: String,
     val actions: List<FaqInlineAction>,
-    val bodyKind: FaqItemBodyKind,
 )
 
 private fun parseSectionHeading(rawHeading: String): ParsedSectionHeading {
@@ -211,17 +199,23 @@ private fun parseItemHeading(rawHeading: String): ParsedItemHeading {
         title = title,
         id = options?.id ?: title.toHelpId(),
         actions = options?.actions.orEmpty(),
-        bodyKind = options?.bodyKind ?: FaqItemBodyKind.BULLETS,
     )
 }
 
-private fun String.toBulletLines(): List<String> =
+private fun String.toBodyLines(): List<FaqBodyLine> =
     lineSequence()
         .map { line -> line.trim() }
         .filter { line -> line.isNotEmpty() && !line.startsWith("<!--") }
-        .map { line -> line.removePrefix("- ").trim() }
-        .filter { line -> line.isNotEmpty() }
+        .map { line -> line.toFaqBodyLine() }
+        .filter { line -> line.text.isNotEmpty() }
         .toList()
+
+private fun String.toFaqBodyLine(): FaqBodyLine =
+    when {
+        startsWith("#### ") -> FaqBodyLine(text = removePrefix("#### ").trim(), isBullet = false, isHeading = true)
+        startsWith("- ") -> FaqBodyLine(text = removePrefix("- ").trim(), isBullet = true)
+        else -> FaqBodyLine(text = this, isBullet = false)
+    }
 
 private fun String.toHelpId(): String =
     lowercase()

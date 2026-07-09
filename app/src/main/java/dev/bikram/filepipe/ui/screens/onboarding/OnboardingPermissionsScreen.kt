@@ -857,6 +857,12 @@ private fun AllFilesAccessPitch(
         )
         Spacer(Modifier.height(20.dp))
         CheckCopyLine(
+            leading = stringResource(R.string.onboarding_permissions_all_files_hook_fast),
+            rest = stringResource(R.string.onboarding_permissions_all_files_rest_fast),
+            compact = compact,
+        )
+        Spacer(Modifier.height(20.dp))
+        CheckCopyLine(
             leading = stringResource(R.string.onboarding_permissions_all_files_hook_device),
             rest = stringResource(R.string.onboarding_permissions_all_files_rest_device),
             compact = compact,
@@ -909,6 +915,13 @@ private fun SelectiveAccessPitch(
             marker = "close",
             leading = stringResource(R.string.onboarding_permissions_selective_hook_limits),
             rest = stringResource(R.string.onboarding_permissions_selective_rest_limits),
+            compact = compact,
+        )
+        Spacer(Modifier.height(18.dp))
+        CopyLine(
+            marker = "close",
+            leading = stringResource(R.string.onboarding_permissions_selective_hook_speed),
+            rest = stringResource(R.string.onboarding_permissions_selective_rest_speed),
             compact = compact,
         )
     }

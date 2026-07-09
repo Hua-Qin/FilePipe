@@ -458,7 +458,7 @@ private fun FileMovedCard(
                 }
 
                 Text(
-                    "From: ${displayPath(file.sourceUri, internalStorageDisplayName)}",
+                    "From: ${folderDisplayPath(file.sourceUri, internalStorageDisplayName)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -466,7 +466,7 @@ private fun FileMovedCard(
                 )
                 if (isSuccess) {
                     Text(
-                        "To: ${displayPath(file.destinationUri, internalStorageDisplayName)}",
+                        "To: ${folderDisplayPath(file.destinationUri, internalStorageDisplayName)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -862,6 +862,19 @@ private fun calculateSampleSize(
         sampleSize *= 2
     }
     return sampleSize
+}
+
+/**
+ * Display path of the folder that contains [uriString], with subdirectories preserved but the file name
+ * dropped (the file name is already the row's title). Falls back to the full display when there's no
+ * separable parent segment.
+ */
+private fun folderDisplayPath(
+    uriString: String,
+    internalStorageRootDisplayName: String,
+): String {
+    val full = displayPath(uriString, internalStorageRootDisplayName)
+    return full.substringBeforeLast('/', missingDelimiterValue = full)
 }
 
 private fun thumbnailMediaType(fileName: String): ThumbnailMediaType? {

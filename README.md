@@ -1,6 +1,6 @@
 # FilePipe
 
-<img alt="FilePipe Banner" src="fastlane/metadata/android/en-US/images/featureGraphic.png" />
+<img alt="FilePipe Banner" src="fastlane/metadata/android/en-US/images/featureGraphic.jpg" />
 
 FilePipe turns your chaotic storage into a perfectly organized library — automatically.
 
@@ -10,10 +10,10 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 
 ## 📦 Downloads
 
-[<img src="app/src/main/res/drawable-nodpi/badge_playstore.png" alt="Get FilePipe on Play Store" height="80">](https://play.google.com/store/apps/details?id=dev.bikram.filepipe)
-[<img src="app/src/main/res/drawable-nodpi/badge_github.png" alt="Get FilePipe on GitHub" height="80">](https://github.com/bikram-agarwal/FilePipe/releases/latest)
+[<img src="docs/assets/badge_playstore.png" alt="Get FilePipe on Play Store" height="80">](https://play.google.com/store/apps/details?id=dev.bikram.filepipe)
+[<img src="docs/assets/badge_github.png" alt="Get FilePipe on GitHub" height="80">](https://github.com/bikram-agarwal/FilePipe/releases/latest)
 <!-- Coming soon. Placeholder code.
-[<img src="app/src/main/res/drawable-nodpi/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.filepipe)
+[<img src="docs/assets/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.filepipe.gh)
 -->
 
 ## 🛠️ How to use
@@ -29,7 +29,7 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 ### 📂 Rule-Based Automation
 
 - **Templates**: Get started instantly with presets for screenshots, images, video, music, downloads, documents, and more.
-- **Advanced Filtering**: Go beyond extensions with name patterns, wildcards, file size limits, and age-based rules.
+- **Advanced Filtering**: Go beyond extensions with name patterns, wildcards, file size limits, media orientation (portrait/lanscape) and age-based rules.
 - **Recursive Scanning**: Deep-dive into subfolders to find every matching file. Optionally mirror folder structure at the destination.
 - **Action control**: Choose the action - move or copy. And conflict resolution method - skip, overwrite or rename. 
 
@@ -130,6 +130,25 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 The source code of this project is licensed under the GNU General Public License v3.0 (see the [LICENSE](LICENSE) file). 
 
 However, the application names "Remember", "FilePipe", and "ObtainX", along with all original branding artwork, logos, and custom launcher icons, are the exclusive intellectual property and trademarks of the author. Redistribution or modification of the source code under the GPLv3 does not grant permission to use these brand assets in derivative works. All forks must be entirely rebranded.
+
+## ➕ More Apps
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="https://bikram-agarwal.github.io/remember/">
+        <img src="docs/assets/feature_remember.jpg" alt="Remember feature graphic" width="100%">
+      <b>Remember</b></a>
+      <p>Notes, tasks, and reminders that keep coming back until they are done.</p>
+    </td>
+    <td width="50%" align="center">
+      <a href="https://bikram-agarwal.github.io/obtainx/">
+        <img src="docs/assets/feature_obtainx.jpg" alt="ObtainX feature graphic" width="100%">
+      <b>ObtainX</b></a>
+      <p>A supercharged Obtainium: get Android app updates straight from the source.</p>
+    </td>
+  </tr>
+</table>
 
 ---
 

@@ -317,13 +317,15 @@
     <string name="onboarding_permissions_grant_all_files">Grant all files access</string>
     <string name="onboarding_permissions_use_selective_access">Use selective access</string>
     <string name="onboarding_permissions_all_files_pitch_title">One permission, every folder</string>
-    <string name="onboarding_permissions_all_files_pitch_subtitle">FilePipe needs all-files access to sort across Download, SD card, and the rest.</string>
+    <string name="onboarding_permissions_all_files_pitch_subtitle">FilePipe needs all-files access to sort across Download, storage root, and the rest.</string>
     <string name="onboarding_permissions_all_files_hook_once">Set it once</string>
     <string name="onboarding_permissions_all_files_rest_once">- no permission prompts later</string>
     <string name="onboarding_permissions_all_files_hook_everywhere">Works everywhere</string>
     <string name="onboarding_permissions_all_files_rest_everywhere">- Download, SD card, storage root, app folders</string>
     <string name="onboarding_permissions_all_files_hook_device">Stays on this device</string>
     <string name="onboarding_permissions_all_files_rest_device">- FilePipe never uploads your files</string>
+    <string name="onboarding_permissions_all_files_hook_fast">Faster</string>
+    <string name="onboarding_permissions_all_files_rest_fast">- quicker scans and moves, even for large libraries</string>
     <string name="onboarding_permissions_selective_pitch_title">Your choices, folder by folder</string>
     <string name="onboarding_permissions_selective_pitch_subtitle">FilePipe will use Android\'s basic access to sort across folders you grant one by one.</string>
     <string name="onboarding_permissions_selective_hook_privacy">More privacy</string>
@@ -331,25 +333,9 @@
     <string name="onboarding_permissions_selective_hook_control">You control access</string>
     <string name="onboarding_permissions_selective_rest_control">- Every folder access requires its own approval</string>
     <string name="onboarding_permissions_selective_hook_limits">System limits</string>
-    <string name="onboarding_permissions_selective_rest_limits">- Android blocks selecting the Download folder</string>
-    <string name="onboarding_permissions_sheet_title">Choose how FilePipe accesses your files</string>
-    <string name="onboarding_permissions_sheet_full_mode">🔓 All files access</string>
-    <string name="onboarding_permissions_sheet_full_subtitle">Best for most people</string>
-    <string name="onboarding_permissions_sheet_full_use_intro">Use this to:</string>
-    <string name="onboarding_permissions_sheet_full_bullet1">Organize your Download folder automatically</string>
-    <string name="onboarding_permissions_sheet_full_bullet2">Work across your entire storage</string>
-    <string name="onboarding_permissions_sheet_full_bullet3">Run rules without extra setup</string>
-    <string name="onboarding_permissions_sheet_full_good_to_know">Good to know</string>
-    <string name="onboarding_permissions_sheet_full_note1">No repeated permission prompts for every folder</string>
-    <string name="onboarding_permissions_sheet_full_note2">FilePipe only acts on the rules you create</string>
-    <string name="onboarding_permissions_sheet_select_mode">🔒 Selective access</string>
-    <string name="onboarding_permissions_sheet_select_subtitle">Best for individual folder control</string>
-    <string name="onboarding_permissions_sheet_select_use_intro">Use this if you:</string>
-    <string name="onboarding_permissions_sheet_select_bullet1">Only want to organize a few folders</string>
-    <string name="onboarding_permissions_sheet_select_bullet2">Prefer granting access one folder at a time</string>
-    <string name="onboarding_permissions_sheet_select_limitations">Limitations</string>
-    <string name="onboarding_permissions_sheet_select_lim1">Some folders (like Download) can\'t be selected</string>
-    <string name="onboarding_permissions_sheet_select_lim2">You\'ll need to approve each folder manually</string>
+    <string name="onboarding_permissions_selective_rest_limits">- Android blocks selecting the Download folder and storage root</string>
+    <string name="onboarding_permissions_selective_hook_speed">Slower</string>
+    <string name="onboarding_permissions_selective_rest_speed">- for large libraries and big files</string>
     <string name="onboarding_permissions_sheet_footer_tip">💡 Not sure? Choose \"All files access\" - it works best for most setups. You can change this anytime in Settings.</string>
 
     <!-- Onboarding wizard -->

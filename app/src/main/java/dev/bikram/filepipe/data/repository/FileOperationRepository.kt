@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.provider.DocumentsContract
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
@@ -209,49 +210,45 @@ class FileOperationRepository
 
                 val scanContext = currentCoroutineContext()
 
-                val sequence: Sequence<Pair<DocumentFile, List<String>>> =
-                    if (scanSubdirectories) {
-                        walkDocFilesWithRelativeParents(folder, maxDepth, emptyList())
-                    } else {
-                        folder
-                            .listFiles()
-                            .asSequence()
-                            .filter { it.isFile }
-                            .map { it to emptyList() }
+                // Traverse via a single projected cursor per directory (name/size/date/mime in one IPC round-trip)
+                // instead of DocumentFile.listFiles() + one query per attribute per file — far fewer Binder calls.
+                val candidates =
+                    try {
+                        val rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
+                        collectSafFiles(treeUri, rootDocumentId, scanSubdirectories, maxDepth)
+                    } catch (_: SecurityException) {
+                        return@withContext emptyList()
+                    } catch (_: IllegalArgumentException) {
+                        return@withContext emptyList()
                     }
 
-                try {
-                    sequence
-                        // Cooperative cancellation: the per-file orientation probe below can be slow, so bail out
-                        // between files as soon as the run is cancelled instead of scanning to completion.
-                        .onEach { scanContext.ensureActive() }
-                        .filter { (doc, _) ->
-                            val ext = ".${doc.name.orEmpty().substringAfterLast('.').lowercase()}"
-                            ext in lowerExtensions
-                        }.filter { (doc, _) -> filenameRegexes == null || filenameRegexes.isEmpty() || filenameRegexes.any { it.matches(doc.name.orEmpty()) } }
-                        .filter { (doc, _) -> excludeRegexes.none { it.matches(doc.name.orEmpty()) } }
-                        .filter { (doc, _) -> minFileSizeBytes == null || doc.length() >= minFileSizeBytes }
-                        .filter { (doc, _) -> maxFileSizeBytes == null || doc.length() <= maxFileSizeBytes }
-                        .filter { (doc, _) ->
-                            if (minAgeMs == null && maxAgeMs == null) return@filter true
-                            val ageMs = now - doc.lastModified()
-                            (minAgeMs == null || ageMs >= minAgeMs) && (maxAgeMs == null || ageMs <= maxAgeMs)
-                        }.filter { (doc, _) ->
-                            if (orientation == null) return@filter true
-                            val fileOrientation = getDocumentFileOrientation(context, doc)
-                            fileOrientation == orientation
-                        }.map { (doc, relativeParentSegments) ->
-                            FileEntry(
-                                uri = doc.uri,
-                                name = doc.name.orEmpty(),
-                                size = doc.length(),
-                                lastModifiedMs = doc.lastModified(),
-                                relativeParentSegments = relativeParentSegments,
-                            )
-                        }.toList()
-                } catch (_: SecurityException) {
-                    emptyList()
-                }
+                candidates
+                    .asSequence()
+                    .filter { (doc, _) ->
+                        val ext = ".${doc.name.substringAfterLast('.').lowercase()}"
+                        ext in lowerExtensions
+                    }.filter { (doc, _) -> filenameRegexes == null || filenameRegexes.isEmpty() || filenameRegexes.any { it.matches(doc.name) } }
+                    .filter { (doc, _) -> excludeRegexes.none { it.matches(doc.name) } }
+                    .filter { (doc, _) -> minFileSizeBytes == null || doc.size >= minFileSizeBytes }
+                    .filter { (doc, _) -> maxFileSizeBytes == null || doc.size <= maxFileSizeBytes }
+                    .filter { (doc, _) ->
+                        if (minAgeMs == null && maxAgeMs == null) return@filter true
+                        val ageMs = now - doc.lastModifiedMs
+                        (minAgeMs == null || ageMs >= minAgeMs) && (maxAgeMs == null || ageMs <= maxAgeMs)
+                    }.filter { (doc, _) ->
+                        // Orientation probe opens a stream per file, so stay cancellable between files.
+                        scanContext.ensureActive()
+                        if (orientation == null) return@filter true
+                        getDocumentUriOrientation(doc.name, doc.uri) == orientation
+                    }.map { (doc, relativeParentSegments) ->
+                        FileEntry(
+                            uri = doc.uri,
+                            name = doc.name,
+                            size = doc.size,
+                            lastModifiedMs = doc.lastModifiedMs,
+                            relativeParentSegments = relativeParentSegments,
+                        )
+                    }.toList()
             }
 
         private suspend fun listMatchingFilesFromFilesystemRoot(
@@ -322,14 +319,14 @@ class FileOperationRepository
                 }.toList()
         }
 
-        private fun getDocumentFileOrientation(
-            context: Context,
-            docFile: DocumentFile,
+        private fun getDocumentUriOrientation(
+            name: String,
+            uri: Uri,
         ): FileOrientation? {
-            val ext = normalizeExtension(docFile.name.orEmpty().substringAfterLast('.', ""))
+            val ext = normalizeExtension(name.substringAfterLast('.', ""))
             return when (ext) {
-                in IMAGE_EXTENSIONS -> imageOrientation { context.contentResolver.openInputStream(docFile.uri) }
-                in VIDEO_EXTENSIONS -> videoOrientation { it.setDataSource(context, docFile.uri) }
+                in IMAGE_EXTENSIONS -> imageOrientation { context.contentResolver.openInputStream(uri) }
+                in VIDEO_EXTENSIONS -> videoOrientation { it.setDataSource(context, uri) }
                 else -> null
             }
         }
@@ -437,32 +434,104 @@ class FileOperationRepository
                 }
             }
 
+        private data class SafDocEntry(
+            val documentId: String,
+            val uri: Uri,
+            val name: String,
+            val size: Long,
+            val lastModifiedMs: Long,
+            val isFile: Boolean,
+            val isDirectory: Boolean,
+        )
+
         /**
-         * Yields each file with path segments from the scanned tree root to the file's parent
-         * (e.g. `Photos/vacation/img.jpg` → `["Photos","vacation"]`).
+         * Fetches all children of [parentDocumentId] under [treeUri] in a single projected cursor query
+         * (document id / name / size / last-modified / mime), instead of [DocumentFile.listFiles] followed by
+         * one IPC query per attribute per file. Returns an empty list on any query failure, matching
+         * [DocumentFile.listFiles]'s behavior for unreadable/gone directories.
          */
-        private fun walkDocFilesWithRelativeParents(
-            dir: DocumentFile,
+        private fun querySafChildren(
+            treeUri: Uri,
+            parentDocumentId: String,
+        ): List<SafDocEntry> {
+            val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocumentId)
+            val projection =
+                arrayOf(
+                    DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                    DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                    DocumentsContract.Document.COLUMN_SIZE,
+                    DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+                    DocumentsContract.Document.COLUMN_MIME_TYPE,
+                )
+            val results = mutableListOf<SafDocEntry>()
+            try {
+                context.contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                    val idIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                    val nameIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                    val sizeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                    val modifiedIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                    val mimeIdx = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                    if (idIdx == -1) return emptyList()
+                    while (cursor.moveToNext()) {
+                        val documentId = cursor.getString(idIdx) ?: continue
+                        val mimeType = if (mimeIdx != -1) cursor.getString(mimeIdx) else null
+                        val isDirectory = mimeType == DocumentsContract.Document.MIME_TYPE_DIR
+                        // Mirror DocumentFile.isFile(): a document with no/blank mime type is treated as neither.
+                        val isFile = !mimeType.isNullOrEmpty() && !isDirectory
+                        results +=
+                            SafDocEntry(
+                                documentId = documentId,
+                                uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, documentId),
+                                name = (if (nameIdx != -1) cursor.getString(nameIdx) else null).orEmpty(),
+                                size = if (sizeIdx != -1 && !cursor.isNull(sizeIdx)) cursor.getLong(sizeIdx) else 0L,
+                                lastModifiedMs = if (modifiedIdx != -1 && !cursor.isNull(modifiedIdx)) cursor.getLong(modifiedIdx) else 0L,
+                                isFile = isFile,
+                                isDirectory = isDirectory,
+                            )
+                    }
+                }
+            } catch (_: Exception) {
+                return emptyList()
+            }
+            return results
+        }
+
+        /**
+         * Walks the SAF tree from [rootDocumentId], collecting files paired with the path segments from the
+         * scanned root to each file's parent (e.g. `Photos/vacation/img.jpg` → `["Photos","vacation"]`).
+         * Non-recursive scans read only the root's direct children; recursive scans honor [maxDepth].
+         */
+        private suspend fun collectSafFiles(
+            treeUri: Uri,
+            rootDocumentId: String,
+            scanSubdirectories: Boolean,
             maxDepth: Int,
-            relativeParentSegments: List<String>,
-        ): Sequence<Pair<DocumentFile, List<String>>> =
-            sequence {
-                if (maxDepth <= 0) return@sequence
-                dir.listFiles().forEach { child ->
-                    val segment = child.name?.trim().orEmpty()
+        ): List<Pair<SafDocEntry, List<String>>> {
+            val scanContext = currentCoroutineContext()
+            val out = mutableListOf<Pair<SafDocEntry, List<String>>>()
+
+            fun visit(
+                parentDocumentId: String,
+                relativeParents: List<String>,
+                depth: Int,
+            ) {
+                if (depth <= 0) return
+                for (child in querySafChildren(treeUri, parentDocumentId)) {
+                    scanContext.ensureActive()
                     if (child.isFile) {
-                        yield(child to relativeParentSegments)
-                    } else if (child.isDirectory && segment.isNotEmpty() && segment != "." && segment != "..") {
-                        yieldAll(
-                            walkDocFilesWithRelativeParents(
-                                child,
-                                maxDepth - 1,
-                                relativeParentSegments + segment,
-                            ),
-                        )
+                        out += child to relativeParents
+                    } else if (scanSubdirectories && child.isDirectory) {
+                        val segment = child.name.trim()
+                        if (segment.isNotEmpty() && segment != "." && segment != "..") {
+                            visit(child.documentId, relativeParents + segment, depth - 1)
+                        }
                     }
                 }
             }
+
+            visit(rootDocumentId, emptyList(), if (scanSubdirectories) maxDepth else 1)
+            return out
+        }
 
         suspend fun moveFile(
             sourceEntry: FileEntry,

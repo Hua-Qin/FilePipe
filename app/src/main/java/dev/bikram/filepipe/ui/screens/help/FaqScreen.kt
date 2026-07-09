@@ -79,8 +79,6 @@ import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer
 import dev.bikram.filepipe.ui.navigation.Screen
-import dev.bikram.filepipe.ui.screens.onboarding.FolderAccessLearnMoreFullModeSection
-import dev.bikram.filepipe.ui.screens.onboarding.FolderAccessLearnMoreSelectiveModeSection
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
@@ -191,36 +189,29 @@ private fun FaqTopicListItem(
                             .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    when (itemContent.bodyKind) {
-                        FaqItemBodyKind.STORAGE_FULL_MODE -> {
-                            FolderAccessLearnMoreFullModeSection(
-                                modifier = Modifier.padding(top = 4.dp),
-                                showModeTitleInBody = false,
+                    itemContent.body.forEachIndexed { index, line ->
+                        // Non-bullet lines start a new group (sub-heading / label like "Use this to:"),
+                        // so give them extra breathing room above so groups read as distinct on a quick scan.
+                        val topSpacing = if (index > 0 && !line.isBullet) 10.dp else 0.dp
+                        if (line.isHeading) {
+                            Text(
+                                text = parseDoubleAsteriskEmphasis(line.text),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(top = topSpacing),
                             )
-                        }
-
-                        FaqItemBodyKind.STORAGE_SELECTIVE_MODE -> {
-                            FolderAccessLearnMoreSelectiveModeSection(
-                                modifier = Modifier.padding(top = 4.dp),
-                                showModeTitleInBody = false,
+                        } else {
+                            Text(
+                                text =
+                                    buildAnnotatedString {
+                                        if (line.isBullet) append("• ")
+                                        append(parseDoubleAsteriskEmphasis(line.text))
+                                    },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.padding(top = topSpacing),
                             )
-                        }
-
-                        FaqItemBodyKind.BULLETS -> {
-                            itemContent.bullets.forEach { bulletText ->
-                                val trimmed = bulletText.trim()
-                                if (trimmed.isNotEmpty()) {
-                                    Text(
-                                        text =
-                                            buildAnnotatedString {
-                                                append("• ")
-                                                append(parseDoubleAsteriskEmphasis(bulletText))
-                                            },
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                            }
                         }
                     }
                     if (itemContent.inlineActions.isNotEmpty()) {
