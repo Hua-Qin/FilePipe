@@ -421,7 +421,7 @@ class RulesViewModel
                 } else {
                     ManualRunCancelAnchor.RunSelectedBar
                 }
-            enqueueManualRun(realRulesToRun, anchor)
+            enqueueManualRun(realRulesToRun, anchor, useCache = true)
         }
 
         fun isCardExpanded(
@@ -543,17 +543,7 @@ class RulesViewModel
         ) {
             val realRules = rules.filterNot(DevMockFileMove::isMockRule)
             if (realRules.isEmpty()) return
-            viewModelScope.launch {
-                val rulesWithAffectedFiles =
-                    realRules.filter { rule ->
-                        simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
-                    }
-                if (rulesWithAffectedFiles.isEmpty()) {
-                    postUserMessage(appContext.getString(R.string.history_no_files_affected))
-                    return@launch
-                }
-                enqueueManualRun(rulesWithAffectedFiles, anchor)
-            }
+            enqueueManualRun(realRules, anchor, runSimulationCheck = true)
         }
 
         /**
@@ -566,6 +556,8 @@ class RulesViewModel
         private fun enqueueManualRun(
             rules: List<Rule>,
             anchor: ManualRunCancelAnchor,
+            useCache: Boolean = false,
+            runSimulationCheck: Boolean = false,
         ) {
             if (rules.isEmpty()) return
             viewModelScope.launch {
@@ -584,8 +576,27 @@ class RulesViewModel
                                     )
                             }
                         try {
+                            val targetRules =
+                                if (runSimulationCheck) {
+                                    val filtered =
+                                        rules.filter { rule ->
+                                            simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
+                                        }
+                                    if (filtered.isEmpty()) {
+                                        postUserMessage(appContext.getString(R.string.history_no_files_affected))
+                                        return@launch
+                                    }
+                                    filtered
+                                } else {
+                                    rules
+                                }
+
                             val results =
-                                executeRulesUseCase(rules, TriggerType.MANUAL) { progress ->
+                                executeRulesUseCase(
+                                    targetRules,
+                                    TriggerType.MANUAL,
+                                    useCache = useCache || runSimulationCheck,
+                                ) { progress ->
                                     _progressMap.update { current -> current + (progress.ruleId to progress) }
                                 }
                             when {

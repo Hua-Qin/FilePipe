@@ -34,18 +34,20 @@ class ExecuteRulesUseCase
         suspend operator fun invoke(
             rules: List<Rule>,
             triggerType: TriggerType,
+            useCache: Boolean = false,
             onProgress: (RunProgress) -> Unit = {},
         ): List<RunResult> =
             coroutineScope {
                 rules
                     .map { rule ->
-                        async { executeRule(rule, triggerType, onProgress) }
+                        async { executeRule(rule, triggerType, useCache, onProgress) }
                     }.awaitAll()
             }
 
         private suspend fun executeRule(
             rule: Rule,
             triggerType: TriggerType,
+            useCache: Boolean,
             onProgress: (RunProgress) -> Unit,
         ): RunResult {
             val startedAt = System.currentTimeMillis()
@@ -75,6 +77,8 @@ class ExecuteRulesUseCase
                             maxAgeDays = rule.maxAgeDays,
                             excludePatterns = rule.excludePatterns,
                             filesystemAccessEnabled = filesystemAccessEnabled,
+                            orientation = rule.orientation,
+                            useCache = useCache,
                         )
                     }
 

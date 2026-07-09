@@ -10,13 +10,17 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -85,11 +89,13 @@ fun OnboardingTitleScreen(
         }
 
     BoxWithConstraints(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .systemBarsPadding(),
+        modifier = Modifier.fillMaxSize(),
     ) {
+        // Edge-to-edge like every other screen: no reserved bar strips. Centered content sits in the
+        // full window; the bottom actions/byline and the scrollable stack carry the system bar insets
+        // so they clear the bars while the background still runs under them.
+        val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val useTwoColumns = maxHeight < 480.dp && maxWidth > maxHeight
         val useScrollableStack = maxHeight < 560.dp && !useTwoColumns
 
@@ -233,7 +239,12 @@ fun OnboardingTitleScreen(
                     Modifier
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 32.dp, vertical = 24.dp),
+                        .padding(
+                            start = 32.dp,
+                            end = 32.dp,
+                            top = 24.dp + statusBarInset,
+                            bottom = 24.dp + navBarInset,
+                        ),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(24.dp),
             ) {
@@ -251,6 +262,7 @@ fun OnboardingTitleScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
                         .padding(bottom = 120.dp),
             ) {
                 bylinePill()
@@ -259,6 +271,7 @@ fun OnboardingTitleScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
                         .padding(bottom = 40.dp),
             ) {
                 beginButton()

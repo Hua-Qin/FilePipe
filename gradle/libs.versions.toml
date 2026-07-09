@@ -11,6 +11,7 @@ coroutines = "1.11.0"
 datastore = "1.2.1"
 detekt = "2.0.0-alpha.5"
 documentfile = "1.1.0"
+exifinterface = "1.4.2"
 gradleVersionsPlugin = "0.54.0"
 hilt = "2.60.1"
 hiltNav = "1.4.0"
@@ -54,6 +55,7 @@ detekt-sarif4k = { module = "io.github.detekt.sarif4k:sarif4k", version.ref = "s
 detekt-sarif4k-jvm = { module = "io.github.detekt.sarif4k:sarif4k-jvm", version.ref = "sarif4k" }
 documentfile = { module = "androidx.documentfile:documentfile", version.ref = "documentfile" }
 errorprone-annotations = "com.google.errorprone:error_prone_annotations:2.50.0"
+exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 hilt-nav-compose = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNav" }

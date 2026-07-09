@@ -18,6 +18,7 @@ import dev.bikram.filepipe.data.storage.primaryDownloadsDirectoryPath
 import dev.bikram.filepipe.data.storage.primaryScreenshotsDirectoryPath
 import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.domain.model.ConflictPolicy
+import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
@@ -26,6 +27,7 @@ import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.TemplateAutoSource
+import dev.bikram.filepipe.domain.model.appliesToImageAndVideoOnly
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
 import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
@@ -71,6 +73,7 @@ data class RuleDetailUiState(
     val minAgeDays: String = "",
     val maxAgeDays: String = "",
     val excludePatternsText: String = "",
+    val orientation: FileOrientation? = null,
     val isLoading: Boolean = true,
     val isSaved: Boolean = false,
     val errors: List<String> = emptyList(),
@@ -111,6 +114,7 @@ private data class RuleSnapshot(
     val minAgeDays: String,
     val maxAgeDays: String,
     val excludePatternsText: String,
+    val orientation: FileOrientation?,
 )
 
 private fun RuleDetailUiState.toSnapshot(): RuleSnapshot =
@@ -133,6 +137,7 @@ private fun RuleDetailUiState.toSnapshot(): RuleSnapshot =
         minAgeDays = minAgeDays,
         maxAgeDays = maxAgeDays,
         excludePatternsText = excludePatternsText,
+        orientation = orientation,
     )
 
 private fun RuleDetailUiState.withSnapshot(snapshot: RuleSnapshot): RuleDetailUiState =
@@ -155,6 +160,7 @@ private fun RuleDetailUiState.withSnapshot(snapshot: RuleSnapshot): RuleDetailUi
         minAgeDays = snapshot.minAgeDays,
         maxAgeDays = snapshot.maxAgeDays,
         excludePatternsText = snapshot.excludePatternsText,
+        orientation = snapshot.orientation,
         errors = emptyList(),
         previewFiles = null,
         isPreviewLoading = false,
@@ -245,6 +251,7 @@ class RuleDetailViewModel
                             minAgeDays = rule.minAgeDays?.toString() ?: "",
                             maxAgeDays = rule.maxAgeDays?.toString() ?: "",
                             excludePatternsText = rule.excludePatterns.joinToString(", "),
+                            orientation = rule.orientation,
                             isLoading = false,
                             isTrashed = rule.trashedAt != null,
                         )
@@ -381,11 +388,11 @@ class RuleDetailViewModel
         fun addExtension(ext: String) =
             _uiState.update {
                 val normalized = ext.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
-                if (normalized in it.fileExtensions) {
-                    it
-                } else {
-                    it.copy(fileExtensions = it.fileExtensions + normalized)
-                }
+                val newExtensions = if (normalized in it.fileExtensions) it.fileExtensions else it.fileExtensions + normalized
+                it.copy(
+                    fileExtensions = newExtensions,
+                    orientation = if (appliesToImageAndVideoOnly(newExtensions)) it.orientation else null,
+                )
             }
 
         fun addExtensions(exts: List<String>) {
@@ -394,7 +401,11 @@ class RuleDetailViewModel
 
         fun removeExtension(ext: String) =
             _uiState.update {
-                it.copy(fileExtensions = it.fileExtensions - ext)
+                val newExtensions = it.fileExtensions - ext
+                it.copy(
+                    fileExtensions = newExtensions,
+                    orientation = if (appliesToImageAndVideoOnly(newExtensions)) it.orientation else null,
+                )
             }
 
         fun setSchedule(schedule: RuleSchedule?) = _uiState.update { it.copy(schedule = schedule) }
@@ -467,6 +478,8 @@ class RuleDetailViewModel
 
         fun setExcludePatternsText(text: String) = _uiState.update { it.copy(excludePatternsText = text) }
 
+        fun setOrientation(orientation: FileOrientation?) = _uiState.update { it.copy(orientation = orientation) }
+
         // Bookmark actions
         fun toggleBookmark(path: String) =
             viewModelScope.launch {
@@ -520,6 +533,7 @@ class RuleDetailViewModel
                         recreateDestinationSubfolders = template.scanSubdirectories,
                         icon = template.suggestedIcon,
                         sourceFolderPaths = sourcePaths,
+                        orientation = if (appliesToImageAndVideoOnly(template.extensions)) state.orientation else null,
                     )
                 if (nextState.scanSubdirectories) {
                     val (kept, removed) = removeRedundantPaths(nextState.sourceFolderPaths)
@@ -638,5 +652,6 @@ class RuleDetailViewModel
                         .split(",")
                         .map { it.trim() }
                         .filter { it.isNotBlank() },
+                orientation = if (appliesToImageAndVideoOnly(state.fileExtensions)) state.orientation else null,
             )
     }

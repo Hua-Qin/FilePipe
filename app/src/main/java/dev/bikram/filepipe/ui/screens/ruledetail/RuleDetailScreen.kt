@@ -56,6 +56,9 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialShapes
@@ -132,12 +135,14 @@ import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.domain.RuleFolderSeverity
 import dev.bikram.filepipe.domain.assessRuleFolderAccess
 import dev.bikram.filepipe.domain.model.ConflictPolicy
+import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
+import dev.bikram.filepipe.domain.model.appliesToImageAndVideoOnly
 import dev.bikram.filepipe.domain.model.materialSymbolName
 import dev.bikram.filepipe.ui.common.AppBottomSheet
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
@@ -847,10 +852,10 @@ fun RuleDetailScreen(
         }
     }
     val bottomBlurAlphaMultiplier =
-        if (!showNavigateBack && !showBottomActions) {
-            0f
-        } else {
+        if (showBottomBar || showBottomActions || showReadOnlyBottomActions) {
             1f
+        } else {
+            0f
         }
     val fullBleedBlurModifier =
         LocalProgressiveBlurStyle.current?.let { blurStyle ->
@@ -1619,7 +1624,8 @@ fun RuleDetailScreen(
                             state.maxFileSizeMb.isNotBlank() ||
                             state.minAgeDays.isNotBlank() ||
                             state.maxAgeDays.isNotBlank() ||
-                            state.excludePatternsText.isNotBlank()
+                            state.excludePatternsText.isNotBlank() ||
+                            state.orientation != null
 
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
@@ -1772,6 +1778,61 @@ fun RuleDetailScreen(
                                         enabled = !isReadOnly,
                                         modifier = Modifier.fillMaxWidth(),
                                     )
+
+                                    if (appliesToImageAndVideoOnly(state.fileExtensions)) {
+                                        var orientationExpanded by remember { mutableStateOf(false) }
+                                        ExposedDropdownMenuBox(
+                                            expanded = orientationExpanded,
+                                            onExpandedChange = { if (!isReadOnly) orientationExpanded = it },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) {
+                                            val displayValue =
+                                                when (state.orientation) {
+                                                    FileOrientation.PORTRAIT -> stringResource(R.string.advanced_orientation_portrait)
+                                                    FileOrientation.LANDSCAPE -> stringResource(R.string.advanced_orientation_landscape)
+                                                    null -> stringResource(R.string.advanced_orientation_any)
+                                                }
+                                            OutlinedTextField(
+                                                value = displayValue,
+                                                onValueChange = {},
+                                                readOnly = true,
+                                                label = { Text(stringResource(R.string.advanced_orientation_label)) },
+                                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(orientationExpanded) },
+                                                modifier =
+                                                    Modifier
+                                                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = !isReadOnly)
+                                                        .fillMaxWidth(),
+                                                enabled = !isReadOnly,
+                                            )
+                                            ExposedDropdownMenu(
+                                                expanded = orientationExpanded,
+                                                onDismissRequest = { orientationExpanded = false },
+                                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                            ) {
+                                                FilePipeDropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.advanced_orientation_any)) },
+                                                    onClick = {
+                                                        viewModel.setOrientation(null)
+                                                        orientationExpanded = false
+                                                    },
+                                                )
+                                                FilePipeDropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.advanced_orientation_portrait)) },
+                                                    onClick = {
+                                                        viewModel.setOrientation(FileOrientation.PORTRAIT)
+                                                        orientationExpanded = false
+                                                    },
+                                                )
+                                                FilePipeDropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.advanced_orientation_landscape)) },
+                                                    onClick = {
+                                                        viewModel.setOrientation(FileOrientation.LANDSCAPE)
+                                                        orientationExpanded = false
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }

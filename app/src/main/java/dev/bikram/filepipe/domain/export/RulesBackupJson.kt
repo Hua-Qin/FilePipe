@@ -7,6 +7,7 @@ import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
@@ -22,7 +23,7 @@ import kotlinx.serialization.json.JsonNames
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
  * (`@Database`); Room KSP does not allow that annotation to reference this constant.
  */
-const val APP_DATABASE_SCHEMA_VERSION = 8
+const val APP_DATABASE_SCHEMA_VERSION = 9
 
 /**
  * Root object for `filepipe_backup_*.json`.
@@ -66,6 +67,7 @@ data class RuleBackupDto(
     val minAgeDays: Int? = null,
     val maxAgeDays: Int? = null,
     val excludePatterns: List<String> = emptyList(),
+    val orientation: String? = null,
 )
 
 @Serializable
@@ -181,6 +183,7 @@ fun Rule.toBackupDto(): RuleBackupDto =
         minAgeDays = minAgeDays,
         maxAgeDays = maxAgeDays,
         excludePatterns = excludePatterns,
+        orientation = orientation?.name,
     )
 
 fun RuleSchedule.toBackupDto(): ScheduleBackupDto =
@@ -286,6 +289,7 @@ fun RuleBackupDto.toDomain(): Rule =
         minAgeDays = minAgeDays,
         maxAgeDays = maxAgeDays,
         excludePatterns = excludePatterns,
+        orientation = orientation?.let { runCatching { FileOrientation.valueOf(it) }.getOrNull() },
     )
 
 fun ScheduleBackupDto.toDomain(): RuleSchedule? {

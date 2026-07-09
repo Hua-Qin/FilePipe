@@ -56,8 +56,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = filePipeApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 388
-        versionName = "3.8.8"
+        versionCode = 389
+        versionName = "3.8.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -280,6 +280,9 @@ dependencies {
 
     // DocumentFile (SAF helper)
     implementation(libs.documentfile)
+
+    // ExifInterface (image orientation metadata; AndroidX replacement for deprecated android.media.ExifInterface)
+    implementation(libs.exifinterface)
 
     implementation(libs.datastore.preferences)
 

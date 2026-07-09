@@ -1,10 +1,13 @@
 package dev.bikram.filepipe.data.repository
 
 import android.content.Context
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
+import androidx.exifinterface.media.ExifInterface
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.storage.folderPathForFilesystemAccess
 import dev.bikram.filepipe.data.storage.isCanonicalPathUnderAllowedSharedStorage
@@ -13,22 +16,33 @@ import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.FolderAccessResult
+import dev.bikram.filepipe.domain.model.IMAGE_EXTENSIONS
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
+import dev.bikram.filepipe.domain.model.VIDEO_EXTENSIONS
+import dev.bikram.filepipe.domain.model.normalizeExtension
 import dev.bikram.filepipe.domain.model.resolveRenameSuffixName
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.io.InputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/** How long a cached scan stays reusable (preview/simulate → run) before it's treated as stale. */
+private const val SCAN_CACHE_TTL_MS = 300_000L
 
 @Singleton
 class FileOperationRepository
@@ -37,6 +51,28 @@ class FileOperationRepository
         @param:ApplicationContext private val context: Context,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) {
+        private data class ScanCacheKey(
+            val folderUriString: String,
+            val extensions: List<String>,
+            val scanSubdirectories: Boolean,
+            val filenamePattern: String?,
+            val minFileSizeBytes: Long?,
+            val maxFileSizeBytes: Long?,
+            val minAgeDays: Int?,
+            val maxAgeDays: Int?,
+            val excludePatterns: List<String>,
+            val maxDepth: Int,
+            val orientation: FileOrientation?,
+            val filesystemAccessEnabled: Boolean,
+        )
+
+        private data class CacheEntry(
+            val files: List<FileEntry>,
+            val timestamp: Long,
+        )
+
+        private val scanCache = ConcurrentHashMap<ScanCacheKey, CacheEntry>()
+
         suspend fun listMatchingFiles(
             folderUriString: String,
             extensions: List<String>,
@@ -49,6 +85,74 @@ class FileOperationRepository
             excludePatterns: List<String> = emptyList(),
             maxDepth: Int = 5,
             filesystemAccessEnabled: Boolean = false,
+            orientation: FileOrientation? = null,
+            useCache: Boolean = false,
+        ): List<FileEntry> =
+            withContext(ioDispatcher) {
+                val cacheKey =
+                    ScanCacheKey(
+                        folderUriString = folderUriString,
+                        extensions = extensions,
+                        scanSubdirectories = scanSubdirectories,
+                        filenamePattern = filenamePattern,
+                        minFileSizeBytes = minFileSizeBytes,
+                        maxFileSizeBytes = maxFileSizeBytes,
+                        minAgeDays = minAgeDays,
+                        maxAgeDays = maxAgeDays,
+                        excludePatterns = excludePatterns,
+                        maxDepth = maxDepth,
+                        orientation = orientation,
+                        filesystemAccessEnabled = filesystemAccessEnabled,
+                    )
+
+                if (useCache) {
+                    val nowTime = System.currentTimeMillis()
+                    val cached = scanCache[cacheKey]
+                    if (cached != null && (nowTime - cached.timestamp) < SCAN_CACHE_TTL_MS) {
+                        scanCache.remove(cacheKey)
+                        return@withContext cached.files
+                    }
+                }
+
+                val resultList =
+                    listMatchingFilesScan(
+                        folderUriString = folderUriString,
+                        extensions = extensions,
+                        scanSubdirectories = scanSubdirectories,
+                        filenamePattern = filenamePattern,
+                        minFileSizeBytes = minFileSizeBytes,
+                        maxFileSizeBytes = maxFileSizeBytes,
+                        minAgeDays = minAgeDays,
+                        maxAgeDays = maxAgeDays,
+                        excludePatterns = excludePatterns,
+                        maxDepth = maxDepth,
+                        filesystemAccessEnabled = filesystemAccessEnabled,
+                        orientation = orientation,
+                    )
+
+                // A scan populated here is meant to be consumed by a matching `useCache = true` read
+                // (preview/simulate → run). Entries whose key is never read back (e.g. background runs)
+                // would otherwise live for the whole process, so evict anything past the TTL on every
+                // write to keep the cache bounded.
+                val writeTime = System.currentTimeMillis()
+                scanCache.entries.removeAll { (_, entry) -> writeTime - entry.timestamp >= SCAN_CACHE_TTL_MS }
+                scanCache[cacheKey] = CacheEntry(resultList, writeTime)
+                resultList
+            }
+
+        private suspend fun listMatchingFilesScan(
+            folderUriString: String,
+            extensions: List<String>,
+            scanSubdirectories: Boolean = false,
+            filenamePattern: String? = null,
+            minFileSizeBytes: Long? = null,
+            maxFileSizeBytes: Long? = null,
+            minAgeDays: Int? = null,
+            maxAgeDays: Int? = null,
+            excludePatterns: List<String> = emptyList(),
+            maxDepth: Int = 5,
+            filesystemAccessEnabled: Boolean = false,
+            orientation: FileOrientation? = null,
         ): List<FileEntry> =
             withContext(ioDispatcher) {
                 val effectiveFolderUriString =
@@ -70,6 +174,7 @@ class FileOperationRepository
                         maxAgeDays = maxAgeDays,
                         excludePatterns = excludePatterns,
                         maxDepth = maxDepth,
+                        orientation = orientation,
                     )
                 }
 
@@ -102,6 +207,8 @@ class FileOperationRepository
                 val minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
                 val maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
 
+                val scanContext = currentCoroutineContext()
+
                 val sequence: Sequence<Pair<DocumentFile, List<String>>> =
                     if (scanSubdirectories) {
                         walkDocFilesWithRelativeParents(folder, maxDepth, emptyList())
@@ -115,6 +222,9 @@ class FileOperationRepository
 
                 try {
                     sequence
+                        // Cooperative cancellation: the per-file orientation probe below can be slow, so bail out
+                        // between files as soon as the run is cancelled instead of scanning to completion.
+                        .onEach { scanContext.ensureActive() }
                         .filter { (doc, _) ->
                             val ext = ".${doc.name.orEmpty().substringAfterLast('.').lowercase()}"
                             ext in lowerExtensions
@@ -126,6 +236,10 @@ class FileOperationRepository
                             if (minAgeMs == null && maxAgeMs == null) return@filter true
                             val ageMs = now - doc.lastModified()
                             (minAgeMs == null || ageMs >= minAgeMs) && (maxAgeMs == null || ageMs <= maxAgeMs)
+                        }.filter { (doc, _) ->
+                            if (orientation == null) return@filter true
+                            val fileOrientation = getDocumentFileOrientation(context, doc)
+                            fileOrientation == orientation
                         }.map { (doc, relativeParentSegments) ->
                             FileEntry(
                                 uri = doc.uri,
@@ -140,7 +254,7 @@ class FileOperationRepository
                 }
             }
 
-        private fun listMatchingFilesFromFilesystemRoot(
+        private suspend fun listMatchingFilesFromFilesystemRoot(
             rootDir: File,
             extensions: List<String>,
             scanSubdirectories: Boolean,
@@ -151,7 +265,9 @@ class FileOperationRepository
             maxAgeDays: Int?,
             excludePatterns: List<String>,
             maxDepth: Int,
+            orientation: FileOrientation?,
         ): List<FileEntry> {
+            val scanContext = currentCoroutineContext()
             val lowerExtensions =
                 extensions
                     .map {
@@ -177,6 +293,9 @@ class FileOperationRepository
                         .map { it to emptyList() }
                 }
             return sequence
+                // Cooperative cancellation: bail out between files as soon as the run is cancelled
+                // rather than running the (potentially slow) per-file orientation probe to completion.
+                .onEach { scanContext.ensureActive() }
                 .filter { (file, _) ->
                     val ext = ".${file.name.substringAfterLast('.').lowercase()}"
                     ext in lowerExtensions
@@ -188,6 +307,10 @@ class FileOperationRepository
                     if (minAgeMs == null && maxAgeMs == null) return@filter true
                     val ageMs = now - file.lastModified()
                     (minAgeMs == null || ageMs >= minAgeMs) && (maxAgeMs == null || ageMs <= maxAgeMs)
+                }.filter { (file, _) ->
+                    if (orientation == null) return@filter true
+                    val fileOrientation = getDiskFileOrientation(file)
+                    fileOrientation == orientation
                 }.map { (file, relativeParentSegments) ->
                     FileEntry(
                         uri = file.toUri(),
@@ -197,6 +320,98 @@ class FileOperationRepository
                         relativeParentSegments = relativeParentSegments,
                     )
                 }.toList()
+        }
+
+        private fun getDocumentFileOrientation(
+            context: Context,
+            docFile: DocumentFile,
+        ): FileOrientation? {
+            val ext = normalizeExtension(docFile.name.orEmpty().substringAfterLast('.', ""))
+            return when (ext) {
+                in IMAGE_EXTENSIONS -> imageOrientation { context.contentResolver.openInputStream(docFile.uri) }
+                in VIDEO_EXTENSIONS -> videoOrientation { it.setDataSource(context, docFile.uri) }
+                else -> null
+            }
+        }
+
+        private fun getDiskFileOrientation(file: File): FileOrientation? {
+            val ext = normalizeExtension(file.name.substringAfterLast('.', ""))
+            return when (ext) {
+                in IMAGE_EXTENSIONS -> imageOrientation { FileInputStream(file) }
+                in VIDEO_EXTENSIONS -> videoOrientation { it.setDataSource(file.absolutePath) }
+                else -> null
+            }
+        }
+
+        /**
+         * Resolves image orientation from a single stream where possible: AndroidX [ExifInterface] exposes both the
+         * rotation flag and (for formats that store them, e.g. JPEG/HEIF) the pixel dimensions in one pass. A second
+         * stream is only opened to decode the bounds when EXIF doesn't carry dimensions (PNG/WebP/…).
+         */
+        private fun imageOrientation(openStream: () -> InputStream?): FileOrientation? =
+            try {
+                var swapped = false
+                var width = 0
+                var height = 0
+                openStream()?.use { stream ->
+                    val exif = ExifInterface(stream)
+                    swapped = exif.isOrientationSwapped()
+                    width = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0)
+                    height = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0)
+                }
+                if (width <= 0 || height <= 0) {
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    openStream()?.use { BitmapFactory.decodeStream(it, null, options) }
+                    width = options.outWidth
+                    height = options.outHeight
+                }
+                orientationOf(width, height, swapped)
+            } catch (_: Exception) {
+                null
+            }
+
+        private fun videoOrientation(setDataSource: (MediaMetadataRetriever) -> Unit): FileOrientation? {
+            val retriever = MediaMetadataRetriever()
+            return try {
+                setDataSource(retriever)
+                val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+                val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+                val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+                orientationOf(width, height, rotation == 90 || rotation == 270)
+            } catch (_: Exception) {
+                null
+            } finally {
+                try {
+                    retriever.release()
+                } catch (_: Exception) {
+                }
+            }
+        }
+
+        private fun ExifInterface.isOrientationSwapped(): Boolean =
+            when (getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                ExifInterface.ORIENTATION_ROTATE_90,
+                ExifInterface.ORIENTATION_ROTATE_270,
+                ExifInterface.ORIENTATION_TRANSPOSE,
+                ExifInterface.ORIENTATION_TRANSVERSE,
+                -> true
+
+                else -> false
+            }
+
+        private fun orientationOf(
+            width: Int,
+            height: Int,
+            swapped: Boolean,
+        ): FileOrientation? {
+            if (width <= 0 || height <= 0) return null
+            val visualWidth = if (swapped) height else width
+            val visualHeight = if (swapped) width else height
+            return when {
+                visualWidth > visualHeight -> FileOrientation.LANDSCAPE
+                visualHeight > visualWidth -> FileOrientation.PORTRAIT
+                else -> null
+            }
         }
 
         private fun walkDiskFilesWithRelativeParents(

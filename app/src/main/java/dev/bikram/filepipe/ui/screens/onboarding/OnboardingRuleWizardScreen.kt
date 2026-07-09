@@ -6,12 +6,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -138,11 +142,13 @@ fun OnboardingRuleWizardScreen(
     }
 
     BoxWithConstraints(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .systemBarsPadding(),
+        modifier = Modifier.fillMaxSize(),
     ) {
+        // Edge-to-edge: reserve the system bars per scroll container (not on the whole screen) so
+        // in landscape the content scrolls *under* the bars with inset-sized clearance, instead of
+        // the title clipping under the status bar and the actions under the navigation bar.
+        val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val templateColumns = if (maxWidth >= 600.dp) 2 else 1
         if (maxHeight < 560.dp) {
             // Short screens (e.g. landscape): scroll the header, templates and actions together.
@@ -151,7 +157,13 @@ fun OnboardingRuleWizardScreen(
             LazyVerticalGrid(
                 columns = GridCells.Fixed(templateColumns),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 24.dp),
+                contentPadding =
+                    PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 16.dp + statusBarInset,
+                        bottom = 24.dp + navBarInset,
+                    ),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
@@ -180,7 +192,7 @@ fun OnboardingRuleWizardScreen(
             Column(
                 modifier = Modifier.fillMaxSize(),
             ) {
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(28.dp + statusBarInset))
                 header()
                 Spacer(Modifier.height(28.dp))
                 LazyVerticalGrid(
@@ -189,7 +201,7 @@ fun OnboardingRuleWizardScreen(
                         Modifier
                             .weight(1f)
                             .fillMaxWidth(),
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 120.dp + navBarInset),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -208,6 +220,7 @@ fun OnboardingRuleWizardScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
                         .padding(bottom = 40.dp),
             ) {
                 actionButtons()

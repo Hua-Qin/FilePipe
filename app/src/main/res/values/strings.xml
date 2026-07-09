@@ -911,6 +911,10 @@
     <string name="advanced_max_age_label">Max age (days)</string>
     <string name="advanced_exclude_patterns_label">Exclude patterns, comma separated</string>
     <string name="advanced_exclude_placeholder">e.g. .nomedia</string>
+    <string name="advanced_orientation_label">Orientation</string>
+    <string name="advanced_orientation_any">Any orientation</string>
+    <string name="advanced_orientation_portrait">Portrait</string>
+    <string name="advanced_orientation_landscape">Landscape</string>
 
     <!-- Folder bookmarks -->
     <string name="bookmark_toggle_cd">Toggle bookmark</string>

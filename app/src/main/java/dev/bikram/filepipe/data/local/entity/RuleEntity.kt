@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import dev.bikram.filepipe.domain.model.ConflictPolicy
+import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
@@ -48,6 +49,7 @@ data class RuleEntity(
     val maxAgeDays: Int? = null,
     @ColumnInfo(defaultValue = "[]")
     val excludePatterns: List<String> = emptyList(),
+    val orientation: String? = null,
 )
 
 fun RuleEntity.toDomain(): Rule =
@@ -90,6 +92,7 @@ fun RuleEntity.toDomain(): Rule =
         minAgeDays = minAgeDays,
         maxAgeDays = maxAgeDays,
         excludePatterns = excludePatterns,
+        orientation = orientation?.let { runCatching { FileOrientation.valueOf(it) }.getOrNull() },
     )
 
 fun Rule.toEntity(): RuleEntity =
@@ -134,4 +137,5 @@ fun Rule.toEntity(): RuleEntity =
         minAgeDays = minAgeDays,
         maxAgeDays = maxAgeDays,
         excludePatterns = excludePatterns,
+        orientation = orientation?.name,
     )

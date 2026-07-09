@@ -66,6 +66,13 @@ object DatabaseModule {
             }
         }
 
+    private val migration8To9 =
+        object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE rules ADD COLUMN orientation TEXT")
+            }
+        }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -74,7 +81,7 @@ object DatabaseModule {
         migrateLegacyDatabaseNameIfNeeded(context)
         return Room
             .databaseBuilder(context, AppDatabase::class.java, APP_DATABASE_NAME)
-            .addMigrations(migration2To3, migration5To6, migration6To7, migration7To8)
+            .addMigrations(migration2To3, migration5To6, migration6To7, migration7To8, migration8To9)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }

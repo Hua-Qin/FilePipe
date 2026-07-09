@@ -20,15 +20,18 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -241,6 +244,11 @@ fun OnboardingPermissionsScreen(
                 }
             val compactHeight = maxHeight < 560.dp
             val isLandscape = isLandscape()
+            // Landscape scrolls edge-to-edge like the templates screen: the columns carry the system
+            // bar insets as scroll *content* padding (not as reserved strips on the Row), so content
+            // clears the bars at rest but can still scroll under them.
+            val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+            val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
             CompositionLocalProvider(LocalDensity provides responsiveDensity) {
                 val isSmallLandscape = isLandscape && screenHeight < 480.dp
@@ -358,13 +366,14 @@ fun OnboardingPermissionsScreen(
 
                 Box(Modifier.fillMaxSize()) {
                     if (isLandscape) {
+                        // Fill the full width like Remember's two-column layout — no max-width cap,
+                        // which on wide landscape screens would centre the content and leave big
+                        // empty gutters on the left and right.
                         Row(
                             modifier =
                                 Modifier
-                                    .align(Alignment.Center)
-                                    .widthIn(max = 800.dp)
                                     .fillMaxSize()
-                                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                                    .padding(horizontal = 24.dp),
                             horizontalArrangement = Arrangement.spacedBy(24.dp),
                         ) {
                             // Left column
@@ -372,9 +381,9 @@ fun OnboardingPermissionsScreen(
                                 modifier =
                                     Modifier
                                         .weight(1f)
-                                        .fillMaxHeight()
                                         .verticalScroll(rememberScrollState())
-                                        .heightIn(min = screenHeight - 24.dp),
+                                        .heightIn(min = screenHeight)
+                                        .padding(top = statusBarInset, bottom = navBarInset),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center,
                             ) {
@@ -400,16 +409,18 @@ fun OnboardingPermissionsScreen(
                                 ChangeAnytimeFooter()
                             }
 
-                            // Right column
+                            // Right column — mirrors Remember's permissions right column: content
+                            // fills the column width (no cap) and is vertically centered. Reserving
+                            // the system bars is FilePipe-specific — Remember's content is short
+                            // enough not to need it.
                             Column(
                                 modifier =
                                     Modifier
                                         .weight(1.2f)
-                                        .fillMaxHeight()
                                         .verticalScroll(rememberScrollState())
-                                        .heightIn(min = screenHeight - 24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center,
+                                        .heightIn(min = screenHeight)
+                                        .padding(top = statusBarInset, bottom = navBarInset),
+                                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
                             ) {
                                 if (selected == FolderAccessMode.SAF_ONLY) {
                                     SelectiveAccessPitch(

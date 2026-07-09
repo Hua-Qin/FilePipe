@@ -44,6 +44,7 @@ data class Rule(
     val minAgeDays: Int? = null,
     val maxAgeDays: Int? = null,
     val excludePatterns: List<String> = emptyList(),
+    val orientation: FileOrientation? = null,
 )
 
 enum class ScheduleType { DAILY, WEEKLY, EVERY_N_HOURS }
@@ -262,5 +263,25 @@ data class RunProgress(
     companion object {
         /** Matches [ExecuteRulesUseCase] cancellation path; distinguishes success terminal from stopped mid-run. */
         const val ERROR_CANCELLED: String = "Cancelled"
+    }
+}
+
+enum class FileOrientation {
+    PORTRAIT,
+    LANDSCAPE,
+}
+
+/** Canonical image/video extensions (no leading dot, lowercase). Single source of truth for orientation support. */
+val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "gif", "heic", "webp", "bmp", "tiff", "heif")
+val VIDEO_EXTENSIONS = setOf("mp4", "mov", "mkv", "avi", "webm", "3gp", "ts", "m4v")
+
+/** Normalizes an extension token (with or without a leading dot, any case) to its bare lowercase suffix. */
+fun normalizeExtension(ext: String): String = ext.trim().removePrefix(".").lowercase()
+
+fun appliesToImageAndVideoOnly(fileExtensions: List<String>): Boolean {
+    if (fileExtensions.isEmpty()) return false
+    return fileExtensions.all { ext ->
+        val clean = normalizeExtension(ext)
+        clean in IMAGE_EXTENSIONS || clean in VIDEO_EXTENSIONS
     }
 }

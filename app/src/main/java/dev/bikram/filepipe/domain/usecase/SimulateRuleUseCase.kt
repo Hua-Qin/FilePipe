@@ -32,6 +32,7 @@ class SimulateRuleUseCase
                         maxAgeDays = rule.maxAgeDays,
                         excludePatterns = rule.excludePatterns,
                         filesystemAccessEnabled = filesystemAccessEnabled,
+                        orientation = rule.orientation,
                     )
                 }
 
