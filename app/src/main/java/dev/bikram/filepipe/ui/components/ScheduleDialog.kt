@@ -4,14 +4,17 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -35,6 +38,7 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -49,6 +53,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -59,6 +64,13 @@ import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.theme.compactControlShape
 import java.util.Calendar
+
+private const val TIME_PICKER_MIN_DENSITY_SCALE = 0.74f
+private val TIME_PICKER_HEIGHT = 420.dp
+private val TIME_PICKER_ACTION_AREA_HEIGHT = 92.dp
+private val TIME_PICKER_LANDSCAPE_ACTION_WIDTH = 144.dp
+private val TIME_PICKER_LANDSCAPE_ACTION_GAP = 8.dp
+private val TIME_PICKER_DIALOG_MARGIN = 8.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -441,96 +453,259 @@ private fun ScheduleTimePickerDialog(
 ) {
     var showDial by remember { mutableStateOf(true) }
 
+    // Capture the app-capped density BEFORE opening the Dialog. A Dialog opens its own window
+    // that resets LocalDensity to the raw OS density/fontScale, so reading it inside would
+    // bypass the app-wide font cap and size the picker off the uncapped OS font. Kept in parity
+    // with Remember's ReminderTimePickerDialog.
+    val baseDensity = LocalDensity.current
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
-        key(initialHour, initialMinute) {
-            val pickerContext = androidx.compose.ui.platform.LocalContext.current
-            val timePickerState =
-                rememberTimePickerState(
-                    initialHour = initialHour,
-                    initialMinute = initialMinute,
-                    is24Hour =
-                        android.text.format.DateFormat
-                            .is24HourFormat(pickerContext),
-                )
-            Surface(
-                shape = MaterialTheme.shapes.extraLarge,
-                tonalElevation = 6.dp,
-                modifier =
-                    Modifier
-                        .widthIn(max = 560.dp)
-                        .padding(16.dp),
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = stringResource(R.string.schedule_time_picker_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
+        BoxWithConstraints(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = null,
+                        indication = null,
+                        onClick = onDismiss,
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            val landscape = maxWidth > maxHeight
+            val dialogMaxHeight = (maxHeight - TIME_PICKER_DIALOG_MARGIN * 2).coerceAtLeast(0.dp)
+            val requiredTimeHeight =
+                if (landscape) {
+                    TIME_PICKER_HEIGHT
+                } else {
+                    TIME_PICKER_HEIGHT + TIME_PICKER_ACTION_AREA_HEIGHT
+                }
+            val availableTimeHeight =
+                if (landscape) {
+                    dialogMaxHeight
+                } else {
+                    dialogMaxHeight - TIME_PICKER_ACTION_AREA_HEIGHT
+                }
+            val pickerDensityScale =
+                if (dialogMaxHeight < requiredTimeHeight) {
+                    (availableTimeHeight / TIME_PICKER_HEIGHT)
+                        .coerceIn(TIME_PICKER_MIN_DENSITY_SCALE, 1f)
+                } else {
+                    1f
+                }
+            val pickerDensity =
+                remember(baseDensity, pickerDensityScale) {
+                    Density(
+                        density = baseDensity.density * pickerDensityScale,
+                        // When compact (short landscape), cap font so the fixed-size picker fits;
+                        // otherwise use the full app font scale so picker text stays close to the
+                        // rest of the app instead of rendering conspicuously tiny. Kept in parity
+                        // with Remember's ReminderTimePickerDialog.
+                        fontScale =
+                            if (pickerDensityScale < 1f) {
+                                baseDensity.fontScale.coerceAtMost(0.90f)
+                            } else {
+                                baseDensity.fontScale
+                            },
                     )
-                    if (showDial) {
-                        TimePicker(state = timePickerState)
-                    } else {
-                        TimeInput(state = timePickerState)
-                    }
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        TooltipBox(
-                            positionProvider =
-                                TooltipDefaults.rememberTooltipPositionProvider(
-                                    TooltipAnchorPosition.Above,
-                                ),
-                            tooltip = {
-                                PlainTooltip {
-                                    CenteredTooltipText(
-                                        text =
-                                            if (showDial) {
-                                                stringResource(R.string.schedule_time_input_mode_cd)
-                                            } else {
-                                                stringResource(R.string.schedule_time_dial_mode_cd)
-                                            },
-                                    )
-                                }
-                            },
-                            state = rememberTooltipState(),
-                        ) {
-                            FilePipeIconButton(
-                                onClick = { showDial = !showDial },
+                }
+            key(initialHour, initialMinute) {
+                val pickerContext = androidx.compose.ui.platform.LocalContext.current
+                val timePickerState =
+                    rememberTimePickerState(
+                        initialHour = initialHour,
+                        initialMinute = initialMinute,
+                        is24Hour =
+                            android.text.format.DateFormat
+                                .is24HourFormat(pickerContext),
+                    )
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    tonalElevation = 6.dp,
+                    modifier =
+                        Modifier
+                            .padding(TIME_PICKER_DIALOG_MARGIN)
+                            .widthIn(max = if (landscape) 640.dp else 432.dp)
+                            .fillMaxWidth()
+                            .heightIn(max = dialogMaxHeight)
+                            .clickable(
+                                interactionSource = null,
+                                indication = null,
+                                onClick = {},
+                            ),
+                ) {
+                    // Ambient app-capped density for title/actions; only the dial is wrapped in the
+                    // compact pickerDensity so it fits. Keeps the action buttons at a readable
+                    // app-scale size instead of shrinking them with the dial. Kept in parity with
+                    // Remember's ReminderTimePickerDialog (which additionally drops the title text).
+                    CompositionLocalProvider(LocalDensity provides baseDensity) {
+                        if (landscape) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                FilePipeMaterialRoundedSymbol(
-                                    name = if (showDial) "keyboard" else "schedule",
-                                    contentDescription =
-                                        if (showDial) {
-                                            stringResource(R.string.schedule_time_input_mode_cd)
-                                        } else {
-                                            stringResource(R.string.schedule_time_dial_mode_cd)
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.schedule_time_picker_title),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(bottom = 12.dp),
+                                    )
+                                    Box(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        CompositionLocalProvider(LocalDensity provides pickerDensity) {
+                                            if (showDial) {
+                                                TimePicker(state = timePickerState)
+                                            } else {
+                                                TimeInput(state = timePickerState)
+                                            }
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.width(TIME_PICKER_LANDSCAPE_ACTION_GAP))
+                                Column(
+                                    modifier = Modifier.width(TIME_PICKER_LANDSCAPE_ACTION_WIDTH),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                                ) {
+                                    TooltipBox(
+                                        positionProvider =
+                                            TooltipDefaults.rememberTooltipPositionProvider(
+                                                TooltipAnchorPosition.Above,
+                                            ),
+                                        tooltip = {
+                                            PlainTooltip {
+                                                CenteredTooltipText(
+                                                    text =
+                                                        if (showDial) {
+                                                            stringResource(R.string.schedule_time_input_mode_cd)
+                                                        } else {
+                                                            stringResource(R.string.schedule_time_dial_mode_cd)
+                                                        },
+                                                )
+                                            }
                                         },
-                                )
+                                        state = rememberTooltipState(),
+                                    ) {
+                                        FilePipeIconButton(
+                                            onClick = { showDial = !showDial },
+                                        ) {
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = if (showDial) "keyboard" else "schedule",
+                                                contentDescription =
+                                                    if (showDial) {
+                                                        stringResource(R.string.schedule_time_input_mode_cd)
+                                                    } else {
+                                                        stringResource(R.string.schedule_time_dial_mode_cd)
+                                                    },
+                                            )
+                                        }
+                                    }
+                                    FilePipeTextButton(
+                                        onClick = onDismiss,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(stringResource(R.string.cancel))
+                                    }
+                                    FilePipeTextButton(
+                                        onClick = {
+                                            onConfirm(timePickerState.hour, timePickerState.minute)
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(stringResource(R.string.save))
+                                    }
+                                }
                             }
-                        }
-                        Spacer(Modifier.weight(1f))
-                        FilePipeTextButton(onClick = onDismiss) {
-                            Text(stringResource(R.string.cancel))
-                        }
-                        FilePipeTextButton(
-                            onClick = {
-                                onConfirm(timePickerState.hour, timePickerState.minute)
-                            },
-                        ) {
-                            Text(stringResource(R.string.save))
+                        } else {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.schedule_time_picker_title),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(bottom = 12.dp),
+                                )
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .weight(1f, fill = false)
+                                            .fillMaxWidth(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CompositionLocalProvider(LocalDensity provides pickerDensity) {
+                                        if (showDial) {
+                                            TimePicker(state = timePickerState)
+                                        } else {
+                                            TimeInput(state = timePickerState)
+                                        }
+                                    }
+                                }
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    TooltipBox(
+                                        positionProvider =
+                                            TooltipDefaults.rememberTooltipPositionProvider(
+                                                TooltipAnchorPosition.Above,
+                                            ),
+                                        tooltip = {
+                                            PlainTooltip {
+                                                CenteredTooltipText(
+                                                    text =
+                                                        if (showDial) {
+                                                            stringResource(R.string.schedule_time_input_mode_cd)
+                                                        } else {
+                                                            stringResource(R.string.schedule_time_dial_mode_cd)
+                                                        },
+                                                )
+                                            }
+                                        },
+                                        state = rememberTooltipState(),
+                                    ) {
+                                        FilePipeIconButton(
+                                            onClick = { showDial = !showDial },
+                                        ) {
+                                            FilePipeMaterialRoundedSymbol(
+                                                name = if (showDial) "keyboard" else "schedule",
+                                                contentDescription =
+                                                    if (showDial) {
+                                                        stringResource(R.string.schedule_time_input_mode_cd)
+                                                    } else {
+                                                        stringResource(R.string.schedule_time_dial_mode_cd)
+                                                    },
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.weight(1f))
+                                    FilePipeTextButton(onClick = onDismiss) {
+                                        Text(stringResource(R.string.cancel))
+                                    }
+                                    FilePipeTextButton(
+                                        onClick = {
+                                            onConfirm(timePickerState.hour, timePickerState.minute)
+                                        },
+                                    ) {
+                                        Text(stringResource(R.string.save))
+                                    }
+                                }
+                            }
                         }
                     }
                 }

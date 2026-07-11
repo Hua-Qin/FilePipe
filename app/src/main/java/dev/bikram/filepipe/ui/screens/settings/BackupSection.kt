@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -22,12 +23,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
+import dev.bikram.filepipe.ui.common.ResponsiveActionLayout
+import dev.bikram.filepipe.ui.common.responsiveActionLayout
+import dev.bikram.filepipe.ui.components.FilePipeActionLabel
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
@@ -151,33 +156,72 @@ internal fun BackupSection(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    FilePipeOutlinedButton(
-                        onClick = onLaunchImportMerge,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.settings_import_rules))
-                    }
-                    FilePipeOutlinedButton(
-                        onClick = {
-                            if (exportFolderReady) {
-                                onExportNow()
-                            } else {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = resources.getString(R.string.settings_export_select_folder_first),
-                                        duration = SnackbarDuration.Short,
-                                    )
-                                }
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val stacked =
+                        responsiveActionLayout(
+                            availableWidth = maxWidth,
+                            effectiveFontScale = LocalDensity.current.fontScale,
+                            itemCount = 2,
+                        ) == ResponsiveActionLayout.STACKED
+                    if (stacked) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FilePipeOutlinedButton(
+                                onClick = onLaunchImportMerge,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                FilePipeActionLabel(stringResource(R.string.settings_import_rules))
                             }
-                        },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.settings_export_now))
+                            FilePipeOutlinedButton(
+                                onClick = {
+                                    if (exportFolderReady) {
+                                        onExportNow()
+                                    } else {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = resources.getString(R.string.settings_export_select_folder_first),
+                                                duration = SnackbarDuration.Short,
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                FilePipeActionLabel(stringResource(R.string.settings_export_now))
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            FilePipeOutlinedButton(
+                                onClick = onLaunchImportMerge,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                FilePipeActionLabel(stringResource(R.string.settings_import_rules))
+                            }
+                            FilePipeOutlinedButton(
+                                onClick = {
+                                    if (exportFolderReady) {
+                                        onExportNow()
+                                    } else {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = resources.getString(R.string.settings_export_select_folder_first),
+                                                duration = SnackbarDuration.Short,
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                FilePipeActionLabel(stringResource(R.string.settings_export_now))
+                            }
+                        }
                     }
                 }
                 val restoreOutline = MaterialTheme.colorScheme.error.copy(alpha = 0.45f)

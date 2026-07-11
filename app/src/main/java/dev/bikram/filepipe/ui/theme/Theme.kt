@@ -39,19 +39,28 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 import com.materialkolor.PaletteStyle
+import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
+import dev.bikram.filepipe.ui.common.responsiveTextScaleForWidth
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.LocalTapSound
 
 private const val MAX_APP_DISPLAY_SCALE = 1.15f
-private const val MAX_APP_FONT_SCALE = 1.20f
+
+private val FilePipeColorSpecVersion = ColorSpec.SpecVersion.SPEC_2025
+
+// Modest cap so text on extreme OS font settings stays large enough to honor the user's
+// choice, but not so large that sheets/lists balloon far past the (necessarily shrunk)
+// date/time pickers. Kept in parity with Remember.
+private const val MAX_APP_FONT_SCALE = 1.10f
 
 private val LightColors =
     lightColorScheme(
@@ -246,11 +255,18 @@ fun FilePipeTheme(
     val context = LocalContext.current
     val baseDensity = LocalDensity.current
     val stableDensity = DisplayMetrics.DENSITY_DEVICE_STABLE.toFloat() / DisplayMetrics.DENSITY_DEFAULT
+    val responsiveTextScale =
+        with(baseDensity) {
+            responsiveTextScaleForWidth(
+                LocalWindowInfo.current.containerSize.width
+                    .toDp(),
+            )
+        }
     val appDensity =
-        remember(baseDensity.density, baseDensity.fontScale, stableDensity) {
+        remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale, stableDensity) {
             Density(
                 density = baseDensity.density.coerceAtMost(stableDensity * MAX_APP_DISPLAY_SCALE),
-                fontScale = baseDensity.fontScale.coerceAtMost(MAX_APP_FONT_SCALE),
+                fontScale = (baseDensity.fontScale * responsiveTextScale).coerceAtMost(MAX_APP_FONT_SCALE),
             )
         }
     val systemDark = isSystemInDarkTheme()
@@ -305,6 +321,7 @@ fun FilePipeTheme(
                     tertiary = tripletOverrides?.tertiary,
                     style = themePaletteStyle.toLib(),
                     isAmoled = black,
+                    specVersion = FilePipeColorSpecVersion,
                 )
             }
 
@@ -314,6 +331,7 @@ fun FilePipeTheme(
                     isDark = darkTheme,
                     style = themePaletteStyle.toLib(),
                     isAmoled = black,
+                    specVersion = FilePipeColorSpecVersion,
                 )
             }
 

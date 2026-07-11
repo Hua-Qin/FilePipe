@@ -176,7 +176,7 @@ extensions.configure<ApplicationExtension>("android") {
     }
 
     androidResources {
-        ignoreAssetsPattern = "IconKitchen.zip"
+        localeFilters += setOf("en")
     }
 
     lint {

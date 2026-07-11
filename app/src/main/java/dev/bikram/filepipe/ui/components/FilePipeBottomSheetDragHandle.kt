@@ -14,12 +14,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun FilePipeBottomSheetDragHandle(modifier: Modifier = Modifier) {
+fun FilePipeBottomSheetDragHandle(
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
     Box(
         modifier =
             modifier
                 .fillMaxWidth()
-                .padding(top = 14.dp, bottom = 12.dp),
+                .padding(
+                    top = if (compact) 6.dp else 14.dp,
+                    bottom = if (compact) 4.dp else 12.dp,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         Box(

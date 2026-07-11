@@ -55,6 +55,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.ui.common.isSmallLandscape
@@ -80,6 +84,46 @@ fun rememberResponsiveActionButtonSize(
             else -> defaultSize
         }
     return targetSize
+}
+
+@Composable
+fun rememberResponsiveActionIconSize(
+    defaultSize: Dp = 20.dp,
+    compactSize: Dp = 17.dp,
+    ultraCompactSize: Dp = 15.dp,
+): Dp {
+    val screenWidth =
+        with(LocalDensity.current) {
+            LocalWindowInfo.current.containerSize.width
+                .toDp()
+        }
+    val targetSize =
+        when {
+            screenWidth < 360.dp -> ultraCompactSize
+            screenWidth < 430.dp -> compactSize
+            else -> defaultSize
+        }
+    return targetSize
+}
+
+@Composable
+fun FilePipeActionLabel(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = androidx.compose.material3.LocalTextStyle.current,
+    fontWeight: FontWeight? = null,
+    textAlign: TextAlign? = null,
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        style = style,
+        fontWeight = fontWeight,
+        textAlign = textAlign,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable
