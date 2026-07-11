@@ -17,11 +17,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -73,6 +75,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -131,6 +134,7 @@ fun OnboardingPermissionsScreen(
     var showAccessNotGrantedHint by remember { mutableStateOf(false) }
     var hasEnteredAllFilesGrantFlow by remember { mutableStateOf(false) }
     var didAutoAdvanceFromGrant by remember { mutableStateOf(false) }
+    var bottomActionsHeight by remember { mutableStateOf(OnboardingPermissionsBottomOverlayClearance) }
 
     val scheme = MaterialTheme.colorScheme
     val context = LocalContext.current
@@ -310,6 +314,10 @@ fun OnboardingPermissionsScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
+                            if (!isLandscape) {
+                                ChangeAnytimeFooter()
+                                Spacer(Modifier.height(16.dp))
+                            }
                             if (selected == FolderAccessMode.SAF_ONLY) {
                                 val selectiveActionColor = MaterialTheme.colorScheme.surfaceContainerHighest
                                 PrimaryPermissionActionButton(
@@ -355,10 +363,6 @@ fun OnboardingPermissionsScreen(
                                     label = allFilesButtonLabel,
                                     compact = isSmallLandscape,
                                 )
-                            }
-                            if (!isLandscape) {
-                                Spacer(Modifier.height(16.dp))
-                                ChangeAnytimeFooter()
                             }
                         }
                     }
@@ -488,7 +492,7 @@ fun OnboardingPermissionsScreen(
                                 Spacer(Modifier.statusBarsPadding())
                                 scrollContent()
                                 if (!hideBottomPrimaryButton) {
-                                    Spacer(Modifier.height(OnboardingPermissionsBottomOverlayClearance))
+                                    Spacer(Modifier.height(bottomActionsHeight + 24.dp))
                                 }
                             }
                             if (!hideBottomPrimaryButton) {
@@ -496,7 +500,9 @@ fun OnboardingPermissionsScreen(
                                     modifier =
                                         Modifier
                                             .align(Alignment.BottomCenter)
-                                            .navigationBarsPadding()
+                                            .onGloballyPositioned { coordinates ->
+                                                bottomActionsHeight = with(responsiveDensity) { coordinates.size.height.toDp() }
+                                            }.navigationBarsPadding()
                                             .padding(bottom = 24.dp),
                                 ) {
                                     bottomActionsCluster()
@@ -529,7 +535,7 @@ fun OnboardingPermissionsScreen(
                                 Spacer(Modifier.statusBarsPadding())
                                 scrollContent()
                                 if (!hideBottomPrimaryButton) {
-                                    Spacer(Modifier.height(OnboardingPermissionsBottomOverlayClearance))
+                                    Spacer(Modifier.height(bottomActionsHeight + 24.dp))
                                 }
                             }
                             if (!hideBottomPrimaryButton) {
@@ -537,7 +543,9 @@ fun OnboardingPermissionsScreen(
                                     modifier =
                                         Modifier
                                             .align(Alignment.BottomCenter)
-                                            .navigationBarsPadding()
+                                            .onGloballyPositioned { coordinates ->
+                                                bottomActionsHeight = with(responsiveDensity) { coordinates.size.height.toDp() }
+                                            }.navigationBarsPadding()
                                             .padding(bottom = 40.dp),
                                 ) {
                                     bottomActionsCluster()
@@ -679,6 +687,7 @@ private fun AccessModeSwitcher(
             modifier =
                 Modifier
                     .fillMaxWidth()
+                    .height(IntrinsicSize.Min)
                     .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
             overflowIndicator = { menuState ->
@@ -693,7 +702,8 @@ private fun AccessModeSwitcher(
                         modifier =
                             Modifier
                                 .weight(1f)
-                                .height(54.dp)
+                                .fillMaxHeight()
+                                .heightIn(min = 54.dp)
                                 .semantics { role = Role.RadioButton },
                         shapes = ButtonGroupDefaults.connectedLeadingButtonShapes(),
                         colors =
@@ -740,7 +750,8 @@ private fun AccessModeSwitcher(
                         modifier =
                             Modifier
                                 .weight(1f)
-                                .height(54.dp)
+                                .fillMaxHeight()
+                                .heightIn(min = 54.dp)
                                 .semantics { role = Role.RadioButton },
                         shapes = ButtonGroupDefaults.connectedTrailingButtonShapes(),
                         colors =
@@ -796,7 +807,7 @@ private fun PrimaryPermissionActionButton(
     val verticalPadding = if (compact) 10.dp else 16.dp
     FilePipeButton(
         onClick = onClick,
-        modifier = modifier.height(height),
+        modifier = modifier.heightIn(min = height),
         shape = pillShape,
         colors = colors,
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = verticalPadding),

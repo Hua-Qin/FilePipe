@@ -22,6 +22,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -107,6 +109,7 @@ fun AppBottomSheet(
             val bodyModifier =
                 Modifier
                     .fillMaxWidth()
+                    .let { if (scrollable) it.weight(1f, fill = false) else it }
                     .padding(contentPadding)
                     .let { modifier ->
                         if (scrollable) {
@@ -130,4 +133,29 @@ fun AppBottomSheet(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun rememberBottomSheetStateWithUnsavedChanges(
+    isDirty: Boolean,
+    onShowDialog: () -> Unit,
+): SheetState {
+    val currentIsDirty = rememberUpdatedState(isDirty)
+    val currentOnShowDialog = rememberUpdatedState(onShowDialog)
+    return rememberBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        confirmValueChange =
+            remember {
+                { sheetValue ->
+                    if (sheetValue == SheetValue.Hidden && currentIsDirty.value) {
+                        currentOnShowDialog.value()
+                        false
+                    } else {
+                        true
+                    }
+                }
+            },
+    )
 }

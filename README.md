@@ -11,10 +11,8 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 ## 📦 Downloads
 
 [<img src="docs/assets/badge_playstore.png" alt="Get FilePipe on Play Store" height="80">](https://play.google.com/store/apps/details?id=dev.bikram.filepipe)
-[<img src="docs/assets/badge_github.png" alt="Get FilePipe on GitHub" height="80">](https://github.com/bikram-agarwal/FilePipe/releases/latest)
-<!-- Coming soon. Placeholder code.
 [<img src="docs/assets/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.filepipe.gh)
--->
+[<img src="docs/assets/badge_github.png" alt="Get FilePipe on GitHub" height="80">](https://github.com/bikram-agarwal/FilePipe/releases/latest)
 
 ## 🛠️ How to use
 
@@ -136,13 +134,13 @@ However, the application names "Remember", "FilePipe", and "ObtainX", along with
 <table>
   <tr>
     <td width="50%" align="center">
-      <a href="https://bikram-agarwal.github.io/remember/">
+      <a href="https://github.com/bikram-agarwal/Remember">
         <img src="docs/assets/feature_remember.jpg" alt="Remember feature graphic" width="100%">
       <b>Remember</b></a>
       <p>Notes, tasks, and reminders that keep coming back until they are done.</p>
     </td>
     <td width="50%" align="center">
-      <a href="https://bikram-agarwal.github.io/obtainx/">
+      <a href="https://github.com/bikram-agarwal/ObtainX">
         <img src="docs/assets/feature_obtainx.jpg" alt="ObtainX feature graphic" width="100%">
       <b>ObtainX</b></a>
       <p>A supercharged Obtainium: get Android app updates straight from the source.</p>

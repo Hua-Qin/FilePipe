@@ -50,8 +50,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.ButtonGroup
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -70,6 +68,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -1443,50 +1442,36 @@ fun RuleDetailScreen(
                                     OperationMode.COPY -> stringResource(R.string.operation_copy)
                                 }
                             }
-                        val operationShapes =
-                            operationModes.mapIndexed { index, _ ->
-                                when (index) {
-                                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                                    operationModes.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                                }
-                            }
-                        ButtonGroup(
+                        val toggleColors =
+                            ToggleButtonDefaults.toggleButtonColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                contentColor = MaterialTheme.colorScheme.onSurface,
+                                checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            )
+                        FlowRow(
                             modifier = Modifier.fillMaxWidth(),
-                            overflowIndicator = { menuState ->
-                                ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
-                            },
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            operationModes.forEachIndexed { index, mode ->
-                                val label = operationLabels[index]
-                                customItem(
-                                    buttonGroupContent = {
-                                        FilePipeToggleButton(
-                                            checked = state.operationMode == mode,
-                                            onCheckedChange = { checked -> if (checked) viewModel.setOperationMode(mode) },
-                                            enabled = !isReadOnly,
-                                            shapes = operationShapes[index],
-                                            modifier = Modifier.weight(1f),
-                                        ) {
-                                            Text(label)
-                                        }
-                                    },
-                                    menuContent = { menuState ->
-                                        FilePipeDropdownMenuItem(
-                                            text = { Text(label) },
-                                            onClick = {
-                                                if (!isReadOnly) {
-                                                    viewModel.setOperationMode(mode)
-                                                    menuState.dismiss()
-                                                }
-                                            },
-                                        )
-                                    },
-                                )
+                            operationModes.forEach { mode ->
+                                val label = operationLabels[operationModes.indexOf(mode)]
+                                FilePipeToggleButton(
+                                    checked = state.operationMode == mode,
+                                    onCheckedChange = { checked -> if (checked) viewModel.setOperationMode(mode) },
+                                    enabled = !isReadOnly,
+                                    colors = toggleColors,
+                                    modifier =
+                                        Modifier
+                                            .widthIn(min = 100.dp)
+                                            .weight(1f),
+                                ) {
+                                    Text(label)
+                                }
                             }
                         }
 
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(12.dp))
 
                         Text(
                             text = stringResource(R.string.rule_conflict_policy_label),
@@ -1501,46 +1486,25 @@ fun RuleDetailScreen(
                                     ConflictPolicy.RENAME_SUFFIX -> stringResource(R.string.conflict_rename)
                                 }
                             }
-                        val conflictShapes =
-                            conflictPolicies.mapIndexed { index, _ ->
-                                when (index) {
-                                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                                    conflictPolicies.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                                }
-                            }
-                        ButtonGroup(
+                        FlowRow(
                             modifier = Modifier.fillMaxWidth(),
-                            overflowIndicator = { menuState ->
-                                ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
-                            },
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            conflictPolicies.forEachIndexed { index, policy ->
-                                val label = conflictLabels[index]
-                                customItem(
-                                    buttonGroupContent = {
-                                        FilePipeToggleButton(
-                                            checked = state.conflictPolicy == policy,
-                                            onCheckedChange = { checked -> if (checked) viewModel.setConflictPolicy(policy) },
-                                            enabled = !isReadOnly,
-                                            shapes = conflictShapes[index],
-                                            modifier = Modifier.weight(1f),
-                                        ) {
-                                            Text(label)
-                                        }
-                                    },
-                                    menuContent = { menuState ->
-                                        FilePipeDropdownMenuItem(
-                                            text = { Text(label) },
-                                            onClick = {
-                                                if (!isReadOnly) {
-                                                    viewModel.setConflictPolicy(policy)
-                                                    menuState.dismiss()
-                                                }
-                                            },
-                                        )
-                                    },
-                                )
+                            conflictPolicies.forEach { policy ->
+                                val label = conflictLabels[conflictPolicies.indexOf(policy)]
+                                FilePipeToggleButton(
+                                    checked = state.conflictPolicy == policy,
+                                    onCheckedChange = { checked -> if (checked) viewModel.setConflictPolicy(policy) },
+                                    enabled = !isReadOnly,
+                                    colors = toggleColors,
+                                    modifier =
+                                        Modifier
+                                            .widthIn(min = 100.dp)
+                                            .weight(1f),
+                                ) {
+                                    Text(label)
+                                }
                             }
                         }
                     }

@@ -51,7 +51,7 @@ import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.LocalTapSound
 
 private const val MAX_APP_DISPLAY_SCALE = 1.15f
-private const val MAX_APP_FONT_SCALE = 1.3f
+private const val MAX_APP_FONT_SCALE = 1.20f
 
 private val LightColors =
     lightColorScheme(

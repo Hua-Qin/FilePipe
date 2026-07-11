@@ -1,7 +1,7 @@
 [versions]
 # BOM material3 is older; this line tracks the expressive build used by the app (override BOM for this artifact).
 activityCompose = "1.13.0"
-agp = "9.4.0-alpha03"
+agp = "9.4.0-alpha04"
 appcompat = "1.7.1"
 composeBom = "2026.06.01"
 composeMaterial3Adaptive = "1.2.0"
@@ -19,7 +19,7 @@ java = "21"
 junit = "4.13.2"
 kotlin = "2.4.20-Beta1"
 kotlinLogging = "8.0.4"
-ksp = "2.3.9"
+ksp = "2.3.10"
 ktlint = "1.8.0"
 ktlintGradle = "14.2.0"
 lifecycle = "2.11.0"

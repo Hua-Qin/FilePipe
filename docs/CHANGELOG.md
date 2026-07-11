@@ -1,3 +1,11 @@
+## v3.9.0
+
+### 📦 Misc
+
+- Few UI consistency and responsiveness tweaks
+
+---
+
 ## v3.8.9 Filter by orientation
 
 ### ✨ New Features
