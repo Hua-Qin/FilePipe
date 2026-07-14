@@ -1,8 +1,9 @@
-## v3.9.0
+## v3.9.1
 
-### 📦 Misc
-
-- Few UI consistency and responsiveness tweaks
+### 🛠 Improved Features
+- Undo operations now show live progress bar, and continue safely if you leave the History detail screen.
+- Tapping Undo on a scheduled-run notification now opens the matching History entry and automatically starts the undo operation, so progress and results remain visible.
+- Layouts now adapt more gracefully to narrow screens, landscape orientation, and larger text.
 
 ---
 

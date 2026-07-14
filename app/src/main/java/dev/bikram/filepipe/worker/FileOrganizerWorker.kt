@@ -1,9 +1,7 @@
 package dev.bikram.filepipe.worker
 
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.content.pm.ServiceInfo
 import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
@@ -20,7 +18,6 @@ import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunProgress
 import dev.bikram.filepipe.domain.model.TriggerType
 import dev.bikram.filepipe.domain.usecase.ExecuteRulesUseCase
-import dev.bikram.filepipe.receiver.NotificationActionReceiver
 import kotlinx.coroutines.CancellationException
 import kotlin.math.abs
 import kotlin.math.min
@@ -201,21 +198,11 @@ class FileOrganizerWorker
             builder.setContentIntent(openRunHistoryDetailPendingIntent(appContext, historyId))
 
             if (moved > 0) {
-                val undoIntent =
-                    Intent(appContext, NotificationActionReceiver::class.java).apply {
-                        action = NotificationActionReceiver.ACTION_UNDO_RUN
-                        putExtra(NotificationActionReceiver.EXTRA_HISTORY_ID, historyId)
-                        putExtra(
-                            NotificationActionReceiver.EXTRA_SUMMARY_NOTIFICATION_ID,
-                            summaryNotificationIdForWork,
-                        )
-                    }
                 val undoPendingIntent =
-                    PendingIntent.getBroadcast(
-                        appContext,
-                        historyId.toInt(),
-                        undoIntent,
-                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    openRunHistoryDetailPendingIntent(
+                        context = appContext,
+                        historyId = historyId,
+                        undoNotificationId = summaryNotificationIdForWork,
                     )
                 builder.addAction(0, appContext.getString(R.string.notification_action_undo), undoPendingIntent)
             }

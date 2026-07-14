@@ -13,6 +13,7 @@ import android.util.LruCache
 import android.util.Size
 import android.webkit.MimeTypeMap
 import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +38,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -90,6 +92,7 @@ import dev.bikram.filepipe.ui.theme.compactControlShape
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.gradientOverlayTopAppBarColors
 import dev.bikram.filepipe.ui.theme.pillShape
+import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -120,6 +123,9 @@ fun HistoryDetailScreen(
 ) {
     val history by viewModel.history.collectAsStateWithLifecycle()
     val files by viewModel.files.collectAsStateWithLifecycle()
+    val isUndoing by viewModel.isUndoing.collectAsStateWithLifecycle()
+    val undoProgress by viewModel.undoProgress.collectAsStateWithLifecycle()
+    val pendingHistoryUndoRequest by viewModel.pendingHistoryUndoRequest.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val listState = rememberLazyListState()
     val density = LocalDensity.current
@@ -141,6 +147,13 @@ fun HistoryDetailScreen(
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topListPadding = statusTop + 64.dp
+
+    LaunchedEffect(history?.id, pendingHistoryUndoRequest, isUndoing) {
+        val request = pendingHistoryUndoRequest ?: return@LaunchedEffect
+        if (history?.id == request.historyId && !isUndoing) {
+            viewModel.undoRunFromNotification(request)
+        }
+    }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(Unit) {
@@ -202,6 +215,8 @@ fun HistoryDetailScreen(
                         RunSummaryCard(
                             history = h,
                             onUndo = viewModel::undoRun,
+                            isUndoing = isUndoing,
+                            undoProgress = undoProgress,
                         )
                     }
                     if (files.isNotEmpty()) {
@@ -265,7 +280,14 @@ fun HistoryDetailScreen(
 private fun RunSummaryCard(
     history: RunHistory,
     onUndo: () -> Unit,
+    isUndoing: Boolean,
+    undoProgress: Float?,
 ) {
+    val animatedUndoProgress by animateFloatAsState(
+        targetValue = undoProgress ?: 0f,
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec()),
+        label = "undoProgress",
+    )
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         colors = elevatedCardColors(),
@@ -332,28 +354,40 @@ private fun RunSummaryCard(
                 Spacer(Modifier.height(8.dp))
                 FilePipeButton(
                     onClick = onUndo,
+                    enabled = !isUndoing,
                     modifier = Modifier.fillMaxWidth(),
                     shape = pillShape,
                     colors =
                         ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.secondaryContainer,
                             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                            disabledContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            disabledContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                         ),
                 ) {
-                    FilePipeMaterialRoundedSymbol(
-                        name = "undo",
-                        contentDescription = null,
-                        size = 20.dp,
-                        autoMirror = true,
-                    )
-                    Spacer(Modifier.size(6.dp))
-                    Text(
-                        pluralStringResource(
-                            R.plurals.history_detail_undo_files,
-                            history.totalFilesMoved,
-                            history.totalFilesMoved,
-                        ),
-                    )
+                    if (isUndoing) {
+                        LinearWavyProgressIndicator(
+                            progress = { animatedUndoProgress },
+                            modifier = Modifier.fillMaxWidth().height(8.dp),
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            trackColor = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.24f),
+                        )
+                    } else {
+                        FilePipeMaterialRoundedSymbol(
+                            name = "undo",
+                            contentDescription = null,
+                            size = 20.dp,
+                            autoMirror = true,
+                        )
+                        Spacer(Modifier.size(6.dp))
+                        Text(
+                            pluralStringResource(
+                                R.plurals.history_detail_undo_files,
+                                history.totalFilesMoved,
+                                history.totalFilesMoved,
+                            ),
+                        )
+                    }
                 }
             }
         }

@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.UriPermission
@@ -20,6 +19,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
@@ -29,11 +29,12 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.APP_DATABASE_NAME
 import dev.bikram.filepipe.AppDatabase
 import dev.bikram.filepipe.BuildConfig
-import dev.bikram.filepipe.MainActivity
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.local.dao.FileMovedDao
 import dev.bikram.filepipe.data.local.dao.RuleDao
 import dev.bikram.filepipe.data.local.dao.RunHistoryDao
+import dev.bikram.filepipe.data.local.entity.FileMovedEntity
+import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
@@ -45,8 +46,8 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RunStatus
+import dev.bikram.filepipe.domain.model.TriggerType
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
-import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.update.FILEPIPE_UPDATE_APK_CACHE_NAME
 import dev.bikram.filepipe.update.UpdateAvailableNotifier
 import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
@@ -56,6 +57,7 @@ import dev.bikram.filepipe.worker.LogPruneWorker
 import dev.bikram.filepipe.worker.RunNotificationChannels
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
 import dev.bikram.filepipe.worker.UpdateCheckWorker
+import dev.bikram.filepipe.worker.openRunHistoryDetailPendingIntent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
@@ -353,9 +355,23 @@ class DevOptionsViewModel
             viewModelScope.launch {
                 if (!notificationsAllowed()) return@launch
                 ensureFileOperationChannels()
-                val contentPendingIntent = openHistoryPendingIntent()
                 val ruleName = context.getString(R.string.dev_options_mock_file_operation_rule_name)
                 val largeFileName = context.getString(R.string.dev_options_mock_file_operation_large_file_name)
+                val startedAt = System.currentTimeMillis()
+                val historyId =
+                    withContext(ioDispatcher) {
+                        runHistoryDao.insertHistory(
+                            RunHistoryEntity(
+                                ruleId = null,
+                                ruleName = ruleName,
+                                triggeredBy = TriggerType.MANUAL,
+                                startedAt = startedAt,
+                                status = RunStatus.IN_PROGRESS,
+                                operationMode = OperationMode.MOVE,
+                            ),
+                        )
+                    }
+                val contentPendingIntent = openRunHistoryDetailPendingIntent(context, historyId)
                 for (progress in 0..100 step 10) {
                     val notification =
                         NotificationCompat
@@ -384,6 +400,33 @@ class DevOptionsViewModel
                         context.getString(R.string.dev_options_mock_file_operation_file_2),
                         context.getString(R.string.dev_options_mock_file_operation_file_3),
                     )
+                val completedAt = System.currentTimeMillis()
+                withContext(ioDispatcher) {
+                    appDatabase.withTransaction {
+                        val history = runHistoryDao.getHistoryById(historyId) ?: return@withTransaction
+                        runHistoryDao.updateHistory(
+                            history.copy(
+                                completedAt = completedAt,
+                                status = RunStatus.SUCCESS,
+                                totalFilesFound = movedFileNames.size,
+                                totalFilesMoved = movedFileNames.size,
+                            ),
+                        )
+                        fileMovedDao.insertFilesMoved(
+                            movedFileNames.mapIndexed { index, fileName ->
+                                FileMovedEntity(
+                                    runHistoryId = historyId,
+                                    fileName = fileName,
+                                    sourceUri = DevMockFileMove.sourceUri(fileName),
+                                    destinationUri = DevMockFileMove.destinationUri(fileName),
+                                    fileSizeBytes = DevMockFileMove.FILE_SIZE_BYTES,
+                                    movedAt = startedAt + ((completedAt - startedAt) * (index + 1) / movedFileNames.size),
+                                    success = true,
+                                )
+                            },
+                        )
+                    }
+                }
                 val body =
                     context.resources.getQuantityString(
                         R.plurals.history_files_moved,
@@ -406,7 +449,15 @@ class DevOptionsViewModel
                         .setStyle(style)
                         .setContentIntent(contentPendingIntent)
                         .setAutoCancel(true)
-                        .build()
+                        .addAction(
+                            0,
+                            context.getString(R.string.notification_action_undo),
+                            openRunHistoryDetailPendingIntent(
+                                context = context,
+                                historyId = historyId,
+                                undoNotificationId = MOCK_FILE_OPERATION_NOTIFICATION_ID,
+                            ),
+                        ).build()
                 NotificationManagerCompat.from(context).notify(MOCK_FILE_OPERATION_NOTIFICATION_ID, notification)
                 _events.emit(context.getString(R.string.dev_options_event_mock_file_operation_notification_requested))
             }
@@ -682,20 +733,6 @@ class DevOptionsViewModel
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
                 PackageManager.PERMISSION_GRANTED
 
-        private fun openHistoryPendingIntent(): PendingIntent {
-            val openIntent =
-                Intent(context, MainActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    putExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY, true)
-                }
-            return PendingIntent.getActivity(
-                context,
-                REQUEST_CODE_OPEN_HISTORY,
-                openIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-        }
-
         private fun ensureFileOperationChannels() {
             RunNotificationChannels.ensure(context)
         }
@@ -915,7 +952,6 @@ class DevOptionsViewModel
         companion object {
             private const val MOCK_FILE_OPERATION_PROGRESS_NOTIFICATION_ID = 71004
             private const val MOCK_FILE_OPERATION_NOTIFICATION_ID = 71003
-            private const val REQUEST_CODE_OPEN_HISTORY = 1003
             private const val DATABASE_NAME = APP_DATABASE_NAME
             private const val DEV_MOCK_GITHUB_ASSET_UPDATED_AT = "2000-01-01T00:00:00Z"
             private const val CONTENT_URI_PREFIX = "content://"

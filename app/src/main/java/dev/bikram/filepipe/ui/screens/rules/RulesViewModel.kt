@@ -670,7 +670,7 @@ class RulesViewModel
                                             )
                                     )
                                 }
-                                delay(450L)
+                                delay(DevMockFileMove.FILE_OPERATION_DELAY_MILLIS)
                             }
                             _progressMap.update { current ->
                                 current + (

@@ -66,14 +66,6 @@
         </provider>
 
         <receiver
-            android:name=".receiver.NotificationActionReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="${applicationId}.ACTION_UNDO_RUN" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
             android:name=".receiver.ScheduledRuleAlarmReceiver"
             android:exported="false" />
 

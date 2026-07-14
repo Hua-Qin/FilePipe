@@ -6,6 +6,7 @@ object DevMockFileMove {
     const val SOURCE_FOLDER_URI = "file:///storage/emulated/0/FilePipe Mock/Incoming"
     const val DESTINATION_FOLDER_URI = "file:///storage/emulated/0/FilePipe Mock/Organized"
     const val FILE_SIZE_BYTES = 104_857_600L
+    const val FILE_OPERATION_DELAY_MILLIS = 450L
 
     fun isMockRule(rule: Rule): Boolean =
         rule.sourceFolderPaths == listOf(SOURCE_FOLDER_URI) &&
@@ -14,7 +15,9 @@ object DevMockFileMove {
     fun isMockMovedFile(
         sourceUri: String,
         destinationUri: String,
-    ): Boolean = sourceUri.startsWith(SOURCE_FOLDER_URI) && destinationUri.startsWith(DESTINATION_FOLDER_URI)
+    ): Boolean =
+        sourceUri.startsWith("$SOURCE_FOLDER_URI/") &&
+            destinationUri.startsWith("$DESTINATION_FOLDER_URI/")
 
     fun sourceUri(fileName: String): String = "$SOURCE_FOLDER_URI/$fileName"
 

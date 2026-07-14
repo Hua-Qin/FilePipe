@@ -57,7 +57,6 @@ class MainActivity : ComponentActivity() {
         )
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
             window.isNavigationBarContrastEnforced = false
-            window.isStatusBarContrastEnforced = false
         }
         handleShortcutIntent(intent)
         handleOpenHistoryIntent(intent)
@@ -150,8 +149,13 @@ class MainActivity : ComponentActivity() {
                 -1L,
             )
         if (historyId != -1L) {
-            pendingShortcutRepository.requestOpenHistoryDetail(historyId)
+            val undoNotificationId =
+                sourceIntent
+                    .getIntExtra(PendingShortcutRepository.EXTRA_UNDO_SUMMARY_NOTIFICATION_ID, -1)
+                    .takeIf { notificationId -> notificationId != -1 }
+            pendingShortcutRepository.requestOpenHistoryDetail(historyId, undoNotificationId)
             sourceIntent.removeExtra(PendingShortcutRepository.EXTRA_OPEN_HISTORY_DETAIL_ID)
+            sourceIntent.removeExtra(PendingShortcutRepository.EXTRA_UNDO_SUMMARY_NOTIFICATION_ID)
         }
     }
 
