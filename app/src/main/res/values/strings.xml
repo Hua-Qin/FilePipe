@@ -375,7 +375,8 @@
     <string name="settings_enhanced_shading_desc">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="settings_surface_shading">Surface shading</string>
     <string name="settings_surface_shading_desc">Adjust how strongly theme colors tint surfaces</string>
-    <string name="settings_black_theme_effect_disabled">Can\'t change this in Black theme</string>
+    <string name="settings_use_black_theme">Use pure black dark theme</string>
+    <string name="settings_black_theme_effect_disabled">Can not enable in black theme</string>
     <string name="settings_backup_section">Backup &amp; restore</string>
     <string name="settings_choose_local_backup_folder">Choose local backup folder</string>
     <string name="settings_choose_cloud_backup_file">Choose cloud backup file</string>
@@ -762,7 +763,14 @@
     <string name="settings_haptic_feedback">Haptic feedback</string>
     <string name="settings_haptic_feedback_desc">Tap sounds and swipe vibrations</string>
     <string name="settings_progressive_blur">Progressive blur</string>
-    <string name="settings_progressive_blur_desc">Frosted blur at top &amp; bottom of screen</string>
+    <string name="settings_progressive_blur_desc">Frosted glass blur effect at places</string>
+    <string name="settings_custom_font_title">Font in use</string>
+    <string name="settings_custom_font_default">Default system font</string>
+    <string name="settings_custom_font_choose">Import font</string>
+    <string name="settings_custom_font_choose_explanation">Select a custom font file (.ttf or .otf) from your storage to apply to the user interface.</string>
+    <string name="settings_custom_font_success">Custom font applied successfully.</string>
+    <string name="settings_custom_font_reset_success">Reverted to default system font.</string>
+    <string name="settings_custom_font_error_invalid">Failed to load: invalid or corrupted font file.</string>
     <string name="settings_schedule_section">Schedule</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_desc">Run summaries and reminders</string>

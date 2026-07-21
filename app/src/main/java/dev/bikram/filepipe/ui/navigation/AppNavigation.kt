@@ -27,6 +27,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -142,7 +143,6 @@ import androidx.navigation.navArgument
 import dev.bikram.filepipe.BuildConfig
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppPreferences
-import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.shortcuts.PendingShortcutRepository
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
@@ -598,8 +598,9 @@ fun AppNavigation(
     }
 
     val snackbarHostState = remember { SnackbarHostState() }
-    val effectiveUseGradientBackground =
-        preferences.useGradientBackground && preferences.themeMode != AppThemeMode.BLACK
+    val systemDark = isSystemInDarkTheme()
+    val blackThemeActive = preferences.blackThemeActive(systemDark)
+    val effectiveUseGradientBackground = preferences.effectiveUseGradient(blackThemeActive)
     CompositionLocalProvider(
         LocalSnackbarHostState provides snackbarHostState,
         LocalUseGradientBackground provides effectiveUseGradientBackground,

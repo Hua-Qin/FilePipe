@@ -7,7 +7,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import dev.bikram.filepipe.data.preferences.AppThemeMode
 
 private val DarkContent = Color(0xFFE6E6EA)
 private val LightContent = Color(0xFF1C1B1F)
@@ -20,8 +19,9 @@ private val LightContent = Color(0xFF1C1B1F)
 @Composable
 fun elevatedCardColors(): CardColors {
     val themeState = LocalFilePipeThemeState.current
+    val blackThemeActive = themeState.blackThemeActive(LocalIsDark.current)
     val containerColor =
-        if (themeState.themeMode == AppThemeMode.BLACK) {
+        if (blackThemeActive) {
             MaterialTheme.colorScheme.surfaceContainerLow
         } else {
             MaterialTheme.colorScheme.surfaceContainer

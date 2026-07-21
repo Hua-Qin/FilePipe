@@ -48,7 +48,10 @@ import com.materialkolor.dynamiccolor.ColorSpec
 import com.materialkolor.rememberDynamicColorScheme
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
+import dev.bikram.filepipe.data.preferences.DEFAULT_SHADING_INTENSITY
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
+import dev.bikram.filepipe.data.preferences.blackThemeEligible
+import dev.bikram.filepipe.data.preferences.effectiveDarkTheme
 import dev.bikram.filepipe.ui.common.responsiveTextScaleForWidth
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.LocalTapSound
@@ -241,6 +244,7 @@ private fun pageBackgroundWithThemeHint(
 @Composable
 fun FilePipeTheme(
     themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    useBlackTheme: Boolean = false,
     colorSource: AppColorSource = AppColorSource.DEFAULT,
     savedCustomSeedHexes: List<String> = emptyList(),
     themePaletteStyle: ThemePaletteStyle = ThemePaletteStyle.TONAL_SPOT,
@@ -249,6 +253,7 @@ fun FilePipeTheme(
     activeCustomSeedHex: String = "",
     useGradientBackground: Boolean = true,
     progressiveBlurEnabled: Boolean = true,
+    customFontPath: String = "",
     paintBackground: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -272,17 +277,23 @@ fun FilePipeTheme(
     val systemDark = isSystemInDarkTheme()
     val reducedMotion = rememberSystemReducedMotionEnabled(context)
 
-    val darkTheme =
-        when (themeMode) {
-            AppThemeMode.LIGHT -> false
-            AppThemeMode.DARK -> true
-            AppThemeMode.BLACK -> true
-            AppThemeMode.SYSTEM -> systemDark
+    val customFontFamily =
+        remember(customFontPath) {
+            CustomFontStorage.loadFontFamily(customFontPath)
+        }
+    val typography =
+        remember(customFontFamily) {
+            customFontFamily?.let { customFontTypography(it) } ?: AppTypography
         }
 
+    val darkTheme = themeMode.effectiveDarkTheme(systemDark)
+
+    val blackThemeActive = useBlackTheme && themeMode.blackThemeEligible(darkTheme)
+    val effectiveShadingIntensity = if (blackThemeActive) DEFAULT_SHADING_INTENSITY else shadingIntensity
+    val effectiveUseGradientBackground = if (blackThemeActive) false else useGradientBackground
+    val black = blackThemeActive
+
     val useDynamic = colorSource == AppColorSource.MATERIAL_YOU
-    val black = themeMode == AppThemeMode.BLACK
-    val effectiveUseGradientBackground = useGradientBackground && !black
 
     /** Non-wallpaper themes use either curated triplets or a custom seed ramp. */
     val staticTriplet =
@@ -349,7 +360,7 @@ fun FilePipeTheme(
             if (!black) {
                 oledAdjusted.tintSurfacesTowardPrimary(
                     darkTheme = darkTheme,
-                    intensityFactor = shadingIntensity,
+                    intensityFactor = effectiveShadingIntensity,
                 )
             } else {
                 oledAdjusted
@@ -414,20 +425,21 @@ fun FilePipeTheme(
     val themeState =
         FilePipeThemeState(
             themeMode = themeMode,
+            useBlackTheme = useBlackTheme,
             colorSource = colorSource,
             savedCustomSeedHexes = savedCustomSeedHexes,
             activeCustomSeedHex = activeCustomSeedHex,
             themePaletteStyle = themePaletteStyle,
             useGradientBackground = effectiveUseGradientBackground,
-            shadingIntensity = shadingIntensity,
+            shadingIntensity = effectiveShadingIntensity,
             progressiveBlurEnabled = progressiveBlurEnabled,
         )
 
     CompositionLocalProvider(
         LocalIsDark provides darkTheme,
         LocalUseGradientBackground provides effectiveUseGradientBackground,
-        LocalUseEnhancedShading provides (shadingIntensity > 0.0f),
-        LocalShadingIntensity provides shadingIntensity,
+        LocalUseEnhancedShading provides (effectiveShadingIntensity > 0.0f),
+        LocalShadingIntensity provides effectiveShadingIntensity,
         LocalHeroOnCards provides false,
         LocalBlurBars provides progressiveBlurEnabled,
         LocalFilePipeThemeState provides themeState,
@@ -442,7 +454,7 @@ fun FilePipeTheme(
             colorScheme = colorScheme,
             motionScheme = MotionScheme.expressive(),
             shapes = AppShapes,
-            typography = AppTypography,
+            typography = typography,
         ) {
             Box(Modifier.fillMaxSize()) {
                 if (paintBackground) {

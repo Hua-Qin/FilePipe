@@ -16,6 +16,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.domain.export.SettingsBackupDto
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
+import dev.bikram.filepipe.ui.theme.CustomFontStorage
 import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -49,6 +50,7 @@ private fun decodeCustomSeedHexList(json: String?): List<String> {
 
 private object PrefKeys {
     val THEME_MODE = stringPreferencesKey("theme_mode")
+    val USE_BLACK_THEME = booleanPreferencesKey("use_black_theme")
     val USE_MATERIAL_YOU = booleanPreferencesKey("use_material_you")
     val COLOR_SOURCE = stringPreferencesKey("color_source")
     val THEME_PALETTE_STYLE = stringPreferencesKey("theme_palette_style")
@@ -97,6 +99,8 @@ private object PrefKeys {
     val PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME =
         longPreferencesKey("play_auto_review_prompted_for_last_update_time")
     val DEVELOPER_OPTIONS_ENABLED = booleanPreferencesKey("developer_options_enabled")
+    val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
+    val CUSTOM_FONT_NAME = stringPreferencesKey("custom_font_name")
 }
 
 private enum class ShadingIntensity {
@@ -140,13 +144,15 @@ class UserPreferencesRepository
             dataStore.data.map { prefs ->
                 val rawTheme = prefs[PrefKeys.THEME_MODE]
                 val parsedMode = rawTheme?.let { runCatching { AppThemeMode.valueOf(it) }.getOrNull() }
+                val legacyBlackTheme = isLegacyBlackThemeModeName(rawTheme)
                 val legacyMaterialYou = rawTheme == "MATERIAL_YOU"
                 val themeMode =
                     when {
                         legacyMaterialYou -> AppThemeMode.DARK
-                        parsedMode != null -> parsedMode
+                        parsedMode != null -> parsedMode.migrated()
                         else -> AppThemeMode.SYSTEM
                     }
+                val useBlackTheme = (prefs[PrefKeys.USE_BLACK_THEME] ?: false) || legacyBlackTheme
                 val storedColorSource =
                     prefs[PrefKeys.COLOR_SOURCE]?.let { raw ->
                         runCatching { AppColorSource.valueOf(raw) }.getOrNull()?.migrated()
@@ -183,6 +189,7 @@ class UserPreferencesRepository
                     }
                 AppPreferences(
                     themeMode = themeMode,
+                    useBlackTheme = useBlackTheme,
                     colorSource = colorSource,
                     savedCustomSeedHexes = savedCustomSeedHexes,
                     activeCustomSeedHex = activeCustomSeedHex,
@@ -253,6 +260,8 @@ class UserPreferencesRepository
                     inAppReviewAutoNeverAskAgain = prefs[PrefKeys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN] ?: false,
                     playAutoReviewPromptedForLastUpdateTime =
                         prefs[PrefKeys.PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME] ?: 0L,
+                    customFontPath = prefs[PrefKeys.CUSTOM_FONT_PATH].orEmpty(),
+                    customFontName = prefs[PrefKeys.CUSTOM_FONT_NAME].orEmpty(),
                 )
             }
 
@@ -266,7 +275,22 @@ class UserPreferencesRepository
         }
 
         suspend fun setThemeMode(mode: AppThemeMode) {
-            dataStore.edit { it[PrefKeys.THEME_MODE] = mode.name }
+            dataStore.edit { it[PrefKeys.THEME_MODE] = mode.migrated().name }
+        }
+
+        suspend fun setUseBlackTheme(enabled: Boolean) {
+            dataStore.edit { it[PrefKeys.USE_BLACK_THEME] = enabled }
+        }
+
+        /**
+         * Rewrite legacy theme_mode BLACK to DARK + use_black_theme in DataStore.
+         */
+        suspend fun migrateLegacyBlackThemeIfNeeded() {
+            dataStore.edit { prefs ->
+                if (!isLegacyBlackThemeModeName(prefs[PrefKeys.THEME_MODE])) return@edit
+                prefs[PrefKeys.THEME_MODE] = AppThemeMode.DARK.name
+                prefs[PrefKeys.USE_BLACK_THEME] = true
+            }
         }
 
         suspend fun setColorSource(source: AppColorSource) {
@@ -374,6 +398,24 @@ class UserPreferencesRepository
 
         suspend fun setProgressiveBlurEnabled(enabled: Boolean) {
             dataStore.edit { it[PrefKeys.PROGRESSIVE_BLUR] = enabled }
+        }
+
+        suspend fun setCustomFont(
+            path: String,
+            displayName: String,
+        ) {
+            dataStore.edit { prefs ->
+                prefs[PrefKeys.CUSTOM_FONT_PATH] = path
+                prefs[PrefKeys.CUSTOM_FONT_NAME] = displayName
+            }
+        }
+
+        suspend fun clearCustomFont() {
+            CustomFontStorage.deleteStoredFontFiles(context)
+            dataStore.edit { prefs ->
+                prefs.remove(PrefKeys.CUSTOM_FONT_PATH)
+                prefs.remove(PrefKeys.CUSTOM_FONT_NAME)
+            }
         }
 
         suspend fun setUpdateCheckSchedule(schedule: UpdateCheckSchedule) {
@@ -564,6 +606,8 @@ class UserPreferencesRepository
                 prefs.remove(PrefKeys.SHADING_INTENSITY_FACTOR)
                 prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
                 prefs.remove(PrefKeys.PROGRESSIVE_BLUR)
+                prefs.remove(PrefKeys.CUSTOM_FONT_PATH)
+                prefs.remove(PrefKeys.CUSTOM_FONT_NAME)
                 prefs.remove(PrefKeys.HAPTIC_FEEDBACK)
                 prefs.remove(PrefKeys.SWIPE_START_TO_END)
                 prefs.remove(PrefKeys.SWIPE_END_TO_START)
@@ -681,8 +725,17 @@ class UserPreferencesRepository
                 }
             }
             dataStore.edit { prefs ->
-                val themeMode = runCatching { AppThemeMode.valueOf(dto.themeMode) }.getOrDefault(AppThemeMode.SYSTEM)
-                prefs[PrefKeys.THEME_MODE] = themeMode.name
+                if (isLegacyBlackThemeModeName(dto.themeMode)) {
+                    prefs[PrefKeys.THEME_MODE] = AppThemeMode.DARK.name
+                    prefs[PrefKeys.USE_BLACK_THEME] = true
+                } else {
+                    val parsedThemeMode =
+                        runCatching { AppThemeMode.valueOf(dto.themeMode) }.getOrDefault(AppThemeMode.SYSTEM)
+                    prefs[PrefKeys.THEME_MODE] = parsedThemeMode.migrated().name
+                    dto.useBlackTheme?.let { value ->
+                        prefs[PrefKeys.USE_BLACK_THEME] = value
+                    }
+                }
 
                 val parsedColorSource =
                     dto.colorSource?.let { raw ->
@@ -851,6 +904,20 @@ class UserPreferencesRepository
                         prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] = activeNorm
                     }
                     prefs.remove(PrefKeys.CUSTOM_SEED_HEX)
+                }
+
+                val restoredFontPath = dto.customFontPath.trim()
+                if (restoredFontPath.isNotBlank() && java.io.File(restoredFontPath).isFile) {
+                    prefs[PrefKeys.CUSTOM_FONT_PATH] = restoredFontPath
+                    val restoredFontName = dto.customFontName.trim()
+                    if (restoredFontName.isNotBlank()) {
+                        prefs[PrefKeys.CUSTOM_FONT_NAME] = restoredFontName
+                    } else {
+                        prefs.remove(PrefKeys.CUSTOM_FONT_NAME)
+                    }
+                } else {
+                    prefs.remove(PrefKeys.CUSTOM_FONT_PATH)
+                    prefs.remove(PrefKeys.CUSTOM_FONT_NAME)
                 }
             }
         }

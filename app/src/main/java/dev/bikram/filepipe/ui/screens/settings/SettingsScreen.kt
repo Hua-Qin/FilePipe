@@ -858,6 +858,7 @@ fun SettingsScreen(
                     ) {
                         AppearanceSection(
                             themeMode = preferences.themeMode,
+                            useBlackTheme = preferences.useBlackTheme,
                             colorSource = preferences.colorSource,
                             savedCustomSeedHexes = preferences.savedCustomSeedHexes,
                             activeCustomSeedHex = preferences.activeCustomSeedHex,
@@ -865,7 +866,10 @@ fun SettingsScreen(
                             useGradientBackground = preferences.useGradientBackground,
                             shadingIntensity = preferences.shadingIntensity,
                             progressiveBlurEnabled = preferences.progressiveBlurEnabled,
+                            customFontPath = preferences.customFontPath,
+                            customFontName = preferences.customFontName,
                             onThemeMode = viewModel::setThemeMode,
+                            onUseBlackTheme = viewModel::setUseBlackTheme,
                             onColorSource = viewModel::setColorSource,
                             onPaletteStyle = viewModel::setThemePaletteStyle,
                             onAddCustomSeedHex = viewModel::addCustomSeedHex,
@@ -875,6 +879,8 @@ fun SettingsScreen(
                             onUseGradientBackground = viewModel::setUseGradientBackground,
                             onShadingIntensity = viewModel::setShadingIntensity,
                             onProgressiveBlurEnabled = viewModel::setProgressiveBlurEnabled,
+                            onCustomFontImported = viewModel::importCustomFont,
+                            onCustomFontClear = viewModel::clearCustomFont,
                             onBlackThemeEffectClick = {
                                 coroutineScope.launch {
                                     snackbarHostState.currentSnackbarData?.dismiss()

@@ -117,6 +117,7 @@ data class FileMovedBackupDto(
 @Serializable
 data class SettingsBackupDto(
     val themeMode: String,
+    val useBlackTheme: Boolean? = null,
     val colorSource: String? = null,
     val themePaletteStyle: String? = null,
     val useMaterialYou: Boolean? = null,
@@ -150,6 +151,8 @@ data class SettingsBackupDto(
     val customSeedHexes: List<String>? = null,
     val activeCustomSeedHex: String? = null,
     val folderAccessMode: String? = null,
+    val customFontPath: String = "",
+    val customFontName: String = "",
 )
 
 private val jsonFormatter =
@@ -232,6 +235,7 @@ fun FileMoved.toBackupDto(): FileMovedBackupDto =
 fun AppPreferences.toBackupDto(): SettingsBackupDto =
     SettingsBackupDto(
         themeMode = themeMode.name,
+        useBlackTheme = useBlackTheme,
         colorSource = colorSource.name,
         themePaletteStyle = themePaletteStyle.name,
         useMaterialYou = if (colorSource == AppColorSource.MATERIAL_YOU) true else false,
@@ -263,6 +267,8 @@ fun AppPreferences.toBackupDto(): SettingsBackupDto =
         customSeedHexes = savedCustomSeedHexes.takeIf { it.isNotEmpty() },
         activeCustomSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },
         folderAccessMode = folderAccessMode.name,
+        customFontPath = customFontPath,
+        customFontName = customFontName,
     )
 
 fun RuleBackupDto.toDomain(): Rule =

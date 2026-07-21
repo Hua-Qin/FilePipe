@@ -80,6 +80,7 @@ class MainActivity : ComponentActivity() {
             val preferences = preferencesState ?: AppPreferences.DEFAULT
             FilePipeTheme(
                 themeMode = preferences.themeMode,
+                useBlackTheme = preferences.useBlackTheme,
                 colorSource = preferences.colorSource,
                 savedCustomSeedHexes = preferences.savedCustomSeedHexes,
                 themePaletteStyle = preferences.themePaletteStyle,
@@ -88,6 +89,7 @@ class MainActivity : ComponentActivity() {
                 activeCustomSeedHex = preferences.activeCustomSeedHex,
                 useGradientBackground = preferences.useGradientBackground,
                 progressiveBlurEnabled = preferences.progressiveBlurEnabled,
+                customFontPath = preferences.customFontPath,
             ) {
                 if (introSeenAtLaunch == null) {
                     Surface(
