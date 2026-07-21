@@ -76,8 +76,7 @@ data class FilePipeThemeState(
     val useEnhancedShading: Boolean
         get() = shadingIntensity > 0.0f
 
-    fun blackThemeActive(isDarkTheme: Boolean): Boolean =
-        useBlackTheme && themeMode.blackThemeEligible(isDarkTheme)
+    fun blackThemeActive(isDarkTheme: Boolean): Boolean = useBlackTheme && themeMode.blackThemeEligible(isDarkTheme)
 }
 
 val LocalFilePipeThemeState = compositionLocalOf { FilePipeThemeState() }

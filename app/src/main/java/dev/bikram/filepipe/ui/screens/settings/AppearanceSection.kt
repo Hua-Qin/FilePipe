@@ -1,12 +1,11 @@
 package dev.bikram.filepipe.ui.screens.settings
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -15,6 +14,7 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -703,92 +703,92 @@ private fun AppearanceAccentStudioControls(
                     .padding(horizontal = if (compact) 10.dp else 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 14.dp),
         ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(
-                    text = stringResource(R.string.settings_palette),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            ThemePaletteStyleRow(
-                selected = themePaletteStyle,
-                enabled = colorSource.supportsPaletteStyle,
-                onSelect = onPaletteStyle,
-            )
-        }
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-        ) {
-            ThemeAccentRow(
-                colorSource = colorSource,
-                activeCustomSeedHex = activeCustomSeedHex,
-                savedCustomSeedHexes = savedCustomSeedHexes,
-                customPickerExpanded = customPickerExpanded,
-                onSelectPreset = { source ->
-                    if (customPickerExpanded) {
-                        editingTarget = ColorTarget.PRIMARY
-                    }
-                    onColorSource(source)
-                },
-                onSelectCustomHex = { hex ->
-                    if (customPickerExpanded) {
-                        editingTarget = ColorTarget.PRIMARY
-                    }
-                    onSelectCustomSeedHex(hex)
-                },
-                onCustomHexLongPress = onCustomHexLongPress,
-                onAddCustomHexClick = {
-                    customPickerExpanded = !customPickerExpanded
-                },
-            )
-            AnimatedVisibility(
-                visible = customPickerExpanded,
-                enter = expandVertically(animationSpec = spatialSpec, expandFrom = Alignment.Top),
-                exit = shrinkVertically(animationSpec = spatialSpec, shrinkTowards = Alignment.Top),
-            ) {
-                Column(
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Spacer(Modifier.height(0.dp))
-                    CustomColorSlider(
-                        initialSeedHex =
-                            customSliderInitialSeedHex(
-                                colorSource = colorSource,
-                                activeCustomSeedHex = activeCustomSeedHex,
-                                currentPrimary = MaterialTheme.colorScheme.primary,
-                            ),
-                        editingTarget = editingTarget,
-                        onPreviewColor = onPreviewCustomSeedHex,
-                        onSaveColor = onAddCustomSeedHex,
+                    Text(
+                        text = stringResource(R.string.settings_palette),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                        modifier = Modifier.weight(1f),
                     )
                 }
+                ThemePaletteStyleRow(
+                    selected = themePaletteStyle,
+                    enabled = colorSource.supportsPaletteStyle,
+                    onSelect = onPaletteStyle,
+                )
             }
-        }
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-        ) {
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f))
-            ThemePreviewPanel(
-                colorSource = colorSource,
-                isInteractive = colorSource == AppColorSource.CUSTOM,
-                selectedTarget = editingTarget,
-                onTargetSelect = { target ->
-                    editingTarget = target
-                    customPickerExpanded = true
-                },
-            )
-        }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                ThemeAccentRow(
+                    colorSource = colorSource,
+                    activeCustomSeedHex = activeCustomSeedHex,
+                    savedCustomSeedHexes = savedCustomSeedHexes,
+                    customPickerExpanded = customPickerExpanded,
+                    onSelectPreset = { source ->
+                        if (customPickerExpanded) {
+                            editingTarget = ColorTarget.PRIMARY
+                        }
+                        onColorSource(source)
+                    },
+                    onSelectCustomHex = { hex ->
+                        if (customPickerExpanded) {
+                            editingTarget = ColorTarget.PRIMARY
+                        }
+                        onSelectCustomSeedHex(hex)
+                    },
+                    onCustomHexLongPress = onCustomHexLongPress,
+                    onAddCustomHexClick = {
+                        customPickerExpanded = !customPickerExpanded
+                    },
+                )
+                AnimatedVisibility(
+                    visible = customPickerExpanded,
+                    enter = expandVertically(animationSpec = spatialSpec, expandFrom = Alignment.Top),
+                    exit = shrinkVertically(animationSpec = spatialSpec, shrinkTowards = Alignment.Top),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        Spacer(Modifier.height(0.dp))
+                        CustomColorSlider(
+                            initialSeedHex =
+                                customSliderInitialSeedHex(
+                                    colorSource = colorSource,
+                                    activeCustomSeedHex = activeCustomSeedHex,
+                                    currentPrimary = MaterialTheme.colorScheme.primary,
+                                ),
+                            editingTarget = editingTarget,
+                            onPreviewColor = onPreviewCustomSeedHex,
+                            onSaveColor = onAddCustomSeedHex,
+                        )
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f))
+                ThemePreviewPanel(
+                    colorSource = colorSource,
+                    isInteractive = colorSource == AppColorSource.CUSTOM,
+                    selectedTarget = editingTarget,
+                    onTargetSelect = { target ->
+                        editingTarget = target
+                        customPickerExpanded = true
+                    },
+                )
+            }
         }
     }
 }

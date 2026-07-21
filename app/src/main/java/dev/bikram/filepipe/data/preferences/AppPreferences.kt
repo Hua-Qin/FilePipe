@@ -90,14 +90,11 @@ data class AppPreferences(
         get() = shadingIntensity > 0.0f
 
     /** ObtainX parity: pure black only while the app is effectively on a dark theme. */
-    fun blackThemeActive(isDarkTheme: Boolean): Boolean =
-        useBlackTheme && themeMode.blackThemeEligible(isDarkTheme)
+    fun blackThemeActive(isDarkTheme: Boolean): Boolean = useBlackTheme && themeMode.blackThemeEligible(isDarkTheme)
 
-    fun effectiveShadingIntensity(blackThemeActive: Boolean): Float =
-        if (blackThemeActive) DEFAULT_SHADING_INTENSITY else shadingIntensity
+    fun effectiveShadingIntensity(blackThemeActive: Boolean): Float = if (blackThemeActive) DEFAULT_SHADING_INTENSITY else shadingIntensity
 
-    fun effectiveUseGradient(blackThemeActive: Boolean): Boolean =
-        if (blackThemeActive) false else useGradientBackground
+    fun effectiveUseGradient(blackThemeActive: Boolean): Boolean = if (blackThemeActive) false else useGradientBackground
 
     companion object {
         val DEFAULT = AppPreferences()

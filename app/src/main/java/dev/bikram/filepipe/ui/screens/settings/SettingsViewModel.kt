@@ -32,8 +32,8 @@ import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.ImportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
-import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
 import dev.bikram.filepipe.ui.theme.CustomFontStorage
+import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.BufferOverflow
