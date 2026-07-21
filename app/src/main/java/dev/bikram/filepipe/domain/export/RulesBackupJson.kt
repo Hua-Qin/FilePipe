@@ -117,6 +117,7 @@ data class FileMovedBackupDto(
 @Serializable
 data class SettingsBackupDto(
     val themeMode: String,
+    val useBlackTheme: Boolean? = null,
     val colorSource: String? = null,
     val themePaletteStyle: String? = null,
     val useMaterialYou: Boolean? = null,
@@ -234,6 +235,7 @@ fun FileMoved.toBackupDto(): FileMovedBackupDto =
 fun AppPreferences.toBackupDto(): SettingsBackupDto =
     SettingsBackupDto(
         themeMode = themeMode.name,
+        useBlackTheme = useBlackTheme,
         colorSource = colorSource.name,
         themePaletteStyle = themePaletteStyle.name,
         useMaterialYou = if (colorSource == AppColorSource.MATERIAL_YOU) true else false,

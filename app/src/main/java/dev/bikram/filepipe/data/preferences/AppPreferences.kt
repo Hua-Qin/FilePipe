@@ -33,6 +33,7 @@ fun defaultUpdateCheckSchedule(): UpdateCheckSchedule =
 
 data class AppPreferences(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    val useBlackTheme: Boolean = false,
     val colorSource: AppColorSource = AppColorSource.MATERIAL_YOU,
     /** Saved custom accent seeds (canonical `#RRGGBB`); order is display order. */
     val savedCustomSeedHexes: List<String> = emptyList(),
@@ -87,6 +88,16 @@ data class AppPreferences(
 ) {
     val useEnhancedShading: Boolean
         get() = shadingIntensity > 0.0f
+
+    /** ObtainX parity: pure black only while the app is effectively on a dark theme. */
+    fun blackThemeActive(isDarkTheme: Boolean): Boolean =
+        useBlackTheme && themeMode.blackThemeEligible(isDarkTheme)
+
+    fun effectiveShadingIntensity(blackThemeActive: Boolean): Float =
+        if (blackThemeActive) DEFAULT_SHADING_INTENSITY else shadingIntensity
+
+    fun effectiveUseGradient(blackThemeActive: Boolean): Boolean =
+        if (blackThemeActive) false else useGradientBackground
 
     companion object {
         val DEFAULT = AppPreferences()

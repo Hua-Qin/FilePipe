@@ -858,6 +858,7 @@ fun SettingsScreen(
                     ) {
                         AppearanceSection(
                             themeMode = preferences.themeMode,
+                            useBlackTheme = preferences.useBlackTheme,
                             colorSource = preferences.colorSource,
                             savedCustomSeedHexes = preferences.savedCustomSeedHexes,
                             activeCustomSeedHex = preferences.activeCustomSeedHex,
@@ -868,6 +869,7 @@ fun SettingsScreen(
                             customFontPath = preferences.customFontPath,
                             customFontName = preferences.customFontName,
                             onThemeMode = viewModel::setThemeMode,
+                            onUseBlackTheme = viewModel::setUseBlackTheme,
                             onColorSource = viewModel::setColorSource,
                             onPaletteStyle = viewModel::setThemePaletteStyle,
                             onAddCustomSeedHex = viewModel::addCustomSeedHex,

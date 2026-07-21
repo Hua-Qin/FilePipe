@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -16,6 +17,7 @@ import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -95,6 +97,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.ColorUtils
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.AppColorSource
+import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.data.preferences.generateTripletForSeed
@@ -397,6 +400,7 @@ fun ThemePaletteStyleRow(
 @Composable
 fun AppearanceSection(
     themeMode: AppThemeMode,
+    useBlackTheme: Boolean,
     colorSource: AppColorSource,
     savedCustomSeedHexes: List<String>,
     activeCustomSeedHex: String,
@@ -407,6 +411,7 @@ fun AppearanceSection(
     customFontPath: String,
     customFontName: String,
     onThemeMode: (AppThemeMode) -> Unit,
+    onUseBlackTheme: (Boolean) -> Unit,
     onColorSource: (AppColorSource) -> Unit,
     onPaletteStyle: (ThemePaletteStyle) -> Unit,
     onAddCustomSeedHex: (String) -> Unit,
@@ -436,17 +441,31 @@ fun AppearanceSection(
             destructive = true,
         )
     }
-    val blackThemeEffectsDisabled = themeMode == AppThemeMode.BLACK
+    val systemDark = isSystemInDarkTheme()
+    val appearancePrefs =
+        AppPreferences(
+            themeMode = themeMode,
+            useBlackTheme = useBlackTheme,
+            useGradientBackground = useGradientBackground,
+            shadingIntensity = shadingIntensity,
+        )
+    val blackThemeActive = appearancePrefs.blackThemeActive(systemDark)
 
     GroupedListColumn {
         GroupedListItem(position = GroupPosition.FIRST) {
-            AppearanceStudioControls(
+            AppearanceThemeControls(
                 themeMode = themeMode,
+                useBlackTheme = useBlackTheme,
+                onThemeMode = onThemeMode,
+                onUseBlackTheme = onUseBlackTheme,
+            )
+        }
+        GroupedListItem(position = GroupPosition.MIDDLE) {
+            AppearanceAccentStudioControls(
                 colorSource = colorSource,
                 savedCustomSeedHexes = savedCustomSeedHexes,
                 activeCustomSeedHex = activeCustomSeedHex,
                 themePaletteStyle = themePaletteStyle,
-                onThemeMode = onThemeMode,
                 onColorSource = onColorSource,
                 onPaletteStyle = onPaletteStyle,
                 onSelectCustomSeedHex = onSelectCustomSeedHex,
@@ -456,7 +475,7 @@ fun AppearanceSection(
             )
         }
         GroupedListItem(position = GroupPosition.MIDDLE) {
-            val enabled = !blackThemeEffectsDisabled
+            val enabled = !blackThemeActive
             Column(
                 modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -484,7 +503,7 @@ fun AppearanceSection(
                     )
                 }
                 ShadingIntensitySlider(
-                    intensity = shadingIntensity,
+                    intensity = appearancePrefs.effectiveShadingIntensity(blackThemeActive),
                     enabled = enabled,
                     onDisabledClick = onBlackThemeEffectClick,
                     onValueChange = onShadingIntensity,
@@ -495,8 +514,8 @@ fun AppearanceSection(
             AppearanceToggleItem(
                 title = stringResource(R.string.settings_gradient_background),
                 subtitle = stringResource(R.string.settings_gradient_background_desc),
-                checked = useGradientBackground && !blackThemeEffectsDisabled,
-                enabled = !blackThemeEffectsDisabled,
+                checked = appearancePrefs.effectiveUseGradient(blackThemeActive),
+                enabled = !blackThemeActive,
                 onDisabledClick = onBlackThemeEffectClick,
                 onCheckedChange = onUseGradientBackground,
             )
@@ -604,13 +623,61 @@ private fun CustomFontSettingsRow(
 }
 
 @Composable
-private fun AppearanceStudioControls(
+private fun AppearanceThemeControls(
     themeMode: AppThemeMode,
+    useBlackTheme: Boolean,
+    onThemeMode: (AppThemeMode) -> Unit,
+    onUseBlackTheme: (Boolean) -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 340.dp
+        val showBlackThemeToggle = themeMode != AppThemeMode.LIGHT
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = if (compact) 10.dp else 16.dp,
+                        top = 14.dp,
+                        end = if (compact) 10.dp else 16.dp,
+                        bottom = if (showBlackThemeToggle) 4.dp else 14.dp,
+                    ),
+            verticalArrangement = Arrangement.spacedBy(if (showBlackThemeToggle) 4.dp else 0.dp),
+        ) {
+            ThemeModeSegmentedRow(
+                selected = themeMode,
+                onSelect = onThemeMode,
+            )
+            if (showBlackThemeToggle) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .tapSoundClickable { onUseBlackTheme(!useBlackTheme) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_use_black_theme),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    FilePipeSwitch(
+                        checked = useBlackTheme,
+                        enabled = true,
+                        onCheckedChange = onUseBlackTheme,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppearanceAccentStudioControls(
     colorSource: AppColorSource,
     savedCustomSeedHexes: List<String>,
     activeCustomSeedHex: String,
     themePaletteStyle: ThemePaletteStyle,
-    onThemeMode: (AppThemeMode) -> Unit,
     onColorSource: (AppColorSource) -> Unit,
     onPaletteStyle: (ThemePaletteStyle) -> Unit,
     onSelectCustomSeedHex: (String) -> Unit,
@@ -627,17 +694,15 @@ private fun AppearanceStudioControls(
         }
     }
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        ThemeModeSegmentedRow(
-            selected = themeMode,
-            onSelect = onThemeMode,
-        )
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 340.dp
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = if (compact) 10.dp else 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 14.dp),
+        ) {
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -723,6 +788,7 @@ private fun AppearanceStudioControls(
                     customPickerExpanded = true
                 },
             )
+        }
         }
     }
 }
@@ -1342,17 +1408,15 @@ private val themePickerOrder =
         AppThemeMode.SYSTEM,
         AppThemeMode.LIGHT,
         AppThemeMode.DARK,
-        AppThemeMode.BLACK,
     )
 
 @Composable
 private fun themeModeLabel(mode: AppThemeMode): String =
     stringResource(
-        when (mode) {
-            AppThemeMode.SYSTEM -> R.string.theme_system
-            AppThemeMode.LIGHT -> R.string.theme_light
-            AppThemeMode.DARK -> R.string.theme_dark
-            AppThemeMode.BLACK -> R.string.theme_black
+        when (mode.name) {
+            AppThemeMode.SYSTEM.name -> R.string.theme_system
+            AppThemeMode.LIGHT.name -> R.string.theme_light
+            else -> R.string.theme_dark
         },
     )
 

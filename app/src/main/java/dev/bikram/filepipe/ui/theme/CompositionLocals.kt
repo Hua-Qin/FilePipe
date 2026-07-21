@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import dev.bikram.filepipe.data.preferences.AppColorSource
 import dev.bikram.filepipe.data.preferences.AppThemeMode
 import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
+import dev.bikram.filepipe.data.preferences.blackThemeEligible
 
 val LocalSnackbarHostState = staticCompositionLocalOf<SnackbarHostState> { error("No SnackbarHostState provided") }
 
@@ -63,6 +64,7 @@ val LocalProgressiveBlurStyle = compositionLocalOf<ProgressiveBlurStyle?> { null
 
 data class FilePipeThemeState(
     val themeMode: AppThemeMode = AppThemeMode.SYSTEM,
+    val useBlackTheme: Boolean = false,
     val colorSource: AppColorSource = AppColorSource.DEFAULT,
     val savedCustomSeedHexes: List<String> = emptyList(),
     val activeCustomSeedHex: String = "",
@@ -73,6 +75,9 @@ data class FilePipeThemeState(
 ) {
     val useEnhancedShading: Boolean
         get() = shadingIntensity > 0.0f
+
+    fun blackThemeActive(isDarkTheme: Boolean): Boolean =
+        useBlackTheme && themeMode.blackThemeEligible(isDarkTheme)
 }
 
 val LocalFilePipeThemeState = compositionLocalOf { FilePipeThemeState() }

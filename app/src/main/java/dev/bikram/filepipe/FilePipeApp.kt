@@ -60,6 +60,7 @@ class FilePipeApp :
                 prefs.migrateLegacyEnhancedShadingPreferenceIfNeeded()
                 prefs.migrateLegacyCustomSeedIfNeeded()
                 prefs.migrateLegacyAutoCheckToScheduleIfNeeded()
+                prefs.migrateLegacyBlackThemeIfNeeded()
                 prefs.migrateDeferredFolderAccessIfNeeded()
                 updateCheckWorkScheduler.syncFromPreferences()
             }.onFailure { error ->

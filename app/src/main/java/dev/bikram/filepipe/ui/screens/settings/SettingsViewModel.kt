@@ -142,6 +142,11 @@ class SettingsViewModel
                 userPreferencesRepository.setThemeMode(mode)
             }
 
+        fun setUseBlackTheme(enabled: Boolean) =
+            viewModelScope.launch {
+                userPreferencesRepository.setUseBlackTheme(enabled)
+            }
+
         fun setColorSource(source: AppColorSource) =
             viewModelScope.launch {
                 userPreferencesRepository.setColorSource(source)

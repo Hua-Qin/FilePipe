@@ -50,6 +50,7 @@ private fun decodeCustomSeedHexList(json: String?): List<String> {
 
 private object PrefKeys {
     val THEME_MODE = stringPreferencesKey("theme_mode")
+    val USE_BLACK_THEME = booleanPreferencesKey("use_black_theme")
     val USE_MATERIAL_YOU = booleanPreferencesKey("use_material_you")
     val COLOR_SOURCE = stringPreferencesKey("color_source")
     val THEME_PALETTE_STYLE = stringPreferencesKey("theme_palette_style")
@@ -143,13 +144,15 @@ class UserPreferencesRepository
             dataStore.data.map { prefs ->
                 val rawTheme = prefs[PrefKeys.THEME_MODE]
                 val parsedMode = rawTheme?.let { runCatching { AppThemeMode.valueOf(it) }.getOrNull() }
+                val legacyBlackTheme = isLegacyBlackThemeModeName(rawTheme)
                 val legacyMaterialYou = rawTheme == "MATERIAL_YOU"
                 val themeMode =
                     when {
                         legacyMaterialYou -> AppThemeMode.DARK
-                        parsedMode != null -> parsedMode
+                        parsedMode != null -> parsedMode.migrated()
                         else -> AppThemeMode.SYSTEM
                     }
+                val useBlackTheme = (prefs[PrefKeys.USE_BLACK_THEME] ?: false) || legacyBlackTheme
                 val storedColorSource =
                     prefs[PrefKeys.COLOR_SOURCE]?.let { raw ->
                         runCatching { AppColorSource.valueOf(raw) }.getOrNull()?.migrated()
@@ -186,6 +189,7 @@ class UserPreferencesRepository
                     }
                 AppPreferences(
                     themeMode = themeMode,
+                    useBlackTheme = useBlackTheme,
                     colorSource = colorSource,
                     savedCustomSeedHexes = savedCustomSeedHexes,
                     activeCustomSeedHex = activeCustomSeedHex,
@@ -271,7 +275,22 @@ class UserPreferencesRepository
         }
 
         suspend fun setThemeMode(mode: AppThemeMode) {
-            dataStore.edit { it[PrefKeys.THEME_MODE] = mode.name }
+            dataStore.edit { it[PrefKeys.THEME_MODE] = mode.migrated().name }
+        }
+
+        suspend fun setUseBlackTheme(enabled: Boolean) {
+            dataStore.edit { it[PrefKeys.USE_BLACK_THEME] = enabled }
+        }
+
+        /**
+         * Rewrite legacy theme_mode BLACK to DARK + use_black_theme in DataStore.
+         */
+        suspend fun migrateLegacyBlackThemeIfNeeded() {
+            dataStore.edit { prefs ->
+                if (!isLegacyBlackThemeModeName(prefs[PrefKeys.THEME_MODE])) return@edit
+                prefs[PrefKeys.THEME_MODE] = AppThemeMode.DARK.name
+                prefs[PrefKeys.USE_BLACK_THEME] = true
+            }
         }
 
         suspend fun setColorSource(source: AppColorSource) {
@@ -706,8 +725,17 @@ class UserPreferencesRepository
                 }
             }
             dataStore.edit { prefs ->
-                val themeMode = runCatching { AppThemeMode.valueOf(dto.themeMode) }.getOrDefault(AppThemeMode.SYSTEM)
-                prefs[PrefKeys.THEME_MODE] = themeMode.name
+                if (isLegacyBlackThemeModeName(dto.themeMode)) {
+                    prefs[PrefKeys.THEME_MODE] = AppThemeMode.DARK.name
+                    prefs[PrefKeys.USE_BLACK_THEME] = true
+                } else {
+                    val parsedThemeMode =
+                        runCatching { AppThemeMode.valueOf(dto.themeMode) }.getOrDefault(AppThemeMode.SYSTEM)
+                    prefs[PrefKeys.THEME_MODE] = parsedThemeMode.migrated().name
+                    dto.useBlackTheme?.let { value ->
+                        prefs[PrefKeys.USE_BLACK_THEME] = value
+                    }
+                }
 
                 val parsedColorSource =
                     dto.colorSource?.let { raw ->
