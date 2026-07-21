@@ -865,6 +865,8 @@ fun SettingsScreen(
                             useGradientBackground = preferences.useGradientBackground,
                             shadingIntensity = preferences.shadingIntensity,
                             progressiveBlurEnabled = preferences.progressiveBlurEnabled,
+                            customFontPath = preferences.customFontPath,
+                            customFontName = preferences.customFontName,
                             onThemeMode = viewModel::setThemeMode,
                             onColorSource = viewModel::setColorSource,
                             onPaletteStyle = viewModel::setThemePaletteStyle,
@@ -875,6 +877,8 @@ fun SettingsScreen(
                             onUseGradientBackground = viewModel::setUseGradientBackground,
                             onShadingIntensity = viewModel::setShadingIntensity,
                             onProgressiveBlurEnabled = viewModel::setProgressiveBlurEnabled,
+                            onCustomFontImported = viewModel::importCustomFont,
+                            onCustomFontClear = viewModel::clearCustomFont,
                             onBlackThemeEffectClick = {
                                 coroutineScope.launch {
                                     snackbarHostState.currentSnackbarData?.dismiss()

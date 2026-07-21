@@ -14,6 +14,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.domain.export.SettingsBackupDto
+import dev.bikram.filepipe.ui.theme.CustomFontStorage
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
@@ -97,6 +98,8 @@ private object PrefKeys {
     val PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME =
         longPreferencesKey("play_auto_review_prompted_for_last_update_time")
     val DEVELOPER_OPTIONS_ENABLED = booleanPreferencesKey("developer_options_enabled")
+    val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
+    val CUSTOM_FONT_NAME = stringPreferencesKey("custom_font_name")
 }
 
 private enum class ShadingIntensity {
@@ -253,6 +256,8 @@ class UserPreferencesRepository
                     inAppReviewAutoNeverAskAgain = prefs[PrefKeys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN] ?: false,
                     playAutoReviewPromptedForLastUpdateTime =
                         prefs[PrefKeys.PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME] ?: 0L,
+                    customFontPath = prefs[PrefKeys.CUSTOM_FONT_PATH].orEmpty(),
+                    customFontName = prefs[PrefKeys.CUSTOM_FONT_NAME].orEmpty(),
                 )
             }
 
@@ -374,6 +379,24 @@ class UserPreferencesRepository
 
         suspend fun setProgressiveBlurEnabled(enabled: Boolean) {
             dataStore.edit { it[PrefKeys.PROGRESSIVE_BLUR] = enabled }
+        }
+
+        suspend fun setCustomFont(
+            path: String,
+            displayName: String,
+        ) {
+            dataStore.edit { prefs ->
+                prefs[PrefKeys.CUSTOM_FONT_PATH] = path
+                prefs[PrefKeys.CUSTOM_FONT_NAME] = displayName
+            }
+        }
+
+        suspend fun clearCustomFont() {
+            CustomFontStorage.deleteStoredFontFiles(context)
+            dataStore.edit { prefs ->
+                prefs.remove(PrefKeys.CUSTOM_FONT_PATH)
+                prefs.remove(PrefKeys.CUSTOM_FONT_NAME)
+            }
         }
 
         suspend fun setUpdateCheckSchedule(schedule: UpdateCheckSchedule) {
@@ -564,6 +587,8 @@ class UserPreferencesRepository
                 prefs.remove(PrefKeys.SHADING_INTENSITY_FACTOR)
                 prefs.remove(PrefKeys.ENHANCED_SHADING_LEGACY)
                 prefs.remove(PrefKeys.PROGRESSIVE_BLUR)
+                prefs.remove(PrefKeys.CUSTOM_FONT_PATH)
+                prefs.remove(PrefKeys.CUSTOM_FONT_NAME)
                 prefs.remove(PrefKeys.HAPTIC_FEEDBACK)
                 prefs.remove(PrefKeys.SWIPE_START_TO_END)
                 prefs.remove(PrefKeys.SWIPE_END_TO_START)
@@ -851,6 +876,20 @@ class UserPreferencesRepository
                         prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] = activeNorm
                     }
                     prefs.remove(PrefKeys.CUSTOM_SEED_HEX)
+                }
+
+                val restoredFontPath = dto.customFontPath.trim()
+                if (restoredFontPath.isNotBlank() && java.io.File(restoredFontPath).isFile) {
+                    prefs[PrefKeys.CUSTOM_FONT_PATH] = restoredFontPath
+                    val restoredFontName = dto.customFontName.trim()
+                    if (restoredFontName.isNotBlank()) {
+                        prefs[PrefKeys.CUSTOM_FONT_NAME] = restoredFontName
+                    } else {
+                        prefs.remove(PrefKeys.CUSTOM_FONT_NAME)
+                    }
+                } else {
+                    prefs.remove(PrefKeys.CUSTOM_FONT_PATH)
+                    prefs.remove(PrefKeys.CUSTOM_FONT_NAME)
                 }
             }
         }

@@ -1,5 +1,8 @@
 package dev.bikram.filepipe.ui.screens.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -401,6 +404,8 @@ fun AppearanceSection(
     useGradientBackground: Boolean,
     shadingIntensity: Float,
     progressiveBlurEnabled: Boolean,
+    customFontPath: String,
+    customFontName: String,
     onThemeMode: (AppThemeMode) -> Unit,
     onColorSource: (AppColorSource) -> Unit,
     onPaletteStyle: (ThemePaletteStyle) -> Unit,
@@ -411,6 +416,8 @@ fun AppearanceSection(
     onUseGradientBackground: (Boolean) -> Unit,
     onShadingIntensity: (Float) -> Unit,
     onProgressiveBlurEnabled: (Boolean) -> Unit,
+    onCustomFontImported: (Uri) -> Unit,
+    onCustomFontClear: () -> Unit,
     onBlackThemeEffectClick: () -> Unit,
 ) {
     var hexPendingRemove by remember { mutableStateOf<String?>(null) }
@@ -451,8 +458,8 @@ fun AppearanceSection(
         GroupedListItem(position = GroupPosition.MIDDLE) {
             val enabled = !blackThemeEffectsDisabled
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
@@ -494,7 +501,7 @@ fun AppearanceSection(
                 onCheckedChange = onUseGradientBackground,
             )
         }
-        GroupedListItem(position = GroupPosition.LAST) {
+        GroupedListItem(position = GroupPosition.MIDDLE) {
             AppearanceToggleItem(
                 title = stringResource(R.string.settings_progressive_blur),
                 subtitle = stringResource(R.string.settings_progressive_blur_desc),
@@ -502,6 +509,96 @@ fun AppearanceSection(
                 leadingIconName = "blur_on",
                 onCheckedChange = onProgressiveBlurEnabled,
             )
+        }
+        GroupedListItem(position = GroupPosition.LAST) {
+            CustomFontSettingsRow(
+                customFontPath = customFontPath,
+                customFontName = customFontName,
+                onCustomFontImported = onCustomFontImported,
+                onCustomFontClear = onCustomFontClear,
+            )
+        }
+    }
+}
+
+@Composable
+private fun CustomFontSettingsRow(
+    customFontPath: String,
+    customFontName: String,
+    onCustomFontImported: (Uri) -> Unit,
+    onCustomFontClear: () -> Unit,
+) {
+    var showImportDialog by rememberSaveable { mutableStateOf(false) }
+    val fontPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri != null) {
+                onCustomFontImported(uri)
+            }
+        }
+
+    if (showImportDialog) {
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.settings_custom_font_choose),
+            text = stringResource(R.string.settings_custom_font_choose_explanation),
+            confirmLabel = stringResource(R.string.settings_custom_font_choose),
+            onConfirm = {
+                showImportDialog = false
+                fontPickerLauncher.launch(arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-otf"))
+            },
+            onDismiss = { showImportDialog = false },
+        )
+    }
+
+    val hasCustomFont = customFontPath.isNotBlank()
+    val subtitleText =
+        if (hasCustomFont) {
+            customFontName.ifBlank { customFontPath.substringAfterLast('/') }
+        } else {
+            stringResource(R.string.settings_custom_font_default)
+        }
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .tapSoundClickable { showImportDialog = true }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        FilePipeMaterialRoundedSymbol(
+            name = "font_download",
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.settings_custom_font_title),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = subtitleText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (hasCustomFont) {
+            Spacer(Modifier.width(8.dp))
+            FilePipeFilledTonalIconButton(
+                onClick = onCustomFontClear,
+            ) {
+                FilePipeMaterialRoundedSymbol(
+                    name = "close",
+                    contentDescription = stringResource(R.string.settings_custom_font_reset_success),
+                )
+            }
         }
     }
 }
@@ -543,7 +640,7 @@ private fun AppearanceStudioControls(
         )
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -612,16 +709,21 @@ private fun AppearanceStudioControls(
                 }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f))
-        ThemePreviewPanel(
-            colorSource = colorSource,
-            isInteractive = colorSource == AppColorSource.CUSTOM,
-            selectedTarget = editingTarget,
-            onTargetSelect = { target ->
-                editingTarget = target
-                customPickerExpanded = true
-            },
-        )
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
+        ) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f))
+            ThemePreviewPanel(
+                colorSource = colorSource,
+                isInteractive = colorSource == AppColorSource.CUSTOM,
+                selectedTarget = editingTarget,
+                onTargetSelect = { target ->
+                    editingTarget = target
+                    customPickerExpanded = true
+                },
+            )
+        }
     }
 }
 

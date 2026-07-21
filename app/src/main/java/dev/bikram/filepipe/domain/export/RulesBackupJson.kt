@@ -150,6 +150,8 @@ data class SettingsBackupDto(
     val customSeedHexes: List<String>? = null,
     val activeCustomSeedHex: String? = null,
     val folderAccessMode: String? = null,
+    val customFontPath: String = "",
+    val customFontName: String = "",
 )
 
 private val jsonFormatter =
@@ -263,6 +265,8 @@ fun AppPreferences.toBackupDto(): SettingsBackupDto =
         customSeedHexes = savedCustomSeedHexes.takeIf { it.isNotEmpty() },
         activeCustomSeedHex = activeCustomSeedHex.takeIf { it.isNotBlank() },
         folderAccessMode = folderAccessMode.name,
+        customFontPath = customFontPath,
+        customFontName = customFontName,
     )
 
 fun RuleBackupDto.toDomain(): Rule =

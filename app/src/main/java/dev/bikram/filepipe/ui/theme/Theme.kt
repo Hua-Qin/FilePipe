@@ -249,6 +249,7 @@ fun FilePipeTheme(
     activeCustomSeedHex: String = "",
     useGradientBackground: Boolean = true,
     progressiveBlurEnabled: Boolean = true,
+    customFontPath: String = "",
     paintBackground: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -271,6 +272,15 @@ fun FilePipeTheme(
         }
     val systemDark = isSystemInDarkTheme()
     val reducedMotion = rememberSystemReducedMotionEnabled(context)
+
+    val customFontFamily =
+        remember(customFontPath) {
+            CustomFontStorage.loadFontFamily(customFontPath)
+        }
+    val typography =
+        remember(customFontFamily) {
+            customFontFamily?.let { customFontTypography(it) } ?: AppTypography
+        }
 
     val darkTheme =
         when (themeMode) {
@@ -442,7 +452,7 @@ fun FilePipeTheme(
             colorScheme = colorScheme,
             motionScheme = MotionScheme.expressive(),
             shapes = AppShapes,
-            typography = AppTypography,
+            typography = typography,
         ) {
             Box(Modifier.fillMaxSize()) {
                 if (paintBackground) {

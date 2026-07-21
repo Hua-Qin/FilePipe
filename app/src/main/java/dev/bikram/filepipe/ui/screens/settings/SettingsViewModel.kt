@@ -33,6 +33,7 @@ import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.ImportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
+import dev.bikram.filepipe.ui.theme.CustomFontStorage
 import dev.bikram.filepipe.worker.ScheduledRulesExportWorker
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.channels.BufferOverflow
@@ -535,5 +536,27 @@ class SettingsViewModel
                 }
             manageIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             runCatching { context.startActivity(manageIntent) }
+        }
+
+        fun importCustomFont(uri: Uri) {
+            viewModelScope.launch(ioDispatcher) {
+                when (val result = CustomFontStorage.importFromUri(context, uri)) {
+                    is CustomFontStorage.ImportResult.Success -> {
+                        userPreferencesRepository.setCustomFont(result.path, result.displayName)
+                        postUserMessage(context.getString(R.string.settings_custom_font_success))
+                    }
+
+                    CustomFontStorage.ImportResult.InvalidFont -> {
+                        postUserMessage(context.getString(R.string.settings_custom_font_error_invalid))
+                    }
+                }
+            }
+        }
+
+        fun clearCustomFont() {
+            viewModelScope.launch(ioDispatcher) {
+                userPreferencesRepository.clearCustomFont()
+                postUserMessage(context.getString(R.string.settings_custom_font_reset_success))
+            }
         }
     }

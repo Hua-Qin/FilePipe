@@ -81,6 +81,9 @@ data class AppPreferences(
      * automatic in-app review flow (or it completed) for this install/update cycle.
      */
     val playAutoReviewPromptedForLastUpdateTime: Long = 0L,
+    /** Absolute path to a user-imported UI font under app filesDir/fonts. Empty == system font. */
+    val customFontPath: String = "",
+    val customFontName: String = "",
 ) {
     val useEnhancedShading: Boolean
         get() = shadingIntensity > 0.0f

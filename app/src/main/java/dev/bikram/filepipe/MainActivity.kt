@@ -88,6 +88,7 @@ class MainActivity : ComponentActivity() {
                 activeCustomSeedHex = preferences.activeCustomSeedHex,
                 useGradientBackground = preferences.useGradientBackground,
                 progressiveBlurEnabled = preferences.progressiveBlurEnabled,
+                customFontPath = preferences.customFontPath,
             ) {
                 if (introSeenAtLaunch == null) {
                     Surface(
