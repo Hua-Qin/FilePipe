@@ -73,6 +73,14 @@ object DatabaseModule {
             }
         }
 
+    private val migration9To10 =
+        object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE rules ADD COLUMN isRegexPattern INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE rules ADD COLUMN isExcludeRegexPattern INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -81,8 +89,16 @@ object DatabaseModule {
         migrateLegacyDatabaseNameIfNeeded(context)
         return Room
             .databaseBuilder(context, AppDatabase::class.java, APP_DATABASE_NAME)
-            .addMigrations(migration2To3, migration5To6, migration6To7, migration7To8, migration8To9)
+            .addMigrations(
+                migration2To3,
+                migration5To6,
+                migration6To7,
+                migration7To8,
+                migration8To9,
+                migration9To10,
+            )
             .fallbackToDestructiveMigration(dropAllTables = true)
+            .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
             .build()
     }
 

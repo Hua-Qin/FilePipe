@@ -99,6 +99,12 @@
 - Yes — enable **Include subfolders** on a source folder in the rule editor.
 - The destination can optionally recreate the source subfolder structure so files land in matching subdirectories.
 
+### How do RegEx filters work?
+- Tap the **RegEx** chip inside the **Filename pattern** or **Exclude pattern** text box to switch that field to regular expression mode.
+- In wildcard mode (default), use `*` to match any text (e.g. `Screenshot_*`) or separate multiple patterns with commas.
+- In RegEx mode, enter regular expression syntax (e.g. `^IMG_\d{4}\.(jpg|png)$` or `\.nomedia|.*\.tmp`). RegEx matching is case-insensitive.
+- If a regular expression has invalid syntax (such as an unclosed bracket), an error message will display and the rule cannot be saved until corrected.
+
 ---
 
 ## History & undo

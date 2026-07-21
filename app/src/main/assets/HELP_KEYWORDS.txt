@@ -53,3 +53,7 @@ palette -> colors
 gradient -> visual_effects
 blur -> visual_effects
 appearance -> theme_appearance|colors|visual_effects
+regex -> regex_filters
+regular expression -> regex_filters
+pattern -> regex_filters
+invalid regex -> regex_filters

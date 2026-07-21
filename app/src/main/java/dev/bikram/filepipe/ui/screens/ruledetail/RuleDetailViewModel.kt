@@ -68,11 +68,13 @@ data class RuleDetailUiState(
     val iconEmoji: String? = null,
     // Advanced filters (shown as display strings in UI)
     val filenamePattern: String = "",
+    val isRegexPattern: Boolean = false,
     val minFileSizeMb: String = "",
     val maxFileSizeMb: String = "",
     val minAgeDays: String = "",
     val maxAgeDays: String = "",
     val excludePatternsText: String = "",
+    val isExcludeRegexPattern: Boolean = false,
     val orientation: FileOrientation? = null,
     val isLoading: Boolean = true,
     val isSaved: Boolean = false,
@@ -93,7 +95,13 @@ data class RuleDetailUiState(
     val folderAccessMode: FolderAccessMode = FolderAccessMode.SAF_ONLY,
     val allFilesAccessGranted: Boolean = false,
     val isTrashed: Boolean = false,
-)
+) {
+    val isFilenamePatternInvalidRegex: Boolean
+        get() = isRegexPattern && filenamePattern.isNotBlank() && runCatching { Regex(filenamePattern) }.isFailure
+
+    val isExcludePatternInvalidRegex: Boolean
+        get() = isExcludeRegexPattern && excludePatternsText.isNotBlank() && runCatching { Regex(excludePatternsText.trim()) }.isFailure
+}
 
 private data class RuleSnapshot(
     val name: String,
@@ -109,11 +117,13 @@ private data class RuleSnapshot(
     val icon: RuleIcon,
     val iconEmoji: String?,
     val filenamePattern: String,
+    val isRegexPattern: Boolean,
     val minFileSizeMb: String,
     val maxFileSizeMb: String,
     val minAgeDays: String,
     val maxAgeDays: String,
     val excludePatternsText: String,
+    val isExcludeRegexPattern: Boolean,
     val orientation: FileOrientation?,
 )
 
@@ -132,11 +142,13 @@ private fun RuleDetailUiState.toSnapshot(): RuleSnapshot =
         icon = icon,
         iconEmoji = iconEmoji,
         filenamePattern = filenamePattern,
+        isRegexPattern = if (filenamePattern.isBlank()) false else isRegexPattern,
         minFileSizeMb = minFileSizeMb,
         maxFileSizeMb = maxFileSizeMb,
         minAgeDays = minAgeDays,
         maxAgeDays = maxAgeDays,
         excludePatternsText = excludePatternsText,
+        isExcludeRegexPattern = if (excludePatternsText.isBlank()) false else isExcludeRegexPattern,
         orientation = orientation,
     )
 
@@ -155,11 +167,13 @@ private fun RuleDetailUiState.withSnapshot(snapshot: RuleSnapshot): RuleDetailUi
         icon = snapshot.icon,
         iconEmoji = snapshot.iconEmoji,
         filenamePattern = snapshot.filenamePattern,
+        isRegexPattern = snapshot.isRegexPattern,
         minFileSizeMb = snapshot.minFileSizeMb,
         maxFileSizeMb = snapshot.maxFileSizeMb,
         minAgeDays = snapshot.minAgeDays,
         maxAgeDays = snapshot.maxAgeDays,
         excludePatternsText = snapshot.excludePatternsText,
+        isExcludeRegexPattern = snapshot.isExcludeRegexPattern,
         orientation = snapshot.orientation,
         errors = emptyList(),
         previewFiles = null,
@@ -246,11 +260,13 @@ class RuleDetailViewModel
                             icon = rule.icon,
                             iconEmoji = rule.iconEmoji,
                             filenamePattern = rule.filenamePattern ?: "",
+                            isRegexPattern = rule.isRegexPattern,
                             minFileSizeMb = rule.minFileSizeBytes?.let { bytes -> "${bytes / 1024 / 1024}" } ?: "",
                             maxFileSizeMb = rule.maxFileSizeBytes?.let { bytes -> "${bytes / 1024 / 1024}" } ?: "",
                             minAgeDays = rule.minAgeDays?.toString() ?: "",
                             maxAgeDays = rule.maxAgeDays?.toString() ?: "",
                             excludePatternsText = rule.excludePatterns.joinToString(", "),
+                            isExcludeRegexPattern = rule.isExcludeRegexPattern,
                             orientation = rule.orientation,
                             isLoading = false,
                             isTrashed = rule.trashedAt != null,
@@ -468,6 +484,8 @@ class RuleDetailViewModel
         // Advanced filter setters
         fun setFilenamePattern(pattern: String) = _uiState.update { it.copy(filenamePattern = pattern) }
 
+        fun setIsRegexPattern(isRegex: Boolean) = _uiState.update { it.copy(isRegexPattern = isRegex) }
+
         fun setMinFileSizeMb(value: String) = _uiState.update { it.copy(minFileSizeMb = value) }
 
         fun setMaxFileSizeMb(value: String) = _uiState.update { it.copy(maxFileSizeMb = value) }
@@ -477,6 +495,8 @@ class RuleDetailViewModel
         fun setMaxAgeDays(value: String) = _uiState.update { it.copy(maxAgeDays = value) }
 
         fun setExcludePatternsText(text: String) = _uiState.update { it.copy(excludePatternsText = text) }
+
+        fun setIsExcludeRegexPattern(isRegex: Boolean) = _uiState.update { it.copy(isExcludeRegexPattern = isRegex) }
 
         fun setOrientation(orientation: FileOrientation?) = _uiState.update { it.copy(orientation = orientation) }
 
@@ -650,5 +670,7 @@ class RuleDetailViewModel
                         .map { it.trim() }
                         .filter { it.isNotBlank() },
                 orientation = if (appliesToImageAndVideoOnly(state.fileExtensions)) state.orientation else null,
+                isRegexPattern = state.isRegexPattern,
+                isExcludeRegexPattern = state.isExcludeRegexPattern,
             )
     }

@@ -763,7 +763,7 @@ fun AppNavigation(
                                         onOpenNewRule = {
                                             navController.navigate(Screen.RuleDetail.createRoute())
                                         },
-                                        onOpenFaq = { navController.navigate(Screen.Faq.createRoute()) },
+                                        onOpenFaq = { focusSection -> navController.navigate(Screen.Faq.createRoute(focusSection)) },
                                         onNavigateToHistoryDetail = { historyId ->
                                             navController.navigate(Screen.HistoryDetail.createRoute(historyId)) {
                                                 launchSingleTop = true
@@ -828,7 +828,7 @@ fun AppNavigation(
                             ) {
                                 RuleDetailScreen(
                                     onNavigateBack = { navController.popBackStack() },
-                                    onOpenFaq = { navController.navigate(Screen.Faq.createRoute()) },
+                                    onOpenFaq = { focusSection -> navController.navigate(Screen.Faq.createRoute(focusSection)) },
                                 )
                             }
                             composable(Screen.History.route) {
@@ -1295,7 +1295,7 @@ private fun RulesTwoPaneRoute(
     contentPadding: PaddingValues,
     onOpenRuleDetail: (Long) -> Unit,
     onOpenNewRule: () -> Unit,
-    onOpenFaq: () -> Unit,
+    onOpenFaq: (String) -> Unit,
     onNavigateToHistoryDetail: (Long) -> Unit,
     onNavigateToHistoryList: () -> Unit,
     onNavigateToRuleHistory: (Long) -> Unit,
@@ -1552,7 +1552,7 @@ private fun RulesTwoPaneRoute(
                     } else if (selectedRuleId == null) {
                         SettingsScreen(
                             contentPadding = detailPaneContentPadding,
-                            onOpenHelp = onOpenFaq,
+                            onOpenHelp = { onOpenFaq("") },
                             viewModel = settingsViewModel,
                             updateVm = updateVm,
                             selectedSectionKey = SettingsSectionKey.About,
@@ -1944,7 +1944,7 @@ private fun HistoryTwoPaneRoute(
                                     navigator.navigateBack()
                                 }
                             },
-                            onOpenFaq = onOpenHelp,
+                            onOpenFaq = { focusSection -> onOpenHelp() },
                             onSavedRule = { _ -> },
                             showNavigateBack = showDetailNavigateBack,
                             isReadOnly = true,
@@ -1973,7 +1973,7 @@ private fun HistoryTwoPaneRoute(
 private fun RuleDetailPaneHost(
     ruleId: Long,
     onNavigateBack: () -> Unit,
-    onOpenFaq: () -> Unit,
+    onOpenFaq: (String) -> Unit,
     onSavedRule: (Long) -> Unit,
     showNavigateBack: Boolean,
     isReadOnly: Boolean = false,

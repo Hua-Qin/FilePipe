@@ -280,6 +280,23 @@ private fun computeLazyIndexForSectionHeader(
     return -1
 }
 
+private fun computeLazyIndexForItem(
+    focusItemId: String,
+    filteredSections: List<FaqSectionContent>,
+): Int {
+    var index = 1
+    for (section in filteredSections) {
+        index += 1
+        if (section.showNotSureBanner) index += 1
+        if (section.calloutBody != null) index += 1
+        for (item in section.items) {
+            if (item.id == focusItemId) return index
+            index += 1
+        }
+    }
+    return -1
+}
+
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalLayoutApi::class,
@@ -362,21 +379,32 @@ fun FaqScreen(
     }
 
     LaunchedEffect(initialFocusSectionId, filteredSections) {
-        if (initialFocusSectionId != Screen.Faq.FOCUS_STORAGE_ACCESS) return@LaunchedEffect
-        if (!expandedItemIds.contains("storage_all_files")) {
-            faqViewModel.setItemExpanded("storage_all_files", true)
+        if (initialFocusSectionId == Screen.Faq.FOCUS_STORAGE_ACCESS) {
+            if (!expandedItemIds.contains("storage_all_files")) {
+                faqViewModel.setItemExpanded("storage_all_files", true)
+            }
+            if (!expandedItemIds.contains("storage_selective")) {
+                faqViewModel.setItemExpanded("storage_selective", true)
+            }
+            val scrollIndex =
+                computeLazyIndexForSectionHeader(
+                    focusSectionId = SECTION_STORAGE_ACCESS_MODES,
+                    filteredSections = filteredSections,
+                )
+            if (scrollIndex >= 0) {
+                delay(120)
+                listState.scrollToItem(scrollIndex)
+            }
+        } else if (initialFocusSectionId == Screen.Faq.FOCUS_REGEX || initialFocusSectionId == "regex_filters") {
+            if (!expandedItemIds.contains("regex_filters")) {
+                faqViewModel.setItemExpanded("regex_filters", true)
+            }
+            val scrollIndex = computeLazyIndexForItem("regex_filters", filteredSections)
+            if (scrollIndex >= 0) {
+                delay(120)
+                listState.scrollToItem(scrollIndex)
+            }
         }
-        if (!expandedItemIds.contains("storage_selective")) {
-            faqViewModel.setItemExpanded("storage_selective", true)
-        }
-        val scrollIndex =
-            computeLazyIndexForSectionHeader(
-                focusSectionId = SECTION_STORAGE_ACCESS_MODES,
-                filteredSections = filteredSections,
-            )
-        if (scrollIndex < 0) return@LaunchedEffect
-        delay(120)
-        listState.scrollToItem(scrollIndex)
     }
 
     val scheme = MaterialTheme.colorScheme

@@ -14,6 +14,7 @@ sealed class Screen(
     data object Faq : Screen("faq?focusSection={focusSection}") {
         const val ARG_FOCUS_SECTION = "focusSection"
         const val FOCUS_STORAGE_ACCESS = "storage"
+        const val FOCUS_REGEX = "regex"
 
         /** Use for [composable] route registration and [NavController.navigate]. */
         fun createRoute(focusSection: String = ""): String = "faq?focusSection=$focusSection"

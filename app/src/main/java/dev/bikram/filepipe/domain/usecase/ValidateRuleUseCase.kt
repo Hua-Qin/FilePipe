@@ -59,6 +59,14 @@ class ValidateRuleUseCase
                             }
                         }
                     }
+                    if (rule.isRegexPattern && !rule.filenamePattern.isNullOrBlank()) {
+                        if (runCatching { Regex(rule.filenamePattern) }.isFailure) {
+                            add("Invalid regular expression syntax")
+                        }
+                    }
+                    if (rule.isExcludeRegexPattern && rule.excludePatterns.any { it.isNotBlank() && runCatching { Regex(it.trim()) }.isFailure }) {
+                        add("Invalid regular expression syntax in exclude patterns")
+                    }
                 }
             return if (errors.isEmpty()) Result.Valid else Result.Invalid(errors)
         }

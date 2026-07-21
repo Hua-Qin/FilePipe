@@ -79,6 +79,8 @@ private val itemOptionsByTitle =
         "Why is my rule skipping files?" to ItemOptions("rule_skipping_files"),
         "What does preview do?" to ItemOptions("what_preview_does"),
         "Can rules scan subfolders?" to ItemOptions("subfolders"),
+        "How do RegEx filters work?" to ItemOptions("regex_filters"),
+        "How do regular expression (RegEx) filters work?" to ItemOptions("regex_filters"),
         "What is in History?" to ItemOptions("history_contents"),
         "How do I undo a rule run?" to ItemOptions("undo_run"),
         "How do scheduled rules work?" to ItemOptions("scheduled_rules"),

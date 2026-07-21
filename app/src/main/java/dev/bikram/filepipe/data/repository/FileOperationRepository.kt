@@ -65,6 +65,8 @@ class FileOperationRepository
             val maxDepth: Int,
             val orientation: FileOrientation?,
             val filesystemAccessEnabled: Boolean,
+            val isRegexPattern: Boolean,
+            val isExcludeRegexPattern: Boolean,
         )
 
         private data class CacheEntry(
@@ -87,6 +89,8 @@ class FileOperationRepository
             maxDepth: Int = 5,
             filesystemAccessEnabled: Boolean = false,
             orientation: FileOrientation? = null,
+            isRegexPattern: Boolean = false,
+            isExcludeRegexPattern: Boolean = false,
             useCache: Boolean = false,
         ): List<FileEntry> =
             withContext(ioDispatcher) {
@@ -104,6 +108,8 @@ class FileOperationRepository
                         maxDepth = maxDepth,
                         orientation = orientation,
                         filesystemAccessEnabled = filesystemAccessEnabled,
+                        isRegexPattern = isRegexPattern,
+                        isExcludeRegexPattern = isExcludeRegexPattern,
                     )
 
                 if (useCache) {
@@ -129,6 +135,8 @@ class FileOperationRepository
                         maxDepth = maxDepth,
                         filesystemAccessEnabled = filesystemAccessEnabled,
                         orientation = orientation,
+                        isRegexPattern = isRegexPattern,
+                        isExcludeRegexPattern = isExcludeRegexPattern,
                     )
 
                 // A scan populated here is meant to be consumed by a matching `useCache = true` read
@@ -154,6 +162,8 @@ class FileOperationRepository
             maxDepth: Int = 5,
             filesystemAccessEnabled: Boolean = false,
             orientation: FileOrientation? = null,
+            isRegexPattern: Boolean = false,
+            isExcludeRegexPattern: Boolean = false,
         ): List<FileEntry> =
             withContext(ioDispatcher) {
                 val effectiveFolderUriString =
@@ -176,6 +186,8 @@ class FileOperationRepository
                         excludePatterns = excludePatterns,
                         maxDepth = maxDepth,
                         orientation = orientation,
+                        isRegexPattern = isRegexPattern,
+                        isExcludeRegexPattern = isExcludeRegexPattern,
                     )
                 }
 
@@ -196,14 +208,8 @@ class FileOperationRepository
                         .map {
                             it.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
                         }.toSet()
-                val filenameRegexes =
-                    filenamePattern
-                        ?.takeIf { it.isNotBlank() }
-                        ?.split(",")
-                        ?.map { it.trim() }
-                        ?.filter { it.isNotBlank() }
-                        ?.map { globToRegex(it) }
-                val excludeRegexes = excludePatterns.filter { it.isNotBlank() }.map { globToRegex(it) }
+                val filenameRegexes = buildFilenameRegexes(filenamePattern, isRegexPattern)
+                val excludeRegexes = buildExcludeRegexes(excludePatterns, isExcludeRegexPattern)
                 val now = System.currentTimeMillis()
                 val minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
                 val maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
@@ -227,8 +233,8 @@ class FileOperationRepository
                     .filter { (doc, _) ->
                         val ext = ".${doc.name.substringAfterLast('.').lowercase()}"
                         ext in lowerExtensions
-                    }.filter { (doc, _) -> filenameRegexes == null || filenameRegexes.isEmpty() || filenameRegexes.any { it.matches(doc.name) } }
-                    .filter { (doc, _) -> excludeRegexes.none { it.matches(doc.name) } }
+                    }.filter { (doc, _) -> matchesFilename(doc.name, filenameRegexes, isRegexPattern) }
+                    .filter { (doc, _) -> !shouldExclude(doc.name, excludeRegexes, isExcludeRegexPattern) }
                     .filter { (doc, _) -> minFileSizeBytes == null || doc.size >= minFileSizeBytes }
                     .filter { (doc, _) -> maxFileSizeBytes == null || doc.size <= maxFileSizeBytes }
                     .filter { (doc, _) ->
@@ -263,6 +269,8 @@ class FileOperationRepository
             excludePatterns: List<String>,
             maxDepth: Int,
             orientation: FileOrientation?,
+            isRegexPattern: Boolean = false,
+            isExcludeRegexPattern: Boolean = false,
         ): List<FileEntry> {
             val scanContext = currentCoroutineContext()
             val lowerExtensions =
@@ -270,14 +278,8 @@ class FileOperationRepository
                     .map {
                         it.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
                     }.toSet()
-            val filenameRegexes =
-                filenamePattern
-                    ?.takeIf { it.isNotBlank() }
-                    ?.split(",")
-                    ?.map { it.trim() }
-                    ?.filter { it.isNotBlank() }
-                    ?.map { globToRegex(it) }
-            val excludeRegexes = excludePatterns.filter { it.isNotBlank() }.map { globToRegex(it) }
+            val filenameRegexes = buildFilenameRegexes(filenamePattern, isRegexPattern)
+            val excludeRegexes = buildExcludeRegexes(excludePatterns, isExcludeRegexPattern)
             val now = System.currentTimeMillis()
             val minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
             val maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
@@ -296,8 +298,8 @@ class FileOperationRepository
                 .filter { (file, _) ->
                     val ext = ".${file.name.substringAfterLast('.').lowercase()}"
                     ext in lowerExtensions
-                }.filter { (file, _) -> filenameRegexes == null || filenameRegexes.isEmpty() || filenameRegexes.any { it.matches(file.name) } }
-                .filter { (file, _) -> excludeRegexes.none { it.matches(file.name) } }
+                }.filter { (file, _) -> matchesFilename(file.name, filenameRegexes, isRegexPattern) }
+                .filter { (file, _) -> !shouldExclude(file.name, excludeRegexes, isExcludeRegexPattern) }
                 .filter { (file, _) -> minFileSizeBytes == null || file.length() >= minFileSizeBytes }
                 .filter { (file, _) -> maxFileSizeBytes == null || file.length() <= maxFileSizeBytes }
                 .filter { (file, _) ->
@@ -1680,6 +1682,64 @@ class FileOperationRepository
             }
             sb.append("$")
             return Regex(sb.toString(), RegexOption.IGNORE_CASE)
+        }
+
+        private fun buildFilenameRegexes(
+            filenamePattern: String?,
+            isRegexPattern: Boolean,
+        ): List<Regex>? {
+            val trimmed = filenamePattern?.takeIf { it.isNotBlank() } ?: return null
+            if (isRegexPattern) {
+                return runCatching {
+                    listOf(Regex(trimmed, RegexOption.IGNORE_CASE))
+                }.getOrElse { emptyList() }
+            }
+            return trimmed
+                .split(",")
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .map { globToRegex(it) }
+        }
+
+        private fun matchesFilename(
+            name: String,
+            filenameRegexes: List<Regex>?,
+            isRegexPattern: Boolean,
+        ): Boolean {
+            if (filenameRegexes.isNullOrEmpty()) return true
+            return if (isRegexPattern) {
+                filenameRegexes.any { it.containsMatchIn(name) }
+            } else {
+                filenameRegexes.any { it.matches(name) }
+            }
+        }
+
+        private fun buildExcludeRegexes(
+            excludePatterns: List<String>,
+            isRegexPattern: Boolean,
+        ): List<Regex> {
+            val nonBlank = excludePatterns.filter { it.isNotBlank() }
+            if (nonBlank.isEmpty()) return emptyList()
+            return if (isRegexPattern) {
+                nonBlank.mapNotNull { pattern ->
+                    runCatching { Regex(pattern.trim(), RegexOption.IGNORE_CASE) }.getOrNull()
+                }
+            } else {
+                nonBlank.map { globToRegex(it.trim()) }
+            }
+        }
+
+        private fun shouldExclude(
+            name: String,
+            excludeRegexes: List<Regex>,
+            isRegexPattern: Boolean,
+        ): Boolean {
+            if (excludeRegexes.isEmpty()) return false
+            return if (isRegexPattern) {
+                excludeRegexes.any { it.containsMatchIn(name) }
+            } else {
+                excludeRegexes.any { it.matches(name) }
+            }
         }
     }
 

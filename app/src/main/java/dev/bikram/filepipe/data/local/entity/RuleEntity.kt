@@ -50,6 +50,10 @@ data class RuleEntity(
     @ColumnInfo(defaultValue = "[]")
     val excludePatterns: List<String> = emptyList(),
     val orientation: String? = null,
+    @ColumnInfo(defaultValue = "0")
+    val isRegexPattern: Boolean = false,
+    @ColumnInfo(defaultValue = "0")
+    val isExcludeRegexPattern: Boolean = false,
 )
 
 fun RuleEntity.toDomain(): Rule =
@@ -93,6 +97,8 @@ fun RuleEntity.toDomain(): Rule =
         maxAgeDays = maxAgeDays,
         excludePatterns = excludePatterns,
         orientation = orientation?.let { runCatching { FileOrientation.valueOf(it) }.getOrNull() },
+        isRegexPattern = isRegexPattern,
+        isExcludeRegexPattern = isExcludeRegexPattern,
     )
 
 fun Rule.toEntity(): RuleEntity =
@@ -138,4 +144,6 @@ fun Rule.toEntity(): RuleEntity =
         maxAgeDays = maxAgeDays,
         excludePatterns = excludePatterns,
         orientation = orientation?.name,
+        isRegexPattern = isRegexPattern,
+        isExcludeRegexPattern = isExcludeRegexPattern,
     )

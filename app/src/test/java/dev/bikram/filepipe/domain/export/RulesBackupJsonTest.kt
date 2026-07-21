@@ -43,6 +43,8 @@ class RulesBackupJsonTest {
                 minAgeDays = 1,
                 maxAgeDays = 30,
                 excludePatterns = listOf("*tmp*"),
+                isRegexPattern = true,
+                isExcludeRegexPattern = true,
             )
         val movedFile =
             FileMoved(
@@ -57,25 +59,22 @@ class RulesBackupJsonTest {
             )
         val history =
             RunHistory(
-                id = 7L,
-                ruleId = rule.id,
-                ruleName = rule.name,
+                id = 100L,
+                ruleName = "Screenshots",
                 triggeredBy = TriggerType.SCHEDULED,
-                startedAt = 100L,
-                completedAt = 200L,
+                startedAt = 1000L,
+                completedAt = 2000L,
                 status = RunStatus.SUCCESS,
-                totalFilesFound = 1,
                 totalFilesMoved = 1,
+                totalFilesFailed = 0,
                 operationMode = OperationMode.COPY,
                 copyCreatedDestFolderUris = listOf("content://destination/Camera"),
             )
         val settings =
             AppPreferences(
-                exportFolderUri = "content://backup/local",
-                cloudExportFolderUri = "content://backup/cloud",
                 autoExportOnRuleChange = true,
                 scheduledExportEnabled = true,
-                logRetentionDays = 14,
+                cloudExportFolderUri = "content://backup/cloud",
                 bookmarkedFolders = listOf("content://source"),
             )
 
@@ -92,6 +91,8 @@ class RulesBackupJsonTest {
         assertTrue(restoredRule.suppressMissingSourceFolderCardWarning)
         assertEquals(RuleIcon.SCREENSHOT, restoredRule.icon)
         assertEquals(rule.excludePatterns, restoredRule.excludePatterns)
+        assertTrue(restoredRule.isRegexPattern)
+        assertTrue(restoredRule.isExcludeRegexPattern)
 
         val restoredHistory = backup.history.single()
         assertEquals(0, restoredHistory.ruleIndexInBackup)

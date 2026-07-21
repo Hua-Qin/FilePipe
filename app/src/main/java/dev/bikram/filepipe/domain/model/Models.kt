@@ -45,6 +45,8 @@ data class Rule(
     val maxAgeDays: Int? = null,
     val excludePatterns: List<String> = emptyList(),
     val orientation: FileOrientation? = null,
+    val isRegexPattern: Boolean = false,
+    val isExcludeRegexPattern: Boolean = false,
 )
 
 enum class ScheduleType { DAILY, WEEKLY, EVERY_N_HOURS }

@@ -33,6 +33,8 @@ class SimulateRuleUseCase
                         excludePatterns = rule.excludePatterns,
                         filesystemAccessEnabled = filesystemAccessEnabled,
                         orientation = rule.orientation,
+                        isRegexPattern = rule.isRegexPattern,
+                        isExcludeRegexPattern = rule.isExcludeRegexPattern,
                     )
                 }
 

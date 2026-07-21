@@ -97,6 +97,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -134,6 +135,7 @@ import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.domain.RuleFolderSeverity
 import dev.bikram.filepipe.domain.assessRuleFolderAccess
 import dev.bikram.filepipe.domain.model.ConflictPolicy
+import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -155,6 +157,7 @@ import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeElevatedCard
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
+import dev.bikram.filepipe.ui.components.FilePipeFilterChip
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeSurface
@@ -325,7 +328,7 @@ private fun RuleErrorAlertCard(
 private fun RuleValidationErrorBar(
     messages: List<String>,
     isErrorSeverity: Boolean,
-    onOpenFaq: () -> Unit,
+    onOpenFaq: (String) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -346,9 +349,10 @@ private fun RuleValidationErrorBar(
         modifier =
             modifier
                 .fillMaxWidth()
-                .offset { IntOffset(offsetX.roundToInt(), 0) }
-                .onSizeChanged { size -> widthPx = size.width.toFloat() }
-                .pointerInput(widthPx) {
+                .padding(horizontal = 16.dp)
+                .onGloballyPositioned { widthPx = it.size.width.toFloat() }
+                .graphicsLayer { translationX = offsetX }
+                .pointerInput(messages) {
                     detectHorizontalDragGestures(
                         onHorizontalDrag = { _, dragAmount ->
                             val dragLimit = widthPx.takeIf { it > 0f } ?: 10_000f
@@ -408,7 +412,17 @@ private fun RuleValidationErrorBar(
                     modifier = Modifier.weight(1f),
                 )
                 FilePipeFilledTonalButton(
-                    onClick = onOpenFaq,
+                    onClick = {
+                        val focusSection =
+                            if (messages.any { it.contains("regular expression", ignoreCase = true) || it.contains("RegEx", ignoreCase = true) }) {
+                                Screen.Faq.FOCUS_REGEX
+                            } else if (messages.any { it.contains("folder", ignoreCase = true) || it.contains("access", ignoreCase = true) }) {
+                                Screen.Faq.FOCUS_STORAGE_ACCESS
+                            } else {
+                                ""
+                            }
+                        onOpenFaq(focusSection)
+                    },
                     shape = pillShape,
                     colors =
                         ButtonDefaults.filledTonalButtonColors(
@@ -581,7 +595,7 @@ private fun isScheduleInvalid(schedule: RuleSchedule?): Boolean {
 @Composable
 fun RuleDetailScreen(
     onNavigateBack: () -> Unit,
-    onOpenFaq: () -> Unit,
+    onOpenFaq: (String) -> Unit = {},
     onSavedRule: ((Long) -> Unit)? = null,
     showNavigateBack: Boolean = true,
     allowInitialRuleNameFocus: Boolean = true,
@@ -603,7 +617,7 @@ fun RuleDetailScreen(
             enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
         )
     val bookmarkedFolders by viewModel.bookmarkedFolders.collectAsStateWithLifecycle()
-    var advancedExpanded by remember { mutableStateOf(false) }
+    var userToggledAdvanced by remember(state.id) { mutableStateOf<Boolean?>(null) }
     var ruleNameCanFocus by remember(allowInitialRuleNameFocus) { mutableStateOf(allowInitialRuleNameFocus) }
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -1589,7 +1603,11 @@ fun RuleDetailScreen(
                             state.minAgeDays.isNotBlank() ||
                             state.maxAgeDays.isNotBlank() ||
                             state.excludePatternsText.isNotBlank() ||
-                            state.orientation != null
+                            state.orientation != null ||
+                            state.isRegexPattern ||
+                            state.isExcludeRegexPattern
+
+                    val advancedExpanded = userToggledAdvanced ?: hasAdvancedFilters
 
                     ElevatedCard(
                         modifier = Modifier.fillMaxWidth(),
@@ -1607,7 +1625,7 @@ fun RuleDetailScreen(
                                     Modifier
                                         .fillMaxWidth()
                                         .tapSoundClickable(
-                                            onClick = { advancedExpanded = !advancedExpanded },
+                                            onClick = { userToggledAdvanced = !advancedExpanded },
                                             interactionSource = advancedHeaderInteractionSource,
                                             indication = null,
                                         ),
@@ -1678,10 +1696,54 @@ fun RuleDetailScreen(
                                     OutlinedTextField(
                                         value = state.filenamePattern,
                                         onValueChange = viewModel::setFilenamePattern,
-                                        label = { Text(stringResource(R.string.advanced_filename_pattern_label)) },
-                                        placeholder = { Text(stringResource(R.string.advanced_filename_pattern_placeholder)) },
+                                        label = {
+                                            Text(
+                                                text =
+                                                    stringResource(
+                                                        if (state.isRegexPattern) {
+                                                            R.string.advanced_filename_pattern_regex_label
+                                                        } else {
+                                                            R.string.advanced_filename_pattern_label
+                                                        },
+                                                    ),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                softWrap = false,
+                                            )
+                                        },
+                                        placeholder = {
+                                            Text(
+                                                text =
+                                                    stringResource(
+                                                        if (state.isRegexPattern) {
+                                                            R.string.advanced_filename_pattern_regex_placeholder
+                                                        } else {
+                                                            R.string.advanced_filename_pattern_placeholder
+                                                        },
+                                                    ),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                softWrap = false,
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            FilePipeFilterChip(
+                                                selected = state.isRegexPattern,
+                                                onClick = { viewModel.setIsRegexPattern(!state.isRegexPattern) },
+                                                enabled = !isReadOnly,
+                                                label = { Text(stringResource(R.string.advanced_filename_pattern_regex_chip)) },
+                                                modifier = Modifier.padding(end = 4.dp),
+                                            )
+                                        },
                                         singleLine = true,
                                         enabled = !isReadOnly,
+                                        isError = state.isFilenamePatternInvalidRegex,
+                                        supportingText =
+                                            if (state.isFilenamePatternInvalidRegex) {
+                                                { Text(stringResource(R.string.advanced_filename_pattern_regex_error)) }
+                                            } else {
+                                                null
+                                            },
                                         modifier = Modifier.fillMaxWidth(),
                                     )
 
@@ -1736,8 +1798,52 @@ fun RuleDetailScreen(
                                     OutlinedTextField(
                                         value = state.excludePatternsText,
                                         onValueChange = viewModel::setExcludePatternsText,
-                                        label = { Text(stringResource(R.string.advanced_exclude_patterns_label)) },
-                                        placeholder = { Text(stringResource(R.string.advanced_exclude_placeholder)) },
+                                        label = {
+                                            Text(
+                                                text =
+                                                    stringResource(
+                                                        if (state.isExcludeRegexPattern) {
+                                                            R.string.advanced_exclude_patterns_regex_label
+                                                        } else {
+                                                            R.string.advanced_exclude_patterns_label
+                                                        },
+                                                    ),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                softWrap = false,
+                                            )
+                                        },
+                                        placeholder = {
+                                            Text(
+                                                text =
+                                                    stringResource(
+                                                        if (state.isExcludeRegexPattern) {
+                                                            R.string.advanced_exclude_patterns_regex_placeholder
+                                                        } else {
+                                                            R.string.advanced_exclude_placeholder
+                                                        },
+                                                    ),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                                softWrap = false,
+                                            )
+                                        },
+                                        trailingIcon = {
+                                            FilePipeFilterChip(
+                                                selected = state.isExcludeRegexPattern,
+                                                onClick = { viewModel.setIsExcludeRegexPattern(!state.isExcludeRegexPattern) },
+                                                enabled = !isReadOnly,
+                                                label = { Text(stringResource(R.string.advanced_filename_pattern_regex_chip)) },
+                                                modifier = Modifier.padding(end = 4.dp),
+                                            )
+                                        },
+                                        isError = state.isExcludePatternInvalidRegex,
+                                        supportingText =
+                                            if (state.isExcludePatternInvalidRegex) {
+                                                { Text(stringResource(R.string.advanced_exclude_patterns_regex_error)) }
+                                            } else {
+                                                null
+                                            },
                                         singleLine = true,
                                         enabled = !isReadOnly,
                                         modifier = Modifier.fillMaxWidth(),

@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonNames
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
  * (`@Database`); Room KSP does not allow that annotation to reference this constant.
  */
-const val APP_DATABASE_SCHEMA_VERSION = 9
+const val APP_DATABASE_SCHEMA_VERSION = 10
 
 /**
  * Root object for `filepipe_backup_*.json`.
@@ -68,6 +68,8 @@ data class RuleBackupDto(
     val maxAgeDays: Int? = null,
     val excludePatterns: List<String> = emptyList(),
     val orientation: String? = null,
+    val isRegexPattern: Boolean = false,
+    val isExcludeRegexPattern: Boolean = false,
 )
 
 @Serializable
@@ -187,6 +189,8 @@ fun Rule.toBackupDto(): RuleBackupDto =
         maxAgeDays = maxAgeDays,
         excludePatterns = excludePatterns,
         orientation = orientation?.name,
+        isRegexPattern = isRegexPattern,
+        isExcludeRegexPattern = isExcludeRegexPattern,
     )
 
 fun RuleSchedule.toBackupDto(): ScheduleBackupDto =
@@ -296,6 +300,8 @@ fun RuleBackupDto.toDomain(): Rule =
         maxAgeDays = maxAgeDays,
         excludePatterns = excludePatterns,
         orientation = orientation?.let { runCatching { FileOrientation.valueOf(it) }.getOrNull() },
+        isRegexPattern = isRegexPattern,
+        isExcludeRegexPattern = isExcludeRegexPattern,
     )
 
 fun ScheduleBackupDto.toDomain(): RuleSchedule? {

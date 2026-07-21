@@ -83,6 +83,45 @@ class ValidateRuleUseCaseTest {
         assertEquals(listOf("Interval must be between 1 and 52 weeks"), weeklyErrors.errors)
     }
 
+    @Test
+    fun invalidRegexPatternFailsValidation() {
+        val result =
+            validate(
+                baseRule().copy(
+                    isRegexPattern = true,
+                    filenamePattern = "IMG_\\d+(",
+                ),
+            ) as ValidateRuleUseCase.Result.Invalid
+
+        assertTrue(result.errors.contains("Invalid regular expression syntax"))
+    }
+
+    @Test
+    fun validRegexPatternPassesValidation() {
+        val result =
+            validate(
+                baseRule().copy(
+                    isRegexPattern = true,
+                    filenamePattern = "^IMG_\\d+\\.(jpg|png)$",
+                ),
+            )
+
+        assertEquals(ValidateRuleUseCase.Result.Valid, result)
+    }
+
+    @Test
+    fun invalidExcludeRegexPatternFailsValidation() {
+        val result =
+            validate(
+                baseRule().copy(
+                    isExcludeRegexPattern = true,
+                    excludePatterns = listOf(".nomedia", "([invalid"),
+                ),
+            ) as ValidateRuleUseCase.Result.Invalid
+
+        assertTrue(result.errors.contains("Invalid regular expression syntax in exclude patterns"))
+    }
+
     private fun baseRule(): Rule =
         Rule(
             name = "Screenshots",
