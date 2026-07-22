@@ -84,7 +84,7 @@ private data class StorageVolumeRoot(
 )
 
 private fun folderPickerDirectoryEntry(file: File): FolderPickerDirectoryEntry? {
-    if (!file.isDirectory || !file.canRead() || file.name.startsWith(".")) return null
+    if (!file.isDirectory || !file.canRead()) return null
     val resolvedPath =
         runCatching { file.canonicalFile.absolutePath }
             .getOrElse { file.absolutePath }

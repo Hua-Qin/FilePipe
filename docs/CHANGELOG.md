@@ -1,11 +1,12 @@
-## v3.9.3 Custom fonts, AMOLED toggle, RegEx
+## v3.9.4 Fonts, AMOLED, RegEx, Dot folders
 
 ### ✨ New Features
 - Import your own font (`.ttf` or `.otf`) from Settings → Appearance and use it across the whole app.
 - Advanced filters now support regular expressions.
 
 ### 🛠 Improved Features
-- Pure black (OLED) is now a separate toggle under System or Dark, instead of a fourth theme mode in the picker.
+- Pure black (OLED) is now a separate toggle under System or Dark, instead of a fourth theme mode.
+- dot folders (folders whose names start with ".") are now selectable in all-files-access folder picker.
 
 ---
 
