@@ -135,7 +135,6 @@ import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.domain.RuleFolderSeverity
 import dev.bikram.filepipe.domain.assessRuleFolderAccess
 import dev.bikram.filepipe.domain.model.ConflictPolicy
-import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -147,7 +146,6 @@ import dev.bikram.filepipe.domain.model.appliesToImageAndVideoOnly
 import dev.bikram.filepipe.domain.model.formatExtensionLabel
 import dev.bikram.filepipe.domain.model.isAllFilesExtension
 import dev.bikram.filepipe.domain.model.materialSymbolName
-import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.usecase.RuleConflict
 import dev.bikram.filepipe.domain.usecase.RuleConflictDetector
 import dev.bikram.filepipe.ui.common.AppBottomSheet
@@ -180,6 +178,7 @@ import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.previewSourceFolderDisplayPath
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer
+import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.cardFilledTonalIconButtonColors
@@ -917,47 +916,7 @@ fun RuleDetailScreen(
             else -> null
         }
     val scheduleHasError = showValidationErrors && isScheduleInvalid(state.schedule)
-    val currentRule =
-        remember(state) {
-            Rule(
-                id = state.id,
-                sortOrder = state.sortOrder,
-                name = state.name.trim(),
-                sourceFolderPaths = state.sourceFolderPaths,
-                destinationFolderPath = state.destinationFolderPath,
-                fileExtensions = state.fileExtensions,
-                isEnabled = state.isEnabled,
-                schedule = state.schedule,
-                conflictPolicy = state.conflictPolicy,
-                operationMode = state.operationMode,
-                scanSubdirectories = state.scanSubdirectories,
-                recreateDestinationSubfolders = state.scanSubdirectories && state.recreateDestinationSubfolders,
-                suppressMissingSourceFolderCardWarning = state.suppressMissingSourceFolderCardWarning,
-                icon = state.icon,
-                iconEmoji = state.iconEmoji?.takeIf { it.isNotBlank() },
-                filenamePattern = state.filenamePattern.takeIf { it.isNotBlank() },
-                minFileSizeBytes =
-                    state.minFileSizeMb
-                        .toLongOrNull()
-                        ?.takeIf { it > 0 }
-                        ?.let { it * 1024 * 1024 },
-                maxFileSizeBytes =
-                    state.maxFileSizeMb
-                        .toLongOrNull()
-                        ?.takeIf { it > 0 }
-                        ?.let { it * 1024 * 1024 },
-                minAgeDays = state.minAgeDays.toIntOrNull()?.takeIf { it > 0 },
-                maxAgeDays = state.maxAgeDays.toIntOrNull()?.takeIf { it > 0 },
-                excludePatterns =
-                    state.excludePatternsText
-                        .split(",")
-                        .map { it.trim() }
-                        .filter { it.isNotBlank() },
-                orientation = if (appliesToImageAndVideoOnly(state.fileExtensions)) state.orientation else null,
-                isRegexPattern = state.isRegexPattern,
-                isExcludeRegexPattern = state.isExcludeRegexPattern,
-            )
-        }
+    val currentRule = remember(state) { viewModel.buildRuleFromState(state) }
     val ruleConflicts = remember(currentRule) { RuleConflictDetector.detectConflicts(currentRule) }
 
     Box(
@@ -1079,20 +1038,25 @@ fun RuleDetailScreen(
                         ruleConflicts.forEach { conflict ->
                             val msg =
                                 when (conflict) {
-                                    is RuleConflict.NoExtensionPatternConflict ->
+                                    is RuleConflict.NoExtensionPatternConflict -> {
                                         stringResource(R.string.rule_conflict_no_ext_pattern, conflict.patternExtension)
+                                    }
 
-                                    is RuleConflict.ExtensionPatternMismatch ->
+                                    is RuleConflict.ExtensionPatternMismatch -> {
                                         stringResource(R.string.rule_conflict_ext_mismatch, conflict.patternExtension)
+                                    }
 
-                                    RuleConflict.InvalidSizeRange ->
+                                    RuleConflict.InvalidSizeRange -> {
                                         stringResource(R.string.rule_conflict_invalid_size)
+                                    }
 
-                                    RuleConflict.InvalidAgeRange ->
+                                    RuleConflict.InvalidAgeRange -> {
                                         stringResource(R.string.rule_conflict_invalid_age)
+                                    }
 
-                                    is RuleConflict.ExcludeAllPattern ->
+                                    is RuleConflict.ExcludeAllPattern -> {
                                         stringResource(R.string.rule_conflict_exclude_all, conflict.pattern)
+                                    }
                                 }
                             Text(
                                 text = msg,

@@ -60,6 +60,7 @@ class RulesBackupJsonTest {
         val history =
             RunHistory(
                 id = 100L,
+                ruleId = rule.id,
                 ruleName = "Screenshots",
                 triggeredBy = TriggerType.SCHEDULED,
                 startedAt = 1000L,

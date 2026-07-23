@@ -96,8 +96,7 @@ object DatabaseModule {
                 migration7To8,
                 migration8To9,
                 migration9To10,
-            )
-            .fallbackToDestructiveMigration(dropAllTables = true)
+            ).fallbackToDestructiveMigration(dropAllTables = true)
             .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
             .build()
     }

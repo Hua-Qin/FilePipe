@@ -5,13 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.InputChipDefaults
@@ -139,25 +137,6 @@ fun FileExtensionChips(
 }
 
 @Composable
-private fun FileTypeActionButtonContent(
-    iconName: String,
-    text: String,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        FilePipeMaterialRoundedSymbol(
-            name = iconName,
-            contentDescription = null,
-            size = 18.dp,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(text)
-    }
-}
-
-@Composable
 private fun AddExtensionDialog(
     onDismiss: () -> Unit,
     onAdd: (String) -> Unit,
@@ -218,8 +197,12 @@ private fun AddExtensionDialog(
                             .filter { it.isNotEmpty() }
                             .map { ext ->
                                 when {
-                                    dev.bikram.filepipe.domain.model.isAllFilesExtension(ext) -> dev.bikram.filepipe.domain.model.ALL_FILES_EXTENSION
-                                    dev.bikram.filepipe.domain.model.isNoExtensionToken(ext) -> dev.bikram.filepipe.domain.model.NO_EXTENSION_TOKEN
+                                    dev.bikram.filepipe.domain.model
+                                        .isAllFilesExtension(ext) -> dev.bikram.filepipe.domain.model.ALL_FILES_EXTENSION
+
+                                    dev.bikram.filepipe.domain.model
+                                        .isNoExtensionToken(ext) -> dev.bikram.filepipe.domain.model.NO_EXTENSION_TOKEN
+
                                     else -> ext.lowercase().let { if (it.startsWith(".")) it else ".$it" }
                                 }
                             }

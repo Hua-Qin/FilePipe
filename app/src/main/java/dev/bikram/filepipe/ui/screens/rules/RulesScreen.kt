@@ -96,7 +96,6 @@ import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
-import dev.bikram.filepipe.domain.usecase.RuleConflictDetector
 import dev.bikram.filepipe.ui.components.RuleCard
 import dev.bikram.filepipe.ui.components.RuleCardAction
 import dev.bikram.filepipe.ui.components.RuleCardFolderIssueSeverity
@@ -628,11 +627,12 @@ fun RulesScreen(
                         val showInlineProgressCancel =
                             manualRunCancelAnchor is ManualRunCancelAnchor.SingleRule &&
                                 manualRunCancelAnchor.ruleId == rule.id
+                        // Rule-conflict warnings are applied inside RuleCard (memoized per rule);
+                        // here we only surface stale/missing-folder state.
                         val folderIssueSeverity =
                             when {
                                 rule.id in staleRuleErrorIds -> RuleCardFolderIssueSeverity.ERROR
                                 rule.id in staleRuleWarningIds -> RuleCardFolderIssueSeverity.WARNING
-                                RuleConflictDetector.detectConflicts(rule).isNotEmpty() -> RuleCardFolderIssueSeverity.WARNING
                                 else -> null
                             }
                         SwipeToDismissRuleCard(

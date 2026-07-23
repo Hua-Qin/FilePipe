@@ -17,13 +17,13 @@ import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.data.storage.primaryDownloadsDirectoryPath
 import dev.bikram.filepipe.data.storage.primaryScreenshotsDirectoryPath
 import dev.bikram.filepipe.di.IoDispatcher
+import dev.bikram.filepipe.domain.model.ALL_FILES_EXTENSION
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.FolderAccessResult
+import dev.bikram.filepipe.domain.model.NO_EXTENSION_TOKEN
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
-import dev.bikram.filepipe.domain.model.ALL_FILES_EXTENSION
-import dev.bikram.filepipe.domain.model.NO_EXTENSION_TOKEN
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleSchedule
@@ -649,7 +649,11 @@ class RuleDetailViewModel
                 _uiState.update { it.copy(isSaved = true) }
             }
 
-        private fun buildRuleFromState(state: RuleDetailUiState) =
+        /**
+         * Builds a domain [Rule] from the current editor state. Public so the screen can derive
+         * the same rule (e.g. for conflict detection) without duplicating this mapping.
+         */
+        fun buildRuleFromState(state: RuleDetailUiState) =
             Rule(
                 id = state.id,
                 sortOrder = state.sortOrder,

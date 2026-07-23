@@ -67,6 +67,46 @@ class RuleConflictDetectorTest {
     }
 
     @Test
+    fun allowsMultiGlobPatternWhenOneAlternativeMatchesSelectedType() {
+        val rule =
+            baseRule().copy(
+                fileExtensions = listOf("pdf"),
+                filenamePattern = "*.pdf, *.png",
+                isRegexPattern = false,
+            )
+        val conflicts = RuleConflictDetector.detectConflicts(rule)
+
+        assertTrue(conflicts.isEmpty())
+    }
+
+    @Test
+    fun detectsMismatchWhenNoMultiGlobAlternativeMatches() {
+        val rule =
+            baseRule().copy(
+                fileExtensions = listOf("jpg"),
+                filenamePattern = "*.pdf, *.png",
+                isRegexPattern = false,
+            )
+        val conflicts = RuleConflictDetector.detectConflicts(rule)
+
+        assertEquals(1, conflicts.size)
+        assertTrue(conflicts.first() is RuleConflict.ExtensionPatternMismatch)
+    }
+
+    @Test
+    fun allowsMultiGlobPatternWithUnconstrainedAlternative() {
+        val rule =
+            baseRule().copy(
+                fileExtensions = listOf("pdf"),
+                filenamePattern = "*.png, IMG_*",
+                isRegexPattern = false,
+            )
+        val conflicts = RuleConflictDetector.detectConflicts(rule)
+
+        assertTrue(conflicts.isEmpty())
+    }
+
+    @Test
     fun detectsInvalidSizeRange() {
         val rule =
             baseRule().copy(

@@ -277,6 +277,7 @@ const val ALL_FILES_EXTENSION = "*"
 const val NO_EXTENSION_TOKEN = "[no_ext]"
 
 fun isAllFilesExtension(ext: String): Boolean = ext.trim() == ALL_FILES_EXTENSION
+
 fun isNoExtensionToken(ext: String): Boolean = ext.trim().lowercase() == NO_EXTENSION_TOKEN
 
 /** Canonical image/video extensions (no leading dot, lowercase). Single source of truth for orientation support. */
