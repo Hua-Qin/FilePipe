@@ -9,6 +9,7 @@ enum class RuleIcon {
     DOWNLOAD,
     DOCUMENT,
     INSTALLABLE,
+    DRAFT,
     ;
 
     companion object {
@@ -26,4 +27,5 @@ fun RuleIcon.materialSymbolName(): String =
         RuleIcon.DOWNLOAD -> "download"
         RuleIcon.DOCUMENT -> "text_snippet"
         RuleIcon.INSTALLABLE -> "android"
+        RuleIcon.DRAFT -> "draft"
     }

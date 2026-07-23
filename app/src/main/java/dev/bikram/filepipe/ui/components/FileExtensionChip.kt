@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.R
+import dev.bikram.filepipe.domain.model.formatExtensionLabel
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -49,6 +51,12 @@ fun FileExtensionChips(
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         extensions.forEach { ext ->
+            val labelText =
+                formatExtensionLabel(
+                    ext = ext,
+                    allFilesLabel = stringResource(R.string.file_type_all_files),
+                    noExtensionLabel = stringResource(R.string.file_type_no_extension),
+                )
             FilePipeInputChip(
                 selected = true,
                 onClick = {
@@ -57,7 +65,7 @@ fun FileExtensionChips(
                     }
                 },
                 enabled = enabled,
-                label = { Text(ext.removePrefix(".")) },
+                label = { Text(labelText) },
                 colors =
                     InputChipDefaults.inputChipColors(
                         selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -69,7 +77,7 @@ fun FileExtensionChips(
                         {
                             FilePipeMaterialRoundedSymbol(
                                 name = "close",
-                                contentDescription = stringResource(R.string.file_type_remove_content_description, ext),
+                                contentDescription = stringResource(R.string.file_type_remove_content_description, labelText),
                                 size = InputChipDefaults.AvatarSize,
                                 modifier = Modifier.size(InputChipDefaults.AvatarSize),
                             )
@@ -80,28 +88,42 @@ fun FileExtensionChips(
             )
         }
         if (enabled) {
-            FilePipeOutlinedButton(
-                onClick = {
-                    showAddDialog = true
+            FilePipeFilterChip(
+                selected = false,
+                onClick = { showAddDialog = true },
+                leadingIcon = {
+                    Box(
+                        modifier = Modifier.size(FilterChipDefaults.IconSize),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        FilePipeMaterialRoundedSymbol(
+                            name = "add",
+                            contentDescription = null,
+                            size = FilterChipDefaults.IconSize,
+                            opticalCenterYOffset = (-1).dp,
+                        )
+                    }
                 },
-                shape = FilterChipDefaults.shape,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                FileTypeActionButtonContent(
-                    iconName = "add",
-                    text = addTypeLabel,
-                )
-            }
-            FilePipeOutlinedButton(
+                label = { Text(addTypeLabel) },
+            )
+            FilePipeFilterChip(
+                selected = false,
                 onClick = onUseTemplate,
-                shape = FilterChipDefaults.shape,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-            ) {
-                FileTypeActionButtonContent(
-                    iconName = "auto_awesome",
-                    text = useTemplateLabel,
-                )
-            }
+                leadingIcon = {
+                    Box(
+                        modifier = Modifier.size(FilterChipDefaults.IconSize),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        FilePipeMaterialRoundedSymbol(
+                            name = "auto_awesome",
+                            contentDescription = null,
+                            size = FilterChipDefaults.IconSize,
+                            opticalCenterYOffset = (-1).dp,
+                        )
+                    }
+                },
+                label = { Text(useTemplateLabel) },
+            )
         }
     }
 
@@ -156,14 +178,35 @@ private fun AddExtensionDialog(
             }
         },
         text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.file_type_dialog_label)) },
-                placeholder = { Text(stringResource(R.string.file_type_dialog_placeholder)) },
-                singleLine = true,
-            )
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.file_type_dialog_label)) },
+                    placeholder = { Text(stringResource(R.string.file_type_dialog_placeholder)) },
+                    singleLine = true,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FilePipeFilterChip(
+                        selected = false,
+                        onClick = {
+                            onAdd(dev.bikram.filepipe.domain.model.ALL_FILES_EXTENSION)
+                        },
+                        label = { Text(stringResource(R.string.file_type_all_files)) },
+                    )
+                    FilePipeFilterChip(
+                        selected = false,
+                        onClick = {
+                            onAdd(dev.bikram.filepipe.domain.model.NO_EXTENSION_TOKEN)
+                        },
+                        label = { Text(stringResource(R.string.file_type_no_extension)) },
+                    )
+                }
+            }
         },
         confirmButton = {
             FilePipeTextButton(
@@ -171,10 +214,15 @@ private fun AddExtensionDialog(
                     val extensions =
                         text
                             .split(Regex("[,;\\s]+"))
-                            .map { it.trim().lowercase() }
+                            .map { it.trim() }
                             .filter { it.isNotEmpty() }
-                            .map { if (it.startsWith(".")) it else ".$it" }
-                            .filter { it.length > 1 }
+                            .map { ext ->
+                                when {
+                                    dev.bikram.filepipe.domain.model.isAllFilesExtension(ext) -> dev.bikram.filepipe.domain.model.ALL_FILES_EXTENSION
+                                    dev.bikram.filepipe.domain.model.isNoExtensionToken(ext) -> dev.bikram.filepipe.domain.model.NO_EXTENSION_TOKEN
+                                    else -> ext.lowercase().let { if (it.startsWith(".")) it else ".$it" }
+                                }
+                            }
                     extensions.forEach { onAdd(it) }
                 },
                 enabled = text.isNotBlank(),

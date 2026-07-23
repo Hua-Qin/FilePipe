@@ -23,6 +23,8 @@ import dev.bikram.filepipe.domain.model.IMAGE_EXTENSIONS
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.VIDEO_EXTENSIONS
+import dev.bikram.filepipe.domain.model.isAllFilesExtension
+import dev.bikram.filepipe.domain.model.isNoExtensionToken
 import dev.bikram.filepipe.domain.model.normalizeExtension
 import dev.bikram.filepipe.domain.model.resolveRenameSuffixName
 import kotlinx.coroutines.CoroutineDispatcher
@@ -230,10 +232,7 @@ class FileOperationRepository
 
                 candidates
                     .asSequence()
-                    .filter { (doc, _) ->
-                        val ext = ".${doc.name.substringAfterLast('.').lowercase()}"
-                        ext in lowerExtensions
-                    }.filter { (doc, _) -> matchesFilename(doc.name, filenameRegexes, isRegexPattern) }
+                    .filter { (doc, _) -> matchesExtensions(doc.name, extensions) }.filter { (doc, _) -> matchesFilename(doc.name, filenameRegexes, isRegexPattern) }
                     .filter { (doc, _) -> !shouldExclude(doc.name, excludeRegexes, isExcludeRegexPattern) }
                     .filter { (doc, _) -> minFileSizeBytes == null || doc.size >= minFileSizeBytes }
                     .filter { (doc, _) -> maxFileSizeBytes == null || doc.size <= maxFileSizeBytes }
@@ -295,10 +294,7 @@ class FileOperationRepository
                 // Cooperative cancellation: bail out between files as soon as the run is cancelled
                 // rather than running the (potentially slow) per-file orientation probe to completion.
                 .onEach { scanContext.ensureActive() }
-                .filter { (file, _) ->
-                    val ext = ".${file.name.substringAfterLast('.').lowercase()}"
-                    ext in lowerExtensions
-                }.filter { (file, _) -> matchesFilename(file.name, filenameRegexes, isRegexPattern) }
+                .filter { (file, _) -> matchesExtensions(file.name, extensions) }.filter { (file, _) -> matchesFilename(file.name, filenameRegexes, isRegexPattern) }
                 .filter { (file, _) -> !shouldExclude(file.name, excludeRegexes, isExcludeRegexPattern) }
                 .filter { (file, _) -> minFileSizeBytes == null || file.length() >= minFileSizeBytes }
                 .filter { (file, _) -> maxFileSizeBytes == null || file.length() <= maxFileSizeBytes }
@@ -1740,6 +1736,25 @@ class FileOperationRepository
             } else {
                 excludeRegexes.any { it.matches(name) }
             }
+        }
+
+        private fun matchesExtensions(fileName: String, extensions: List<String>): Boolean {
+            if (extensions.isEmpty()) return false
+            if (extensions.any { isAllFilesExtension(it) }) return true
+
+            val hasNoExtension = !fileName.contains('.') || fileName.indexOf('.') == 0 || fileName.endsWith('.')
+            if (hasNoExtension && extensions.any { isNoExtensionToken(it) }) return true
+
+            val fileExt = if (fileName.contains('.')) fileName.substringAfterLast('.').lowercase() else ""
+            if (fileExt.isEmpty()) return extensions.any { isNoExtensionToken(it) }
+
+            val formattedFileExt = ".$fileExt"
+            val lowerExtensions = extensions.map {
+                val lower = it.lowercase()
+                if (lower.startsWith(".")) lower else ".$lower"
+            }.toSet()
+
+            return formattedFileExt in lowerExtensions
         }
     }
 

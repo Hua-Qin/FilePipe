@@ -15,7 +15,21 @@ data class RuleTemplate(
     val autoFilesystemSource: TemplateAutoSource? = null,
 ) {
     companion object {
-        val ALL =
+        val ALL_FILES =
+            RuleTemplate(
+                name = "All Files",
+                extensions = listOf(ALL_FILES_EXTENSION),
+                suggestedIcon = RuleIcon.DEFAULT,
+            )
+
+        val NO_EXTENSION =
+            RuleTemplate(
+                name = "No Extension",
+                extensions = listOf(NO_EXTENSION_TOKEN),
+                suggestedIcon = RuleIcon.DRAFT,
+            )
+
+        val CATEGORIES =
             listOf(
                 RuleTemplate(
                     name = "Screenshots",
@@ -56,5 +70,7 @@ data class RuleTemplate(
                     suggestedIcon = RuleIcon.VIDEO,
                 ),
             )
+
+        val ALL = CATEGORIES + listOf(ALL_FILES, NO_EXTENSION)
     }
 }

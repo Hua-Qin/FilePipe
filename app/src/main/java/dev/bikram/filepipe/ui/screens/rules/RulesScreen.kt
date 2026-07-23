@@ -96,6 +96,7 @@ import dev.bikram.filepipe.ui.components.FilePipeFilledTonalButton
 import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
+import dev.bikram.filepipe.domain.usecase.RuleConflictDetector
 import dev.bikram.filepipe.ui.components.RuleCard
 import dev.bikram.filepipe.ui.components.RuleCardAction
 import dev.bikram.filepipe.ui.components.RuleCardFolderIssueSeverity
@@ -628,9 +629,10 @@ fun RulesScreen(
                             manualRunCancelAnchor is ManualRunCancelAnchor.SingleRule &&
                                 manualRunCancelAnchor.ruleId == rule.id
                         val folderIssueSeverity =
-                            when (rule.id) {
-                                in staleRuleErrorIds -> RuleCardFolderIssueSeverity.ERROR
-                                in staleRuleWarningIds -> RuleCardFolderIssueSeverity.WARNING
+                            when {
+                                rule.id in staleRuleErrorIds -> RuleCardFolderIssueSeverity.ERROR
+                                rule.id in staleRuleWarningIds -> RuleCardFolderIssueSeverity.WARNING
+                                RuleConflictDetector.detectConflicts(rule).isNotEmpty() -> RuleCardFolderIssueSeverity.WARNING
                                 else -> null
                             }
                         SwipeToDismissRuleCard(

@@ -110,6 +110,30 @@ class ValidateRuleUseCaseTest {
     }
 
     @Test
+    fun validAllFilesRulePassesValidation() {
+        val result =
+            validate(
+                baseRule().copy(
+                    fileExtensions = listOf("*"),
+                ),
+            )
+
+        assertEquals(ValidateRuleUseCase.Result.Valid, result)
+    }
+
+    @Test
+    fun validNoExtensionRulePassesValidation() {
+        val result =
+            validate(
+                baseRule().copy(
+                    fileExtensions = listOf("[no_ext]"),
+                ),
+            )
+
+        assertEquals(ValidateRuleUseCase.Result.Valid, result)
+    }
+
+    @Test
     fun invalidExcludeRegexPatternFailsValidation() {
         val result =
             validate(

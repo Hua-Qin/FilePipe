@@ -273,6 +273,12 @@ enum class FileOrientation {
     LANDSCAPE,
 }
 
+const val ALL_FILES_EXTENSION = "*"
+const val NO_EXTENSION_TOKEN = "[no_ext]"
+
+fun isAllFilesExtension(ext: String): Boolean = ext.trim() == ALL_FILES_EXTENSION
+fun isNoExtensionToken(ext: String): Boolean = ext.trim().lowercase() == NO_EXTENSION_TOKEN
+
 /** Canonical image/video extensions (no leading dot, lowercase). Single source of truth for orientation support. */
 val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "gif", "heic", "webp", "bmp", "tiff", "heif")
 val VIDEO_EXTENSIONS = setOf("mp4", "mov", "mkv", "avi", "webm", "3gp", "ts", "m4v")
@@ -280,9 +286,21 @@ val VIDEO_EXTENSIONS = setOf("mp4", "mov", "mkv", "avi", "webm", "3gp", "ts", "m
 /** Normalizes an extension token (with or without a leading dot, any case) to its bare lowercase suffix. */
 fun normalizeExtension(ext: String): String = ext.trim().removePrefix(".").lowercase()
 
+fun formatExtensionLabel(
+    ext: String,
+    allFilesLabel: String = "All files",
+    noExtensionLabel: String = "No extension",
+): String =
+    when {
+        isAllFilesExtension(ext) -> allFilesLabel
+        isNoExtensionToken(ext) -> noExtensionLabel
+        else -> ext.removePrefix(".")
+    }
+
 fun appliesToImageAndVideoOnly(fileExtensions: List<String>): Boolean {
     if (fileExtensions.isEmpty()) return false
     return fileExtensions.all { ext ->
+        if (isAllFilesExtension(ext) || isNoExtensionToken(ext)) return@all false
         val clean = normalizeExtension(ext)
         clean in IMAGE_EXTENSIONS || clean in VIDEO_EXTENSIONS
     }

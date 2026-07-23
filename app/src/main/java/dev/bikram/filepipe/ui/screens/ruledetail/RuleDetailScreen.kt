@@ -144,7 +144,12 @@ import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.domain.model.appliesToImageAndVideoOnly
+import dev.bikram.filepipe.domain.model.formatExtensionLabel
+import dev.bikram.filepipe.domain.model.isAllFilesExtension
 import dev.bikram.filepipe.domain.model.materialSymbolName
+import dev.bikram.filepipe.domain.model.Rule
+import dev.bikram.filepipe.domain.usecase.RuleConflict
+import dev.bikram.filepipe.domain.usecase.RuleConflictDetector
 import dev.bikram.filepipe.ui.common.AppBottomSheet
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.FilePipePredictiveBackHandler
@@ -494,6 +499,7 @@ private fun ruleIconOptionLabel(icon: RuleIcon): String =
             RuleIcon.DOWNLOAD -> R.string.rule_icon_label_download
             RuleIcon.DOCUMENT -> R.string.rule_icon_label_document
             RuleIcon.INSTALLABLE -> R.string.rule_icon_label_installable
+            RuleIcon.DRAFT -> R.string.file_type_no_extension
         },
     )
 
@@ -911,6 +917,48 @@ fun RuleDetailScreen(
             else -> null
         }
     val scheduleHasError = showValidationErrors && isScheduleInvalid(state.schedule)
+    val currentRule =
+        remember(state) {
+            Rule(
+                id = state.id,
+                sortOrder = state.sortOrder,
+                name = state.name.trim(),
+                sourceFolderPaths = state.sourceFolderPaths,
+                destinationFolderPath = state.destinationFolderPath,
+                fileExtensions = state.fileExtensions,
+                isEnabled = state.isEnabled,
+                schedule = state.schedule,
+                conflictPolicy = state.conflictPolicy,
+                operationMode = state.operationMode,
+                scanSubdirectories = state.scanSubdirectories,
+                recreateDestinationSubfolders = state.scanSubdirectories && state.recreateDestinationSubfolders,
+                suppressMissingSourceFolderCardWarning = state.suppressMissingSourceFolderCardWarning,
+                icon = state.icon,
+                iconEmoji = state.iconEmoji?.takeIf { it.isNotBlank() },
+                filenamePattern = state.filenamePattern.takeIf { it.isNotBlank() },
+                minFileSizeBytes =
+                    state.minFileSizeMb
+                        .toLongOrNull()
+                        ?.takeIf { it > 0 }
+                        ?.let { it * 1024 * 1024 },
+                maxFileSizeBytes =
+                    state.maxFileSizeMb
+                        .toLongOrNull()
+                        ?.takeIf { it > 0 }
+                        ?.let { it * 1024 * 1024 },
+                minAgeDays = state.minAgeDays.toIntOrNull()?.takeIf { it > 0 },
+                maxAgeDays = state.maxAgeDays.toIntOrNull()?.takeIf { it > 0 },
+                excludePatterns =
+                    state.excludePatternsText
+                        .split(",")
+                        .map { it.trim() }
+                        .filter { it.isNotBlank() },
+                orientation = if (appliesToImageAndVideoOnly(state.fileExtensions)) state.orientation else null,
+                isRegexPattern = state.isRegexPattern,
+                isExcludeRegexPattern = state.isExcludeRegexPattern,
+            )
+        }
+    val ruleConflicts = remember(currentRule) { RuleConflictDetector.detectConflicts(currentRule) }
 
     Box(
         modifier =
@@ -1020,6 +1068,39 @@ fun RuleDetailScreen(
                             onUseTemplate = { showTemplateSheet = true },
                             enabled = !isReadOnly,
                         )
+                        if (state.fileExtensions.any { isAllFilesExtension(it) }) {
+                            Text(
+                                text = stringResource(R.string.rule_all_files_warning),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                        ruleConflicts.forEach { conflict ->
+                            val msg =
+                                when (conflict) {
+                                    is RuleConflict.NoExtensionPatternConflict ->
+                                        stringResource(R.string.rule_conflict_no_ext_pattern, conflict.patternExtension)
+
+                                    is RuleConflict.ExtensionPatternMismatch ->
+                                        stringResource(R.string.rule_conflict_ext_mismatch, conflict.patternExtension)
+
+                                    RuleConflict.InvalidSizeRange ->
+                                        stringResource(R.string.rule_conflict_invalid_size)
+
+                                    RuleConflict.InvalidAgeRange ->
+                                        stringResource(R.string.rule_conflict_invalid_age)
+
+                                    is RuleConflict.ExcludeAllPattern ->
+                                        stringResource(R.string.rule_conflict_exclude_all, conflict.pattern)
+                                }
+                            Text(
+                                text = msg,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
                     }
 
                     RuleSectionCard(
@@ -2479,7 +2560,10 @@ fun RuleDetailScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
         ) {
             Spacer(Modifier.height(8.dp))
-            RuleTemplate.ALL.forEach { template ->
+            val allFilesLabel = stringResource(R.string.file_type_all_files)
+            val noExtLabel = stringResource(R.string.file_type_no_extension)
+
+            RuleTemplate.CATEGORIES.forEach { template ->
                 FilePipeElevatedCard(
                     onClick = {
                         viewModel.applyTemplate(template)
@@ -2513,10 +2597,59 @@ fun RuleDetailScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(template.name, style = MaterialTheme.typography.titleSmall)
                             Text(
-                                template.extensions.map { it.removePrefix(".") }.joinToString(", "),
+                                template.extensions.map { formatExtensionLabel(it, allFilesLabel, noExtLabel) }.joinToString(", "),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                    }
+                }
+            }
+
+            // Shared row for All Files and No Extension at bottom of stack
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(RuleTemplate.ALL_FILES, RuleTemplate.NO_EXTENSION).forEach { template ->
+                    FilePipeElevatedCard(
+                        onClick = {
+                            viewModel.applyTemplate(template)
+                            showTemplateSheet = false
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Surface(
+                                shape = compactControlShape,
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = template.suggestedIcon.materialSymbolName(),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        size = 24.dp,
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(template.name, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    template.extensions.map { formatExtensionLabel(it, allFilesLabel, noExtLabel) }.joinToString(", "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }

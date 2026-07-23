@@ -22,12 +22,16 @@ import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
+import dev.bikram.filepipe.domain.model.ALL_FILES_EXTENSION
+import dev.bikram.filepipe.domain.model.NO_EXTENSION_TOKEN
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.TemplateAutoSource
 import dev.bikram.filepipe.domain.model.appliesToImageAndVideoOnly
+import dev.bikram.filepipe.domain.model.isAllFilesExtension
+import dev.bikram.filepipe.domain.model.isNoExtensionToken
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
 import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
@@ -403,8 +407,19 @@ class RuleDetailViewModel
 
         fun addExtension(ext: String) =
             _uiState.update {
-                val normalized = ext.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
-                val newExtensions = if (normalized in it.fileExtensions) it.fileExtensions else it.fileExtensions + normalized
+                val normalized =
+                    when {
+                        isAllFilesExtension(ext) -> ALL_FILES_EXTENSION
+                        isNoExtensionToken(ext) -> NO_EXTENSION_TOKEN
+                        else -> ext.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
+                    }
+                val newExtensions =
+                    if (normalized == ALL_FILES_EXTENSION) {
+                        listOf(ALL_FILES_EXTENSION)
+                    } else {
+                        val base = it.fileExtensions - ALL_FILES_EXTENSION
+                        if (normalized in base) base else base + normalized
+                    }
                 it.copy(
                     fileExtensions = newExtensions,
                     orientation = if (appliesToImageAndVideoOnly(newExtensions)) it.orientation else null,

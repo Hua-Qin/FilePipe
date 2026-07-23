@@ -23,7 +23,7 @@
     <string name="rule_card_collapse_cd">Collapse %1$s</string>
     <string name="rule_card_select_cd">Select %1$s</string>
     <string name="rule_card_deselect_cd">Deselect %1$s</string>
-    <string name="rule_card_stale_folder_warning">One or more folders need attention</string>
+    <string name="rule_card_stale_folder_warning">One or more conditions need attention</string>
     <string name="rule_card_progress_moving_file">Moving %1$s (%2$d / %3$d)</string>
     <string name="rule_card_progress_copying_file">Copying %1$s (%2$d / %3$d)</string>
     <plurals name="rule_card_progress_files_moved_summary">
@@ -943,4 +943,12 @@
     <string name="file_type_add_type">Add type</string>
     <string name="file_type_use_template">Use template</string>
     <string name="file_type_remove_content_description">Remove %1$s</string>
+    <string name="file_type_all_files">All files</string>
+    <string name="file_type_no_extension">No extension</string>
+    <string name="rule_all_files_warning">This rule will target ALL files in the selected source folders.</string>
+    <string name="rule_conflict_no_ext_pattern">Warning: This rule targets \"No extension\", but the filename pattern requires \".%1$s\". No files will match.</string>
+    <string name="rule_conflict_ext_mismatch">Warning: Filename pattern requires \".%1$s\", which is not in your selected file types. No files will match.</string>
+    <string name="rule_conflict_invalid_size">Warning: Minimum file size is greater than Maximum file size. No files will match.</string>
+    <string name="rule_conflict_invalid_age">Warning: Minimum file age is greater than Maximum file age. No files will match.</string>
+    <string name="rule_conflict_exclude_all">Warning: Exclude pattern \"%1$s\" will exclude all files. No files will match.</string>
 </resources>
