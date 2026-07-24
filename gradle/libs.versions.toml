@@ -1,7 +1,7 @@
 [versions]
 # BOM material3 is older; this line tracks the expressive build used by the app (override BOM for this artifact).
 activityCompose = "1.13.0"
-agp = "9.4.0-alpha05"
+agp = "9.4.0-alpha06"
 appcompat = "1.7.1"
 composeBom = "2026.07.00"
 composeMaterial3Adaptive = "1.2.0"

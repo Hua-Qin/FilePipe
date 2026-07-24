@@ -6,7 +6,6 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import dev.bikram.filepipe.ui.components.rememberMaxLabelMinWidth
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -108,10 +107,10 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -178,6 +177,7 @@ import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.previewSourceFolderDisplayPath
+import dev.bikram.filepipe.ui.components.rememberMaxLabelMinWidth
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer
 import dev.bikram.filepipe.ui.navigation.Screen
@@ -2093,8 +2093,8 @@ fun RuleDetailScreen(
                             onClick = { viewModel.loadPreview() },
                             enabled =
                                 state.sourceFolderPaths.isNotEmpty() &&
-                                    state.destinationFolderPath.isNotBlank() &&
-                                    state.fileExtensions.isNotEmpty(),
+                                    state.fileExtensions.isNotEmpty() &&
+                                    (state.operationMode == OperationMode.DELETE || state.destinationFolderPath.isNotBlank()),
                         ) {
                             FilePipeMaterialRoundedSymbol(
                                 name = "visibility",

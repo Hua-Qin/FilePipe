@@ -589,8 +589,8 @@ class RuleDetailViewModel
             viewModelScope.launch {
                 val state = _uiState.value
                 if (state.sourceFolderPaths.isEmpty() ||
-                    state.destinationFolderPath.isBlank() ||
-                    state.fileExtensions.isEmpty()
+                    state.fileExtensions.isEmpty() ||
+                    (state.operationMode != OperationMode.DELETE && state.destinationFolderPath.isBlank())
                 ) {
                     return@launch
                 }

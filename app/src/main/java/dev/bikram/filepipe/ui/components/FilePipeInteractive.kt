@@ -487,17 +487,20 @@ fun rememberMaxLabelMinWidth(
     style: androidx.compose.ui.text.TextStyle = androidx.compose.material3.MaterialTheme.typography.labelLarge,
     extraPadding: androidx.compose.ui.unit.Dp = 28.dp,
 ): androidx.compose.ui.unit.Dp {
-    val textMeasurer = androidx.compose.ui.text.rememberTextMeasurer()
+    val textMeasurer =
+        androidx.compose.ui.text
+            .rememberTextMeasurer()
     val density = androidx.compose.ui.platform.LocalDensity.current
     return androidx.compose.runtime.remember(labels, style, density) {
         val maxPx =
             labels.maxOfOrNull { label ->
-                textMeasurer.measure(
-                    text = label,
-                    style = style,
-                    maxLines = 1,
-                    softWrap = false,
-                ).size.width
+                textMeasurer
+                    .measure(
+                        text = label,
+                        style = style,
+                        maxLines = 1,
+                        softWrap = false,
+                    ).size.width
             } ?: 0
         with(density) { maxPx.toDp() } + extraPadding
     }
