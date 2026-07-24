@@ -6,6 +6,7 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import dev.bikram.filepipe.ui.components.rememberMaxLabelMinWidth
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -107,6 +108,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -1511,6 +1513,7 @@ fun RuleDetailScreen(
                                     OperationMode.DELETE -> stringResource(R.string.operation_delete)
                                 }
                             }
+                        val operationMinWidth = rememberMaxLabelMinWidth(operationLabels)
                         val toggleColors =
                             ToggleButtonDefaults.toggleButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -1532,10 +1535,10 @@ fun RuleDetailScreen(
                                     colors = toggleColors,
                                     modifier =
                                         Modifier
-                                            .widthIn(min = 100.dp)
+                                            .widthIn(min = operationMinWidth)
                                             .weight(1f),
                                 ) {
-                                    Text(label)
+                                    Text(label, maxLines = 1, softWrap = false)
                                 }
                             }
                         }
@@ -1592,6 +1595,7 @@ fun RuleDetailScreen(
                                     ConflictPolicy.RENAME_SUFFIX -> stringResource(R.string.conflict_rename)
                                 }
                             }
+                        val conflictMinWidth = rememberMaxLabelMinWidth(conflictLabels)
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1606,10 +1610,10 @@ fun RuleDetailScreen(
                                     colors = toggleColors,
                                     modifier =
                                         Modifier
-                                            .widthIn(min = 100.dp)
+                                            .widthIn(min = conflictMinWidth)
                                             .weight(1f),
                                 ) {
-                                    Text(label)
+                                    Text(label, maxLines = 1, softWrap = false)
                                 }
                             }
                         }
