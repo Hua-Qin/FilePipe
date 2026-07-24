@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -49,10 +50,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
@@ -661,14 +664,11 @@ private fun ExpandedContent(
                 Spacer(Modifier.height(8.dp))
 
                 val notSet = stringResource(R.string.rule_card_destination_not_set)
-                val fromText =
+                val sourceValues =
                     if (rule.sourceFolderPaths.isEmpty()) {
-                        stringResource(R.string.rule_card_from_none)
+                        listOf(stringResource(R.string.rule_card_from_none))
                     } else {
-                        val shown = rule.sourceFolderPaths.take(3)
-                        val extra = rule.sourceFolderPaths.size - shown.size
-                        shown.joinToString(", ") { displayPath(it, internalStorageDisplayName) } +
-                            if (extra > 0) ", +$extra" else ""
+                        rule.sourceFolderPaths.map { path -> displayPath(path, internalStorageDisplayName) }
                     }
                 val operationIconName =
                     when (rule.operationMode) {
@@ -685,7 +685,8 @@ private fun ExpandedContent(
 
                 LabeledInfoSingleLine(
                     label = stringResource(R.string.rule_card_from),
-                    value = fromText,
+                    values = sourceValues,
+                    maxVisibleValues = RULE_CARD_MAX_VISIBLE_SOURCES,
                     leadingIconName = if (rule.operationMode == OperationMode.DELETE) operationIconName else null,
                     leadingIconContentDescription = if (rule.operationMode == OperationMode.DELETE) modeLabel else null,
                 )
@@ -693,12 +694,14 @@ private fun ExpandedContent(
                     Spacer(Modifier.height(4.dp))
                     LabeledInfoSingleLine(
                         label = stringResource(R.string.rule_card_to),
-                        value =
-                            if (rule.destinationFolderPath.isEmpty()) {
-                                notSet
-                            } else {
-                                displayPath(rule.destinationFolderPath, internalStorageDisplayName)
-                            },
+                        values =
+                            listOf(
+                                if (rule.destinationFolderPath.isEmpty()) {
+                                    notSet
+                                } else {
+                                    displayPath(rule.destinationFolderPath, internalStorageDisplayName)
+                                },
+                            ),
                         leadingIconName = operationIconName,
                         leadingIconContentDescription = modeLabel,
                     )
@@ -737,9 +740,20 @@ private fun ExpandedContent(
 
                 rule.schedule?.let { schedule ->
                     Spacer(Modifier.height(4.dp))
-                    val cardContext = androidx.compose.ui.platform.LocalContext.current
+                    val cardContext = LocalContext.current
                     val scheduleText = schedule.toReadableString(cardContext)
-                    LabeledInfo(label = stringResource(R.string.schedule_card_label), value = scheduleText)
+                    LabeledInfo(
+                        label = stringResource(R.string.schedule_card_label),
+                        value = scheduleText,
+                        // Delete rules prefix the "From" row with the operation icon, so indent by the
+                        // icon plus its spacing to keep the label colons vertically aligned.
+                        modifier =
+                            if (rule.operationMode == OperationMode.DELETE) {
+                                Modifier.padding(start = LabelLeadingIconIndent)
+                            } else {
+                                Modifier
+                            },
+                    )
                 }
 
                 AnimatedVisibility(
@@ -977,12 +991,19 @@ private fun ExpandedContent(
     }
 }
 
+private const val RULE_CARD_MAX_VISIBLE_SOURCES = 3
+
+private val LabelLeadingIconSize = 14.dp
+private val LabelLeadingIconSpacing = 4.dp
+private val LabelLeadingIconIndent = LabelLeadingIconSize + LabelLeadingIconSpacing
+
 @Composable
 private fun LabeledInfo(
     label: String,
     value: String,
+    modifier: Modifier = Modifier,
 ) {
-    Row {
+    Row(modifier = modifier) {
         Text(
             text = "$label:",
             style = MaterialTheme.typography.bodyMedium,
@@ -1000,11 +1021,17 @@ private fun LabeledInfo(
     }
 }
 
+/**
+ * One-line label + value row. Values are dropped from the end until the joined text fits the
+ * available width, and the hidden ones are reported as a trailing "+N" instead of being cut off
+ * mid-path by an ellipsis.
+ */
 @Composable
 private fun LabeledInfoSingleLine(
     label: String,
-    value: String,
+    values: List<String>,
     modifier: Modifier = Modifier,
+    maxVisibleValues: Int = values.size,
     leadingIconName: String? = null,
     leadingIconContentDescription: String? = null,
 ) {
@@ -1016,23 +1043,58 @@ private fun LabeledInfoSingleLine(
             FilePipeMaterialRoundedSymbol(
                 name = leadingIconName,
                 contentDescription = leadingIconContentDescription,
-                size = 14.dp,
+                size = LabelLeadingIconSize,
                 tint = MaterialTheme.colorScheme.primary,
             )
-            Spacer(Modifier.width(4.dp))
+            Spacer(Modifier.width(LabelLeadingIconSpacing))
         }
         Text(
             text = "$label:",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
         )
-        Text(
-            text = " $value",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        val valueStyle = MaterialTheme.typography.bodyMedium
+        val textMeasurer = rememberTextMeasurer()
+        val context = LocalContext.current
+        BoxWithConstraints(modifier = Modifier.weight(1f)) {
+            val availableWidth = constraints.maxWidth
+            val valueText =
+                remember(values, maxVisibleValues, availableWidth, valueStyle) {
+                    var visibleCount = minOf(values.size, maxVisibleValues).coerceAtLeast(1)
+                    var candidate: String
+                    while (true) {
+                        val hiddenCount = values.size - visibleCount
+                        candidate =
+                            buildString {
+                                append(' ')
+                                values.take(visibleCount).joinTo(this, ", ")
+                                if (hiddenCount > 0) {
+                                    append(", ")
+                                    append(context.getString(R.string.rule_card_more_count, hiddenCount))
+                                }
+                            }
+                        if (visibleCount == 1) break
+                        val candidateWidth =
+                            textMeasurer
+                                .measure(
+                                    text = candidate,
+                                    style = valueStyle,
+                                    softWrap = false,
+                                    maxLines = 1,
+                                ).size
+                                .width
+                        if (candidateWidth <= availableWidth) break
+                        visibleCount--
+                    }
+                    candidate
+                }
+            Text(
+                text = valueText,
+                style = valueStyle,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }

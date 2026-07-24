@@ -139,6 +139,13 @@ sealed interface ManualRunCancelAnchor {
     data object RunSelectedBar : ManualRunCancelAnchor
 }
 
+/** A sorted rules list together with the sort selection that produced it. */
+private data class SortedRules(
+    val rules: List<Rule>,
+    val sortKey: HistorySortKey,
+    val sortDirection: HistorySortDirection,
+)
+
 data class RulesUiState(
     val rules: List<Rule> = emptyList(),
     val staleRuleIds: Set<Long> = emptySet(),
@@ -216,6 +223,9 @@ class RulesViewModel
                 .observeLastRunStartedAtByRuleId()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
+        // The sort selection travels with the list it produced. Reading the selection from a second
+        // subscription to the preferences flow let combine() pair a freshly changed sort key with the
+        // previously sorted list, so the UI was told "My order" while holding name-sorted rules.
         private val sortedRulesFlow =
             combine(
                 _rules,
@@ -223,7 +233,11 @@ class RulesViewModel
                 lastRunStartedAtByRuleId,
             ) { rules, sortParams, lastRunMap ->
                 val (sortKey, sortDirection) = sortParams
-                sortRulesList(rules, sortKey, sortDirection, lastRunMap)
+                SortedRules(
+                    rules = sortRulesList(rules, sortKey, sortDirection, lastRunMap),
+                    sortKey = sortKey,
+                    sortDirection = sortDirection,
+                )
             }
 
         val uiState: StateFlow<RulesUiState> =
@@ -232,9 +246,7 @@ class RulesViewModel
                 _staleRuleIssues,
                 userPreferencesRepository.preferencesFlow,
                 _selectedRuleIds,
-                rulesSortPreferencesFlow,
-            ) { sortedRules, staleIssues, prefs, selected, sortParams ->
-                val (sortKey, sortDirection) = sortParams
+            ) { sortedRules, staleIssues, prefs, selected ->
                 val staleWarningIds =
                     staleIssues
                         .filterValues { it == RuleFolderIssueSeverity.WARNING }
@@ -244,15 +256,15 @@ class RulesViewModel
                         .filterValues { it == RuleFolderIssueSeverity.ERROR }
                         .keys
                 RulesUiState(
-                    rules = sortedRules,
+                    rules = sortedRules.rules,
                     staleRuleIds = staleIssues.keys,
                     staleRuleWarningIds = staleWarningIds,
                     staleRuleErrorIds = staleErrorIds,
                     swipeStartToEnd = prefs.swipeStartToEnd,
                     swipeEndToStart = prefs.swipeEndToStart,
                     selectedRuleIds = selected,
-                    sortKey = sortKey,
-                    sortDirection = sortDirection,
+                    sortKey = sortedRules.sortKey,
+                    sortDirection = sortedRules.sortDirection,
                 )
             }.combine(_progressMap) { state, progress ->
                 state.copy(progressMap = progress, isRunning = progress.values.any { !it.isComplete })
