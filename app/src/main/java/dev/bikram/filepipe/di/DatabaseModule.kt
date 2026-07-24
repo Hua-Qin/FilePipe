@@ -81,6 +81,20 @@ object DatabaseModule {
             }
         }
 
+    private val migration10To11 =
+        object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE rules ADD COLUMN lastRunStartedAt INTEGER")
+                // Seed from existing history so the "last run" sort keeps working for current users.
+                db.execSQL(
+                    """
+                    UPDATE rules SET lastRunStartedAt =
+                        (SELECT MAX(startedAt) FROM run_history WHERE run_history.ruleId = rules.id)
+                    """.trimIndent(),
+                )
+            }
+        }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -96,6 +110,7 @@ object DatabaseModule {
                 migration7To8,
                 migration8To9,
                 migration9To10,
+                migration10To11,
             ).fallbackToDestructiveMigration(dropAllTables = true)
             .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
             .build()

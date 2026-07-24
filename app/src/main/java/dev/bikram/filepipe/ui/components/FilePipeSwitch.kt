@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.ui.components
 
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchColors
 import androidx.compose.material3.SwitchDefaults
@@ -15,7 +16,12 @@ fun FilePipeSwitch(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    colors: SwitchColors = SwitchDefaults.colors(),
+    // The checked thumb is painted with onPrimary, so the check has to be drawn in primary to read
+    // against it. Material's own default pairs an onPrimary thumb with an onPrimaryContainer icon,
+    // which only contrasts under the 2021 color spec; the app generates its scheme with the 2025
+    // spec, where onPrimaryContainer is itself dark in dark mode - leaving a near-black check on a
+    // near-black thumb. Keep in parity with Remember's RememberSwitch.
+    colors: SwitchColors = SwitchDefaults.colors(checkedIconColor = MaterialTheme.colorScheme.primary),
     interactionSource: MutableInteractionSource? = null,
 ) {
     val playTap = rememberPlayTapSound()

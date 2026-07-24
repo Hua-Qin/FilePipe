@@ -18,6 +18,14 @@ data class Rule(
     val isEnabled: Boolean = true,
     /** Display order when sorting by [HistorySortKey.MY_ORDER]; lower first. */
     val sortOrder: Int = 0,
+    /**
+     * When this rule last started a run, or null if it has never run. Recorded for **every** run,
+     * including ones that matched no files and therefore moved nothing, so sorting by
+     * [HistorySortKey.LAST_RAN] reflects what actually ran. Deliberately stored on the rule rather
+     * than derived from run history: history rows are prunable (log retention) and deletable by the
+     * user, and a run that changed nothing should not have to leave a history entry to count here.
+     */
+    val lastRunStartedAt: Long? = null,
     /** Overrides the global expanded/collapsed display mode for this rule card. */
     val cardModeOverride: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),

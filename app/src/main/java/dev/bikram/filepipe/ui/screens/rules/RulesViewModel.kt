@@ -62,7 +62,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 import javax.inject.Inject
 
 data class DeleteUndoEvent(
@@ -218,11 +217,6 @@ class RulesViewModel
                     AppPreferences.DEFAULT.rulesSortKey to AppPreferences.DEFAULT.rulesSortDirection,
                 )
 
-        private val lastRunStartedAtByRuleId: StateFlow<Map<Long, Long>> =
-            runHistoryRepository
-                .observeLastRunStartedAtByRuleId()
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
-
         // The sort selection travels with the list it produced. Reading the selection from a second
         // subscription to the preferences flow let combine() pair a freshly changed sort key with the
         // previously sorted list, so the UI was told "My order" while holding name-sorted rules.
@@ -230,11 +224,10 @@ class RulesViewModel
             combine(
                 _rules,
                 rulesSortPreferencesFlow,
-                lastRunStartedAtByRuleId,
-            ) { rules, sortParams, lastRunMap ->
+            ) { rules, sortParams ->
                 val (sortKey, sortDirection) = sortParams
                 SortedRules(
-                    rules = sortRulesList(rules, sortKey, sortDirection, lastRunMap),
+                    rules = sortRulesList(rules, sortKey, sortDirection),
                     sortKey = sortKey,
                     sortDirection = sortDirection,
                 )
@@ -692,30 +685,30 @@ class RulesViewModel
                                     )
                             }
                         try {
-                            val targetRules =
-                                if (runSimulationCheck) {
-                                    val filtered =
-                                        rules.filter { rule ->
-                                            simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
-                                        }
-                                    if (filtered.isEmpty()) {
-                                        postUserMessage(appContext.getString(R.string.history_no_files_affected))
-                                        return@launch
+                            // Every rule the user ran is executed, even one that matches nothing: that
+                            // run is real, so it earns a history row ("No changes", where it can be
+                            // filtered by chip or deleted) and a last-run time for sorting. The
+                            // simulation now only picks the feedback - a run that affects no files
+                            // reports that instead of pulling the user into History.
+                            val affectsFiles =
+                                !runSimulationCheck ||
+                                    rules.any { rule ->
+                                        simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
                                     }
-                                    filtered
-                                } else {
-                                    rules
-                                }
 
                             val results =
                                 executeRulesUseCase(
-                                    targetRules,
+                                    rules,
                                     TriggerType.MANUAL,
                                     useCache = useCache || runSimulationCheck,
                                 ) { progress ->
                                     _progressMap.update { current -> current + (progress.ruleId to progress) }
                                 }
                             when {
+                                !affectsFiles -> {
+                                    postUserMessage(appContext.getString(R.string.history_no_files_affected))
+                                }
+
                                 results.size == 1 -> {
                                     _navigateAfterRun.emit(
                                         RulesRunNavigation.HistoryDetail(results.first().historyId),
@@ -865,6 +858,9 @@ class RulesViewModel
                         id = 0,
                         name = "${rule.name} (copy)",
                         isEnabled = false,
+                        // The copy has never run, so it must not inherit the original's run time
+                        // and sort under "last run" as though it had.
+                        lastRunStartedAt = null,
                     )
                 ruleRepository.saveRule(copy)
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
@@ -972,7 +968,6 @@ class RulesViewModel
             rules: List<Rule>,
             sortKey: HistorySortKey,
             sortDirection: HistorySortDirection,
-            lastRunStartedAtByRuleId: Map<Long, Long>,
         ): List<Rule> {
             when (sortKey) {
                 HistorySortKey.MY_ORDER -> {
@@ -980,23 +975,24 @@ class RulesViewModel
                 }
 
                 HistorySortKey.LAST_RAN -> {
-                    val locale = Locale.getDefault()
-                    return when (sortDirection) {
-                        HistorySortDirection.DESCENDING -> {
-                            rules.sortedWith(
-                                compareByDescending<Rule> { lastRunStartedAtByRuleId[it.id] ?: Long.MIN_VALUE }
-                                    .thenBy { it.name.lowercase(locale) }
-                                    .thenBy { it.id },
-                            )
-                        }
-
-                        HistorySortDirection.ASCENDING -> {
-                            rules.sortedWith(
-                                compareBy<Rule> { lastRunStartedAtByRuleId[it.id] ?: Long.MAX_VALUE }
-                                    .thenBy { it.name.lowercase(locale) }
-                                    .thenBy { it.id },
-                            )
-                        }
+                    // A rule that has never run counts as the oldest thing in the list: newest-first
+                    // sinks it to the bottom, oldest-first floats it to the top. Rules that tie fall
+                    // back to the user's own order rather than to the rule name, which made this sort
+                    // indistinguishable from "Rule name (A to Z)".
+                    //
+                    // One direction is the reverse of the other, so the second is built by reversing
+                    // the first instead of re-sorting with a flipped comparator. Flipping only the
+                    // timestamp comparison leaves tied rules in the same relative order in both
+                    // directions, and the list then doesn't read as reversed at all.
+                    val newestFirst =
+                        rules.sortedWith(
+                            compareByDescending<Rule> { it.lastRunStartedAt ?: Long.MIN_VALUE }
+                                .then(compareBy<Rule>({ it.sortOrder }, { it.id })),
+                        )
+                    return if (sortDirection == HistorySortDirection.ASCENDING) {
+                        newestFirst.reversed()
+                    } else {
+                        newestFirst
                     }
                 }
 

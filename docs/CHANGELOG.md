@@ -1,8 +1,16 @@
 ## v3.9.5 Delete operation, more file types
 
 ### ✨ New Features
-- In adition to `Copy` and `Move`, there is now a `Delete` operation type. Create rules for automated file deletions.
-- Rules can now accept "All files" and "No extension" as file types. Any conflict with filename regex will be flaggedd. 
+- **Delete rules.** Alongside Move and Copy, you can now create rules to permanently delete the files it matches.
+- **New "All files" and "No extension" file types.** "All files" matches everything in your source folders, with your filename, size, and age filters still applying. "No extension" matches files with no file type, such as `.gitignore` or `README.`.
+
+
+### 🛠 Improved Features
+- Rule cards now show a small icon telling you whether the rule moves, copies, or deletes.
+- Runs that don't affect any files are now recorded in History, where you can filter for them with the "No changes" chip and delete them if you'd rather not keep them.
+
+### 🐛 Bug Fixes
+- Rule sort orders were broken. They are fixed now. 
 
 ---
 

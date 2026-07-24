@@ -23,7 +23,7 @@ import kotlinx.serialization.json.JsonNames
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
  * (`@Database`); Room KSP does not allow that annotation to reference this constant.
  */
-const val APP_DATABASE_SCHEMA_VERSION = 10
+const val APP_DATABASE_SCHEMA_VERSION = 11
 
 /**
  * Root object for `filepipe_backup_*.json`.
@@ -52,6 +52,8 @@ data class RuleBackupDto(
     val fileExtensions: List<String>,
     val isEnabled: Boolean = true,
     val sortOrder: Int = 0,
+    /** Null in backups written before the rule carried its own last-run time. */
+    val lastRunStartedAt: Long? = null,
     val cardModeOverride: Boolean = false,
     val schedule: ScheduleBackupDto? = null,
     val conflictPolicy: String = ConflictPolicy.RENAME_SUFFIX.name,
@@ -173,6 +175,7 @@ fun Rule.toBackupDto(): RuleBackupDto =
         fileExtensions = fileExtensions,
         isEnabled = isEnabled,
         sortOrder = sortOrder,
+        lastRunStartedAt = lastRunStartedAt,
         cardModeOverride = cardModeOverride,
         schedule = schedule?.toBackupDto(),
         conflictPolicy = conflictPolicy.name,
@@ -284,6 +287,7 @@ fun RuleBackupDto.toDomain(): Rule =
         fileExtensions = fileExtensions,
         isEnabled = isEnabled,
         sortOrder = sortOrder,
+        lastRunStartedAt = lastRunStartedAt,
         cardModeOverride = cardModeOverride,
         schedule = schedule?.toDomain(),
         conflictPolicy = runCatching { ConflictPolicy.valueOf(conflictPolicy) }.getOrDefault(ConflictPolicy.RENAME_SUFFIX),

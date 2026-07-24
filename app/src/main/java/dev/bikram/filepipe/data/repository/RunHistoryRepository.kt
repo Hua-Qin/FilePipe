@@ -35,12 +35,6 @@ class RunHistoryRepository
 
         fun observeHasAnyHistory(): Flow<Boolean> = runHistoryDao.observeHistoryCount().map { count -> count > 0 }
 
-        /** For rules list "last run" sort: map rule id to most recent run [RunHistory.startedAt]. */
-        fun observeLastRunStartedAtByRuleId(): Flow<Map<Long, Long>> =
-            runHistoryDao.observeLastStartedAtByRuleId().map { rows ->
-                rows.associate { row -> row.ruleId to row.lastStartedAt }
-            }
-
         suspend fun getAllHistoryOnce(): List<RunHistory> = runHistoryDao.getAllHistoryOnce().map { it.toDomain() }
 
         fun getHistoryForRule(ruleId: Long): Flow<List<RunHistory>> = runHistoryDao.getHistoryForRule(ruleId).map { it.map { entity -> entity.toDomain() } }
