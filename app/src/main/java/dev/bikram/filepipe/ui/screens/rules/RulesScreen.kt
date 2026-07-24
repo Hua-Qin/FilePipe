@@ -192,38 +192,42 @@ fun RulesScreen(
         )
     var reorderableRules by remember { mutableStateOf(rules) }
     var dragActuallyMoved by remember { mutableStateOf(false) }
-    var previousSortKey by remember { mutableStateOf<HistorySortKey?>(null) }
-    var previousSortDirection by remember { mutableStateOf<HistorySortDirection?>(null) }
+    // A drag reorders the list locally before that order round-trips through the database, so the
+    // local order has to win until the repository echoes it back. Every other emission adopts the
+    // ViewModel's sorted list: re-sorts that keep the same sort mode (a run finishing under "Last
+    // run", a rename under "Rule name", the stored sort preference replacing the startup default)
+    // must not be discarded, or the list stays frozen in an order the sort menu no longer claims.
+    var awaitingDraggedOrder by remember { mutableStateOf(false) }
+    var lastSortSelection by remember { mutableStateOf<Pair<HistorySortKey, HistorySortDirection>?>(null) }
     LaunchedEffect(sortKey, sortDirection, rules) {
-        val sortModeChanged =
-            previousSortKey != sortKey || previousSortDirection != sortDirection
-        previousSortKey = sortKey
-        previousSortDirection = sortDirection
+        val sortSelection = sortKey to sortDirection
+        val sortSelectionChanged = lastSortSelection != null && lastSortSelection != sortSelection
+        lastSortSelection = sortSelection
         if (rules.isEmpty()) {
             reorderableRules = emptyList()
+            awaitingDraggedOrder = false
             return@LaunchedEffect
         }
-        if (sortModeChanged) {
-            reorderableRules = rules
+        val draggedRuleIds = reorderableRules.map { it.id }
+        val incomingRuleIds = rules.map { it.id }
+        if (awaitingDraggedOrder && incomingRuleIds.toSet() == draggedRuleIds.toSet()) {
+            if (incomingRuleIds == draggedRuleIds) {
+                awaitingDraggedOrder = false
+            }
+            val freshByRuleId = rules.associateBy { it.id }
+            reorderableRules = reorderableRules.mapNotNull { rule -> freshByRuleId[rule.id] }
+            return@LaunchedEffect
+        }
+        awaitingDraggedOrder = false
+        reorderableRules = rules
+        if (sortSelectionChanged) {
             lazyListState.scrollToItem(0)
-            return@LaunchedEffect
         }
-        if (reorderableRules.isEmpty()) {
-            reorderableRules = rules
-            return@LaunchedEffect
-        }
-        val reorderRuleIds = reorderableRules.map { it.id }.toSet()
-        val hasRuleNotInReorderList = rules.any { rule -> rule.id !in reorderRuleIds }
-        if (hasRuleNotInReorderList) {
-            reorderableRules = rules
-            return@LaunchedEffect
-        }
-        val freshByRuleId = rules.associateBy { it.id }
-        reorderableRules = reorderableRules.mapNotNull { rule -> freshByRuleId[rule.id] }
     }
     val reorderableLazyListState =
         rememberReorderableLazyListState(lazyListState) { from, to ->
             dragActuallyMoved = true
+            awaitingDraggedOrder = true
             reorderableRules =
                 reorderableRules.toMutableList().apply {
                     add(to.index, removeAt(from.index))
@@ -627,10 +631,12 @@ fun RulesScreen(
                         val showInlineProgressCancel =
                             manualRunCancelAnchor is ManualRunCancelAnchor.SingleRule &&
                                 manualRunCancelAnchor.ruleId == rule.id
+                        // Rule-conflict warnings are applied inside RuleCard (memoized per rule);
+                        // here we only surface stale/missing-folder state.
                         val folderIssueSeverity =
-                            when (rule.id) {
-                                in staleRuleErrorIds -> RuleCardFolderIssueSeverity.ERROR
-                                in staleRuleWarningIds -> RuleCardFolderIssueSeverity.WARNING
+                            when {
+                                rule.id in staleRuleErrorIds -> RuleCardFolderIssueSeverity.ERROR
+                                rule.id in staleRuleWarningIds -> RuleCardFolderIssueSeverity.WARNING
                                 else -> null
                             }
                         SwipeToDismissRuleCard(
@@ -697,6 +703,32 @@ fun RulesScreen(
                 pendingDeleteSelected = false
             },
             onDismiss = { pendingDeleteSelected = false },
+            destructive = true,
+        )
+    }
+
+    val pendingDeleteConfirmation by viewModel.pendingDeleteConfirmation.collectAsStateWithLifecycle()
+    pendingDeleteConfirmation?.let { confirmation ->
+        val remaining = confirmation.fileCount - confirmation.sampleFileNames.size
+        val sampleBlock =
+            if (confirmation.sampleFileNames.isNotEmpty()) {
+                val names = confirmation.sampleFileNames.joinToString("\n") { name -> "• $name" }
+                val more = if (remaining > 0) "\n" + stringResource(R.string.delete_run_confirm_more, remaining) else ""
+                "\n\n$names$more"
+            } else {
+                ""
+            }
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.delete_run_confirm_title),
+            text =
+                pluralStringResource(
+                    R.plurals.delete_run_confirm_message,
+                    confirmation.fileCount,
+                    confirmation.fileCount,
+                ) + sampleBlock,
+            confirmLabel = stringResource(R.string.delete_run_confirm_button),
+            onConfirm = { viewModel.confirmPendingDelete() },
+            onDismiss = { viewModel.dismissPendingDelete() },
             destructive = true,
         )
     }
@@ -769,6 +801,7 @@ fun RulesScreen(
                                                 when (ruleGroup.operationMode) {
                                                     OperationMode.MOVE -> R.plurals.preview_files_would_move
                                                     OperationMode.COPY -> R.plurals.preview_files_would_copy
+                                                    OperationMode.DELETE -> R.plurals.preview_files_would_delete
                                                 },
                                                 ruleGroup.results.size,
                                                 ruleGroup.results.size,

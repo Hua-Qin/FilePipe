@@ -110,6 +110,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -135,7 +136,6 @@ import dev.bikram.filepipe.data.storage.safTreeUriToPath
 import dev.bikram.filepipe.domain.RuleFolderSeverity
 import dev.bikram.filepipe.domain.assessRuleFolderAccess
 import dev.bikram.filepipe.domain.model.ConflictPolicy
-import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.FolderAccessResult
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -144,7 +144,11 @@ import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.domain.model.appliesToImageAndVideoOnly
+import dev.bikram.filepipe.domain.model.formatExtensionLabel
+import dev.bikram.filepipe.domain.model.isAllFilesExtension
 import dev.bikram.filepipe.domain.model.materialSymbolName
+import dev.bikram.filepipe.domain.usecase.RuleConflict
+import dev.bikram.filepipe.domain.usecase.RuleConflictDetector
 import dev.bikram.filepipe.ui.common.AppBottomSheet
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.FilePipePredictiveBackHandler
@@ -173,8 +177,10 @@ import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.previewSourceFolderDisplayPath
+import dev.bikram.filepipe.ui.components.rememberMaxLabelMinWidth
 import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer
+import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
 import dev.bikram.filepipe.ui.theme.cardFilledTonalIconButtonColors
@@ -494,6 +500,7 @@ private fun ruleIconOptionLabel(icon: RuleIcon): String =
             RuleIcon.DOWNLOAD -> R.string.rule_icon_label_download
             RuleIcon.DOCUMENT -> R.string.rule_icon_label_document
             RuleIcon.INSTALLABLE -> R.string.rule_icon_label_installable
+            RuleIcon.DRAFT -> R.string.file_type_no_extension
         },
     )
 
@@ -503,11 +510,15 @@ private fun RuleSectionCard(
     subtitle: String?,
     iconName: String,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     highlightColor: Color? = null,
     titleTrailing: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val cardShape = MaterialTheme.shapes.large
+    val iconTint = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+    val titleColor = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+    val subtitleColor = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
     ElevatedCard(
         modifier =
             modifier
@@ -535,19 +546,19 @@ private fun RuleSectionCard(
                     name = iconName,
                     contentDescription = null,
                     size = 24.dp,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = iconTint,
                 )
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = titleColor,
                     )
                     if (subtitle != null) {
                         Text(
                             text = subtitle,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = subtitleColor,
                         )
                     }
                 }
@@ -911,6 +922,8 @@ fun RuleDetailScreen(
             else -> null
         }
     val scheduleHasError = showValidationErrors && isScheduleInvalid(state.schedule)
+    val currentRule = remember(state) { viewModel.buildRuleFromState(state) }
+    val ruleConflicts = remember(currentRule) { RuleConflictDetector.detectConflicts(currentRule) }
 
     Box(
         modifier =
@@ -1020,6 +1033,44 @@ fun RuleDetailScreen(
                             onUseTemplate = { showTemplateSheet = true },
                             enabled = !isReadOnly,
                         )
+                        if (state.fileExtensions.any { isAllFilesExtension(it) }) {
+                            Text(
+                                text = stringResource(R.string.rule_all_files_warning),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
+                        ruleConflicts.forEach { conflict ->
+                            val msg =
+                                when (conflict) {
+                                    is RuleConflict.NoExtensionPatternConflict -> {
+                                        stringResource(R.string.rule_conflict_no_ext_pattern, conflict.patternExtension)
+                                    }
+
+                                    is RuleConflict.ExtensionPatternMismatch -> {
+                                        stringResource(R.string.rule_conflict_ext_mismatch, conflict.patternExtension)
+                                    }
+
+                                    RuleConflict.InvalidSizeRange -> {
+                                        stringResource(R.string.rule_conflict_invalid_size)
+                                    }
+
+                                    RuleConflict.InvalidAgeRange -> {
+                                        stringResource(R.string.rule_conflict_invalid_age)
+                                    }
+
+                                    is RuleConflict.ExcludeAllPattern -> {
+                                        stringResource(R.string.rule_conflict_exclude_all, conflict.pattern)
+                                    }
+                                }
+                            Text(
+                                text = msg,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = 4.dp),
+                            )
+                        }
                     }
 
                     RuleSectionCard(
@@ -1282,9 +1333,11 @@ fun RuleDetailScreen(
                         title = stringResource(R.string.destination_label),
                         subtitle = stringResource(R.string.rule_section_destination_subtitle),
                         iconName = "folder_special",
+                        enabled = state.operationMode != OperationMode.DELETE,
                         highlightColor = destinationFolderHighlightColor,
                     ) {
-                        if (state.destinationFolderPath.isNotBlank()) {
+                        val isDestinationEnabled = !isReadOnly && state.operationMode != OperationMode.DELETE
+                        if (state.operationMode != OperationMode.DELETE && state.destinationFolderPath.isNotBlank()) {
                             val isDestBookmarked = state.destinationFolderPath in bookmarkedFolders
                             val destinationAccessIssue = state.destinationFolderAccessIssue
                             Row(
@@ -1308,20 +1361,22 @@ fun RuleDetailScreen(
                                     color =
                                         if (destinationAccessIssue != null) {
                                             blockingHighlightColor
+                                        } else if (!isDestinationEnabled) {
+                                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
                                         } else {
                                             MaterialTheme.colorScheme.primary
                                         },
                                     modifier =
                                         Modifier
                                             .weight(1f)
-                                            .tapSoundClickable(enabled = !isReadOnly) {
+                                            .tapSoundClickable(enabled = isDestinationEnabled) {
                                                 launchFolderPicker(
                                                     FolderPickIntent.SetDestination,
                                                     state.destinationFolderPath,
                                                 )
                                             },
                                 )
-                                if (!isReadOnly) {
+                                if (isDestinationEnabled) {
                                     TooltipBox(
                                         positionProvider =
                                             TooltipDefaults.rememberTooltipPositionProvider(
@@ -1369,6 +1424,7 @@ fun RuleDetailScreen(
                                         } else {
                                             stringResource(R.string.change_destination)
                                         },
+                                    enabled = isDestinationEnabled,
                                     onClick = {
                                         launchFolderPicker(
                                             FolderPickIntent.SetDestination,
@@ -1382,7 +1438,7 @@ fun RuleDetailScreen(
                                         onClick = { if (unusedDestBookmarks.isNotEmpty()) destBookmarkDropdownExpanded = true },
                                         modifier = Modifier.fillMaxWidth(),
                                         shape = compactControlShape,
-                                        enabled = unusedDestBookmarks.isNotEmpty(),
+                                        enabled = isDestinationEnabled && unusedDestBookmarks.isNotEmpty(),
                                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
                                     ) {
                                         FilePipeMaterialRoundedSymbol(
@@ -1454,8 +1510,10 @@ fun RuleDetailScreen(
                                 when (mode) {
                                     OperationMode.MOVE -> stringResource(R.string.operation_move)
                                     OperationMode.COPY -> stringResource(R.string.operation_copy)
+                                    OperationMode.DELETE -> stringResource(R.string.operation_delete)
                                 }
                             }
+                        val operationMinWidth = rememberMaxLabelMinWidth(operationLabels)
                         val toggleColors =
                             ToggleButtonDefaults.toggleButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -1477,19 +1535,56 @@ fun RuleDetailScreen(
                                     colors = toggleColors,
                                     modifier =
                                         Modifier
-                                            .widthIn(min = 100.dp)
+                                            .widthIn(min = operationMinWidth)
                                             .weight(1f),
                                 ) {
-                                    Text(label)
+                                    Text(label, maxLines = 1, softWrap = false)
                                 }
                             }
                         }
 
-                        Spacer(Modifier.height(12.dp))
+                        if (state.operationMode == OperationMode.DELETE) {
+                            Spacer(Modifier.height(4.dp))
+                            Surface(
+                                shape = MaterialTheme.shapes.small,
+                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.9f),
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "warning",
+                                        contentDescription = null,
+                                        size = 18.dp,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        weight = FontWeight.Medium,
+                                    )
+                                    Text(
+                                        text = stringResource(R.string.rule_operation_delete_warning),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                    )
+                                }
+                            }
+                        }
 
+                        Spacer(Modifier.height(if (state.operationMode == OperationMode.DELETE) 4.dp else 12.dp))
+
+                        val conflictLabelColor =
+                            if (state.operationMode == OperationMode.DELETE) {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
                         Text(
                             text = stringResource(R.string.rule_conflict_policy_label),
                             style = MaterialTheme.typography.bodyMedium,
+                            color = conflictLabelColor,
                         )
                         val conflictPolicies = ConflictPolicy.entries
                         val conflictLabels =
@@ -1500,6 +1595,7 @@ fun RuleDetailScreen(
                                     ConflictPolicy.RENAME_SUFFIX -> stringResource(R.string.conflict_rename)
                                 }
                             }
+                        val conflictMinWidth = rememberMaxLabelMinWidth(conflictLabels)
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1510,14 +1606,14 @@ fun RuleDetailScreen(
                                 FilePipeToggleButton(
                                     checked = state.conflictPolicy == policy,
                                     onCheckedChange = { checked -> if (checked) viewModel.setConflictPolicy(policy) },
-                                    enabled = !isReadOnly,
+                                    enabled = !isReadOnly && state.operationMode != OperationMode.DELETE,
                                     colors = toggleColors,
                                     modifier =
                                         Modifier
-                                            .widthIn(min = 100.dp)
+                                            .widthIn(min = conflictMinWidth)
                                             .weight(1f),
                                 ) {
-                                    Text(label)
+                                    Text(label, maxLines = 1, softWrap = false)
                                 }
                             }
                         }
@@ -1997,8 +2093,8 @@ fun RuleDetailScreen(
                             onClick = { viewModel.loadPreview() },
                             enabled =
                                 state.sourceFolderPaths.isNotEmpty() &&
-                                    state.destinationFolderPath.isNotBlank() &&
-                                    state.fileExtensions.isNotEmpty(),
+                                    state.fileExtensions.isNotEmpty() &&
+                                    (state.operationMode == OperationMode.DELETE || state.destinationFolderPath.isNotBlank()),
                         ) {
                             FilePipeMaterialRoundedSymbol(
                                 name = "visibility",
@@ -2479,7 +2575,10 @@ fun RuleDetailScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 0.dp),
         ) {
             Spacer(Modifier.height(8.dp))
-            RuleTemplate.ALL.forEach { template ->
+            val allFilesLabel = stringResource(R.string.file_type_all_files)
+            val noExtLabel = stringResource(R.string.file_type_no_extension)
+
+            RuleTemplate.CATEGORIES.forEach { template ->
                 FilePipeElevatedCard(
                     onClick = {
                         viewModel.applyTemplate(template)
@@ -2513,10 +2612,59 @@ fun RuleDetailScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(template.name, style = MaterialTheme.typography.titleSmall)
                             Text(
-                                template.extensions.map { it.removePrefix(".") }.joinToString(", "),
+                                template.extensions.map { formatExtensionLabel(it, allFilesLabel, noExtLabel) }.joinToString(", "),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
+                        }
+                    }
+                }
+            }
+
+            // Shared row for All Files and No Extension at bottom of stack
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                listOf(RuleTemplate.ALL_FILES, RuleTemplate.NO_EXTENSION).forEach { template ->
+                    FilePipeElevatedCard(
+                        onClick = {
+                            viewModel.applyTemplate(template)
+                            showTemplateSheet = false
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = MaterialTheme.shapes.medium,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Surface(
+                                shape = compactControlShape,
+                                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                modifier = Modifier.size(40.dp),
+                            ) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = template.suggestedIcon.materialSymbolName(),
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        size = 24.dp,
+                                    )
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(template.name, style = MaterialTheme.typography.titleSmall)
+                                Text(
+                                    template.extensions.map { formatExtensionLabel(it, allFilesLabel, noExtLabel) }.joinToString(", "),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 }
@@ -2559,6 +2707,7 @@ fun RuleDetailScreen(
                                     when (state.operationMode) {
                                         OperationMode.MOVE -> R.plurals.preview_files_would_move
                                         OperationMode.COPY -> R.plurals.preview_files_would_copy
+                                        OperationMode.DELETE -> R.plurals.preview_files_would_delete
                                     },
                                     files.size,
                                     files.size,

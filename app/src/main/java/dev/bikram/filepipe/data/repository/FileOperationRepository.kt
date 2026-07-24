@@ -1,14 +1,10 @@
 package dev.bikram.filepipe.data.repository
 
 import android.content.Context
-import android.graphics.BitmapFactory
-import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.DocumentsContract
-import android.webkit.MimeTypeMap
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
-import androidx.exifinterface.media.ExifInterface
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.storage.folderPathForFilesystemAccess
 import dev.bikram.filepipe.data.storage.isCanonicalPathUnderAllowedSharedStorage
@@ -19,11 +15,8 @@ import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.FolderAccessResult
-import dev.bikram.filepipe.domain.model.IMAGE_EXTENSIONS
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
-import dev.bikram.filepipe.domain.model.VIDEO_EXTENSIONS
-import dev.bikram.filepipe.domain.model.normalizeExtension
 import dev.bikram.filepipe.domain.model.resolveRenameSuffixName
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.NonCancellable
@@ -203,11 +196,6 @@ class FileOperationRepository
 
                 if (!folder.exists() || !folder.canRead()) return@withContext emptyList()
 
-                val lowerExtensions =
-                    extensions
-                        .map {
-                            it.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
-                        }.toSet()
                 val filenameRegexes = buildFilenameRegexes(filenamePattern, isRegexPattern)
                 val excludeRegexes = buildExcludeRegexes(excludePatterns, isExcludeRegexPattern)
                 val now = System.currentTimeMillis()
@@ -230,10 +218,8 @@ class FileOperationRepository
 
                 candidates
                     .asSequence()
-                    .filter { (doc, _) ->
-                        val ext = ".${doc.name.substringAfterLast('.').lowercase()}"
-                        ext in lowerExtensions
-                    }.filter { (doc, _) -> matchesFilename(doc.name, filenameRegexes, isRegexPattern) }
+                    .filter { (doc, _) -> matchesExtensions(doc.name, extensions) }
+                    .filter { (doc, _) -> matchesFilename(doc.name, filenameRegexes, isRegexPattern) }
                     .filter { (doc, _) -> !shouldExclude(doc.name, excludeRegexes, isExcludeRegexPattern) }
                     .filter { (doc, _) -> minFileSizeBytes == null || doc.size >= minFileSizeBytes }
                     .filter { (doc, _) -> maxFileSizeBytes == null || doc.size <= maxFileSizeBytes }
@@ -245,7 +231,7 @@ class FileOperationRepository
                         // Orientation probe opens a stream per file, so stay cancellable between files.
                         scanContext.ensureActive()
                         if (orientation == null) return@filter true
-                        getDocumentUriOrientation(doc.name, doc.uri) == orientation
+                        getDocumentUriOrientation(context, doc.name, doc.uri) == orientation
                     }.map { (doc, relativeParentSegments) ->
                         FileEntry(
                             uri = doc.uri,
@@ -273,11 +259,6 @@ class FileOperationRepository
             isExcludeRegexPattern: Boolean = false,
         ): List<FileEntry> {
             val scanContext = currentCoroutineContext()
-            val lowerExtensions =
-                extensions
-                    .map {
-                        it.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
-                    }.toSet()
             val filenameRegexes = buildFilenameRegexes(filenamePattern, isRegexPattern)
             val excludeRegexes = buildExcludeRegexes(excludePatterns, isExcludeRegexPattern)
             val now = System.currentTimeMillis()
@@ -295,10 +276,8 @@ class FileOperationRepository
                 // Cooperative cancellation: bail out between files as soon as the run is cancelled
                 // rather than running the (potentially slow) per-file orientation probe to completion.
                 .onEach { scanContext.ensureActive() }
-                .filter { (file, _) ->
-                    val ext = ".${file.name.substringAfterLast('.').lowercase()}"
-                    ext in lowerExtensions
-                }.filter { (file, _) -> matchesFilename(file.name, filenameRegexes, isRegexPattern) }
+                .filter { (file, _) -> matchesExtensions(file.name, extensions) }
+                .filter { (file, _) -> matchesFilename(file.name, filenameRegexes, isRegexPattern) }
                 .filter { (file, _) -> !shouldExclude(file.name, excludeRegexes, isExcludeRegexPattern) }
                 .filter { (file, _) -> minFileSizeBytes == null || file.length() >= minFileSizeBytes }
                 .filter { (file, _) -> maxFileSizeBytes == null || file.length() <= maxFileSizeBytes }
@@ -319,98 +298,6 @@ class FileOperationRepository
                         relativeParentSegments = relativeParentSegments,
                     )
                 }.toList()
-        }
-
-        private fun getDocumentUriOrientation(
-            name: String,
-            uri: Uri,
-        ): FileOrientation? {
-            val ext = normalizeExtension(name.substringAfterLast('.', ""))
-            return when (ext) {
-                in IMAGE_EXTENSIONS -> imageOrientation { context.contentResolver.openInputStream(uri) }
-                in VIDEO_EXTENSIONS -> videoOrientation { it.setDataSource(context, uri) }
-                else -> null
-            }
-        }
-
-        private fun getDiskFileOrientation(file: File): FileOrientation? {
-            val ext = normalizeExtension(file.name.substringAfterLast('.', ""))
-            return when (ext) {
-                in IMAGE_EXTENSIONS -> imageOrientation { FileInputStream(file) }
-                in VIDEO_EXTENSIONS -> videoOrientation { it.setDataSource(file.absolutePath) }
-                else -> null
-            }
-        }
-
-        /**
-         * Resolves image orientation from a single stream where possible: AndroidX [ExifInterface] exposes both the
-         * rotation flag and (for formats that store them, e.g. JPEG/HEIF) the pixel dimensions in one pass. A second
-         * stream is only opened to decode the bounds when EXIF doesn't carry dimensions (PNG/WebP/…).
-         */
-        private fun imageOrientation(openStream: () -> InputStream?): FileOrientation? =
-            try {
-                var swapped = false
-                var width = 0
-                var height = 0
-                openStream()?.use { stream ->
-                    val exif = ExifInterface(stream)
-                    swapped = exif.isOrientationSwapped()
-                    width = exif.getAttributeInt(ExifInterface.TAG_IMAGE_WIDTH, 0)
-                    height = exif.getAttributeInt(ExifInterface.TAG_IMAGE_LENGTH, 0)
-                }
-                if (width <= 0 || height <= 0) {
-                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    openStream()?.use { BitmapFactory.decodeStream(it, null, options) }
-                    width = options.outWidth
-                    height = options.outHeight
-                }
-                orientationOf(width, height, swapped)
-            } catch (_: Exception) {
-                null
-            }
-
-        private fun videoOrientation(setDataSource: (MediaMetadataRetriever) -> Unit): FileOrientation? {
-            val retriever = MediaMetadataRetriever()
-            return try {
-                setDataSource(retriever)
-                val width = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
-                val height = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
-                val rotation = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
-                orientationOf(width, height, rotation == 90 || rotation == 270)
-            } catch (_: Exception) {
-                null
-            } finally {
-                try {
-                    retriever.release()
-                } catch (_: Exception) {
-                }
-            }
-        }
-
-        private fun ExifInterface.isOrientationSwapped(): Boolean =
-            when (getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
-                ExifInterface.ORIENTATION_ROTATE_90,
-                ExifInterface.ORIENTATION_ROTATE_270,
-                ExifInterface.ORIENTATION_TRANSPOSE,
-                ExifInterface.ORIENTATION_TRANSVERSE,
-                -> true
-
-                else -> false
-            }
-
-        private fun orientationOf(
-            width: Int,
-            height: Int,
-            swapped: Boolean,
-        ): FileOrientation? {
-            if (width <= 0 || height <= 0) return null
-            val visualWidth = if (swapped) height else width
-            val visualHeight = if (swapped) width else height
-            return when {
-                visualWidth > visualHeight -> FileOrientation.LANDSCAPE
-                visualHeight > visualWidth -> FileOrientation.PORTRAIT
-                else -> null
-            }
         }
 
         private fun walkDiskFilesWithRelativeParents(
@@ -544,6 +431,10 @@ class FileOperationRepository
             filesystemAccessEnabled: Boolean = false,
         ): FileMoved =
             withContext(ioDispatcher + NonCancellable) {
+                if (operationMode == OperationMode.DELETE) {
+                    return@withContext deleteFile(sourceEntry, filesystemAccessEnabled)
+                }
+
                 val effectiveDestFolder =
                     folderPathForFilesystemAccess(destFolderUriString, filesystemAccessEnabled)
                 val sourceIsFile = sourceEntry.uri.scheme == "file"
@@ -614,6 +505,102 @@ class FileOperationRepository
                     }
                 }
             }
+
+        private fun deleteFile(
+            sourceEntry: FileEntry,
+            filesystemAccessEnabled: Boolean,
+        ): FileMoved {
+            val sourceIsFile = sourceEntry.uri.scheme == "file"
+            if (sourceIsFile) {
+                if (!filesystemAccessEnabled) {
+                    return FileMoved(
+                        fileName = sourceEntry.name,
+                        sourceUri = sourceEntry.uri.toString(),
+                        destinationUri = "",
+                        fileSizeBytes = sourceEntry.size,
+                        relativeParentSegments = sourceEntry.relativeParentSegments,
+                        success = false,
+                        errorMessage = "All files access is required for this source path",
+                    )
+                }
+                val path = sourceEntry.uri.path
+                if (path.isNullOrBlank()) {
+                    return FileMoved(
+                        fileName = sourceEntry.name,
+                        sourceUri = sourceEntry.uri.toString(),
+                        destinationUri = "",
+                        fileSizeBytes = sourceEntry.size,
+                        relativeParentSegments = sourceEntry.relativeParentSegments,
+                        success = false,
+                        errorMessage = "Invalid source path",
+                    )
+                }
+                val sourceFile = File(path)
+                // Deletability depends on the parent directory being writable, not the file's own
+                // write bit — a read-only file in a writable dir is deletable (matches MOVE, which
+                // deletes its source the same way, and standard rm semantics). Only require that the
+                // path still points at a regular file; the delete() below reports any real failure.
+                if (!sourceFile.isFile) {
+                    return FileMoved(
+                        fileName = sourceEntry.name,
+                        sourceUri = sourceEntry.uri.toString(),
+                        destinationUri = "",
+                        fileSizeBytes = sourceEntry.size,
+                        relativeParentSegments = sourceEntry.relativeParentSegments,
+                        success = false,
+                        errorMessage = "Source file not accessible",
+                    )
+                }
+                val deleted =
+                    try {
+                        sourceFile.delete()
+                    } catch (_: SecurityException) {
+                        false
+                    }
+                return FileMoved(
+                    fileName = sourceEntry.name,
+                    sourceUri = sourceEntry.uri.toString(),
+                    destinationUri = "",
+                    fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
+                    success = deleted,
+                    errorMessage = if (deleted) null else "Could not delete file",
+                )
+            } else {
+                val doc =
+                    try {
+                        DocumentFile.fromSingleUri(context, sourceEntry.uri)
+                    } catch (_: Exception) {
+                        null
+                    }
+                if (doc == null || !doc.exists()) {
+                    return FileMoved(
+                        fileName = sourceEntry.name,
+                        sourceUri = sourceEntry.uri.toString(),
+                        destinationUri = "",
+                        fileSizeBytes = sourceEntry.size,
+                        relativeParentSegments = sourceEntry.relativeParentSegments,
+                        success = false,
+                        errorMessage = "Source file not accessible",
+                    )
+                }
+                val deleted =
+                    try {
+                        doc.delete()
+                    } catch (_: Exception) {
+                        false
+                    }
+                return FileMoved(
+                    fileName = sourceEntry.name,
+                    sourceUri = sourceEntry.uri.toString(),
+                    destinationUri = "",
+                    fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
+                    success = deleted,
+                    errorMessage = if (deleted) null else "Could not delete document",
+                )
+            }
+        }
 
         private fun moveFileFilesystemToFilesystem(
             sourceEntry: FileEntry,
@@ -1243,9 +1230,14 @@ class FileOperationRepository
             sourceEntry: FileEntry,
             destFolderUriString: String,
             conflictPolicy: ConflictPolicy,
+            operationMode: OperationMode = OperationMode.MOVE,
             filesystemAccessEnabled: Boolean = false,
         ): PreviewFileResult =
             withContext(ioDispatcher) {
+                if (operationMode == OperationMode.DELETE) {
+                    return@withContext unchangedPreviewResult(sourceEntry, "")
+                }
+
                 val effectiveDestFolder =
                     folderPathForFilesystemAccess(destFolderUriString, filesystemAccessEnabled)
                 val simulatedRootPath =
@@ -1652,95 +1644,6 @@ class FileOperationRepository
             name: String,
             destTree: DocumentFile,
         ): String = resolveRenameSuffixName(name) { candidate -> destTree.findFile(candidate) != null }
-
-        private fun mimeTypeFromName(name: String): String {
-            val ext = name.substringAfterLast('.', "").lowercase()
-            return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
-        }
-
-        private fun globToRegex(pattern: String): Regex {
-            val sb = StringBuilder("^")
-            for (ch in pattern) {
-                when (ch) {
-                    '*' -> {
-                        sb.append(".*")
-                    }
-
-                    '?' -> {
-                        sb.append(".")
-                    }
-
-                    '.', '(', ')', '[', ']', '^', '$', '+', '{', '}', '|', '\\' -> {
-                        sb.append('\\')
-                        sb.append(ch)
-                    }
-
-                    else -> {
-                        sb.append(ch)
-                    }
-                }
-            }
-            sb.append("$")
-            return Regex(sb.toString(), RegexOption.IGNORE_CASE)
-        }
-
-        private fun buildFilenameRegexes(
-            filenamePattern: String?,
-            isRegexPattern: Boolean,
-        ): List<Regex>? {
-            val trimmed = filenamePattern?.takeIf { it.isNotBlank() } ?: return null
-            if (isRegexPattern) {
-                return runCatching {
-                    listOf(Regex(trimmed, RegexOption.IGNORE_CASE))
-                }.getOrElse { emptyList() }
-            }
-            return trimmed
-                .split(",")
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-                .map { globToRegex(it) }
-        }
-
-        private fun matchesFilename(
-            name: String,
-            filenameRegexes: List<Regex>?,
-            isRegexPattern: Boolean,
-        ): Boolean {
-            if (filenameRegexes.isNullOrEmpty()) return true
-            return if (isRegexPattern) {
-                filenameRegexes.any { it.containsMatchIn(name) }
-            } else {
-                filenameRegexes.any { it.matches(name) }
-            }
-        }
-
-        private fun buildExcludeRegexes(
-            excludePatterns: List<String>,
-            isRegexPattern: Boolean,
-        ): List<Regex> {
-            val nonBlank = excludePatterns.filter { it.isNotBlank() }
-            if (nonBlank.isEmpty()) return emptyList()
-            return if (isRegexPattern) {
-                nonBlank.mapNotNull { pattern ->
-                    runCatching { Regex(pattern.trim(), RegexOption.IGNORE_CASE) }.getOrNull()
-                }
-            } else {
-                nonBlank.map { globToRegex(it.trim()) }
-            }
-        }
-
-        private fun shouldExclude(
-            name: String,
-            excludeRegexes: List<Regex>,
-            isRegexPattern: Boolean,
-        ): Boolean {
-            if (excludeRegexes.isEmpty()) return false
-            return if (isRegexPattern) {
-                excludeRegexes.any { it.containsMatchIn(name) }
-            } else {
-                excludeRegexes.any { it.matches(name) }
-            }
-        }
     }
 
 data class FileEntry(

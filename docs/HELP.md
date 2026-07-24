@@ -3,7 +3,7 @@
 ## Fix common issues
 
 ### Fix a rule that isn't working
-- Give the rule a name, source folders, destination folder, and file types.
+- Give the rule a name, file types, source folders, and (for **Move** and **Copy**) a destination folder.
 - Tap any highlighted folder path on the edit screen and grant access again.
 - If the rule uses Download folder or a storage root, switch to **All files access** in Settings.
 
@@ -35,8 +35,9 @@
 
 ### How do I create a rule?
 - Tap **+** on the Rules tab to start a new rule.
-- Pick source folders, file types (enter manually or use template), and a destination folder.
-- Choose **Move** or **Copy**, and set how to handle duplicate files in the destination.
+- Pick source folders, file types (enter manually or use template), and an operation: **Move**, **Copy**, or **Delete**.
+- For **Move** and **Copy**, pick a destination folder and set how to handle duplicate files there.
+- **Delete** rules do not use a destination or conflict settings — matched files are removed from their source folders.
 - Use advanced filters to match by filename pattern, size range, or file age.
 - Save, then tap **Preview** 👁️ to see which files would be affected before committing.
 - Add a schedule if you want the rule to run automatically in the background.
@@ -46,9 +47,19 @@
 - On any rule's page, tap the "Use template" button and choose a template to automatically fill extensions and in some cases, sources.
 - Customise any template just like a regular rule.
 
+### What are "All files" and "No extension" file types?
+- These are special file types you can add from **Add type** on the rule editor (quick chips in the dialog) or from the **Use template** list. They are NOT the same as **All files access** in Settings.
+- **All files** matches every file in your source folders, regardless of extension. Advanced filters still apply — filename pattern, exclude pattern, size, and age can narrow the match.
+- Adding **All files** replaces every other file type on the rule. You cannot combine it with specific types such as `jpg` or `pdf`; only the **All files** chip remains.
+- **No extension** matches files that have no extension — names with no dot, names that are only a dot and suffix (such as `.gitignore`), or names ending in a trailing dot (such as `README.`).
+- Files like `.config.json` or `.env.local` do count as having an extension (`json`, `local`) and are not matched by **No extension** alone.
+- **No extension** can be combined with normal types (for example `jpg` and **No extension** together). **All files** cannot be combined with anything else.
+- If a filename pattern requires a specific extension (such as `*.pdf`) but your file types do not include it — or you only selected **No extension** — the rule editor shows a warning because no files would match.
+
 ### How do I run a rule manually?
 - Tap a rule on the Rules tab and use the **Run** action.
 - Use **Preview** first if you want to see which files match before the rule acts on them.
+- **Delete** rules (and batches that include one) show a confirmation dialog before any files are removed. (Only when run manually.)
 
 ---
 
@@ -85,19 +96,26 @@
 
 ## Managing rules
 
+### What does Delete do?
+- **Delete** permanently removes matched files from your source folders. There is no destination folder and no undo anywhere in the app.
+- The rule editor shows a warning when **Delete** is selected. Use **Preview** first and narrow your filters carefully before you run or schedule the rule.
+- **Conflict setting** does not apply to **Delete** — it is only used for **Move** and **Copy**.
+- When you tap **Run** on a delete rule (or run a batch that includes one), FilePipe asks you to confirm before anything is deleted. (Only when run manually.)
+- Scheduled delete rules run automatically in the background without that extra confirmation — double-check filters and schedules before enabling them.
+
 ### Why is my rule skipping files?
 - The file may not match the extensions or advanced filters.
-- **Conflict setting** controls what happens when a file with the same name already exists in the destination: **Skip** leaves it untouched, **Overwrite** replaces it, **Rename** keeps both by adding a suffix to the incoming filename.
+- For **Move** and **Copy**, **Conflict setting** controls what happens when a file with the same name already exists in the destination: **Skip** leaves it untouched, **Overwrite** replaces it, **Rename** keeps both by adding a suffix to the incoming filename.
 - Lost folder access can hide files until you grant access again.
 
 ### What does preview do?
 - Preview lists files the rule would act on.
-- Nothing is moved or copied until you run the rule for real.
-- Use it to check filters, destination, and access before you rely on the rule.
+- Nothing changes on disk until you run the rule for real.
+- Use it to check filters, destination (for **Move** and **Copy**), and access before you rely on the rule.
 
 ### Can rules scan subfolders?
 - Yes — enable **Include subfolders** on a source folder in the rule editor.
-- The destination can optionally recreate the source subfolder structure so files land in matching subdirectories.
+- For **Move** and **Copy**, the destination can optionally recreate the source subfolder structure so files land in matching subdirectories.
 
 ### How do RegEx filters work?
 - Tap the **RegEx** chip inside the **Filename pattern** or **Exclude pattern** text box to switch that field to regular expression mode.
@@ -111,12 +129,12 @@
 
 ### What is in History?
 - History records every rule run: which files matched, what happened to each, and whether it succeeded.
-- Runs are grouped by date and rule. Tap a run to see per-file details.
-- Open the History tab to review past runs and access undo for any operation.
+- Runs are grouped by date and rule. Tap a run to see per-file details, including how many files were moved, copied, or deleted.
+- Open the History tab to review past runs and access undo for **Move** and **Copy** runs.
 
 ### How do I undo a rule run?
-- Tap **Undo** in the run notification to reverse the last move instantly.
-- Open the **History** tab, tap a completed run, and use the undo option there.
+- **Move** and **Copy** runs can be undone. Tap **Undo** in the run notification, or open the **History** tab, tap a completed run, and use the undo option there.
+- **Delete** runs cannot be undone. Deleted files are gone permanently — there is no undo button in History or in notifications for delete operations.
 
 ---
 
@@ -126,6 +144,7 @@
 - Scheduled rules run in the background at the interval you configure: hourly, daily, or weekly.
 - They still need valid folder access and files that match the rule.
 - Use **Preview** after changes so automation matches what you expect.
+- Scheduled **Delete** rules run without an extra confirmation prompt — treat them like any other scheduled rule and verify filters before you enable the schedule.
 
 ### Not getting scheduled run notifications?
 - Make sure FilePipe has notification permission granted in Android settings.

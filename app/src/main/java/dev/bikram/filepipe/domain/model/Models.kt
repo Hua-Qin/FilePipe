@@ -7,7 +7,7 @@ import java.util.Calendar
 
 enum class ConflictPolicy { SKIP, OVERWRITE, RENAME_SUFFIX }
 
-enum class OperationMode { MOVE, COPY }
+enum class OperationMode { MOVE, COPY, DELETE }
 
 data class Rule(
     val id: Long = 0,
@@ -18,6 +18,14 @@ data class Rule(
     val isEnabled: Boolean = true,
     /** Display order when sorting by [HistorySortKey.MY_ORDER]; lower first. */
     val sortOrder: Int = 0,
+    /**
+     * When this rule last started a run, or null if it has never run. Recorded for **every** run,
+     * including ones that matched no files and therefore moved nothing, so sorting by
+     * [HistorySortKey.LAST_RAN] reflects what actually ran. Deliberately stored on the rule rather
+     * than derived from run history: history rows are prunable (log retention) and deletable by the
+     * user, and a run that changed nothing should not have to leave a history entry to count here.
+     */
+    val lastRunStartedAt: Long? = null,
     /** Overrides the global expanded/collapsed display mode for this rule card. */
     val cardModeOverride: Boolean = false,
     val createdAt: Long = System.currentTimeMillis(),
@@ -273,6 +281,13 @@ enum class FileOrientation {
     LANDSCAPE,
 }
 
+const val ALL_FILES_EXTENSION = "*"
+const val NO_EXTENSION_TOKEN = "[no_ext]"
+
+fun isAllFilesExtension(ext: String): Boolean = ext.trim() == ALL_FILES_EXTENSION
+
+fun isNoExtensionToken(ext: String): Boolean = ext.trim().lowercase() == NO_EXTENSION_TOKEN
+
 /** Canonical image/video extensions (no leading dot, lowercase). Single source of truth for orientation support. */
 val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "gif", "heic", "webp", "bmp", "tiff", "heif")
 val VIDEO_EXTENSIONS = setOf("mp4", "mov", "mkv", "avi", "webm", "3gp", "ts", "m4v")
@@ -280,9 +295,21 @@ val VIDEO_EXTENSIONS = setOf("mp4", "mov", "mkv", "avi", "webm", "3gp", "ts", "m
 /** Normalizes an extension token (with or without a leading dot, any case) to its bare lowercase suffix. */
 fun normalizeExtension(ext: String): String = ext.trim().removePrefix(".").lowercase()
 
+fun formatExtensionLabel(
+    ext: String,
+    allFilesLabel: String = "All files",
+    noExtensionLabel: String = "No extension",
+): String =
+    when {
+        isAllFilesExtension(ext) -> allFilesLabel
+        isNoExtensionToken(ext) -> noExtensionLabel
+        else -> ext.removePrefix(".")
+    }
+
 fun appliesToImageAndVideoOnly(fileExtensions: List<String>): Boolean {
     if (fileExtensions.isEmpty()) return false
     return fileExtensions.all { ext ->
+        if (isAllFilesExtension(ext) || isNoExtensionToken(ext)) return@all false
         val clean = normalizeExtension(ext)
         clean in IMAGE_EXTENSIONS || clean in VIDEO_EXTENSIONS
     }

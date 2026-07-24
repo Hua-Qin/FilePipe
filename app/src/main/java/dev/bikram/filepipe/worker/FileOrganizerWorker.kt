@@ -250,6 +250,10 @@ class FileOrganizerWorker
                             OperationMode.MOVE -> {
                                 appContext.getString(R.string.notification_moving_n_of_m, done, max)
                             }
+
+                            OperationMode.DELETE -> {
+                                appContext.getString(R.string.notification_deleting_n_of_m, done, max)
+                            }
                         }
                     builder.setSubText(subText)
                 }

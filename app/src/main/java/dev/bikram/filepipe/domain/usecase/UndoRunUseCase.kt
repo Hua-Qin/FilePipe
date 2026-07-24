@@ -74,6 +74,15 @@ class UndoRunUseCase
                 }
 
                 val operationMode = history.operationMode
+                if (operationMode == OperationMode.DELETE) {
+                    return@withContext UndoResult(
+                        0,
+                        0,
+                        listOf("Delete operations cannot be undone"),
+                        operationMode = OperationMode.DELETE,
+                    )
+                }
+
                 val movedFiles =
                     runHistoryRepository
                         .getFilesForRunOnce(historyId)

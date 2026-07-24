@@ -49,6 +49,7 @@ class SimulateRuleUseCase
                     sourceEntry = destinationEntry,
                     destFolderUriString = rule.destinationFolderPath,
                     conflictPolicy = rule.conflictPolicy,
+                    operationMode = rule.operationMode,
                     filesystemAccessEnabled = filesystemAccessEnabled,
                 )
             }

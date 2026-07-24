@@ -60,6 +60,7 @@ class RulesBackupJsonTest {
         val history =
             RunHistory(
                 id = 100L,
+                ruleId = rule.id,
                 ruleName = "Screenshots",
                 triggeredBy = TriggerType.SCHEDULED,
                 startedAt = 1000L,
@@ -131,5 +132,21 @@ class RulesBackupJsonTest {
         assertFalse(domainRule.recreateDestinationSubfolders)
         assertEquals(RuleIcon.DEFAULT, domainRule.icon)
         assertNull(domainRule.iconEmoji)
+    }
+
+    @Test
+    fun deleteOperationModeRoundTrip() {
+        val rule =
+            Rule(
+                name = "Delete Temp Files",
+                sourceFolderPaths = listOf("content://source"),
+                destinationFolderPath = "",
+                fileExtensions = listOf("tmp", "bak"),
+                operationMode = OperationMode.DELETE,
+            )
+
+        val backup = parseRulesBackupJson(buildAppBackupJson(listOf(rule), emptyList(), null)).getOrThrow()
+        val restoredRule = backup.rules.single().toDomain()
+        assertEquals(OperationMode.DELETE, restoredRule.operationMode)
     }
 }

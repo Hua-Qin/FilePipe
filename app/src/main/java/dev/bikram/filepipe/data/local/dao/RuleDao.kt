@@ -72,6 +72,13 @@ interface RuleDao {
         restoredAt: Long,
     )
 
+    /** Targeted so recording a run cannot disturb [RuleEntity.updatedAt] or race a full-row update. */
+    @Query("UPDATE rules SET lastRunStartedAt = :startedAt WHERE id = :id")
+    suspend fun updateLastRunStartedAt(
+        id: Long,
+        startedAt: Long,
+    )
+
     @Query("UPDATE rules SET cardModeOverride = :override WHERE id = :id")
     suspend fun updateCardModeOverride(
         id: Long,

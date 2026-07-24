@@ -17,15 +17,17 @@
     <string name="rule_card_types_none">None</string>
     <string name="rule_card_from">From</string>
     <string name="rule_card_from_none">No sources</string>
+    <string name="rule_card_more_count">+%1$d</string>
     <string name="rule_card_destination_not_set">Not set</string>
     <string name="rule_card_to">To</string>
     <string name="rule_card_expand_cd">Expand %1$s</string>
     <string name="rule_card_collapse_cd">Collapse %1$s</string>
     <string name="rule_card_select_cd">Select %1$s</string>
     <string name="rule_card_deselect_cd">Deselect %1$s</string>
-    <string name="rule_card_stale_folder_warning">One or more folders need attention</string>
+    <string name="rule_card_stale_folder_warning">One or more conditions need attention</string>
     <string name="rule_card_progress_moving_file">Moving %1$s (%2$d / %3$d)</string>
     <string name="rule_card_progress_copying_file">Copying %1$s (%2$d / %3$d)</string>
+    <string name="rule_card_progress_deleting_file">Deleting %1$s (%2$d / %3$d)</string>
     <plurals name="rule_card_progress_files_moved_summary">
         <item quantity="one">%1$d / %2$d file moved</item>
         <item quantity="other">%1$d / %2$d files moved</item>
@@ -33,6 +35,10 @@
     <plurals name="rule_card_progress_files_copied_summary">
         <item quantity="one">%1$d / %2$d file copied</item>
         <item quantity="other">%1$d / %2$d files copied</item>
+    </plurals>
+    <plurals name="rule_card_progress_files_deleted_summary">
+        <item quantity="one">%1$d / %2$d file deleted</item>
+        <item quantity="other">%1$d / %2$d files deleted</item>
     </plurals>
     <string name="rule_card_progress_error">Error: %1$s</string>
     <string name="rule_card_progress_no_matching_files">No matching files found</string>
@@ -176,6 +182,7 @@
     <string name="history_two_pane_trash_message">Trashed rules stay in the list. Run details appear when you switch back to Runs.</string>
     <string name="history_detail_files_moved_label">Files moved</string>
     <string name="history_detail_files_copied_label">Files copied</string>
+    <string name="history_detail_files_deleted_label">Files deleted</string>
     <plurals name="history_detail_undo_files">
         <item quantity="one">Undo (%d file)</item>
         <item quantity="other">Undo (%d files)</item>
@@ -225,6 +232,10 @@
     <plurals name="history_files_copied">
         <item quantity="one">%d file copied</item>
         <item quantity="other">%d files copied</item>
+    </plurals>
+    <plurals name="history_files_deleted">
+        <item quantity="one">%d file deleted</item>
+        <item quantity="other">%d files deleted</item>
     </plurals>
     <plurals name="history_files_failed">
         <item quantity="one">%d failed</item>
@@ -287,6 +298,7 @@
     <string name="notification_run_failed_abbr">Stopped: %1$s</string>
     <string name="notification_moving_n_of_m">Moving %1$d of %2$d</string>
     <string name="notification_copying_n_of_m">Copying %1$d of %2$d</string>
+    <string name="notification_deleting_n_of_m">Deleting %1$d of %2$d</string>
     <string name="notification_batch_rule_file">%1$s · %2$s</string>
 
     <!-- Rule search -->
@@ -839,6 +851,15 @@
     <string name="rule_operation_mode_label">Mode</string>
     <string name="operation_move">Move</string>
     <string name="operation_copy">Copy</string>
+    <string name="operation_delete">Delete</string>
+    <string name="rule_operation_delete_warning">CAUTION: FILES WILL BE PERMANENTLY DELETED, WITH NO UNDO OPTION ANYWHERE.</string>
+    <string name="delete_run_confirm_title">Permanently delete files?</string>
+    <string name="delete_run_confirm_button">Delete permanently</string>
+    <plurals name="delete_run_confirm_message">
+        <item quantity="one">%1$d file will be permanently deleted. This cannot be undone.</item>
+        <item quantity="other">%1$d files will be permanently deleted. This cannot be undone.</item>
+    </plurals>
+    <string name="delete_run_confirm_more">…and %1$d more</string>
     <string name="rule_conflict_policy_label">If file already exists</string>
     <string name="conflict_skip">Skip</string>
     <string name="conflict_overwrite">Overwrite</string>
@@ -864,6 +885,10 @@
     <plurals name="preview_files_would_copy">
         <item quantity="one">%1$d file would be copied</item>
         <item quantity="other">%1$d files would be copied</item>
+    </plurals>
+    <plurals name="preview_files_would_delete">
+        <item quantity="one">%1$d file would be deleted</item>
+        <item quantity="other">%1$d files would be deleted</item>
     </plurals>
 
     <!-- Template picker -->
@@ -943,4 +968,12 @@
     <string name="file_type_add_type">Add type</string>
     <string name="file_type_use_template">Use template</string>
     <string name="file_type_remove_content_description">Remove %1$s</string>
+    <string name="file_type_all_files">All files</string>
+    <string name="file_type_no_extension">No extension</string>
+    <string name="rule_all_files_warning">This rule will target ALL files in the selected source folders.</string>
+    <string name="rule_conflict_no_ext_pattern">Warning: This rule targets \"No extension\", but the filename pattern requires \".%1$s\". No files will match.</string>
+    <string name="rule_conflict_ext_mismatch">Warning: Filename pattern requires \".%1$s\", which is not in your selected file types. No files will match.</string>
+    <string name="rule_conflict_invalid_size">Warning: Minimum file size is greater than Maximum file size. No files will match.</string>
+    <string name="rule_conflict_invalid_age">Warning: Minimum file age is greater than Maximum file age. No files will match.</string>
+    <string name="rule_conflict_exclude_all">Warning: Exclude pattern \"%1$s\" will exclude all files. No files will match.</string>
 </resources>

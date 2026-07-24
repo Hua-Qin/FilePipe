@@ -62,7 +62,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.Locale
 import javax.inject.Inject
 
 data class DeleteUndoEvent(
@@ -97,6 +96,37 @@ sealed interface RulesRunNavigation {
     data object HistoryList : RulesRunNavigation
 }
 
+/**
+ * Pending confirmation for a manual run that would permanently delete files. Surfaced to the UI so
+ * the user must explicitly confirm before an irreversible delete rule executes. Scheduled runs do
+ * not go through this path and are unaffected.
+ */
+data class PendingDeleteConfirmation(
+    val fileCount: Int,
+    val sampleFileNames: List<String>,
+)
+
+/** How many affected file names to preview in the delete-confirmation dialog. */
+private const val DELETE_CONFIRM_SAMPLE_SIZE = 5
+
+/**
+ * Builds the delete confirmation for a manual run: flattens each delete rule's simulated results,
+ * keeps only files that would actually be removed (not skipped), and returns null when nothing
+ * would be deleted — so no confirmation is shown and the run proceeds normally. Pure and
+ * module-internal for unit testing without a full ViewModel harness.
+ */
+internal fun deleteConfirmationFor(
+    deleteRuleResults: List<List<PreviewFileResult>>,
+    sampleSize: Int = DELETE_CONFIRM_SAMPLE_SIZE,
+): PendingDeleteConfirmation? {
+    val affected = deleteRuleResults.flatten().filter { result -> !result.wouldSkip }
+    if (affected.isEmpty()) return null
+    return PendingDeleteConfirmation(
+        fileCount = affected.size,
+        sampleFileNames = affected.take(sampleSize).map { it.fileName },
+    )
+}
+
 /** Where the sole in-run Cancel control is shown for manual runs. */
 sealed interface ManualRunCancelAnchor {
     data object None : ManualRunCancelAnchor
@@ -107,6 +137,13 @@ sealed interface ManualRunCancelAnchor {
 
     data object RunSelectedBar : ManualRunCancelAnchor
 }
+
+/** A sorted rules list together with the sort selection that produced it. */
+private data class SortedRules(
+    val rules: List<Rule>,
+    val sortKey: HistorySortKey,
+    val sortDirection: HistorySortDirection,
+)
 
 data class RulesUiState(
     val rules: List<Rule> = emptyList(),
@@ -156,6 +193,12 @@ class RulesViewModel
         private val _previewState = MutableStateFlow<PreviewState?>(null)
         private val _manualRunCancelAnchor = MutableStateFlow<ManualRunCancelAnchor>(ManualRunCancelAnchor.None)
 
+        // A manual run deferred pending the user's delete confirmation, plus the confirmation shown
+        // to the UI. Kept out of the main uiState combine (mirrors _manualRunCancelAnchor's pattern).
+        private var pendingManualRun: PendingManualRun? = null
+        private val _pendingDeleteConfirmation = MutableStateFlow<PendingDeleteConfirmation?>(null)
+        val pendingDeleteConfirmation: StateFlow<PendingDeleteConfirmation?> = _pendingDeleteConfirmation.asStateFlow()
+
         private val rulesCompactModeFlow =
             userPreferencesRepository.preferencesFlow
                 .map { prefs -> prefs.rulesCompactMode }
@@ -174,19 +217,20 @@ class RulesViewModel
                     AppPreferences.DEFAULT.rulesSortKey to AppPreferences.DEFAULT.rulesSortDirection,
                 )
 
-        private val lastRunStartedAtByRuleId: StateFlow<Map<Long, Long>> =
-            runHistoryRepository
-                .observeLastRunStartedAtByRuleId()
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
-
+        // The sort selection travels with the list it produced. Reading the selection from a second
+        // subscription to the preferences flow let combine() pair a freshly changed sort key with the
+        // previously sorted list, so the UI was told "My order" while holding name-sorted rules.
         private val sortedRulesFlow =
             combine(
                 _rules,
                 rulesSortPreferencesFlow,
-                lastRunStartedAtByRuleId,
-            ) { rules, sortParams, lastRunMap ->
+            ) { rules, sortParams ->
                 val (sortKey, sortDirection) = sortParams
-                sortRulesList(rules, sortKey, sortDirection, lastRunMap)
+                SortedRules(
+                    rules = sortRulesList(rules, sortKey, sortDirection),
+                    sortKey = sortKey,
+                    sortDirection = sortDirection,
+                )
             }
 
         val uiState: StateFlow<RulesUiState> =
@@ -195,9 +239,7 @@ class RulesViewModel
                 _staleRuleIssues,
                 userPreferencesRepository.preferencesFlow,
                 _selectedRuleIds,
-                rulesSortPreferencesFlow,
-            ) { sortedRules, staleIssues, prefs, selected, sortParams ->
-                val (sortKey, sortDirection) = sortParams
+            ) { sortedRules, staleIssues, prefs, selected ->
                 val staleWarningIds =
                     staleIssues
                         .filterValues { it == RuleFolderIssueSeverity.WARNING }
@@ -207,15 +249,15 @@ class RulesViewModel
                         .filterValues { it == RuleFolderIssueSeverity.ERROR }
                         .keys
                 RulesUiState(
-                    rules = sortedRules,
+                    rules = sortedRules.rules,
                     staleRuleIds = staleIssues.keys,
                     staleRuleWarningIds = staleWarningIds,
                     staleRuleErrorIds = staleErrorIds,
                     swipeStartToEnd = prefs.swipeStartToEnd,
                     swipeEndToStart = prefs.swipeEndToStart,
                     selectedRuleIds = selected,
-                    sortKey = sortKey,
-                    sortDirection = sortDirection,
+                    sortKey = sortedRules.sortKey,
+                    sortDirection = sortedRules.sortDirection,
                 )
             }.combine(_progressMap) { state, progress ->
                 state.copy(progressMap = progress, isRunning = progress.values.any { !it.isComplete })
@@ -546,6 +588,73 @@ class RulesViewModel
             enqueueManualRun(realRules, anchor, runSimulationCheck = true)
         }
 
+        private data class PendingManualRun(
+            val rules: List<Rule>,
+            val anchor: ManualRunCancelAnchor,
+            val useCache: Boolean,
+            val runSimulationCheck: Boolean,
+        )
+
+        /**
+         * Entry point for every manual run. If any rule in the batch permanently deletes files, this
+         * defers to a user confirmation (see [requestDeleteConfirmation]) before anything runs;
+         * otherwise it starts immediately. Scheduled runs never reach here, so they stay automatic.
+         */
+        private fun enqueueManualRun(
+            rules: List<Rule>,
+            anchor: ManualRunCancelAnchor,
+            useCache: Boolean = false,
+            runSimulationCheck: Boolean = false,
+        ) {
+            if (rules.isEmpty()) return
+            if (rules.any { it.operationMode == OperationMode.DELETE }) {
+                requestDeleteConfirmation(rules, anchor, useCache, runSimulationCheck)
+                return
+            }
+            startManualRun(rules, anchor, useCache, runSimulationCheck)
+        }
+
+        /**
+         * Simulates the delete rules in [rules] to count/sample the files that would be permanently
+         * removed, then raises a [PendingDeleteConfirmation] for the UI. If nothing would be deleted,
+         * the run proceeds normally (the existing simulation check surfaces any "no files" message).
+         */
+        private fun requestDeleteConfirmation(
+            rules: List<Rule>,
+            anchor: ManualRunCancelAnchor,
+            useCache: Boolean,
+            runSimulationCheck: Boolean,
+        ) {
+            viewModelScope.launch {
+                val deleteRuleResults =
+                    rules
+                        .filter { it.operationMode == OperationMode.DELETE }
+                        .map { rule -> runCatching { simulateRuleUseCase(rule) }.getOrDefault(emptyList()) }
+                val confirmation = deleteConfirmationFor(deleteRuleResults)
+                if (confirmation == null) {
+                    // Nothing to delete; run normally — the sim check emits the "no files" message.
+                    startManualRun(rules, anchor, useCache, runSimulationCheck)
+                    return@launch
+                }
+                pendingManualRun = PendingManualRun(rules, anchor, useCache, runSimulationCheck)
+                _pendingDeleteConfirmation.value = confirmation
+            }
+        }
+
+        /** Proceeds with a delete run the user confirmed via the [PendingDeleteConfirmation] dialog. */
+        fun confirmPendingDelete() {
+            val pending = pendingManualRun ?: return
+            pendingManualRun = null
+            _pendingDeleteConfirmation.value = null
+            startManualRun(pending.rules, pending.anchor, pending.useCache, pending.runSimulationCheck)
+        }
+
+        /** Cancels a pending delete run without deleting anything. */
+        fun dismissPendingDelete() {
+            pendingManualRun = null
+            _pendingDeleteConfirmation.value = null
+        }
+
         /**
          * Runs [rules] in-process for immediate start. [ManualRunForegroundService] starts while
          * the app is still foregrounded so the same run can continue if the app backgrounds.
@@ -553,7 +662,7 @@ class RulesViewModel
          * Uses a [CoroutineStart.LAZY] job so the slot can be updated before the previous runner is
          * cancelled and joined, avoiding overlapping executions and stale [manualRunJob] identity.
          */
-        private fun enqueueManualRun(
+        private fun startManualRun(
             rules: List<Rule>,
             anchor: ManualRunCancelAnchor,
             useCache: Boolean = false,
@@ -576,30 +685,30 @@ class RulesViewModel
                                     )
                             }
                         try {
-                            val targetRules =
-                                if (runSimulationCheck) {
-                                    val filtered =
-                                        rules.filter { rule ->
-                                            simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
-                                        }
-                                    if (filtered.isEmpty()) {
-                                        postUserMessage(appContext.getString(R.string.history_no_files_affected))
-                                        return@launch
+                            // Every rule the user ran is executed, even one that matches nothing: that
+                            // run is real, so it earns a history row ("No changes", where it can be
+                            // filtered by chip or deleted) and a last-run time for sorting. The
+                            // simulation now only picks the feedback - a run that affects no files
+                            // reports that instead of pulling the user into History.
+                            val affectsFiles =
+                                !runSimulationCheck ||
+                                    rules.any { rule ->
+                                        simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
                                     }
-                                    filtered
-                                } else {
-                                    rules
-                                }
 
                             val results =
                                 executeRulesUseCase(
-                                    targetRules,
+                                    rules,
                                     TriggerType.MANUAL,
                                     useCache = useCache || runSimulationCheck,
                                 ) { progress ->
                                     _progressMap.update { current -> current + (progress.ruleId to progress) }
                                 }
                             when {
+                                !affectsFiles -> {
+                                    postUserMessage(appContext.getString(R.string.history_no_files_affected))
+                                }
+
                                 results.size == 1 -> {
                                     _navigateAfterRun.emit(
                                         RulesRunNavigation.HistoryDetail(results.first().historyId),
@@ -749,6 +858,9 @@ class RulesViewModel
                         id = 0,
                         name = "${rule.name} (copy)",
                         isEnabled = false,
+                        // The copy has never run, so it must not inherit the original's run time
+                        // and sort under "last run" as though it had.
+                        lastRunStartedAt = null,
                     )
                 ruleRepository.saveRule(copy)
                 rulesAutoExportTrigger.maybeExportAfterRuleChange()
@@ -856,7 +968,6 @@ class RulesViewModel
             rules: List<Rule>,
             sortKey: HistorySortKey,
             sortDirection: HistorySortDirection,
-            lastRunStartedAtByRuleId: Map<Long, Long>,
         ): List<Rule> {
             when (sortKey) {
                 HistorySortKey.MY_ORDER -> {
@@ -864,23 +975,24 @@ class RulesViewModel
                 }
 
                 HistorySortKey.LAST_RAN -> {
-                    val locale = Locale.getDefault()
-                    return when (sortDirection) {
-                        HistorySortDirection.DESCENDING -> {
-                            rules.sortedWith(
-                                compareByDescending<Rule> { lastRunStartedAtByRuleId[it.id] ?: Long.MIN_VALUE }
-                                    .thenBy { it.name.lowercase(locale) }
-                                    .thenBy { it.id },
-                            )
-                        }
-
-                        HistorySortDirection.ASCENDING -> {
-                            rules.sortedWith(
-                                compareBy<Rule> { lastRunStartedAtByRuleId[it.id] ?: Long.MAX_VALUE }
-                                    .thenBy { it.name.lowercase(locale) }
-                                    .thenBy { it.id },
-                            )
-                        }
+                    // A rule that has never run counts as the oldest thing in the list: newest-first
+                    // sinks it to the bottom, oldest-first floats it to the top. Rules that tie fall
+                    // back to the user's own order rather than to the rule name, which made this sort
+                    // indistinguishable from "Rule name (A to Z)".
+                    //
+                    // One direction is the reverse of the other, so the second is built by reversing
+                    // the first instead of re-sorting with a flipped comparator. Flipping only the
+                    // timestamp comparison leaves tied rules in the same relative order in both
+                    // directions, and the list then doesn't read as reversed at all.
+                    val newestFirst =
+                        rules.sortedWith(
+                            compareByDescending<Rule> { it.lastRunStartedAt ?: Long.MIN_VALUE }
+                                .then(compareBy<Rule>({ it.sortOrder }, { it.id })),
+                        )
+                    return if (sortDirection == HistorySortDirection.ASCENDING) {
+                        newestFirst.reversed()
+                    } else {
+                        newestFirst
                     }
                 }
 

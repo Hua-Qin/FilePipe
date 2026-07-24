@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.domain.usecase
 
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.ScheduleType
@@ -21,9 +22,12 @@ class ValidateRuleUseCase
                 buildList {
                     if (rule.name.isBlank()) add("Rule name is required")
                     if (rule.sourceFolderPaths.isEmpty()) add("At least one source folder is required")
-                    if (rule.destinationFolderPath.isBlank()) add("Destination folder is required")
+                    if (rule.operationMode != OperationMode.DELETE && rule.destinationFolderPath.isBlank()) {
+                        add("Destination folder is required")
+                    }
                     if (rule.fileExtensions.isEmpty()) add("At least one file type is required")
-                    if (rule.destinationFolderPath.isNotBlank() &&
+                    if (rule.operationMode != OperationMode.DELETE &&
+                        rule.destinationFolderPath.isNotBlank() &&
                         rule.sourceFolderPaths.any { it == rule.destinationFolderPath }
                     ) {
                         add("Source and destination folders cannot be the same")

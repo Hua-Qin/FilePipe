@@ -1076,71 +1076,32 @@ fun SettingsScreen(
                         ) {
                             GroupedListColumn {
                                 GroupedListItem(position = GroupPosition.FIRST) {
-                                    ListItem(
-                                        supportingContent = {
-                                            Text(
-                                                stringResource(R.string.settings_notifications_desc),
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis,
-                                            )
-                                        },
-                                        leadingContent = {
-                                            FilePipeMaterialRoundedSymbol(
-                                                name = "notifications",
-                                                contentDescription = null,
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            )
-                                        },
-                                        trailingContent = {
-                                            FilePipeSwitch(
-                                                checked = notificationsGranted,
-                                                onCheckedChange = { wantEnabled ->
-                                                    when {
-                                                        wantEnabled &&
-                                                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
-                                                            pendingEnableUpdateNotificationsAfterPermission = false
-                                                            requestPostNotificationPermissionOrOpenAppSettings()
-                                                        }
+                                    SettingsToggleRow(
+                                        iconName = "notifications",
+                                        title = stringResource(R.string.settings_notifications),
+                                        subtitle = stringResource(R.string.settings_notifications_desc),
+                                        checked = notificationsGranted,
+                                        onCheckedChange = { wantEnabled ->
+                                            when {
+                                                wantEnabled &&
+                                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU -> {
+                                                    pendingEnableUpdateNotificationsAfterPermission = false
+                                                    requestPostNotificationPermissionOrOpenAppSettings()
+                                                }
 
-                                                        wantEnabled &&
-                                                            !NotificationManagerCompat
-                                                                .from(context)
-                                                                .areNotificationsEnabled() -> {
-                                                            viewModel.openAppNotificationSettings()
-                                                        }
-
-                                                        !wantEnabled -> {
-                                                            viewModel.openAppNotificationSettings()
-                                                        }
-                                                    }
-                                                },
-                                            )
-                                        },
-                                        modifier =
-                                            Modifier.tapSoundClickable {
-                                                if (!notificationsGranted) {
-                                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                                        pendingEnableUpdateNotificationsAfterPermission = false
-                                                        requestPostNotificationPermissionOrOpenAppSettings()
-                                                    } else if (!NotificationManagerCompat
-                                                            .from(context)
-                                                            .areNotificationsEnabled()
-                                                    ) {
-                                                        viewModel.openAppNotificationSettings()
-                                                    }
-                                                } else {
+                                                wantEnabled &&
+                                                    !NotificationManagerCompat
+                                                        .from(context)
+                                                        .areNotificationsEnabled() -> {
                                                     viewModel.openAppNotificationSettings()
                                                 }
-                                            },
-                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    ) {
-                                        Text(
-                                            stringResource(R.string.settings_notifications),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                        )
-                                    }
+
+                                                !wantEnabled -> {
+                                                    viewModel.openAppNotificationSettings()
+                                                }
+                                            }
+                                        },
+                                    )
                                 }
                                 GroupedListItem(position = GroupPosition.MIDDLE) {
                                     SettingsToggleRow(
@@ -1159,31 +1120,37 @@ fun SettingsScreen(
                                     )
                                 }
                                 GroupedListItem(position = GroupPosition.LAST) {
-                                    ListItem(
-                                        leadingContent = {
-                                            FilePipeMaterialRoundedSymbol(
-                                                name = "history",
-                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    Row(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        FilePipeMaterialRoundedSymbol(
+                                            name = "history",
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                        Spacer(Modifier.width(16.dp))
+                                        Column(
+                                            modifier = Modifier.weight(1f),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                                        ) {
+                                            Text(
+                                                stringResource(R.string.settings_log_retention),
+                                                style = MaterialTheme.typography.bodyLarge,
                                             )
-                                        },
-                                        supportingContent = {
                                             Text(
                                                 stringResource(R.string.settings_log_retention_hint),
                                                 style = MaterialTheme.typography.bodySmall,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             )
-                                        },
-                                        trailingContent = {
-                                            LogRetentionDropdown(
-                                                currentDays = preferences.logRetentionDays,
-                                                onSelect = { viewModel.setLogRetentionDays(it) },
-                                            )
-                                        },
-                                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                                    ) {
-                                        Text(
-                                            stringResource(R.string.settings_log_retention),
-                                            style = MaterialTheme.typography.bodyLarge,
+                                        }
+                                        Spacer(Modifier.width(16.dp))
+                                        LogRetentionDropdown(
+                                            currentDays = preferences.logRetentionDays,
+                                            onSelect = { viewModel.setLogRetentionDays(it) },
                                         )
                                     }
                                 }

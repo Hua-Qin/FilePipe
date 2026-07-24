@@ -17,9 +17,11 @@ import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.data.storage.primaryDownloadsDirectoryPath
 import dev.bikram.filepipe.data.storage.primaryScreenshotsDirectoryPath
 import dev.bikram.filepipe.di.IoDispatcher
+import dev.bikram.filepipe.domain.model.ALL_FILES_EXTENSION
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileOrientation
 import dev.bikram.filepipe.domain.model.FolderAccessResult
+import dev.bikram.filepipe.domain.model.NO_EXTENSION_TOKEN
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.Rule
@@ -28,6 +30,8 @@ import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.RuleTemplate
 import dev.bikram.filepipe.domain.model.TemplateAutoSource
 import dev.bikram.filepipe.domain.model.appliesToImageAndVideoOnly
+import dev.bikram.filepipe.domain.model.isAllFilesExtension
+import dev.bikram.filepipe.domain.model.isNoExtensionToken
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.domain.usecase.ScheduleRulesUseCase
 import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
@@ -403,8 +407,19 @@ class RuleDetailViewModel
 
         fun addExtension(ext: String) =
             _uiState.update {
-                val normalized = ext.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
-                val newExtensions = if (normalized in it.fileExtensions) it.fileExtensions else it.fileExtensions + normalized
+                val normalized =
+                    when {
+                        isAllFilesExtension(ext) -> ALL_FILES_EXTENSION
+                        isNoExtensionToken(ext) -> NO_EXTENSION_TOKEN
+                        else -> ext.lowercase().let { e -> if (e.startsWith(".")) e else ".$e" }
+                    }
+                val newExtensions =
+                    if (normalized == ALL_FILES_EXTENSION) {
+                        listOf(ALL_FILES_EXTENSION)
+                    } else {
+                        val base = it.fileExtensions - ALL_FILES_EXTENSION
+                        if (normalized in base) base else base + normalized
+                    }
                 it.copy(
                     fileExtensions = newExtensions,
                     orientation = if (appliesToImageAndVideoOnly(newExtensions)) it.orientation else null,
@@ -574,8 +589,8 @@ class RuleDetailViewModel
             viewModelScope.launch {
                 val state = _uiState.value
                 if (state.sourceFolderPaths.isEmpty() ||
-                    state.destinationFolderPath.isBlank() ||
-                    state.fileExtensions.isEmpty()
+                    state.fileExtensions.isEmpty() ||
+                    (state.operationMode != OperationMode.DELETE && state.destinationFolderPath.isBlank())
                 ) {
                     return@launch
                 }
@@ -587,6 +602,9 @@ class RuleDetailViewModel
 
         fun save() =
             viewModelScope.launch {
+                if (_uiState.value.operationMode == OperationMode.DELETE) {
+                    _uiState.update { it.copy(destinationFolderPath = "") }
+                }
                 val state = _uiState.value
                 val rule = buildRuleFromState(state)
 
@@ -634,13 +652,17 @@ class RuleDetailViewModel
                 _uiState.update { it.copy(isSaved = true) }
             }
 
-        private fun buildRuleFromState(state: RuleDetailUiState) =
+        /**
+         * Builds a domain [Rule] from the current editor state. Public so the screen can derive
+         * the same rule (e.g. for conflict detection) without duplicating this mapping.
+         */
+        fun buildRuleFromState(state: RuleDetailUiState) =
             Rule(
                 id = state.id,
                 sortOrder = state.sortOrder,
                 name = state.name.trim(),
                 sourceFolderPaths = state.sourceFolderPaths,
-                destinationFolderPath = state.destinationFolderPath,
+                destinationFolderPath = if (state.operationMode == OperationMode.DELETE) "" else state.destinationFolderPath,
                 fileExtensions = state.fileExtensions,
                 isEnabled = state.isEnabled,
                 schedule = state.schedule,

@@ -834,6 +834,7 @@ private fun HistorySectionSegmentedRow(
                             style = MaterialTheme.typography.labelMedium,
                             textAlign = TextAlign.Center,
                             maxLines = 1,
+                            softWrap = false,
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }

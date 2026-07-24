@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.domain.usecase
 
+import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleSchedule
 import dev.bikram.filepipe.domain.model.ScheduleType
@@ -110,6 +111,30 @@ class ValidateRuleUseCaseTest {
     }
 
     @Test
+    fun validAllFilesRulePassesValidation() {
+        val result =
+            validate(
+                baseRule().copy(
+                    fileExtensions = listOf("*"),
+                ),
+            )
+
+        assertEquals(ValidateRuleUseCase.Result.Valid, result)
+    }
+
+    @Test
+    fun validNoExtensionRulePassesValidation() {
+        val result =
+            validate(
+                baseRule().copy(
+                    fileExtensions = listOf("[no_ext]"),
+                ),
+            )
+
+        assertEquals(ValidateRuleUseCase.Result.Valid, result)
+    }
+
+    @Test
     fun invalidExcludeRegexPatternFailsValidation() {
         val result =
             validate(
@@ -120,6 +145,22 @@ class ValidateRuleUseCaseTest {
             ) as ValidateRuleUseCase.Result.Invalid
 
         assertTrue(result.errors.contains("Invalid regular expression syntax in exclude patterns"))
+    }
+
+    @Test
+    fun deleteRuleWithoutDestinationPassesValidation() {
+        val result =
+            validate(
+                Rule(
+                    name = "Delete Temp Files",
+                    sourceFolderPaths = listOf("content://source"),
+                    destinationFolderPath = "",
+                    fileExtensions = listOf("tmp"),
+                    operationMode = OperationMode.DELETE,
+                ),
+            )
+
+        assertEquals(ValidateRuleUseCase.Result.Valid, result)
     }
 
     private fun baseRule(): Rule =

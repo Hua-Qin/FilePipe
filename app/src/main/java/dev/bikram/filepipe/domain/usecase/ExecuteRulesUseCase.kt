@@ -4,6 +4,7 @@ import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
+import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
@@ -29,6 +30,7 @@ class ExecuteRulesUseCase
         @param:ApplicationContext private val context: Context,
         private val fileOperationRepository: FileOperationRepository,
         private val runHistoryRepository: RunHistoryRepository,
+        private val ruleRepository: RuleRepository,
         private val userPreferencesRepository: UserPreferencesRepository,
     ) {
         suspend operator fun invoke(
@@ -51,6 +53,7 @@ class ExecuteRulesUseCase
             onProgress: (RunProgress) -> Unit,
         ): RunResult {
             val startedAt = System.currentTimeMillis()
+            ruleRepository.markRuleRan(rule.id, startedAt)
             val historyId = runHistoryRepository.startRun(rule.id, rule.name, triggerType, rule.operationMode)
 
             onProgress(RunProgress(rule.id, rule.name, 0f, totalFiles = 0))
