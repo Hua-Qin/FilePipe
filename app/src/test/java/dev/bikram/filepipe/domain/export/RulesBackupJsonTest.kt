@@ -133,4 +133,20 @@ class RulesBackupJsonTest {
         assertEquals(RuleIcon.DEFAULT, domainRule.icon)
         assertNull(domainRule.iconEmoji)
     }
+
+    @Test
+    fun deleteOperationModeRoundTrip() {
+        val rule =
+            Rule(
+                name = "Delete Temp Files",
+                sourceFolderPaths = listOf("content://source"),
+                destinationFolderPath = "",
+                fileExtensions = listOf("tmp", "bak"),
+                operationMode = OperationMode.DELETE,
+            )
+
+        val backup = parseRulesBackupJson(buildAppBackupJson(listOf(rule), emptyList(), null)).getOrThrow()
+        val restoredRule = backup.rules.single().toDomain()
+        assertEquals(OperationMode.DELETE, restoredRule.operationMode)
+    }
 }

@@ -324,6 +324,7 @@ private fun RunSummaryCard(
                     when (history.operationMode) {
                         OperationMode.COPY -> R.string.history_detail_files_copied_label
                         OperationMode.MOVE -> R.string.history_detail_files_moved_label
+                        OperationMode.DELETE -> R.string.history_detail_files_deleted_label
                     },
                 ),
                 history.totalFilesMoved.toString(),
@@ -349,6 +350,7 @@ private fun RunSummaryCard(
                 )
             } else if (
                 history.totalFilesMoved > 0 &&
+                history.operationMode != OperationMode.DELETE &&
                 (history.status == RunStatus.SUCCESS || history.status == RunStatus.CANCELLED)
             ) {
                 Spacer(Modifier.height(8.dp))
@@ -498,7 +500,7 @@ private fun FileMovedCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                if (isSuccess) {
+                if (isSuccess && file.destinationUri.isNotBlank()) {
                     Text(
                         "To: ${folderDisplayPath(file.destinationUri, internalStorageDisplayName)}",
                         style = MaterialTheme.typography.bodySmall,

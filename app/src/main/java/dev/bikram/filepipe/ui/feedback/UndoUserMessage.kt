@@ -31,6 +31,10 @@ fun UndoResult.toUserMessage(context: Context): String =
                         totalReversed,
                     )
                 }
+
+                OperationMode.DELETE -> {
+                    context.getString(R.string.undo_unknown_error)
+                }
             }
         }
 
@@ -52,6 +56,10 @@ fun UndoResult.toUserMessage(context: Context): String =
                         totalReversed,
                         totalFailed,
                     )
+                }
+
+                OperationMode.DELETE -> {
+                    context.getString(R.string.undo_unknown_error)
                 }
             }
         }

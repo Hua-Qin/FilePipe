@@ -431,6 +431,10 @@ class FileOperationRepository
             filesystemAccessEnabled: Boolean = false,
         ): FileMoved =
             withContext(ioDispatcher + NonCancellable) {
+                if (operationMode == OperationMode.DELETE) {
+                    return@withContext deleteFile(sourceEntry, filesystemAccessEnabled)
+                }
+
                 val effectiveDestFolder =
                     folderPathForFilesystemAccess(destFolderUriString, filesystemAccessEnabled)
                 val sourceIsFile = sourceEntry.uri.scheme == "file"
@@ -501,6 +505,102 @@ class FileOperationRepository
                     }
                 }
             }
+
+        private fun deleteFile(
+            sourceEntry: FileEntry,
+            filesystemAccessEnabled: Boolean,
+        ): FileMoved {
+            val sourceIsFile = sourceEntry.uri.scheme == "file"
+            if (sourceIsFile) {
+                if (!filesystemAccessEnabled) {
+                    return FileMoved(
+                        fileName = sourceEntry.name,
+                        sourceUri = sourceEntry.uri.toString(),
+                        destinationUri = "",
+                        fileSizeBytes = sourceEntry.size,
+                        relativeParentSegments = sourceEntry.relativeParentSegments,
+                        success = false,
+                        errorMessage = "All files access is required for this source path",
+                    )
+                }
+                val path = sourceEntry.uri.path
+                if (path.isNullOrBlank()) {
+                    return FileMoved(
+                        fileName = sourceEntry.name,
+                        sourceUri = sourceEntry.uri.toString(),
+                        destinationUri = "",
+                        fileSizeBytes = sourceEntry.size,
+                        relativeParentSegments = sourceEntry.relativeParentSegments,
+                        success = false,
+                        errorMessage = "Invalid source path",
+                    )
+                }
+                val sourceFile = File(path)
+                // Deletability depends on the parent directory being writable, not the file's own
+                // write bit — a read-only file in a writable dir is deletable (matches MOVE, which
+                // deletes its source the same way, and standard rm semantics). Only require that the
+                // path still points at a regular file; the delete() below reports any real failure.
+                if (!sourceFile.isFile) {
+                    return FileMoved(
+                        fileName = sourceEntry.name,
+                        sourceUri = sourceEntry.uri.toString(),
+                        destinationUri = "",
+                        fileSizeBytes = sourceEntry.size,
+                        relativeParentSegments = sourceEntry.relativeParentSegments,
+                        success = false,
+                        errorMessage = "Source file not accessible",
+                    )
+                }
+                val deleted =
+                    try {
+                        sourceFile.delete()
+                    } catch (_: SecurityException) {
+                        false
+                    }
+                return FileMoved(
+                    fileName = sourceEntry.name,
+                    sourceUri = sourceEntry.uri.toString(),
+                    destinationUri = "",
+                    fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
+                    success = deleted,
+                    errorMessage = if (deleted) null else "Could not delete file",
+                )
+            } else {
+                val doc =
+                    try {
+                        DocumentFile.fromSingleUri(context, sourceEntry.uri)
+                    } catch (_: Exception) {
+                        null
+                    }
+                if (doc == null || !doc.exists()) {
+                    return FileMoved(
+                        fileName = sourceEntry.name,
+                        sourceUri = sourceEntry.uri.toString(),
+                        destinationUri = "",
+                        fileSizeBytes = sourceEntry.size,
+                        relativeParentSegments = sourceEntry.relativeParentSegments,
+                        success = false,
+                        errorMessage = "Source file not accessible",
+                    )
+                }
+                val deleted =
+                    try {
+                        doc.delete()
+                    } catch (_: Exception) {
+                        false
+                    }
+                return FileMoved(
+                    fileName = sourceEntry.name,
+                    sourceUri = sourceEntry.uri.toString(),
+                    destinationUri = "",
+                    fileSizeBytes = sourceEntry.size,
+                    relativeParentSegments = sourceEntry.relativeParentSegments,
+                    success = deleted,
+                    errorMessage = if (deleted) null else "Could not delete document",
+                )
+            }
+        }
 
         private fun moveFileFilesystemToFilesystem(
             sourceEntry: FileEntry,
@@ -1130,9 +1230,14 @@ class FileOperationRepository
             sourceEntry: FileEntry,
             destFolderUriString: String,
             conflictPolicy: ConflictPolicy,
+            operationMode: OperationMode = OperationMode.MOVE,
             filesystemAccessEnabled: Boolean = false,
         ): PreviewFileResult =
             withContext(ioDispatcher) {
+                if (operationMode == OperationMode.DELETE) {
+                    return@withContext unchangedPreviewResult(sourceEntry, "")
+                }
+
                 val effectiveDestFolder =
                     folderPathForFilesystemAccess(destFolderUriString, filesystemAccessEnabled)
                 val simulatedRootPath =

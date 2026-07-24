@@ -97,6 +97,37 @@ sealed interface RulesRunNavigation {
     data object HistoryList : RulesRunNavigation
 }
 
+/**
+ * Pending confirmation for a manual run that would permanently delete files. Surfaced to the UI so
+ * the user must explicitly confirm before an irreversible delete rule executes. Scheduled runs do
+ * not go through this path and are unaffected.
+ */
+data class PendingDeleteConfirmation(
+    val fileCount: Int,
+    val sampleFileNames: List<String>,
+)
+
+/** How many affected file names to preview in the delete-confirmation dialog. */
+private const val DELETE_CONFIRM_SAMPLE_SIZE = 5
+
+/**
+ * Builds the delete confirmation for a manual run: flattens each delete rule's simulated results,
+ * keeps only files that would actually be removed (not skipped), and returns null when nothing
+ * would be deleted — so no confirmation is shown and the run proceeds normally. Pure and
+ * module-internal for unit testing without a full ViewModel harness.
+ */
+internal fun deleteConfirmationFor(
+    deleteRuleResults: List<List<PreviewFileResult>>,
+    sampleSize: Int = DELETE_CONFIRM_SAMPLE_SIZE,
+): PendingDeleteConfirmation? {
+    val affected = deleteRuleResults.flatten().filter { result -> !result.wouldSkip }
+    if (affected.isEmpty()) return null
+    return PendingDeleteConfirmation(
+        fileCount = affected.size,
+        sampleFileNames = affected.take(sampleSize).map { it.fileName },
+    )
+}
+
 /** Where the sole in-run Cancel control is shown for manual runs. */
 sealed interface ManualRunCancelAnchor {
     data object None : ManualRunCancelAnchor
@@ -155,6 +186,12 @@ class RulesViewModel
         private val _progressMap = MutableStateFlow<Map<Long, RunProgress>>(emptyMap())
         private val _previewState = MutableStateFlow<PreviewState?>(null)
         private val _manualRunCancelAnchor = MutableStateFlow<ManualRunCancelAnchor>(ManualRunCancelAnchor.None)
+
+        // A manual run deferred pending the user's delete confirmation, plus the confirmation shown
+        // to the UI. Kept out of the main uiState combine (mirrors _manualRunCancelAnchor's pattern).
+        private var pendingManualRun: PendingManualRun? = null
+        private val _pendingDeleteConfirmation = MutableStateFlow<PendingDeleteConfirmation?>(null)
+        val pendingDeleteConfirmation: StateFlow<PendingDeleteConfirmation?> = _pendingDeleteConfirmation.asStateFlow()
 
         private val rulesCompactModeFlow =
             userPreferencesRepository.preferencesFlow
@@ -546,6 +583,73 @@ class RulesViewModel
             enqueueManualRun(realRules, anchor, runSimulationCheck = true)
         }
 
+        private data class PendingManualRun(
+            val rules: List<Rule>,
+            val anchor: ManualRunCancelAnchor,
+            val useCache: Boolean,
+            val runSimulationCheck: Boolean,
+        )
+
+        /**
+         * Entry point for every manual run. If any rule in the batch permanently deletes files, this
+         * defers to a user confirmation (see [requestDeleteConfirmation]) before anything runs;
+         * otherwise it starts immediately. Scheduled runs never reach here, so they stay automatic.
+         */
+        private fun enqueueManualRun(
+            rules: List<Rule>,
+            anchor: ManualRunCancelAnchor,
+            useCache: Boolean = false,
+            runSimulationCheck: Boolean = false,
+        ) {
+            if (rules.isEmpty()) return
+            if (rules.any { it.operationMode == OperationMode.DELETE }) {
+                requestDeleteConfirmation(rules, anchor, useCache, runSimulationCheck)
+                return
+            }
+            startManualRun(rules, anchor, useCache, runSimulationCheck)
+        }
+
+        /**
+         * Simulates the delete rules in [rules] to count/sample the files that would be permanently
+         * removed, then raises a [PendingDeleteConfirmation] for the UI. If nothing would be deleted,
+         * the run proceeds normally (the existing simulation check surfaces any "no files" message).
+         */
+        private fun requestDeleteConfirmation(
+            rules: List<Rule>,
+            anchor: ManualRunCancelAnchor,
+            useCache: Boolean,
+            runSimulationCheck: Boolean,
+        ) {
+            viewModelScope.launch {
+                val deleteRuleResults =
+                    rules
+                        .filter { it.operationMode == OperationMode.DELETE }
+                        .map { rule -> runCatching { simulateRuleUseCase(rule) }.getOrDefault(emptyList()) }
+                val confirmation = deleteConfirmationFor(deleteRuleResults)
+                if (confirmation == null) {
+                    // Nothing to delete; run normally — the sim check emits the "no files" message.
+                    startManualRun(rules, anchor, useCache, runSimulationCheck)
+                    return@launch
+                }
+                pendingManualRun = PendingManualRun(rules, anchor, useCache, runSimulationCheck)
+                _pendingDeleteConfirmation.value = confirmation
+            }
+        }
+
+        /** Proceeds with a delete run the user confirmed via the [PendingDeleteConfirmation] dialog. */
+        fun confirmPendingDelete() {
+            val pending = pendingManualRun ?: return
+            pendingManualRun = null
+            _pendingDeleteConfirmation.value = null
+            startManualRun(pending.rules, pending.anchor, pending.useCache, pending.runSimulationCheck)
+        }
+
+        /** Cancels a pending delete run without deleting anything. */
+        fun dismissPendingDelete() {
+            pendingManualRun = null
+            _pendingDeleteConfirmation.value = null
+        }
+
         /**
          * Runs [rules] in-process for immediate start. [ManualRunForegroundService] starts while
          * the app is still foregrounded so the same run can continue if the app backgrounds.
@@ -553,7 +657,7 @@ class RulesViewModel
          * Uses a [CoroutineStart.LAZY] job so the slot can be updated before the previous runner is
          * cancelled and joined, avoiding overlapping executions and stale [manualRunJob] identity.
          */
-        private fun enqueueManualRun(
+        private fun startManualRun(
             rules: List<Rule>,
             anchor: ManualRunCancelAnchor,
             useCache: Boolean = false,

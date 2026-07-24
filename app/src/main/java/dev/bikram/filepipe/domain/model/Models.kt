@@ -7,7 +7,7 @@ import java.util.Calendar
 
 enum class ConflictPolicy { SKIP, OVERWRITE, RENAME_SUFFIX }
 
-enum class OperationMode { MOVE, COPY }
+enum class OperationMode { MOVE, COPY, DELETE }
 
 data class Rule(
     val id: Long = 0,

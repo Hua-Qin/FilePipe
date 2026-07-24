@@ -476,12 +476,36 @@ private fun CompactContent(
                 },
             colors = ListItemDefaults.colors(containerColor = Color.Transparent),
         ) {
-            Text(
-                text = rule.name,
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = rule.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                val operationIconName =
+                    when (rule.operationMode) {
+                        OperationMode.COPY -> "file_copy"
+                        OperationMode.MOVE -> "move_item"
+                        OperationMode.DELETE -> "delete"
+                    }
+                val modeLabel =
+                    when (rule.operationMode) {
+                        OperationMode.COPY -> stringResource(R.string.operation_copy)
+                        OperationMode.MOVE -> stringResource(R.string.operation_move)
+                        OperationMode.DELETE -> stringResource(R.string.operation_delete)
+                    }
+                FilePipeMaterialRoundedSymbol(
+                    name = operationIconName,
+                    contentDescription = modeLabel,
+                    size = 14.dp,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                )
+            }
         }
     }
 }
@@ -646,20 +670,39 @@ private fun ExpandedContent(
                         shown.joinToString(", ") { displayPath(it, internalStorageDisplayName) } +
                             if (extra > 0) ", +$extra" else ""
                     }
+                val operationIconName =
+                    when (rule.operationMode) {
+                        OperationMode.COPY -> "file_copy"
+                        OperationMode.MOVE -> "move_item"
+                        OperationMode.DELETE -> "delete"
+                    }
+                val modeLabel =
+                    when (rule.operationMode) {
+                        OperationMode.COPY -> stringResource(R.string.operation_copy)
+                        OperationMode.MOVE -> stringResource(R.string.operation_move)
+                        OperationMode.DELETE -> stringResource(R.string.operation_delete)
+                    }
+
                 LabeledInfoSingleLine(
                     label = stringResource(R.string.rule_card_from),
                     value = fromText,
+                    leadingIconName = if (rule.operationMode == OperationMode.DELETE) operationIconName else null,
+                    leadingIconContentDescription = if (rule.operationMode == OperationMode.DELETE) modeLabel else null,
                 )
-                Spacer(Modifier.height(4.dp))
-                LabeledInfoSingleLine(
-                    label = stringResource(R.string.rule_card_to),
-                    value =
-                        if (rule.destinationFolderPath.isEmpty()) {
-                            notSet
-                        } else {
-                            displayPath(rule.destinationFolderPath, internalStorageDisplayName)
-                        },
-                )
+                if (rule.operationMode != OperationMode.DELETE) {
+                    Spacer(Modifier.height(4.dp))
+                    LabeledInfoSingleLine(
+                        label = stringResource(R.string.rule_card_to),
+                        value =
+                            if (rule.destinationFolderPath.isEmpty()) {
+                                notSet
+                            } else {
+                                displayPath(rule.destinationFolderPath, internalStorageDisplayName)
+                            },
+                        leadingIconName = operationIconName,
+                        leadingIconContentDescription = modeLabel,
+                    )
+                }
 
                 if (folderIssueSeverity != null) {
                     Spacer(Modifier.height(6.dp))
@@ -745,6 +788,15 @@ private fun ExpandedContent(
                                                         runProgress.totalFiles,
                                                     )
                                                 }
+
+                                                OperationMode.DELETE -> {
+                                                    pluralStringResource(
+                                                        R.plurals.rule_card_progress_files_deleted_summary,
+                                                        runProgress.totalFiles,
+                                                        runProgress.filesMoved,
+                                                        runProgress.totalFiles,
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -802,6 +854,15 @@ private fun ExpandedContent(
                                                 OperationMode.MOVE -> {
                                                     stringResource(
                                                         R.string.rule_card_progress_moving_file,
+                                                        currentFileName,
+                                                        runProgress.filesMoved + 1,
+                                                        runProgress.totalFiles,
+                                                    )
+                                                }
+
+                                                OperationMode.DELETE -> {
+                                                    stringResource(
+                                                        R.string.rule_card_progress_deleting_file,
                                                         currentFileName,
                                                         runProgress.filesMoved + 1,
                                                         runProgress.totalFiles,
@@ -944,14 +1005,26 @@ private fun LabeledInfoSingleLine(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
+    leadingIconName: String? = null,
+    leadingIconContentDescription: String? = null,
 ) {
-    Row(modifier = modifier.fillMaxWidth()) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(start = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leadingIconName != null) {
+            FilePipeMaterialRoundedSymbol(
+                name = leadingIconName,
+                contentDescription = leadingIconContentDescription,
+                size = 14.dp,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(Modifier.width(4.dp))
+        }
         Text(
             text = "$label:",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.primary,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(48.dp),
         )
         Text(
             text = " $value",

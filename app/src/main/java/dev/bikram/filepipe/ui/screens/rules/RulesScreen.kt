@@ -703,6 +703,32 @@ fun RulesScreen(
         )
     }
 
+    val pendingDeleteConfirmation by viewModel.pendingDeleteConfirmation.collectAsStateWithLifecycle()
+    pendingDeleteConfirmation?.let { confirmation ->
+        val remaining = confirmation.fileCount - confirmation.sampleFileNames.size
+        val sampleBlock =
+            if (confirmation.sampleFileNames.isNotEmpty()) {
+                val names = confirmation.sampleFileNames.joinToString("\n") { name -> "• $name" }
+                val more = if (remaining > 0) "\n" + stringResource(R.string.delete_run_confirm_more, remaining) else ""
+                "\n\n$names$more"
+            } else {
+                ""
+            }
+        FilePipeConfirmDialog(
+            title = stringResource(R.string.delete_run_confirm_title),
+            text =
+                pluralStringResource(
+                    R.plurals.delete_run_confirm_message,
+                    confirmation.fileCount,
+                    confirmation.fileCount,
+                ) + sampleBlock,
+            confirmLabel = stringResource(R.string.delete_run_confirm_button),
+            onConfirm = { viewModel.confirmPendingDelete() },
+            onDismiss = { viewModel.dismissPendingDelete() },
+            destructive = true,
+        )
+    }
+
     previewState?.let { preview ->
         val previewRunEnabled =
             !isRunning &&
@@ -771,6 +797,7 @@ fun RulesScreen(
                                                 when (ruleGroup.operationMode) {
                                                     OperationMode.MOVE -> R.plurals.preview_files_would_move
                                                     OperationMode.COPY -> R.plurals.preview_files_would_copy
+                                                    OperationMode.DELETE -> R.plurals.preview_files_would_delete
                                                 },
                                                 ruleGroup.results.size,
                                                 ruleGroup.results.size,

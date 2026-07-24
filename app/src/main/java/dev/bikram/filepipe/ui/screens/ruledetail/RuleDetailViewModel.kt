@@ -602,6 +602,9 @@ class RuleDetailViewModel
 
         fun save() =
             viewModelScope.launch {
+                if (_uiState.value.operationMode == OperationMode.DELETE) {
+                    _uiState.update { it.copy(destinationFolderPath = "") }
+                }
                 val state = _uiState.value
                 val rule = buildRuleFromState(state)
 
@@ -659,7 +662,7 @@ class RuleDetailViewModel
                 sortOrder = state.sortOrder,
                 name = state.name.trim(),
                 sourceFolderPaths = state.sourceFolderPaths,
-                destinationFolderPath = state.destinationFolderPath,
+                destinationFolderPath = if (state.operationMode == OperationMode.DELETE) "" else state.destinationFolderPath,
                 fileExtensions = state.fileExtensions,
                 isEnabled = state.isEnabled,
                 schedule = state.schedule,

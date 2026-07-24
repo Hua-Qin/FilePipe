@@ -20,10 +20,12 @@ import java.io.File
 fun FolderPickerButton(
     label: String,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
     FilePipeOutlinedButton(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.fillMaxWidth(),
         shape = compactControlShape,
         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),

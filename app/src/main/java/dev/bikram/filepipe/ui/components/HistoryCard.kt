@@ -112,6 +112,14 @@ fun HistoryCard(
                                 history.totalFilesMoved,
                             )
                         }
+
+                        OperationMode.DELETE -> {
+                            pluralStringResource(
+                                R.plurals.history_files_deleted,
+                                history.totalFilesMoved,
+                                history.totalFilesMoved,
+                            )
+                        }
                     }
                 } else {
                     ""

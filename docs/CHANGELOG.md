@@ -1,4 +1,12 @@
-## v3.9.5 Fonts, AMOLED, RegEx, more types
+## v3.9.5 Delete operation, more file types
+
+### ✨ New Features
+- In adition to `Copy` and `Move`, there is now a `Delete` operation type. Create rules for automated file deletions.
+- Rules can now accept "All files" and "No extension" as file types. Any conflict with filename regex will be flaggedd. 
+
+---
+
+## v3.9.4 Fonts, AMOLED, RegEx, Dot folders
 
 ### ✨ New Features
 - Import your own font (`.ttf` or `.otf`) from Settings → Appearance and use it across the whole app.
@@ -7,7 +15,6 @@
 ### 🛠 Improved Features
 - Pure black (OLED) is now a separate toggle under System or Dark, instead of a fourth theme mode.
 - dot folders (folders whose names start with ".") are now selectable in all-files-access folder picker.
-- Rules can now accept "All files" and "No extension" as file types. Any conflict with filename regex will be flaggedd. 
 
 ---
 
