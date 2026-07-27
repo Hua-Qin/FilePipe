@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.data.local.database
 
 import androidx.room.TypeConverter
+import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.ScheduleType
@@ -43,4 +44,10 @@ class Converters {
 
     @TypeConverter
     fun toOperationMode(value: String): OperationMode = OperationMode.valueOf(value)
+
+    @TypeConverter
+    fun fromFileUndoStatus(value: FileUndoStatus): String = value.name
+
+    @TypeConverter
+    fun toFileUndoStatus(value: String): FileUndoStatus = FileUndoStatus.valueOf(value)
 }

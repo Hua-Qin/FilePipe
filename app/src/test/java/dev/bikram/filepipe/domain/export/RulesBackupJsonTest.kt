@@ -3,6 +3,7 @@ package dev.bikram.filepipe.domain.export
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
@@ -18,6 +19,44 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RulesBackupJsonTest {
+    @Test
+    fun legacyFileUndoStatusDefaultsToPending() {
+        val legacyBackup =
+            parseRulesBackupJson(
+                """
+                {
+                  "version": 11,
+                  "rules": [],
+                  "history": [{
+                    "ruleName": "Legacy",
+                    "triggeredBy": "MANUAL",
+                    "startedAt": 100,
+                    "status": "SUCCESS",
+                    "totalFilesMoved": 1,
+                    "totalFilesFailed": 0,
+                    "files": [{
+                      "fileName": "legacy.txt",
+                      "sourceUri": "content://source/legacy.txt",
+                      "destinationUri": "content://destination/legacy.txt",
+                      "fileSizeBytes": 10,
+                      "movedAt": 123,
+                      "success": true
+                    }]
+                  }]
+                }
+                """.trimIndent(),
+            ).getOrThrow()
+
+        assertEquals(
+            FileUndoStatus.PENDING.name,
+            legacyBackup.history
+                .single()
+                .files
+                .single()
+                .undoStatus,
+        )
+    }
+
     @Test
     fun appBackupRoundTripPreservesRulesHistoryFilesAndSettings() {
         val rule =
@@ -56,6 +95,7 @@ class RulesBackupJsonTest {
                 relativeParentSegments = listOf("Camera", "Raw"),
                 movedAt = 123L,
                 success = true,
+                undoStatus = FileUndoStatus.UNDONE,
             )
         val history =
             RunHistory(
@@ -101,6 +141,7 @@ class RulesBackupJsonTest {
         assertEquals("COPY", restoredHistory.operationMode)
         assertEquals(listOf("content://destination/Camera"), restoredHistory.copyCreatedDestFolderUris)
         assertEquals(listOf("Camera", "Raw"), restoredHistory.files.single().relativeParentSegments)
+        assertEquals(FileUndoStatus.UNDONE.name, restoredHistory.files.single().undoStatus)
 
         val restoredSettings = backup.settings!!
         assertTrue(restoredSettings.autoExportOnRuleChange)

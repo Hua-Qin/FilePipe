@@ -210,6 +210,8 @@ enum class HistoryStatusFilter {
 
 // ---
 
+enum class FileUndoStatus { PENDING, IN_PROGRESS, UNDONE, FAILED }
+
 data class FileMoved(
     val id: Long = 0,
     val runHistoryId: Long = 0,
@@ -222,6 +224,7 @@ data class FileMoved(
     val success: Boolean,
     val skipped: Boolean = false,
     val errorMessage: String? = null,
+    val undoStatus: FileUndoStatus = FileUndoStatus.PENDING,
 )
 
 // ---

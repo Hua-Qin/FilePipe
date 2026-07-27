@@ -12,6 +12,7 @@ import dev.bikram.filepipe.data.local.entity.toDomain
 import dev.bikram.filepipe.domain.export.FileMovedBackupDto
 import dev.bikram.filepipe.domain.export.RunHistoryBackupDto
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -133,6 +134,7 @@ class RunHistoryRepository
                         success = fileMoved.success,
                         skipped = fileMoved.skipped,
                         errorMessage = fileMoved.errorMessage,
+                        undoStatus = fileMoved.undoStatus,
                     )
                 },
             )
@@ -201,6 +203,7 @@ class RunHistoryRepository
                         success = fileMoved.success,
                         skipped = fileMoved.skipped,
                         errorMessage = fileMoved.errorMessage,
+                        undoStatus = fileMoved.undoStatus,
                     )
                 },
             )
@@ -218,6 +221,13 @@ class RunHistoryRepository
             runHistoryDao.updateHistory(
                 history.copy(isReversed = false, status = RunStatus.PARTIAL_UNDONE),
             )
+        }
+
+        suspend fun markFileUndoStatus(
+            fileMovedId: Long,
+            status: FileUndoStatus,
+        ) {
+            fileMovedDao.updateUndoStatus(fileMovedId, status)
         }
 
         suspend fun deleteHistoryById(historyId: Long) {
@@ -269,13 +279,42 @@ class RunHistoryRepository
                     )
                 val newHistoryId = runHistoryDao.insertHistory(entity)
                 if (dto.files.isNotEmpty()) {
-                    fileMovedDao.insertFilesMoved(dto.files.map { it.toEntity(newHistoryId) })
+                    fileMovedDao.insertFilesMoved(
+                        dto.files.map {
+                            it.toEntity(
+                                runHistoryId = newHistoryId,
+                                runStatus = status,
+                                isRunReversed = dto.isReversed,
+                            )
+                        },
+                    )
                 }
             }
         }
 
-        private fun FileMovedBackupDto.toEntity(runHistoryId: Long): FileMovedEntity =
-            FileMovedEntity(
+        private fun FileMovedBackupDto.toEntity(
+            runHistoryId: Long,
+            runStatus: RunStatus,
+            isRunReversed: Boolean,
+        ): FileMovedEntity {
+            val backedUpUndoStatus =
+                runCatching { FileUndoStatus.valueOf(undoStatus) }
+                    .getOrDefault(FileUndoStatus.PENDING)
+            val restoredUndoStatus =
+                when {
+                    runStatus == RunStatus.UNDONE || isRunReversed -> {
+                        FileUndoStatus.UNDONE
+                    }
+
+                    runStatus == RunStatus.PARTIAL_UNDONE && backedUpUndoStatus == FileUndoStatus.PENDING -> {
+                        FileUndoStatus.IN_PROGRESS
+                    }
+
+                    else -> {
+                        backedUpUndoStatus
+                    }
+                }
+            return FileMovedEntity(
                 id = 0L,
                 runHistoryId = runHistoryId,
                 fileName = fileName,
@@ -287,5 +326,7 @@ class RunHistoryRepository
                 success = success,
                 skipped = skipped,
                 errorMessage = errorMessage,
+                undoStatus = restoredUndoStatus,
             )
+        }
     }

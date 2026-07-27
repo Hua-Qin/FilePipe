@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
 import dev.bikram.filepipe.data.local.entity.FileMovedEntity
+import dev.bikram.filepipe.domain.model.FileUndoStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -22,4 +23,10 @@ interface FileMovedDao {
 
     @Insert
     suspend fun insertFilesMoved(files: List<FileMovedEntity>)
+
+    @Query("UPDATE files_moved SET undoStatus = :status WHERE id = :fileMovedId")
+    suspend fun updateUndoStatus(
+        fileMovedId: Long,
+        status: FileUndoStatus,
+    )
 }

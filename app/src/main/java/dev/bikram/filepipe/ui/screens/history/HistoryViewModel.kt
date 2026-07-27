@@ -55,6 +55,7 @@ enum class HistoryStatusSection {
     NO_CHANGES,
     IN_PROGRESS,
     CANCELLED,
+    PARTIAL_UNDONE,
     UNDONE,
 }
 
@@ -381,6 +382,7 @@ class HistoryViewModel
             val noChanges = mutableListOf<RunHistory>()
             val inProgress = mutableListOf<RunHistory>()
             val cancelled = mutableListOf<RunHistory>()
+            val partiallyUndone = mutableListOf<RunHistory>()
             val undone = mutableListOf<RunHistory>()
             for (history in list) {
                 when {
@@ -390,6 +392,7 @@ class HistoryViewModel
                     history.status == RunStatus.CANCELLED -> cancelled.add(history)
                     history.status == RunStatus.FAILED -> failed.add(history)
                     history.status == RunStatus.PARTIAL_FAILURE -> partial.add(history)
+                    history.status == RunStatus.PARTIAL_UNDONE -> partiallyUndone.add(history)
                     history.status == RunStatus.SUCCESS -> successWork.add(history)
                 }
             }
@@ -409,6 +412,7 @@ class HistoryViewModel
             appendSection(HistoryStatusSection.NO_CHANGES, noChanges)
             appendSection(HistoryStatusSection.IN_PROGRESS, inProgress)
             appendSection(HistoryStatusSection.CANCELLED, cancelled)
+            appendSection(HistoryStatusSection.PARTIAL_UNDONE, partiallyUndone)
             appendSection(HistoryStatusSection.UNDONE, undone)
             return result
         }

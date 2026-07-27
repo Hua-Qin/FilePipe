@@ -95,6 +95,36 @@ object DatabaseModule {
             }
         }
 
+    private val migration11To12 =
+        object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE files_moved ADD COLUMN undoStatus TEXT NOT NULL DEFAULT 'PENDING'",
+                )
+                db.execSQL(
+                    """
+                    UPDATE files_moved SET undoStatus = 'UNDONE'
+                    WHERE success = 1 AND skipped = 0
+                        AND runHistoryId IN (
+                            SELECT id FROM run_history
+                            WHERE status = 'UNDONE' OR isReversed = 1
+                        )
+                    """.trimIndent(),
+                )
+                // Individual outcomes were not recorded before v12. Treat every successful file
+                // in a partial undo as interrupted so retry can reconcile it from disk state.
+                db.execSQL(
+                    """
+                    UPDATE files_moved SET undoStatus = 'IN_PROGRESS'
+                    WHERE success = 1 AND skipped = 0
+                        AND runHistoryId IN (
+                            SELECT id FROM run_history WHERE status = 'PARTIAL_UNDONE'
+                        )
+                    """.trimIndent(),
+                )
+            }
+        }
+
     @Provides
     @Singleton
     fun provideDatabase(
@@ -111,6 +141,7 @@ object DatabaseModule {
                 migration8To9,
                 migration9To10,
                 migration10To11,
+                migration11To12,
             ).fallbackToDestructiveMigration(dropAllTables = true)
             .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
             .build()

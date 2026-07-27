@@ -1058,6 +1058,7 @@ private fun historyStatusSectionTitle(section: HistoryStatusSection): String =
         HistoryStatusSection.NO_CHANGES -> stringResource(R.string.status_no_changes)
         HistoryStatusSection.IN_PROGRESS -> stringResource(R.string.history_status_header_in_progress)
         HistoryStatusSection.CANCELLED -> stringResource(R.string.status_cancelled)
+        HistoryStatusSection.PARTIAL_UNDONE -> stringResource(R.string.status_partially_undone)
         HistoryStatusSection.UNDONE -> stringResource(R.string.status_undone)
     }
 

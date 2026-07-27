@@ -6,6 +6,7 @@ import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.model.FileUndoStatus
 
 @Entity(
     tableName = "files_moved",
@@ -32,6 +33,8 @@ data class FileMovedEntity(
     val success: Boolean,
     val skipped: Boolean = false,
     val errorMessage: String? = null,
+    @ColumnInfo(defaultValue = "'PENDING'")
+    val undoStatus: FileUndoStatus = FileUndoStatus.PENDING,
 )
 
 fun FileMovedEntity.toDomain(): FileMoved =
@@ -47,6 +50,7 @@ fun FileMovedEntity.toDomain(): FileMoved =
         success = success,
         skipped = skipped,
         errorMessage = errorMessage,
+        undoStatus = undoStatus,
     )
 
 fun FileMoved.toEntity(runHistoryId: Long): FileMovedEntity =
@@ -62,4 +66,5 @@ fun FileMoved.toEntity(runHistoryId: Long): FileMovedEntity =
         success = success,
         skipped = skipped,
         errorMessage = errorMessage,
+        undoStatus = undoStatus,
     )
