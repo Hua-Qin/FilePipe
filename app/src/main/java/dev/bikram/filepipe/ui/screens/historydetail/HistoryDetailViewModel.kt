@@ -28,6 +28,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+import kotlinx.coroutines.flow.map
+
 @HiltViewModel
 class HistoryDetailViewModel
     @Inject
@@ -43,11 +45,23 @@ class HistoryDetailViewModel
         private val _history = MutableStateFlow<RunHistory?>(null)
         val history: StateFlow<RunHistory?> = _history.asStateFlow()
 
-        private val _isUndoing = MutableStateFlow(false)
-        val isUndoing: StateFlow<Boolean> = _isUndoing.asStateFlow()
+        val isUndoing: StateFlow<Boolean> =
+            undoRunUseCase.activeUndoProgress
+                .map { it.containsKey(historyId) }
+                .stateIn(
+                    viewModelScope,
+                    SharingStarted.WhileSubscribed(5_000),
+                    undoRunUseCase.isUndoInProgress(historyId),
+                )
 
-        private val _undoProgress = MutableStateFlow<Float?>(null)
-        val undoProgress: StateFlow<Float?> = _undoProgress.asStateFlow()
+        val undoProgress: StateFlow<Float?> =
+            undoRunUseCase.activeUndoProgress
+                .map { it[historyId] }
+                .stateIn(
+                    viewModelScope,
+                    SharingStarted.WhileSubscribed(5_000),
+                    undoRunUseCase.getUndoProgress(historyId),
+                )
 
         val pendingHistoryUndoRequest: StateFlow<PendingHistoryUndoRequest?> =
             pendingShortcutRepository.pendingHistoryUndoRequest
@@ -68,15 +82,14 @@ class HistoryDetailViewModel
         }
 
         fun undoRun() {
-            if (!_isUndoing.compareAndSet(expect = false, update = true)) return
+            if (undoRunUseCase.isUndoInProgress(historyId)) return
             launchUndo()
         }
 
         fun undoRunFromNotification(request: PendingHistoryUndoRequest) {
             if (request.historyId != historyId) return
-            if (!_isUndoing.compareAndSet(expect = false, update = true)) return
+            if (undoRunUseCase.isUndoInProgress(historyId)) return
             if (!pendingShortcutRepository.consumePendingHistoryUndo(request)) {
-                _isUndoing.value = false
                 return
             }
             launchUndo(notificationId = request.notificationId)
@@ -85,25 +98,9 @@ class HistoryDetailViewModel
         private fun launchUndo(notificationId: Int? = null) {
             viewModelScope.launch {
                 try {
-                    _undoProgress.value = 0f
                     val result =
                         withContext(NonCancellable) {
-                            undoRunUseCase(historyId) { progress ->
-                                _undoProgress.value =
-                                    when {
-                                        progress.totalBytes > 0L -> {
-                                            progress.processedBytes.toFloat() / progress.totalBytes.toFloat()
-                                        }
-
-                                        progress.totalFiles > 0 -> {
-                                            progress.processedFiles.toFloat() / progress.totalFiles.toFloat()
-                                        }
-
-                                        else -> {
-                                            0f
-                                        }
-                                    }.coerceIn(0f, 1f)
-                            }
+                            undoRunUseCase(historyId)
                         }
                     _userMessages.trySend(result.toUserMessage(appContext))
                     _history.value = runHistoryRepository.getHistoryById(historyId)
@@ -111,8 +108,6 @@ class HistoryDetailViewModel
                     notificationId?.let { completedNotificationId ->
                         NotificationManagerCompat.from(appContext).cancel(completedNotificationId)
                     }
-                    _undoProgress.value = null
-                    _isUndoing.value = false
                 }
             }
         }

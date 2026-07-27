@@ -24,10 +24,15 @@ import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
+import javax.inject.Singleton
 
 data class UndoResult(
     val totalReversed: Int,
@@ -45,6 +50,7 @@ data class UndoProgress(
 
 private const val TAG = "UndoRunUseCase"
 
+@Singleton
 class UndoRunUseCase
     @Inject
     constructor(
@@ -55,33 +61,57 @@ class UndoRunUseCase
         private val userPreferencesRepository: UserPreferencesRepository,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) {
+        private val _activeUndoProgress = MutableStateFlow<Map<Long, Float>>(emptyMap())
+        val activeUndoProgress: StateFlow<Map<Long, Float>> = _activeUndoProgress.asStateFlow()
+
+        fun isUndoInProgress(historyId: Long): Boolean = _activeUndoProgress.value.containsKey(historyId)
+
+        fun getUndoProgress(historyId: Long): Float? = _activeUndoProgress.value[historyId]
+
         suspend operator fun invoke(
             historyId: Long,
             onProgress: (UndoProgress) -> Unit = {},
         ): UndoResult =
             withContext(ioDispatcher) {
-                val history =
-                    runHistoryRepository.getHistoryById(historyId)
-                        ?: return@withContext UndoResult(0, 0, listOf("Run not found"))
-
-                if (history.isEffectivelyUndone()) {
-                    return@withContext UndoResult(
-                        0,
-                        0,
-                        listOf("This run has already been undone"),
-                        operationMode = history.operationMode,
-                    )
+                synchronized(this@UndoRunUseCase) {
+                    if (_activeUndoProgress.value.containsKey(historyId)) {
+                        return@withContext UndoResult(0, 0, listOf("Undo operation is already in progress"))
+                    }
+                    _activeUndoProgress.update { it + (historyId to 0f) }
                 }
-
-                val operationMode = history.operationMode
-                if (operationMode == OperationMode.DELETE) {
-                    return@withContext UndoResult(
-                        0,
-                        0,
-                        listOf("Delete operations cannot be undone"),
-                        operationMode = OperationMode.DELETE,
-                    )
+                try {
+                    performUndo(historyId, onProgress)
+                } finally {
+                    _activeUndoProgress.update { it - historyId }
                 }
+            }
+
+        private suspend fun performUndo(
+            historyId: Long,
+            onProgress: (UndoProgress) -> Unit,
+        ): UndoResult {
+            val history =
+                runHistoryRepository.getHistoryById(historyId)
+                    ?: return UndoResult(0, 0, listOf("Run not found"))
+
+            if (history.isEffectivelyUndone()) {
+                return UndoResult(
+                    0,
+                    0,
+                    listOf("This run has already been undone"),
+                    operationMode = history.operationMode,
+                )
+            }
+
+            val operationMode = history.operationMode
+            if (operationMode == OperationMode.DELETE) {
+                return UndoResult(
+                    0,
+                    0,
+                    listOf("Delete operations cannot be undone"),
+                    operationMode = OperationMode.DELETE,
+                )
+            }
 
                 val movedFiles =
                     runHistoryRepository
@@ -100,7 +130,7 @@ class UndoRunUseCase
                 )
 
                 if (isMockMoveRun(operationMode, movedFiles)) {
-                    return@withContext undoMockRun(
+                    return undoMockRun(
                         historyId = historyId,
                         movedFiles = movedFiles,
                         totalBytes = totalBytes,
@@ -236,14 +266,21 @@ class UndoRunUseCase
                     } finally {
                         processedFiles++
                         processedBytes += fileMoved.fileSizeBytes.coerceAtLeast(0L)
-                        onProgress(
+                        val undoProg =
                             UndoProgress(
                                 processedFiles = processedFiles,
                                 totalFiles = movedFiles.size,
                                 processedBytes = processedBytes,
                                 totalBytes = totalBytes,
-                            ),
-                        )
+                            )
+                        val fraction =
+                            when {
+                                totalBytes > 0L -> processedBytes.toFloat() / totalBytes.toFloat()
+                                movedFiles.isNotEmpty() -> processedFiles.toFloat() / movedFiles.size.toFloat()
+                                else -> 0f
+                            }.coerceIn(0f, 1f)
+                        _activeUndoProgress.update { it + (historyId to fraction) }
+                        onProgress(undoProg)
                     }
                 }
 
@@ -273,7 +310,7 @@ class UndoRunUseCase
                         "Undo completed with failures: historyId=$historyId, reversed=$reversed, failed=$failed",
                     )
                 }
-                return@withContext UndoResult(reversed, failed, errors, operationMode = operationMode)
+                return UndoResult(reversed, failed, errors, operationMode = operationMode)
             }
 
         private fun isMockMoveRun(

@@ -309,6 +309,7 @@ class HistoryViewModel
 
         fun undoRun(historyId: Long) =
             viewModelScope.launch {
+                if (undoRunUseCase.isUndoInProgress(historyId)) return@launch
                 val result = undoRunUseCase(historyId)
                 postUserMessage(result.toUserMessage(appContext))
             }
