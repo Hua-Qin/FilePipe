@@ -37,7 +37,7 @@ class FileOrganizerWorker
 
         /** Distinct from other concurrent [FileOrganizerWorker] instances (shared 1001/1002 caused clashes). */
         private val progressNotificationId: Int by lazy {
-            NOTIFICATION_ID_SLOT_BASE + (abs(id.hashCode()) % NOTIFICATION_ID_SLOT_COUNT) * 2
+            NOTIFICATION_ID_SLOT_BASE + ((id.hashCode() and Int.MAX_VALUE) % NOTIFICATION_ID_SLOT_COUNT) * 2
         }
 
         private val summaryNotificationIdForWork: Int by lazy { progressNotificationId + 1 }
