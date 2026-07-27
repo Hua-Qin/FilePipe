@@ -6,6 +6,7 @@ import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
+import dev.bikram.filepipe.data.repository.canonicalIdentity
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.FileMoved
@@ -68,24 +69,26 @@ class ExecuteRulesUseCase
                     isFilesystemAccessEffective(userPreferencesRepository.preferencesFlow.first().folderAccessMode)
                 // Collect all matching files across all source folders
                 val fileEntries =
-                    rule.sourceFolderPaths.flatMap { sourcePath ->
-                        fileOperationRepository.listMatchingFiles(
-                            folderUriString = sourcePath,
-                            extensions = rule.fileExtensions,
-                            scanSubdirectories = rule.scanSubdirectories,
-                            filenamePattern = rule.filenamePattern,
-                            minFileSizeBytes = rule.minFileSizeBytes,
-                            maxFileSizeBytes = rule.maxFileSizeBytes,
-                            minAgeDays = rule.minAgeDays,
-                            maxAgeDays = rule.maxAgeDays,
-                            excludePatterns = rule.excludePatterns,
-                            filesystemAccessEnabled = filesystemAccessEnabled,
-                            orientation = rule.orientation,
-                            isRegexPattern = rule.isRegexPattern,
-                            isExcludeRegexPattern = rule.isExcludeRegexPattern,
-                            useCache = useCache,
-                        )
-                    }
+                    rule.sourceFolderPaths
+                        .distinct()
+                        .flatMap { sourcePath ->
+                            fileOperationRepository.listMatchingFiles(
+                                folderUriString = sourcePath,
+                                extensions = rule.fileExtensions,
+                                scanSubdirectories = rule.scanSubdirectories,
+                                filenamePattern = rule.filenamePattern,
+                                minFileSizeBytes = rule.minFileSizeBytes,
+                                maxFileSizeBytes = rule.maxFileSizeBytes,
+                                minAgeDays = rule.minAgeDays,
+                                maxAgeDays = rule.maxAgeDays,
+                                excludePatterns = rule.excludePatterns,
+                                filesystemAccessEnabled = filesystemAccessEnabled,
+                                orientation = rule.orientation,
+                                isRegexPattern = rule.isRegexPattern,
+                                isExcludeRegexPattern = rule.isExcludeRegexPattern,
+                                useCache = useCache,
+                            )
+                        }.distinctBy { entry -> entry.canonicalIdentity() }
 
                 val total = fileEntries.size
                 totalPlanned = total

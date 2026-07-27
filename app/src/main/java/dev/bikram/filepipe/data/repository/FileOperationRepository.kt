@@ -1657,3 +1657,15 @@ data class FileEntry(
      */
     val relativeParentSegments: List<String> = emptyList(),
 )
+
+fun FileEntry.canonicalIdentity(): String {
+    if (uri.scheme == "content") {
+        return try {
+            val docId = DocumentsContract.getDocumentId(uri)
+            "${uri.authority}:$docId"
+        } catch (_: Exception) {
+            uri.toString()
+        }
+    }
+    return uri.path ?: uri.toString()
+}

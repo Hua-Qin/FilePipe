@@ -5,6 +5,7 @@ import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.Rule
+import dev.bikram.filepipe.data.repository.canonicalIdentity
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
@@ -20,23 +21,25 @@ class SimulateRuleUseCase
             val filesystemAccessEnabled =
                 isFilesystemAccessEffective(userPreferencesRepository.preferencesFlow.first().folderAccessMode)
             val fileEntries =
-                rule.sourceFolderPaths.flatMap { path ->
-                    fileOperationRepository.listMatchingFiles(
-                        folderUriString = path,
-                        extensions = rule.fileExtensions,
-                        scanSubdirectories = rule.scanSubdirectories,
-                        filenamePattern = rule.filenamePattern,
-                        minFileSizeBytes = rule.minFileSizeBytes,
-                        maxFileSizeBytes = rule.maxFileSizeBytes,
-                        minAgeDays = rule.minAgeDays,
-                        maxAgeDays = rule.maxAgeDays,
-                        excludePatterns = rule.excludePatterns,
-                        filesystemAccessEnabled = filesystemAccessEnabled,
-                        orientation = rule.orientation,
-                        isRegexPattern = rule.isRegexPattern,
-                        isExcludeRegexPattern = rule.isExcludeRegexPattern,
-                    )
-                }
+                rule.sourceFolderPaths
+                    .distinct()
+                    .flatMap { path ->
+                        fileOperationRepository.listMatchingFiles(
+                            folderUriString = path,
+                            extensions = rule.fileExtensions,
+                            scanSubdirectories = rule.scanSubdirectories,
+                            filenamePattern = rule.filenamePattern,
+                            minFileSizeBytes = rule.minFileSizeBytes,
+                            maxFileSizeBytes = rule.maxFileSizeBytes,
+                            minAgeDays = rule.minAgeDays,
+                            maxAgeDays = rule.maxAgeDays,
+                            excludePatterns = rule.excludePatterns,
+                            filesystemAccessEnabled = filesystemAccessEnabled,
+                            orientation = rule.orientation,
+                            isRegexPattern = rule.isRegexPattern,
+                            isExcludeRegexPattern = rule.isExcludeRegexPattern,
+                        )
+                    }.distinctBy { entry -> entry.canonicalIdentity() }
 
             return fileEntries.map { entry ->
                 val destinationEntry =
