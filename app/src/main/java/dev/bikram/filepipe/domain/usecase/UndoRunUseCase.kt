@@ -406,7 +406,7 @@ class UndoRunUseCase
                         } catch (_: Exception) {
                             null
                         }
-                    if (children != null && children.isNotEmpty()) continue
+                    if (children?.isEmpty() != true) continue
                     deleteDocumentUriWithFallback(folderUri)
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to delete empty dest subfolder $folderDocumentId", e)
@@ -467,7 +467,7 @@ class UndoRunUseCase
                             } catch (_: Exception) {
                                 null
                             }
-                        if (!listed.isNullOrEmpty()) continue
+                        if (listed?.isEmpty() != true) continue
                         try {
                             dir.delete()
                         } catch (_: Exception) {
@@ -501,7 +501,7 @@ class UndoRunUseCase
                         } catch (_: Exception) {
                             null
                         }
-                    if (!children.isNullOrEmpty()) continue
+                    if (children?.isEmpty() != true) continue
                     deleteDocumentUriWithFallback(folderUri)
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to delete empty recorded copy folder $uriString", e)
@@ -541,8 +541,13 @@ class UndoRunUseCase
                 val dir = File(folderPath)
                 try {
                     if (!dir.isDirectory) continue
-                    val listed = dir.list()
-                    if (listed != null && listed.isNotEmpty()) continue
+                    val listed =
+                        try {
+                            dir.list()
+                        } catch (_: Exception) {
+                            null
+                        }
+                    if (listed?.isEmpty() != true) continue
                     dir.delete()
                 } catch (_: Exception) {
                 }
