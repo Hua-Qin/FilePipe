@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -647,10 +648,23 @@ fun RuleDetailScreen(
                 return@rememberLauncherForActivityResult
             }
             // Persist the grant so it survives reboots
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-            )
+            val permissionGranted =
+                runCatching {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                    )
+                    true
+                }.getOrDefault(false)
+            if (!permissionGranted && uri.toString().startsWith("content://")) {
+                Toast.makeText(
+                    context,
+                    R.string.settings_export_folder_permission_failed,
+                    Toast.LENGTH_LONG,
+                ).show()
+                pendingFolderPick = null
+                return@rememberLauncherForActivityResult
+            }
             val uriString = uri.toString()
             when (pending) {
                 FolderPickIntent.AddSource -> {

@@ -184,27 +184,38 @@ class SettingsViewModel
 
         fun setExportFolderUri(uriString: String) =
             viewModelScope.launch {
-                persistBackupFolderUri(uriString)
+                if (!persistBackupFolderUri(uriString)) {
+                    postUserMessage(context.getString(R.string.settings_export_folder_permission_failed))
+                    return@launch
+                }
                 userPreferencesRepository.setExportFolderUri(uriString)
                 disableAutomationsIfNoBackupDestination()
             }
 
         fun setCloudExportFolderUri(uriString: String) =
             viewModelScope.launch {
-                persistBackupFolderUri(uriString)
+                if (!persistBackupFolderUri(uriString)) {
+                    postUserMessage(context.getString(R.string.settings_export_folder_permission_failed))
+                    return@launch
+                }
                 userPreferencesRepository.setCloudExportFolderUri(uriString)
                 disableAutomationsIfNoBackupDestination()
             }
 
-        private suspend fun persistBackupFolderUri(uriString: String) {
+        private suspend fun persistBackupFolderUri(uriString: String): Boolean {
             if (uriString.startsWith("content://")) {
-                runCatching {
+                return runCatching {
                     context.contentResolver.takePersistableUriPermission(
                         uriString.toUri(),
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                     )
+                    true
+                }.getOrElse { error ->
+                    DiagnosticLog.record(context, "Failed to take persistable URI permission for $uriString", error)
+                    false
                 }
             }
+            return true
         }
 
         private suspend fun disableAutomationsIfNoBackupDestination() {
@@ -356,8 +367,7 @@ class SettingsViewModel
                         val prefs = userPreferencesRepository.getPreferencesSnapshot()
                         if (prefs.exportFolderUri.isBlank()) {
                             val treeUri = treeUriFromDocumentUri(context, targetUri)
-                            if (treeUri != null) {
-                                persistBackupFolderUri(treeUri.toString())
+                            if (treeUri != null && persistBackupFolderUri(treeUri.toString())) {
                                 userPreferencesRepository.setExportFolderUri(treeUri.toString())
                             }
                         }
@@ -372,8 +382,9 @@ class SettingsViewModel
 
         fun completeCloudBackupDocumentSelection(targetUri: Uri) =
             viewModelScope.launch {
-                persistBackupFolderUri(targetUri.toString())
-                userPreferencesRepository.setCloudExportFolderUri(targetUri.toString())
+                if (persistBackupFolderUri(targetUri.toString())) {
+                    userPreferencesRepository.setCloudExportFolderUri(targetUri.toString())
+                }
                 exportRulesUseCase.exportBackupJsonToDocumentUri(targetUri).fold(
                     onSuccess = {
                         val providerName = providerDisplayName(targetUri.authority)

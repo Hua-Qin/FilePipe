@@ -572,13 +572,12 @@ fun SettingsScreen(
             val target = pendingBackupFolderTarget
             pendingBackupFolderTarget = null
             if (uri != null) {
-                val path = safTreeUriToPath(uri) ?: uri.toString()
                 when (target) {
                     BackupFolderTarget.Cloud -> viewModel.setCloudExportFolderUri(uri.toString())
 
                     BackupFolderTarget.Local,
                     null,
-                    -> viewModel.setExportFolderUri(path)
+                    -> viewModel.setExportFolderUri(uri.toString())
                 }
             }
         }

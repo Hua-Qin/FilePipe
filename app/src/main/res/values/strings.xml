@@ -360,6 +360,7 @@
     <string name="onboarding_wizard_start_blank_desc">Choose your own file types</string>
 
     <!-- Settings -->
+    <string name="settings_export_folder_permission_failed">Could not acquire persistent permission for the selected folder</string>
     <string name="settings_folder_access_section">Folder access</string>
     <string name="settings_folder_access_saf_only">Selective access</string>
     <string name="settings_folder_access_all_files">All files access</string>
