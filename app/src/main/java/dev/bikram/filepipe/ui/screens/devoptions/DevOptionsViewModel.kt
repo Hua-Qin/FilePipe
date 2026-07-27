@@ -947,6 +947,7 @@ class DevOptionsViewModel
                 RunStatus.FAILED -> R.string.dev_options_info_history_failed
                 RunStatus.CANCELLED -> R.string.dev_options_info_history_cancelled
                 RunStatus.UNDONE -> R.string.dev_options_info_history_undone
+                RunStatus.PARTIAL_UNDONE -> R.string.dev_options_info_history_partially_undone
             }
 
         companion object {

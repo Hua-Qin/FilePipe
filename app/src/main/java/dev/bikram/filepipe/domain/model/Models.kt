@@ -189,7 +189,7 @@ data class RunHistory(
 
 enum class TriggerType { MANUAL, SCHEDULED }
 
-enum class RunStatus { IN_PROGRESS, SUCCESS, PARTIAL_FAILURE, FAILED, CANCELLED, UNDONE }
+enum class RunStatus { IN_PROGRESS, SUCCESS, PARTIAL_FAILURE, FAILED, CANCELLED, UNDONE, PARTIAL_UNDONE }
 
 /** Successful run with zero files moved and zero failures (shown as "No changes", not "Success"). */
 fun RunHistory.isNoChangesRun(): Boolean = status == RunStatus.SUCCESS && totalFilesMoved == 0 && totalFilesFailed == 0
@@ -205,6 +205,7 @@ enum class HistoryStatusFilter {
     NO_CHANGES,
     CANCELLED,
     UNDONE,
+    PARTIAL_UNDONE,
 }
 
 // ---

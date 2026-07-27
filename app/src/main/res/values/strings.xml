@@ -259,6 +259,7 @@
     <string name="status_in_progress">Running</string>
     <string name="status_cancelled">Cancelled</string>
     <string name="status_undone">Undone</string>
+    <string name="status_partially_undone">Partially undone</string>
     <string name="status_no_changes">No changes</string>
 
     <plurals name="undo_success_restored">
@@ -577,6 +578,7 @@
     <string name="dev_options_info_history_failed">History failed</string>
     <string name="dev_options_info_history_cancelled">History cancelled</string>
     <string name="dev_options_info_history_undone">History undone</string>
+    <string name="dev_options_info_history_partially_undone">History partially undone</string>
     <string name="dev_options_info_moved_file_rows">Moved-file rows</string>
     <string name="dev_options_info_database_file_size">Database file size</string>
     <string name="dev_options_info_cached_update_apk">Cached update APK</string>

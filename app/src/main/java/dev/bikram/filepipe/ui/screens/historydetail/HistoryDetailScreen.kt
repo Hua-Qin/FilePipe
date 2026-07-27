@@ -351,7 +351,12 @@ private fun RunSummaryCard(
             } else if (
                 history.totalFilesMoved > 0 &&
                 history.operationMode != OperationMode.DELETE &&
-                (history.status == RunStatus.SUCCESS || history.status == RunStatus.CANCELLED)
+                (
+                    history.status == RunStatus.SUCCESS ||
+                        history.status == RunStatus.CANCELLED ||
+                        history.status == RunStatus.PARTIAL_FAILURE ||
+                        history.status == RunStatus.PARTIAL_UNDONE
+                )
             ) {
                 Spacer(Modifier.height(8.dp))
                 FilePipeButton(

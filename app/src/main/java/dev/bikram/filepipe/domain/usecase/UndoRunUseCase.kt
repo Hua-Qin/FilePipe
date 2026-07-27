@@ -192,8 +192,7 @@ class UndoRunUseCase
                                             }
                                             val destFile = File(path)
                                             if (!destFile.isFile) {
-                                                errors.add("${fileMoved.fileName}: file no longer exists at destination")
-                                                failed++
+                                                reversed++
                                                 return@forEach
                                             }
                                             destFile.length()
@@ -202,8 +201,7 @@ class UndoRunUseCase
                                         else -> {
                                             val destDoc = DocumentFile.fromSingleUri(context, destUri)
                                             if (destDoc == null || !destDoc.exists()) {
-                                                errors.add("${fileMoved.fileName}: file no longer exists at destination")
-                                                failed++
+                                                reversed++
                                                 return@forEach
                                             }
                                             destDoc.length()
@@ -253,8 +251,10 @@ class UndoRunUseCase
                     deleteEmptyRecordedCopyFolders(history.copyCreatedDestFolderUris)
                 }
 
-                if (reversed > 0) {
+                if (failed == 0 && reversed > 0) {
                     runHistoryRepository.markRunReversed(historyId)
+                } else if (reversed > 0) {
+                    runHistoryRepository.markRunPartiallyUndone(historyId)
                 }
 
                 if (operationMode == OperationMode.COPY && copyDeletedDestinationUris.isNotEmpty()) {

@@ -169,6 +169,7 @@ class HistoryViewModel
                             HistoryStatusFilter.NO_CHANGES,
                             HistoryStatusFilter.CANCELLED,
                             HistoryStatusFilter.UNDONE,
+                            HistoryStatusFilter.PARTIAL_UNDONE,
                         ).forEach { statusFilter ->
                             if (histories.any { history -> history.matchesHistoryStatusFilter(statusFilter) }) {
                                 add(statusFilter)
@@ -460,5 +461,9 @@ private fun RunHistory.matchesHistoryStatusFilter(filter: HistoryStatusFilter): 
 
         HistoryStatusFilter.UNDONE -> {
             isEffectivelyUndone()
+        }
+
+        HistoryStatusFilter.PARTIAL_UNDONE -> {
+            status == RunStatus.PARTIAL_UNDONE
         }
     }

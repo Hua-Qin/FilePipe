@@ -213,6 +213,13 @@ class RunHistoryRepository
             )
         }
 
+        suspend fun markRunPartiallyUndone(historyId: Long) {
+            val history = runHistoryDao.getHistoryById(historyId) ?: return
+            runHistoryDao.updateHistory(
+                history.copy(isReversed = false, status = RunStatus.PARTIAL_UNDONE),
+            )
+        }
+
         suspend fun deleteHistoryById(historyId: Long) {
             runHistoryDao.deleteHistoryById(historyId)
         }

@@ -192,6 +192,7 @@ fun HistoryScreen(
             HistoryStatusFilter.NO_CHANGES to stringResource(R.string.status_no_changes),
             HistoryStatusFilter.CANCELLED to stringResource(R.string.status_cancelled),
             HistoryStatusFilter.UNDONE to stringResource(R.string.status_undone),
+            HistoryStatusFilter.PARTIAL_UNDONE to stringResource(R.string.status_partially_undone),
         )
 
     if (showClearConfirm) {
