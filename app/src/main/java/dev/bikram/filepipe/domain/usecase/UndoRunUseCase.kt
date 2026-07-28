@@ -43,6 +43,7 @@ data class UndoResult(
     val totalFailed: Int,
     val errors: List<String>,
     val operationMode: OperationMode = OperationMode.MOVE,
+    val isAlreadyInProgress: Boolean = false,
 )
 
 data class UndoProgress(
@@ -79,7 +80,12 @@ class UndoRunUseCase
             withContext(ioDispatcher) {
                 synchronized(this@UndoRunUseCase) {
                     if (_activeUndoProgress.value.containsKey(historyId)) {
-                        return@withContext UndoResult(0, 0, listOf("Undo operation is already in progress"))
+                        return@withContext UndoResult(
+                            totalReversed = 0,
+                            totalFailed = 0,
+                            errors = emptyList(),
+                            isAlreadyInProgress = true,
+                        )
                     }
                     _activeUndoProgress.update { it + (historyId to 0f) }
                 }
@@ -419,6 +425,17 @@ class UndoRunUseCase
             totalBytes: Long,
             onProgress: (UndoProgress) -> Unit,
         ): UndoResult {
+            if (movedFiles.isEmpty()) {
+                _activeUndoProgress.update { it + (historyId to 1f) }
+                onProgress(UndoProgress(0, 0, 0L, 0L))
+                runHistoryRepository.markRunReversed(historyId)
+                return UndoResult(
+                    totalReversed = 0,
+                    totalFailed = 0,
+                    errors = emptyList(),
+                    operationMode = OperationMode.MOVE,
+                )
+            }
             var processedBytes = 0L
             movedFiles.forEachIndexed { index, fileMoved ->
                 runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.IN_PROGRESS)
@@ -429,7 +446,7 @@ class UndoRunUseCase
                     when {
                         totalBytes > 0L -> processedBytes.toFloat() / totalBytes.toFloat()
                         movedFiles.isNotEmpty() -> (index + 1).toFloat() / movedFiles.size.toFloat()
-                        else -> 0f
+                        else -> 1f
                     }.coerceIn(0f, 1f)
                 _activeUndoProgress.update { it + (historyId to fraction) }
                 onProgress(
@@ -441,6 +458,7 @@ class UndoRunUseCase
                     ),
                 )
             }
+            _activeUndoProgress.update { it + (historyId to 1f) }
             runHistoryRepository.markRunReversed(historyId)
             return UndoResult(
                 totalReversed = movedFiles.size,

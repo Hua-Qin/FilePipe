@@ -312,7 +312,9 @@ class HistoryViewModel
             viewModelScope.launch {
                 if (undoRunUseCase.isUndoInProgress(historyId)) return@launch
                 val result = undoRunUseCase(historyId)
-                postUserMessage(result.toUserMessage(appContext))
+                result.toUserMessage(appContext)?.let { message ->
+                    postUserMessage(message)
+                }
             }
 
         private fun sortHistories(

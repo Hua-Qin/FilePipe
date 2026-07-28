@@ -96,12 +96,15 @@ class HistoryDetailViewModel
 
         private fun launchUndo(notificationId: Int? = null) {
             viewModelScope.launch {
+                if (undoRunUseCase.isUndoInProgress(historyId)) return@launch
                 try {
                     val result =
                         withContext(NonCancellable) {
                             undoRunUseCase(historyId)
                         }
-                    _userMessages.trySend(result.toUserMessage(appContext))
+                    result.toUserMessage(appContext)?.let { message ->
+                        _userMessages.trySend(message)
+                    }
                     _history.value = runHistoryRepository.getHistoryById(historyId)
                 } finally {
                     notificationId?.let { completedNotificationId ->

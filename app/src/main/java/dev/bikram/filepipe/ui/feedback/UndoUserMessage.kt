@@ -5,8 +5,9 @@ import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.usecase.UndoResult
 
-fun UndoResult.toUserMessage(context: Context): String =
-    when {
+fun UndoResult.toUserMessage(context: Context): String? {
+    if (isAlreadyInProgress) return null
+    return when {
         totalReversed == 0 -> {
             context.getString(
                 R.string.undo_failed_prefix,
@@ -64,3 +65,4 @@ fun UndoResult.toUserMessage(context: Context): String =
             }
         }
     }
+}
