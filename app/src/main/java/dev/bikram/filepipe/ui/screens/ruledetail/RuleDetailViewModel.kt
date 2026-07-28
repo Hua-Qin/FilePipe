@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.ui.screens.ruledetail
 
+import android.content.Context
 import android.os.Environment
 import android.provider.DocumentsContract
 import androidx.core.net.toUri
@@ -7,6 +8,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
@@ -194,6 +197,12 @@ private fun RuleDetailUiState.withSnapshot(snapshot: RuleSnapshot): RuleDetailUi
     )
 
 private val BYTES_PER_MEGABYTE = BigDecimal.valueOf(1024L * 1024L)
+internal const val MAX_FILE_AGE_DAYS = 36_500
+
+internal enum class AgeFilterValidationError {
+    OUT_OF_RANGE,
+    MINIMUM_EXCEEDS_MAXIMUM,
+}
 
 @Suppress("ktlint:standard:function-expression-body")
 internal fun formatFileSizeMegabytes(bytes: Long): String {
@@ -215,6 +224,27 @@ internal fun parseFileSizeMegabytes(value: String): Long? {
     }.getOrNull()
 }
 
+internal fun validateAgeFilterValues(
+    minimumAgeDays: String,
+    maximumAgeDays: String,
+): AgeFilterValidationError? {
+    val minimumValue = minimumAgeDays.trim().takeIf { it.isNotEmpty() }?.toLongOrNull()
+    val maximumValue = maximumAgeDays.trim().takeIf { it.isNotEmpty() }?.toLongOrNull()
+    val minimumIsInvalid =
+        minimumAgeDays.isNotBlank() &&
+            (minimumValue == null || minimumValue !in 1..MAX_FILE_AGE_DAYS.toLong())
+    val maximumIsInvalid =
+        maximumAgeDays.isNotBlank() &&
+            (maximumValue == null || maximumValue !in 1..MAX_FILE_AGE_DAYS.toLong())
+    if (minimumIsInvalid || maximumIsInvalid) {
+        return AgeFilterValidationError.OUT_OF_RANGE
+    }
+    if (minimumValue != null && maximumValue != null && minimumValue > maximumValue) {
+        return AgeFilterValidationError.MINIMUM_EXCEEDS_MAXIMUM
+    }
+    return null
+}
+
 @HiltViewModel
 class RuleDetailViewModel
     @Inject
@@ -228,6 +258,7 @@ class RuleDetailViewModel
         private val userPreferencesRepository: UserPreferencesRepository,
         private val fileOperationRepository: FileOperationRepository,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+        @param:ApplicationContext private val appContext: Context,
     ) : ViewModel() {
         private val ruleId: Long = savedStateHandle[Screen.RuleDetail.ARG_RULE_ID] ?: Screen.RuleDetail.NEW_RULE_ID
         private val templateIndex: Int = savedStateHandle[Screen.RuleDetail.ARG_TEMPLATE_INDEX] ?: -1
@@ -644,14 +675,28 @@ class RuleDetailViewModel
                     }
                     val state = _uiState.value
                     val rule = buildRuleFromState(state)
+                    val ruleErrors =
+                        (validateRuleUseCase(rule) as? ValidateRuleUseCase.Result.Invalid)
+                            ?.errors
+                            .orEmpty()
+                    val ageFilterError =
+                        when (validateAgeFilterValues(state.minAgeDays, state.maxAgeDays)) {
+                            AgeFilterValidationError.OUT_OF_RANGE -> {
+                                appContext.getString(R.string.rule_error_age_out_of_range, MAX_FILE_AGE_DAYS)
+                            }
 
-                    when (val result = validateRuleUseCase(rule)) {
-                        is ValidateRuleUseCase.Result.Invalid -> {
-                            _uiState.update { it.copy(errors = result.errors) }
-                            return@launch
+                            AgeFilterValidationError.MINIMUM_EXCEEDS_MAXIMUM -> {
+                                appContext.getString(R.string.rule_error_minimum_age_exceeds_maximum)
+                            }
+
+                            null -> {
+                                null
+                            }
                         }
-
-                        is ValidateRuleUseCase.Result.Valid -> {}
+                    val validationErrors = ruleErrors + listOfNotNull(ageFilterError)
+                    if (validationErrors.isNotEmpty()) {
+                        _uiState.update { it.copy(errors = validationErrors) }
+                        return@launch
                     }
 
                     val savedId = ruleRepository.saveRule(rule)

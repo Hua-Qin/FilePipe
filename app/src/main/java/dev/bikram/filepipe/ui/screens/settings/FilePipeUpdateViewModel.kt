@@ -41,6 +41,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -361,7 +362,7 @@ class FilePipeUpdateViewModel
                         onFailure = {
                             DiagnosticLog.record(context, "Update changelog load failed", it)
                             ChangelogUiState.Failed(
-                                it.message ?: context.getString(R.string.settings_changelog_load_failed),
+                                context.getString(R.string.settings_changelog_load_failed),
                             )
                         },
                     )
@@ -486,6 +487,10 @@ class FilePipeUpdateViewModel
             connection.readTimeout = 20_000
             return try {
                 connection.connect()
+                val responseCode = connection.responseCode
+                if (responseCode !in 200..299) {
+                    throw IOException("Changelog request returned HTTP $responseCode")
+                }
                 connection.inputStream.bufferedReader().use { reader -> reader.readText() }
             } finally {
                 connection.disconnect()

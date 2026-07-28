@@ -8,6 +8,38 @@ import java.io.File
 import java.io.FileInputStream
 import java.security.MessageDigest
 
+private const val MAX_UPDATE_APK_DISPLAY_NAME_LENGTH = 120
+private const val INVALID_UPDATE_APK_FILENAME_CHARACTERS = "<>:\"/\\|?*"
+private const val APK_EXTENSION = ".apk"
+
+internal fun sanitizeUpdateApkDisplayName(
+    displayName: String,
+    fallbackName: String,
+): String {
+    val cleanedName =
+        buildString(displayName.length) {
+            displayName.forEach { character ->
+                if (character.isISOControl() || character in INVALID_UPDATE_APK_FILENAME_CHARACTERS) {
+                    append('_')
+                } else {
+                    append(character)
+                }
+            }
+        }.trim(' ', '.')
+    val nameWithoutExtension =
+        if (cleanedName.endsWith(".apk", ignoreCase = true)) {
+            cleanedName.dropLast(4)
+        } else {
+            cleanedName
+        }
+    val boundedName =
+        nameWithoutExtension
+            .trim(' ', '.')
+            .take(MAX_UPDATE_APK_DISPLAY_NAME_LENGTH - APK_EXTENSION.length)
+            .trimEnd(' ', '.')
+    return if (boundedName.isBlank()) fallbackName else boundedName + APK_EXTENSION
+}
+
 /**
  * Copies [cacheApkFile] into the public Downloads collection with [displayName] as shown in Files.
  * Uses [MediaStore.Downloads].
@@ -18,10 +50,7 @@ fun copyUpdateApkToMediaStoreDownloads(
     displayName: String,
 ): Result<Unit> =
     runCatching {
-        val safeName =
-            displayName.replace('/', '_').replace('\\', '_').trim().ifBlank {
-                FILEPIPE_UPDATE_APK_CACHE_NAME
-            }
+        val safeName = sanitizeUpdateApkDisplayName(displayName, FILEPIPE_UPDATE_APK_CACHE_NAME)
         val resolver = context.contentResolver
         val values =
             ContentValues().apply {
@@ -45,9 +74,9 @@ fun copyUpdateApkToMediaStoreDownloads(
                     put(MediaStore.MediaColumns.IS_PENDING, 0)
                 }
             resolver.update(itemUri, publish, null, null)
-        } catch (t: Throwable) {
+        } catch (throwable: Throwable) {
             runCatching { resolver.delete(itemUri, null, null) }
-            throw t
+            throw throwable
         }
     }
 
