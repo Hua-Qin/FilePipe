@@ -128,6 +128,19 @@ interface RunHistoryDao {
     @Update
     suspend fun updateHistory(history: RunHistoryEntity)
 
+    @Query(
+        """
+        UPDATE run_history
+        SET completedAt = :completedAt, status = 'FAILED', errorMessage = :errorMessage
+        WHERE status = 'IN_PROGRESS' AND startedAt < :startedBefore
+        """,
+    )
+    suspend fun markInterruptedRunsFailed(
+        startedBefore: Long,
+        completedAt: Long,
+        errorMessage: String,
+    ): Int
+
     @Query("DELETE FROM run_history WHERE startedAt < :olderThan")
     suspend fun deleteHistoryOlderThan(olderThan: Long)
 

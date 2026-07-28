@@ -345,6 +345,16 @@ class RunHistoryRepository
             )
         }
 
+        suspend fun reconcileInterruptedRuns(
+            startedBefore: Long,
+            errorMessage: String,
+        ): Int =
+            runHistoryDao.markInterruptedRunsFailed(
+                startedBefore = startedBefore,
+                completedAt = System.currentTimeMillis(),
+                errorMessage = errorMessage,
+            )
+
         suspend fun finishRunUserCancelled(
             historyId: Long,
             totalPlanned: Int,

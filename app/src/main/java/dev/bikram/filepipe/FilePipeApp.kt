@@ -9,6 +9,7 @@ import androidx.work.WorkManager
 import dagger.Lazy
 import dagger.hilt.android.HiltAndroidApp
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.update.UpdateApkCacheMaintenance
 import dev.bikram.filepipe.update.UpdateAvailableNotifier
@@ -41,7 +42,10 @@ class FilePipeApp :
     @Inject
     lateinit var updateAvailableNotifier: UpdateAvailableNotifier
 
-    private val preferencesMigrationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    @Inject
+    lateinit var runHistoryRepository: Lazy<RunHistoryRepository>
+
+    private val appStartupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
         get() =
@@ -52,9 +56,10 @@ class FilePipeApp :
 
     override fun onCreate() {
         super.onCreate()
+        val processStartedAt = System.currentTimeMillis()
         DiagnosticLog.installCrashHandler(this)
         DiagnosticLog.record(this, "FilePipeApp.onCreate started")
-        preferencesMigrationScope.launch {
+        appStartupScope.launch {
             runCatching {
                 val prefs = userPreferencesRepository.get()
                 prefs.migrateLegacyEnhancedShadingPreferenceIfNeeded()
@@ -66,9 +71,25 @@ class FilePipeApp :
             }.onFailure { error ->
                 DiagnosticLog.record(this@FilePipeApp, "Startup preference migration/update scheduling failed", error)
             }
+            runCatching {
+                runHistoryRepository
+                    .get()
+                    .reconcileInterruptedRuns(
+                        startedBefore = processStartedAt,
+                        errorMessage = getString(R.string.history_run_interrupted),
+                    ).takeIf { interruptedCount -> interruptedCount > 0 }
+                    ?.let { interruptedCount ->
+                        DiagnosticLog.record(
+                            this@FilePipeApp,
+                            "Marked stale in-progress runs as interrupted: count=$interruptedCount",
+                        )
+                    }
+            }.onFailure { error ->
+                DiagnosticLog.record(this@FilePipeApp, "Interrupted run reconciliation failed", error)
+            }
         }
         updateAvailableNotifier.ensureNotificationChannel()
-        updateApkCacheMaintenance.enqueueStartupCleanup(preferencesMigrationScope)
+        updateApkCacheMaintenance.enqueueStartupCleanup(appStartupScope)
         scheduleLogPruneWorker()
         scheduleRuleTrashSweepWorker()
     }

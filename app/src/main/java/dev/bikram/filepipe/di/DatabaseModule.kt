@@ -142,8 +142,9 @@ object DatabaseModule {
                 migration9To10,
                 migration10To11,
                 migration11To12,
-            ).fallbackToDestructiveMigration(dropAllTables = true)
-            .fallbackToDestructiveMigrationOnDowngrade(dropAllTables = true)
+            )
+            // Fail closed if a migration path is missing. Recreating this database would silently
+            // erase rules and run history, while a failed open leaves the original file recoverable.
             .build()
     }
 

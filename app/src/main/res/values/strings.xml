@@ -176,6 +176,7 @@
     <string name="history_detail_title">Run details</string>
     <string name="history_detail_files_header">Files (%1$d)</string>
     <string name="history_detail_no_file_records">No file records for this run.</string>
+    <string name="history_run_interrupted">The run was interrupted when the app process ended.</string>
     <string name="history_detail_run_summary">Run summary</string>
     <string name="history_detail_trigger_label">Trigger</string>
     <string name="history_detail_started_label">Started</string>
