@@ -6,13 +6,14 @@ import android.provider.DocumentsContract
 import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
-import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.data.repository.BackupSnapshot
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.domain.backupFileTimestamp
 import dev.bikram.filepipe.domain.export.buildAppBackupJson
+import dev.bikram.filepipe.domain.model.FileUndoStatus
+import dev.bikram.filepipe.domain.model.RunStatus
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
@@ -22,7 +23,6 @@ class ExportRulesUseCase
     @Inject
     constructor(
         @param:ApplicationContext private val context: Context,
-        private val ruleRepository: RuleRepository,
         private val runHistoryRepository: RunHistoryRepository,
         private val userPreferencesRepository: UserPreferencesRepository,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -43,15 +43,10 @@ class ExportRulesUseCase
                 val destinations = folderPaths.map { it.trim() }.filter { it.isNotBlank() }.distinct()
                 if (destinations.isEmpty()) return@withContext Result.failure(IllegalStateException("No export folder"))
 
-                val rules = ruleRepository.getAllRules().first()
-                val allHistory = runHistoryRepository.getAllHistoryOnce()
-                val historyWithFiles =
-                    allHistory.map { run ->
-                        run to runHistoryRepository.getFilesForRunOnce(run.id)
-                    }
+                val backupSnapshot = normalizedBackupSnapshot()
                 val settings = userPreferencesRepository.getPreferencesSnapshot()
 
-                val json = buildAppBackupJson(rules, historyWithFiles, settings)
+                val json = buildAppBackupJson(backupSnapshot.rules, backupSnapshot.historyWithFiles, settings)
                 val stamp = backupFileTimestamp()
                 val fileName = "filepipe_backup_$stamp.json"
 
@@ -82,14 +77,9 @@ class ExportRulesUseCase
          */
         suspend fun exportBackupJsonToDocumentUri(targetUri: Uri): Result<String> =
             withContext(ioDispatcher) {
-                val rules = ruleRepository.getAllRules().first()
-                val allHistory = runHistoryRepository.getAllHistoryOnce()
-                val historyWithFiles =
-                    allHistory.map { run ->
-                        run to runHistoryRepository.getFilesForRunOnce(run.id)
-                    }
+                val backupSnapshot = normalizedBackupSnapshot()
                 val settings = userPreferencesRepository.getPreferencesSnapshot()
-                val json = buildAppBackupJson(rules, historyWithFiles, settings)
+                val json = buildAppBackupJson(backupSnapshot.rules, backupSnapshot.historyWithFiles, settings)
                 runCatching {
                     context.contentResolver.openOutputStream(targetUri)?.use { stream ->
                         stream.write(json.toByteArray(Charsets.UTF_8))
@@ -97,6 +87,31 @@ class ExportRulesUseCase
                     friendlyFileNameFromDocumentUri(targetUri)
                 }.fold(onSuccess = { Result.success(it) }, onFailure = { Result.failure(it) })
             }
+
+        private suspend fun normalizedBackupSnapshot(): BackupSnapshot {
+            val snapshot = runHistoryRepository.getBackupSnapshot()
+            val normalizedHistory =
+                snapshot.historyWithFiles.map { (run, files) ->
+                    val successFiles = files.filter { it.success && !it.skipped && it.destinationUri.isNotBlank() }
+                    val undoneFileCount = successFiles.count { it.undoStatus == FileUndoStatus.UNDONE }
+                    val effectiveRun =
+                        when {
+                            successFiles.isNotEmpty() && undoneFileCount == successFiles.size -> {
+                                run.copy(status = RunStatus.UNDONE, isReversed = true)
+                            }
+
+                            undoneFileCount > 0 -> {
+                                run.copy(status = RunStatus.PARTIAL_UNDONE, isReversed = false)
+                            }
+
+                            else -> {
+                                run
+                            }
+                        }
+                    effectiveRun to files
+                }
+            return snapshot.copy(historyWithFiles = normalizedHistory)
+        }
 
         /**
          * [Uri.getLastPathSegment] for SAF document URIs is the full document id (e.g. `primary:Download/foo.json`).

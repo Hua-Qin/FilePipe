@@ -87,8 +87,11 @@ class HistoryDetailViewModel
 
         fun undoRunFromNotification(request: PendingHistoryUndoRequest) {
             if (request.historyId != historyId) return
-            if (undoRunUseCase.isUndoInProgress(historyId)) return
             if (!pendingShortcutRepository.consumePendingHistoryUndo(request)) {
+                return
+            }
+            if (undoRunUseCase.isUndoInProgress(historyId)) {
+                NotificationManagerCompat.from(appContext).cancel(request.notificationId)
                 return
             }
             launchUndo(notificationId = request.notificationId)

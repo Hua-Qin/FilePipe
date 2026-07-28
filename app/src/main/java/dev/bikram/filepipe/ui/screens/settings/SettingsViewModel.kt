@@ -22,8 +22,8 @@ import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.data.storage.PersistedUriGrantManager
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
-import dev.bikram.filepipe.data.storage.treeUriFromDocumentUri
 import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.backupFileTimestamp
@@ -64,6 +64,7 @@ class SettingsViewModel
         private val rulesAutoExportTrigger: RulesAutoExportTrigger,
         private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
         private val ruleRepository: RuleRepository,
+        private val persistedUriGrantManager: PersistedUriGrantManager,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         val preferencesFlow = userPreferencesRepository.preferencesFlow
@@ -184,21 +185,25 @@ class SettingsViewModel
 
         fun setExportFolderUri(uriString: String) =
             viewModelScope.launch {
+                val previousUri = userPreferencesRepository.getPreferencesSnapshot().exportFolderUri
                 if (!persistBackupFolderUri(uriString)) {
                     postUserMessage(context.getString(R.string.settings_export_folder_permission_failed))
                     return@launch
                 }
                 userPreferencesRepository.setExportFolderUri(uriString)
+                releaseReplacedBackupGrant(previousUri)
                 disableAutomationsIfNoBackupDestination()
             }
 
         fun setCloudExportFolderUri(uriString: String) =
             viewModelScope.launch {
+                val previousUri = userPreferencesRepository.getPreferencesSnapshot().cloudExportFolderUri
                 if (!persistBackupFolderUri(uriString)) {
                     postUserMessage(context.getString(R.string.settings_export_folder_permission_failed))
                     return@launch
                 }
                 userPreferencesRepository.setCloudExportFolderUri(uriString)
+                releaseReplacedBackupGrant(previousUri)
                 disableAutomationsIfNoBackupDestination()
             }
 
@@ -216,6 +221,22 @@ class SettingsViewModel
                 }
             }
             return true
+        }
+
+        private suspend fun releaseReplacedBackupGrant(previousUri: String) {
+            if (!previousUri.startsWith("content://")) return
+            val preferences = userPreferencesRepository.getPreferencesSnapshot()
+            val retainedRuleUris =
+                ruleRepository
+                    .getAllRulesIncludingTrashed()
+                    .flatMap { rule -> rule.sourceFolderPaths + rule.destinationFolderPath }
+            persistedUriGrantManager.releaseUnused(
+                candidateUris = listOf(previousUri),
+                retainedUris =
+                    retainedRuleUris +
+                        listOf(preferences.exportFolderUri, preferences.cloudExportFolderUri) +
+                        preferences.bookmarkedFolders,
+            )
         }
 
         private suspend fun disableAutomationsIfNoBackupDestination() {
@@ -364,13 +385,6 @@ class SettingsViewModel
             viewModelScope.launch {
                 exportRulesUseCase.exportBackupJsonToDocumentUri(targetUri).fold(
                     onSuccess = { displayName ->
-                        val prefs = userPreferencesRepository.getPreferencesSnapshot()
-                        if (prefs.exportFolderUri.isBlank()) {
-                            val treeUri = treeUriFromDocumentUri(context, targetUri)
-                            if (treeUri != null && persistBackupFolderUri(treeUri.toString())) {
-                                userPreferencesRepository.setExportFolderUri(treeUri.toString())
-                            }
-                        }
                         postUserMessage(context.getString(R.string.settings_export_success, displayName))
                     },
                     onFailure = { err ->
@@ -382,11 +396,18 @@ class SettingsViewModel
 
         fun completeCloudBackupDocumentSelection(targetUri: Uri) =
             viewModelScope.launch {
-                if (persistBackupFolderUri(targetUri.toString())) {
+                val permissionPersisted = persistBackupFolderUri(targetUri.toString())
+                if (permissionPersisted) {
+                    val previousUri = userPreferencesRepository.getPreferencesSnapshot().cloudExportFolderUri
                     userPreferencesRepository.setCloudExportFolderUri(targetUri.toString())
+                    releaseReplacedBackupGrant(previousUri)
                 }
                 exportRulesUseCase.exportBackupJsonToDocumentUri(targetUri).fold(
                     onSuccess = {
+                        if (!permissionPersisted) {
+                            postUserMessage(context.getString(R.string.settings_cloud_backup_configuration_failed))
+                            return@fold
+                        }
                         val providerName = providerDisplayName(targetUri.authority)
                         postUserMessage(
                             if (providerName != null) {

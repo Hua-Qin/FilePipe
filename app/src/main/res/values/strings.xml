@@ -280,6 +280,7 @@
     </plurals>
     <string name="undo_failed_prefix">Undo failed: %s</string>
     <string name="undo_unknown_error">Unknown error</string>
+    <string name="undo_original_source_conflict">A file already exists at the original location</string>
     <string name="history_detail_run_undone">This run has been undone</string>
 
     <!-- Permission screen -->
@@ -361,6 +362,7 @@
 
     <!-- Settings -->
     <string name="settings_export_folder_permission_failed">Could not acquire persistent permission for the selected folder</string>
+    <string name="settings_cloud_backup_configuration_failed">The backup was exported once, but automatic cloud backups could not be configured</string>
     <string name="settings_folder_access_section">Folder access</string>
     <string name="settings_folder_access_saf_only">Selective access</string>
     <string name="settings_folder_access_all_files">All files access</string>

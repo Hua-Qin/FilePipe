@@ -4,7 +4,10 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.map
+import androidx.room.withTransaction
+import dev.bikram.filepipe.AppDatabase
 import dev.bikram.filepipe.data.local.dao.FileMovedDao
+import dev.bikram.filepipe.data.local.dao.RuleDao
 import dev.bikram.filepipe.data.local.dao.RunHistoryDao
 import dev.bikram.filepipe.data.local.entity.FileMovedEntity
 import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
@@ -16,6 +19,7 @@ import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.OperationMode
+import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunResult
 import dev.bikram.filepipe.domain.model.RunStatus
@@ -29,6 +33,8 @@ import javax.inject.Singleton
 class RunHistoryRepository
     @Inject
     constructor(
+        private val appDatabase: AppDatabase,
+        private val ruleDao: RuleDao,
         private val runHistoryDao: RunHistoryDao,
         private val fileMovedDao: FileMovedDao,
     ) {
@@ -37,6 +43,20 @@ class RunHistoryRepository
         fun observeHasAnyHistory(): Flow<Boolean> = runHistoryDao.observeHistoryCount().map { count -> count > 0 }
 
         suspend fun getAllHistoryOnce(): List<RunHistory> = runHistoryDao.getAllHistoryOnce().map { it.toDomain() }
+
+        suspend fun getBackupSnapshot(): BackupSnapshot =
+            appDatabase.withTransaction {
+                BackupSnapshot(
+                    rules = ruleDao.getAllRulesOrderedBySortOrder().map { ruleEntity -> ruleEntity.toDomain() },
+                    historyWithFiles =
+                        runHistoryDao.getAllHistoryOnce().map { historyEntity ->
+                            historyEntity.toDomain() to
+                                fileMovedDao
+                                    .getFilesForRunOnce(historyEntity.id)
+                                    .map { fileMovedEntity -> fileMovedEntity.toDomain() }
+                        },
+                )
+            }
 
         fun getHistoryForRule(ruleId: Long): Flow<List<RunHistory>> = runHistoryDao.getHistoryForRule(ruleId).map { it.map { entity -> entity.toDomain() } }
 
@@ -306,10 +326,6 @@ class RunHistoryRepository
                         FileUndoStatus.UNDONE
                     }
 
-                    runStatus == RunStatus.PARTIAL_UNDONE && backedUpUndoStatus == FileUndoStatus.PENDING -> {
-                        FileUndoStatus.IN_PROGRESS
-                    }
-
                     else -> {
                         backedUpUndoStatus
                     }
@@ -330,3 +346,8 @@ class RunHistoryRepository
             )
         }
     }
+
+data class BackupSnapshot(
+    val rules: List<Rule>,
+    val historyWithFiles: List<Pair<RunHistory, List<FileMoved>>>,
+)

@@ -150,7 +150,7 @@ fun HistoryDetailScreen(
 
     LaunchedEffect(history?.id, pendingHistoryUndoRequest, isUndoing) {
         val request = pendingHistoryUndoRequest ?: return@LaunchedEffect
-        if (history?.id == request.historyId && !isUndoing) {
+        if (history?.id == request.historyId) {
             viewModel.undoRunFromNotification(request)
         }
     }

@@ -95,7 +95,7 @@ object DatabaseModule {
             }
         }
 
-    private val migration11To12 =
+    internal val migration11To12 =
         object : Migration(11, 12) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

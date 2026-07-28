@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
@@ -68,6 +69,7 @@ class UndoRunUseCase
     ) {
         private val _activeUndoProgress = MutableStateFlow<Map<Long, Float>>(emptyMap())
         val activeUndoProgress: StateFlow<Map<Long, Float>> = _activeUndoProgress.asStateFlow()
+        private val undoMutex = Mutex()
 
         fun isUndoInProgress(historyId: Long): Boolean = _activeUndoProgress.value.containsKey(historyId)
 
@@ -78,17 +80,15 @@ class UndoRunUseCase
             onProgress: (UndoProgress) -> Unit = {},
         ): UndoResult =
             withContext(ioDispatcher) {
-                synchronized(this@UndoRunUseCase) {
-                    if (_activeUndoProgress.value.containsKey(historyId)) {
-                        return@withContext UndoResult(
-                            totalReversed = 0,
-                            totalFailed = 0,
-                            errors = emptyList(),
-                            isAlreadyInProgress = true,
-                        )
-                    }
-                    _activeUndoProgress.update { it + (historyId to 0f) }
+                if (!undoMutex.tryLock()) {
+                    return@withContext UndoResult(
+                        totalReversed = 0,
+                        totalFailed = 0,
+                        errors = emptyList(),
+                        isAlreadyInProgress = true,
+                    )
                 }
+                _activeUndoProgress.update { it + (historyId to 0f) }
                 try {
                     performUndo(historyId, onProgress)
                 } finally {
@@ -98,6 +98,7 @@ class UndoRunUseCase
                         }
                     } finally {
                         _activeUndoProgress.update { it - historyId }
+                        undoMutex.unlock()
                     }
                 }
             }
@@ -133,7 +134,7 @@ class UndoRunUseCase
                 runHistoryRepository
                     .getFilesForRunOnce(historyId)
                     .filter { it.success && !it.skipped && it.destinationUri.isNotBlank() }
-            val pendingFiles = movedFiles.filter { it.undoStatus != FileUndoStatus.UNDONE }
+            val pendingFiles = movedFiles.filter { shouldAttemptUndo(it.undoStatus) }
             val totalBytes = pendingFiles.sumOf { fileMoved -> fileMoved.fileSizeBytes.coerceAtLeast(0L) }
             var processedFiles = 0
             var processedBytes = 0L
@@ -145,6 +146,16 @@ class UndoRunUseCase
                     totalBytes = totalBytes,
                 ),
             )
+
+            if (pendingFiles.isEmpty()) {
+                runHistoryRepository.markRunReversed(historyId)
+                return UndoResult(
+                    totalReversed = 0,
+                    totalFailed = 0,
+                    errors = emptyList(),
+                    operationMode = operationMode,
+                )
+            }
 
             if (isMockMoveRun(operationMode, movedFiles)) {
                 return undoMockRun(
@@ -167,8 +178,8 @@ class UndoRunUseCase
                 val wasInterrupted = fileMoved.undoStatus == FileUndoStatus.IN_PROGRESS
                 var physicalUndoCompleted = false
                 var outcomeCounted = false
-                runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.IN_PROGRESS)
                 try {
+                    runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.IN_PROGRESS)
                     when (operationMode) {
                         OperationMode.COPY -> {
                             if (fileMoved.destinationUri.startsWith("file:")) {
@@ -182,10 +193,10 @@ class UndoRunUseCase
                                 }
                                 val destFile = File(path)
                                 if (!destFile.isFile) {
-                                    reversed++
                                     physicalUndoCompleted = true
-                                    outcomeCounted = true
                                     runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.UNDONE)
+                                    reversed++
+                                    outcomeCounted = true
                                     return@forEach
                                 }
                                 val deleted =
@@ -195,10 +206,10 @@ class UndoRunUseCase
                                         false
                                     }
                                 if (deleted) {
-                                    reversed++
                                     physicalUndoCompleted = true
-                                    outcomeCounted = true
                                     runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.UNDONE)
+                                    reversed++
+                                    outcomeCounted = true
                                     copyDeletedDestinationUris.add(fileMoved.destinationUri)
                                 } else {
                                     failed++
@@ -217,10 +228,10 @@ class UndoRunUseCase
                                     return@forEach
                                 }
                                 if (!destDoc.exists()) {
-                                    reversed++
                                     physicalUndoCompleted = true
-                                    outcomeCounted = true
                                     runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.UNDONE)
+                                    reversed++
+                                    outcomeCounted = true
                                     return@forEach
                                 }
                                 val deleted =
@@ -230,10 +241,10 @@ class UndoRunUseCase
                                         false
                                     }
                                 if (deleted) {
-                                    reversed++
                                     physicalUndoCompleted = true
-                                    outcomeCounted = true
                                     runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.UNDONE)
+                                    reversed++
+                                    outcomeCounted = true
                                     copyDeletedDestinationUris.add(fileMoved.destinationUri)
                                 } else {
                                     failed++
@@ -268,10 +279,10 @@ class UndoRunUseCase
                                         val destFile = File(path)
                                         if (!destFile.isFile) {
                                             if (wasInterrupted && originalSourceMatches(fileMoved)) {
-                                                reversed++
                                                 physicalUndoCompleted = true
-                                                outcomeCounted = true
                                                 runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.UNDONE)
+                                                reversed++
+                                                outcomeCounted = true
                                             } else {
                                                 failed++
                                                 outcomeCounted = true
@@ -287,10 +298,10 @@ class UndoRunUseCase
                                         val destDoc = DocumentFile.fromSingleUri(context, destUri)
                                         if (destDoc == null || !destDoc.exists()) {
                                             if (wasInterrupted && originalSourceMatches(fileMoved)) {
-                                                reversed++
                                                 physicalUndoCompleted = true
-                                                outcomeCounted = true
                                                 runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.UNDONE)
+                                                reversed++
+                                                outcomeCounted = true
                                             } else {
                                                 failed++
                                                 outcomeCounted = true
@@ -315,21 +326,24 @@ class UndoRunUseCase
                                 fileOperationRepository.moveFile(
                                     sourceEntry = sourceEntry,
                                     destFolderUriString = sourceFolderUriString,
-                                    conflictPolicy = ConflictPolicy.RENAME_SUFFIX,
+                                    conflictPolicy = ConflictPolicy.SKIP,
                                     operationMode = OperationMode.MOVE,
                                     filesystemAccessEnabled = filesystemAccessEnabled,
                                 )
 
-                            if (reverseResult.success) {
-                                reversed++
+                            if (reverseResult.success && !reverseResult.skipped) {
                                 physicalUndoCompleted = true
-                                outcomeCounted = true
                                 runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.UNDONE)
+                                reversed++
+                                outcomeCounted = true
                             } else {
                                 failed++
                                 outcomeCounted = true
                                 runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.FAILED)
-                                reverseResult.errorMessage?.let { errors.add("${fileMoved.fileName}: $it") }
+                                val reverseError =
+                                    reverseResult.errorMessage
+                                        ?: context.getString(R.string.undo_original_source_conflict)
+                                errors.add("${fileMoved.fileName}: $reverseError")
                             }
                         }
                     }
@@ -342,7 +356,7 @@ class UndoRunUseCase
                     errors.add(
                         "${fileMoved.fileName}: ${error.message ?: context.getString(R.string.undo_unknown_error)}",
                     )
-                    if (!physicalUndoCompleted) {
+                    if (undoStatusAfterFailure(physicalUndoCompleted) == FileUndoStatus.FAILED) {
                         runCatching {
                             runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.FAILED)
                         }.onFailure { persistenceError ->
@@ -765,3 +779,17 @@ class UndoRunUseCase
             }
         }
     }
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun shouldAttemptUndo(undoStatus: FileUndoStatus): Boolean {
+    return undoStatus != FileUndoStatus.UNDONE
+}
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun undoStatusAfterFailure(physicalUndoCompleted: Boolean): FileUndoStatus {
+    return if (physicalUndoCompleted) {
+        FileUndoStatus.IN_PROGRESS
+    } else {
+        FileUndoStatus.FAILED
+    }
+}

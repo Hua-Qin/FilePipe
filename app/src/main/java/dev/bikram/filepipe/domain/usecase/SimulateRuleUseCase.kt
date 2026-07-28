@@ -2,10 +2,11 @@ package dev.bikram.filepipe.domain.usecase
 
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
+import dev.bikram.filepipe.data.repository.canonicalIdentity
+import dev.bikram.filepipe.data.repository.normalizeSourcePath
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.domain.model.PreviewFileResult
 import dev.bikram.filepipe.domain.model.Rule
-import dev.bikram.filepipe.data.repository.canonicalIdentity
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
@@ -22,7 +23,7 @@ class SimulateRuleUseCase
                 isFilesystemAccessEffective(userPreferencesRepository.preferencesFlow.first().folderAccessMode)
             val fileEntries =
                 rule.sourceFolderPaths
-                    .distinct()
+                    .distinctBy { path -> normalizeSourcePath(path, filesystemAccessEnabled) }
                     .flatMap { path ->
                         fileOperationRepository.listMatchingFiles(
                             folderUriString = path,

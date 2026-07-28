@@ -657,11 +657,12 @@ fun RuleDetailScreen(
                     true
                 }.getOrDefault(false)
             if (!permissionGranted && uri.toString().startsWith("content://")) {
-                Toast.makeText(
-                    context,
-                    R.string.settings_export_folder_permission_failed,
-                    Toast.LENGTH_LONG,
-                ).show()
+                Toast
+                    .makeText(
+                        context,
+                        R.string.settings_export_folder_permission_failed,
+                        Toast.LENGTH_LONG,
+                    ).show()
                 pendingFolderPick = null
                 return@rememberLauncherForActivityResult
             }

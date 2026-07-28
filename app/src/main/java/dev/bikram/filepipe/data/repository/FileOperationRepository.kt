@@ -28,6 +28,8 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.net.URI
+import java.net.URLDecoder
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
@@ -1667,5 +1669,65 @@ fun FileEntry.canonicalIdentity(): String {
             uri.toString()
         }
     }
-    return uri.path ?: uri.toString()
+    val rawPath = uri.path ?: uri.toString()
+    return canonicalFilesystemIdentity(rawPath)
 }
+
+internal fun canonicalFilesystemIdentity(rawPath: String): String =
+    try {
+        File(rawPath).canonicalPath
+    } catch (_: Exception) {
+        normalizeFilesystemFolderPath(rawPath) ?: rawPath.trimEnd('/')
+    }
+
+fun normalizeSourcePath(
+    path: String,
+    filesystemAccessEnabled: Boolean,
+): String {
+    val effectivePath = folderPathForFilesystemAccess(path, filesystemAccessEnabled)
+    if (effectivePath.startsWith("content://")) {
+        return canonicalSafTreeIdentity(effectivePath)
+    }
+    if (effectivePath.startsWith("file:")) {
+        val rawPath = effectivePath.toUri().path ?: return effectivePath
+        return try {
+            File(rawPath).canonicalPath
+        } catch (_: Exception) {
+            rawPath.trimEnd('/')
+        }
+    }
+    if (effectivePath.startsWith("/")) {
+        return try {
+            File(effectivePath).canonicalPath
+        } catch (_: Exception) {
+            effectivePath.trimEnd('/')
+        }
+    }
+    return effectivePath.trimEnd('/')
+}
+
+internal fun canonicalSafTreeIdentity(uriString: String): String =
+    runCatching {
+        val parsedUri = URI(uriString)
+        val rawSegments = parsedUri.rawPath.split('/').filter { it.isNotBlank() }
+        val treeSegmentIndex = rawSegments.indexOf("tree")
+        val documentSegmentIndex = rawSegments.indexOf("document")
+        val documentId =
+            when {
+                treeSegmentIndex >= 0 && treeSegmentIndex + 1 < rawSegments.size -> {
+                    rawSegments[treeSegmentIndex + 1]
+                }
+
+                documentSegmentIndex >= 0 && documentSegmentIndex + 1 < rawSegments.size -> {
+                    rawSegments[documentSegmentIndex + 1]
+                }
+
+                else -> {
+                    return@runCatching uriString.trimEnd('/')
+                }
+            }
+        val decodedDocumentId = URLDecoder.decode(documentId.replace("+", "%2B"), Charsets.UTF_8)
+        "content://${parsedUri.authority.lowercase()}/$decodedDocumentId"
+    }.getOrElse {
+        uriString.trimEnd('/')
+    }

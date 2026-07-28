@@ -25,6 +25,9 @@ interface RuleDao {
     @Query("SELECT * FROM rules WHERE trashedAt IS NULL ORDER BY sortOrder ASC, id ASC")
     suspend fun getAllRulesOrderedBySortOrder(): List<RuleEntity>
 
+    @Query("SELECT * FROM rules")
+    suspend fun getAllRulesIncludingTrashed(): List<RuleEntity>
+
     @Query("SELECT * FROM rules WHERE isEnabled = 1 AND trashedAt IS NULL")
     suspend fun getEnabledRules(): List<RuleEntity>
 

@@ -7,6 +7,7 @@ import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.data.repository.canonicalIdentity
+import dev.bikram.filepipe.data.repository.normalizeSourcePath
 import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.FileMoved
@@ -70,7 +71,7 @@ class ExecuteRulesUseCase
                 // Collect all matching files across all source folders
                 val fileEntries =
                     rule.sourceFolderPaths
-                        .distinct()
+                        .distinctBy { path -> normalizeSourcePath(path, filesystemAccessEnabled) }
                         .flatMap { sourcePath ->
                             fileOperationRepository.listMatchingFiles(
                                 folderUriString = sourcePath,
