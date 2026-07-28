@@ -396,67 +396,6 @@ class SettingsViewModel
                 )
             }
 
-        fun completeCloudBackupDocumentSelection(targetUri: Uri) =
-            viewModelScope.launch {
-                val permissionPersisted = persistBackupFolderUri(targetUri.toString())
-                if (permissionPersisted) {
-                    val previousUri = userPreferencesRepository.getPreferencesSnapshot().cloudExportFolderUri
-                    userPreferencesRepository.setCloudExportFolderUri(targetUri.toString())
-                    releaseReplacedBackupGrant(previousUri)
-                }
-                exportRulesUseCase.exportBackupJsonToDocumentUri(targetUri).fold(
-                    onSuccess = {
-                        if (!permissionPersisted) {
-                            postUserMessage(context.getString(R.string.settings_cloud_backup_configuration_failed))
-                            return@fold
-                        }
-                        val providerName = providerDisplayName(targetUri.authority)
-                        postUserMessage(
-                            if (providerName != null) {
-                                context.getString(R.string.settings_backup_export_success_to, providerName)
-                            } else {
-                                context.getString(R.string.settings_backup_export_success)
-                            },
-                        )
-                    },
-                    onFailure = { err ->
-                        DiagnosticLog.record(context, "Cloud backup export failed", err)
-                        postUserMessage(
-                            context.getString(
-                                R.string.settings_backup_export_failed,
-                                err.message.orEmpty(),
-                            ),
-                        )
-                    },
-                )
-            }
-
-        private fun providerDisplayName(authority: String?): String? {
-            val providerAuthority = authority?.takeIf { it.isNotBlank() } ?: return null
-            val normalizedAuthority = providerAuthority.lowercase()
-            return when {
-                normalizedAuthority.contains("google.android.apps.docs") -> {
-                    context.getString(R.string.cloud_provider_google_drive)
-                }
-
-                normalizedAuthority.contains("skydrive") || normalizedAuthority.contains("onedrive") -> {
-                    context.getString(R.string.cloud_provider_onedrive)
-                }
-
-                normalizedAuthority.contains("dropbox") -> {
-                    context.getString(R.string.cloud_provider_dropbox)
-                }
-
-                normalizedAuthority.contains("box.android") -> {
-                    context.getString(R.string.cloud_provider_box)
-                }
-
-                else -> {
-                    null
-                }
-            }
-        }
-
         private fun defaultManualExportFileName(): String {
             val stamp = backupFileTimestamp()
             return "filepipe_backup_$stamp.json"

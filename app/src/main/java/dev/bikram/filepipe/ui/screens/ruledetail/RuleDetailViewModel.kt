@@ -38,6 +38,9 @@ import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
 import dev.bikram.filepipe.domain.usecase.ValidateRuleUseCase
 import dev.bikram.filepipe.ui.navigation.Screen
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -236,6 +239,7 @@ class RuleDetailViewModel
 
         private val _baseline = MutableStateFlow<RuleSnapshot?>(null)
         private val saveMutex = Mutex()
+        private var folderAccessRecomputeJob: Job? = null
 
         val isDirty: StateFlow<Boolean> =
             combine(_uiState, _baseline) { state, baseline ->
@@ -312,37 +316,40 @@ class RuleDetailViewModel
             }
 
         private fun scheduleFolderAccessRecompute() {
-            viewModelScope.launch(ioDispatcher) {
-                val prefs = userPreferencesRepository.preferencesFlow.first()
-                val filesystemAccessEnabled = isFilesystemAccessEffective(prefs.folderAccessMode)
-                val allFilesGranted = Environment.isExternalStorageManager()
-                val snapshot = _uiState.value
-                val sourceIssues =
-                    snapshot.sourceFolderPaths
-                        .mapNotNull { path ->
-                            val result = fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)
-                            if (result == FolderAccessResult.Accessible) null else path to result
-                        }.toMap()
-                val destinationIssue =
-                    if (snapshot.destinationFolderPath.isBlank()) {
-                        null
-                    } else {
-                        val result =
-                            fileOperationRepository.resolveFolderAccess(
-                                snapshot.destinationFolderPath,
-                                filesystemAccessEnabled,
-                            )
-                        if (result == FolderAccessResult.Accessible) null else result
+            folderAccessRecomputeJob?.cancel()
+            val snapshot = _uiState.value
+            folderAccessRecomputeJob =
+                viewModelScope.launch(ioDispatcher) {
+                    val prefs = userPreferencesRepository.preferencesFlow.first()
+                    val filesystemAccessEnabled = isFilesystemAccessEffective(prefs.folderAccessMode)
+                    val allFilesGranted = Environment.isExternalStorageManager()
+                    val sourceIssues =
+                        snapshot.sourceFolderPaths
+                            .mapNotNull { path ->
+                                val result = fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)
+                                if (result == FolderAccessResult.Accessible) null else path to result
+                            }.toMap()
+                    val destinationIssue =
+                        if (snapshot.destinationFolderPath.isBlank()) {
+                            null
+                        } else {
+                            val result =
+                                fileOperationRepository.resolveFolderAccess(
+                                    snapshot.destinationFolderPath,
+                                    filesystemAccessEnabled,
+                                )
+                            if (result == FolderAccessResult.Accessible) null else result
+                        }
+                    currentCoroutineContext().ensureActive()
+                    _uiState.update {
+                        it.copy(
+                            folderAccessMode = prefs.folderAccessMode,
+                            allFilesAccessGranted = allFilesGranted,
+                            inaccessibleSourceIssues = sourceIssues,
+                            destinationFolderAccessIssue = destinationIssue,
+                        )
                     }
-                _uiState.update {
-                    it.copy(
-                        folderAccessMode = prefs.folderAccessMode,
-                        allFilesAccessGranted = allFilesGranted,
-                        inaccessibleSourceIssues = sourceIssues,
-                        destinationFolderAccessIssue = destinationIssue,
-                    )
                 }
-            }
         }
 
         fun refreshFolderAccessAfterPermissionChange() {

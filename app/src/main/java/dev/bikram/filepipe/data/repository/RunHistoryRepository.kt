@@ -18,6 +18,7 @@ import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
+import dev.bikram.filepipe.domain.model.HistoryStatusFilter
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunHistory
@@ -41,6 +42,22 @@ class RunHistoryRepository
         fun getAllHistory(): Flow<List<RunHistory>> = runHistoryDao.getAllHistory().map { it.map { entity -> entity.toDomain() } }
 
         fun observeHasAnyHistory(): Flow<Boolean> = runHistoryDao.observeHistoryCount().map { count -> count > 0 }
+
+        fun observeAvailableHistoryStatusFilters(ruleId: Long?): Flow<Set<HistoryStatusFilter>> =
+            runHistoryDao
+                .observeHistoryStatusAvailability(ruleId)
+                .map { availability ->
+                    buildSet {
+                        add(HistoryStatusFilter.ALL)
+                        if (availability.hasSuccess) add(HistoryStatusFilter.SUCCESS)
+                        if (availability.hasFailed) add(HistoryStatusFilter.FAILED)
+                        if (availability.hasPartial) add(HistoryStatusFilter.PARTIAL)
+                        if (availability.hasNoChanges) add(HistoryStatusFilter.NO_CHANGES)
+                        if (availability.hasCancelled) add(HistoryStatusFilter.CANCELLED)
+                        if (availability.hasUndone) add(HistoryStatusFilter.UNDONE)
+                        if (availability.hasPartialUndone) add(HistoryStatusFilter.PARTIAL_UNDONE)
+                    }
+                }
 
         suspend fun getAllHistoryOnce(): List<RunHistory> = runHistoryDao.getAllHistoryOnce().map { it.toDomain() }
 

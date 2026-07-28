@@ -16,7 +16,9 @@ import dev.bikram.filepipe.domain.model.RunStatus
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
+import java.util.UUID
 import javax.inject.Inject
 
 class ExportRulesUseCase
@@ -46,7 +48,9 @@ class ExportRulesUseCase
                 val backupSnapshot = normalizedBackupSnapshot()
                 val settings = userPreferencesRepository.getPreferencesSnapshot()
 
-                val json = buildAppBackupJson(backupSnapshot.rules, backupSnapshot.historyWithFiles, settings)
+                val backupBytes =
+                    buildAppBackupJson(backupSnapshot.rules, backupSnapshot.historyWithFiles, settings)
+                        .toByteArray(Charsets.UTF_8)
                 val stamp = backupFileTimestamp()
                 val fileName = "filepipe_backup_$stamp.json"
 
@@ -55,9 +59,9 @@ class ExportRulesUseCase
                 destinations.forEach { destinationPath ->
                     val result =
                         if (destinationPath.startsWith("content://")) {
-                            writeToContentDestination(destinationPath, fileName, json).map { fileName }
+                            writeToContentDestination(destinationPath, fileName, backupBytes).map { fileName }
                         } else {
-                            writeToFilePath(destinationPath, fileName, json).map { fileName }
+                            writeToFilePath(destinationPath, fileName, backupBytes).map { fileName }
                         }
                     result.fold(
                         onSuccess = { exportedFileNames.add(it) },
@@ -79,11 +83,11 @@ class ExportRulesUseCase
             withContext(ioDispatcher) {
                 val backupSnapshot = normalizedBackupSnapshot()
                 val settings = userPreferencesRepository.getPreferencesSnapshot()
-                val json = buildAppBackupJson(backupSnapshot.rules, backupSnapshot.historyWithFiles, settings)
+                val backupBytes =
+                    buildAppBackupJson(backupSnapshot.rules, backupSnapshot.historyWithFiles, settings)
+                        .toByteArray(Charsets.UTF_8)
                 runCatching {
-                    context.contentResolver.openOutputStream(targetUri)?.use { stream ->
-                        stream.write(json.toByteArray(Charsets.UTF_8))
-                    } ?: throw IOException("Failed to open output stream for export")
+                    writeDocumentBytes(targetUri, backupBytes)
                     friendlyFileNameFromDocumentUri(targetUri)
                 }.fold(onSuccess = { Result.success(it) }, onFailure = { Result.failure(it) })
             }
@@ -132,30 +136,14 @@ class ExportRulesUseCase
         private fun writeToContentDestination(
             destinationUriString: String,
             fileName: String,
-            json: String,
+            backupBytes: ByteArray,
         ): Result<Unit> {
             val destinationUri = destinationUriString.toUri()
             return runCatching {
                 if (DocumentsContract.isTreeUri(destinationUri)) {
-                    val docTreeUri =
-                        DocumentsContract.buildDocumentUriUsingTree(
-                            destinationUri,
-                            DocumentsContract.getTreeDocumentId(destinationUri),
-                        )
-                    val docUri =
-                        DocumentsContract.createDocument(
-                            context.contentResolver,
-                            docTreeUri,
-                            "application/json",
-                            fileName,
-                        ) ?: throw IOException("Failed to create document in backup folder")
-                    context.contentResolver.openOutputStream(docUri)?.use { stream ->
-                        stream.write(json.toByteArray(Charsets.UTF_8))
-                    } ?: throw IOException("Failed to open output stream for backup document")
+                    writeTreeDocument(destinationUri, fileName, "application/json", backupBytes)
                 } else {
-                    context.contentResolver.openOutputStream(destinationUri, "wt")?.use { stream ->
-                        stream.write(json.toByteArray(Charsets.UTF_8))
-                    } ?: throw IOException("Failed to open output stream for backup document")
+                    writeDocumentBytes(destinationUri, backupBytes, mode = "wt")
                 }
             }.fold(onSuccess = { Result.success(Unit) }, onFailure = { Result.failure(it) })
         }
@@ -163,14 +151,89 @@ class ExportRulesUseCase
         private fun writeToFilePath(
             folderPath: String,
             fileName: String,
-            json: String,
+            backupBytes: ByteArray,
         ): Result<Unit> {
             val folder = File(folderPath)
             if (!folder.exists() || !folder.canWrite()) {
                 return Result.failure(IllegalStateException("Export folder not accessible: $folderPath"))
             }
             return runCatching {
-                File(folder, fileName).writeText(json, Charsets.UTF_8)
+                val destinationFile = File(folder, fileName)
+                val temporaryFile = File(folder, ".$fileName.${UUID.randomUUID()}.partial")
+                try {
+                    FileOutputStream(temporaryFile).use { outputStream ->
+                        outputStream.write(backupBytes)
+                        outputStream.flush()
+                        outputStream.fd.sync()
+                    }
+                    if (!temporaryFile.renameTo(destinationFile)) {
+                        throw IOException("Failed to publish completed backup file")
+                    }
+                } finally {
+                    if (temporaryFile.exists()) {
+                        temporaryFile.delete()
+                    }
+                }
             }.fold(onSuccess = { Result.success(Unit) }, onFailure = { Result.failure(it) })
+        }
+
+        private fun writeTreeDocument(
+            treeUri: Uri,
+            fileName: String,
+            mimeType: String,
+            backupBytes: ByteArray,
+        ) {
+            val resolver = context.contentResolver
+            val documentTreeUri =
+                DocumentsContract.buildDocumentUriUsingTree(
+                    treeUri,
+                    DocumentsContract.getTreeDocumentId(treeUri),
+                )
+            val temporaryName = "$fileName.${UUID.randomUUID()}.partial"
+            val temporaryUri =
+                DocumentsContract.createDocument(
+                    resolver,
+                    documentTreeUri,
+                    mimeType,
+                    temporaryName,
+                ) ?: throw IOException("Failed to create temporary backup document")
+            try {
+                writeDocumentBytes(temporaryUri, backupBytes)
+                val publishedUri =
+                    runCatching {
+                        DocumentsContract.renameDocument(resolver, temporaryUri, fileName)
+                    }.getOrNull()
+                if (publishedUri == null) {
+                    val destinationUri =
+                        DocumentsContract.createDocument(
+                            resolver,
+                            documentTreeUri,
+                            mimeType,
+                            fileName,
+                        ) ?: throw IOException("Failed to create backup document")
+                    writeDocumentBytes(destinationUri, backupBytes)
+                    runCatching { resolver.delete(temporaryUri, null, null) }
+                }
+            } catch (error: Exception) {
+                runCatching { resolver.delete(temporaryUri, null, null) }
+                throw error
+            }
+        }
+
+        private fun writeDocumentBytes(
+            documentUri: Uri,
+            backupBytes: ByteArray,
+            mode: String? = null,
+        ) {
+            val outputStream =
+                if (mode == null) {
+                    context.contentResolver.openOutputStream(documentUri)
+                } else {
+                    context.contentResolver.openOutputStream(documentUri, mode)
+                } ?: throw IOException("Failed to open output stream for backup document")
+            outputStream.use { stream ->
+                stream.write(backupBytes)
+                stream.flush()
+            }
         }
     }

@@ -523,11 +523,6 @@ class RulesViewModel
             _progressMap.value = emptyMap()
         }
 
-        fun clearProgress() {
-            clearRunProgressOnly()
-            _selectedRuleIds.value = emptySet()
-        }
-
         fun toggleEnabled(
             rule: Rule,
             enabled: Boolean,
@@ -684,6 +679,7 @@ class RulesViewModel
                                         progress = 0f,
                                     )
                             }
+                        var runCompleted = false
                         try {
                             // Every rule the user ran is executed, even one that matches nothing: that
                             // run is real, so it earns a history row ("No changes", where it can be
@@ -719,6 +715,7 @@ class RulesViewModel
                                     _navigateAfterRun.emit(RulesRunNavigation.HistoryList)
                                 }
                             }
+                            runCompleted = true
                         } catch (_: CancellationException) {
                             // History finalized inside ExecuteRulesUseCase
                         } finally {
@@ -729,7 +726,10 @@ class RulesViewModel
                                 }
                             }
                             _manualRunCancelAnchor.value = ManualRunCancelAnchor.None
-                            clearProgress()
+                            clearRunProgressOnly()
+                            if (runCompleted) {
+                                clearSelection()
+                            }
                         }
                     }
                 val previousJob =
@@ -762,6 +762,7 @@ class RulesViewModel
                                         totalFiles = fileNames.size,
                                     ),
                             )
+                        var runCompleted = false
                         try {
                             val startedAt = System.currentTimeMillis()
                             fileNames.forEachIndexed { index, fileName ->
@@ -825,6 +826,7 @@ class RulesViewModel
                                 ),
                             )
                             _navigateAfterRun.emit(RulesRunNavigation.HistoryDetail(historyId))
+                            runCompleted = true
                         } catch (_: CancellationException) {
                             // The mock run never touches storage, so cancellation only clears UI progress.
                         } finally {
@@ -835,7 +837,10 @@ class RulesViewModel
                                 }
                             }
                             _manualRunCancelAnchor.value = ManualRunCancelAnchor.None
-                            clearProgress()
+                            clearRunProgressOnly()
+                            if (runCompleted) {
+                                clearSelection()
+                            }
                         }
                     }
                 val previousJob =

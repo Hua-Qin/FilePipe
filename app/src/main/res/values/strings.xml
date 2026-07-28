@@ -395,11 +395,11 @@
     <string name="settings_black_theme_effect_disabled">Can not enable in black theme</string>
     <string name="settings_backup_section">Backup &amp; restore</string>
     <string name="settings_choose_local_backup_folder">Choose local backup folder</string>
-    <string name="settings_choose_cloud_backup_file">Choose cloud backup file</string>
-    <string name="settings_local_backup_folder_hint">Folder for exporting backups (rules, history, settings)</string>
-    <string name="settings_cloud_backup_folder_hint">File on cloud for exporting backups (rules, history, settings)</string>
+    <string name="settings_choose_cloud_backup_file">Choose cloud backup folder</string>
+    <string name="settings_local_backup_folder_hint">Local folder for exporting backups (notes, lists, settings)</string>
+    <string name="settings_cloud_backup_folder_hint">Cloud folder for exporting backups (notes, lists, settings)</string>
     <string name="settings_local_backup_folder_cleared">Local backup folder reset</string>
-    <string name="settings_cloud_backup_file_cleared">Cloud backup file reset</string>
+    <string name="settings_cloud_backup_file_cleared">Cloud backup folder reset</string>
     <string name="settings_export_select_folder_first">Select a local or cloud backup folder first</string>
     <string name="settings_export_success">%1$s exported</string>
     <string name="settings_backup_export_success">Backup exported</string>

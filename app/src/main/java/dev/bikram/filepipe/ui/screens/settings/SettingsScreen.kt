@@ -582,15 +582,6 @@ fun SettingsScreen(
             }
         }
 
-    val cloudBackupDocumentLauncher =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.CreateDocument("application/json"),
-        ) { uri: Uri? ->
-            if (uri != null) {
-                viewModel.completeCloudBackupDocumentSelection(uri)
-            }
-        }
-
     val createDocumentLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.CreateDocument("application/json"),
@@ -1235,7 +1226,8 @@ fun SettingsScreen(
                                 folderLauncher.launch(null)
                             },
                             onPickCloudFolder = {
-                                cloudBackupDocumentLauncher.launch("filepipe_cloud_backup.json")
+                                pendingBackupFolderTarget = BackupFolderTarget.Cloud
+                                folderLauncher.launch(null)
                             },
                             onLaunchImportMerge = {
                                 pendingBackupPickAction = BackupImportPickAction.ImportMerge

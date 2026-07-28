@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -159,25 +160,9 @@ class HistoryViewModel
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
         val availableStatusFilters: StateFlow<Set<HistoryStatusFilter>> =
-            historySourceFlow
-                .map { histories ->
-                    buildSet {
-                        add(HistoryStatusFilter.ALL)
-                        listOf(
-                            HistoryStatusFilter.SUCCESS,
-                            HistoryStatusFilter.FAILED,
-                            HistoryStatusFilter.PARTIAL,
-                            HistoryStatusFilter.NO_CHANGES,
-                            HistoryStatusFilter.CANCELLED,
-                            HistoryStatusFilter.UNDONE,
-                            HistoryStatusFilter.PARTIAL_UNDONE,
-                        ).forEach { statusFilter ->
-                            if (histories.any { history -> history.matchesHistoryStatusFilter(statusFilter) }) {
-                                add(statusFilter)
-                            }
-                        }
-                    }
-                }.stateIn(
+            runHistoryRepository
+                .observeAvailableHistoryStatusFilters(filterRuleId)
+                .stateIn(
                     viewModelScope,
                     SharingStarted.WhileSubscribed(5_000),
                     setOf(HistoryStatusFilter.ALL),
@@ -209,18 +194,25 @@ class HistoryViewModel
 
         val filteredHistoryItems: StateFlow<List<HistoryItem>> =
             combine(
-                historySourceFlow,
                 _statusFilter,
                 _viewMode,
                 historySortPreferencesFlow,
-            ) { all, status, mode, sortParams ->
-                val (sortKey, sortDir) = sortParams
-                val filtered = all.filter { history -> history.matchesHistoryStatusFilter(status) }
-                val sorted = sortHistories(filtered, sortKey, sortDir)
-                when (mode) {
-                    HistoryViewMode.BY_DATE -> buildDateGroupedItems(sorted)
-                    HistoryViewMode.BY_RULE -> buildRuleGroupedItems(sorted)
-                    HistoryViewMode.BY_STATUS -> buildStatusGroupedItems(sorted)
+            ) { status, mode, sortParams ->
+                Triple(status, mode, sortParams)
+            }.flatMapLatest { (status, mode, sortParams) ->
+                if (status == HistoryStatusFilter.ALL && mode == HistoryViewMode.BY_DATE) {
+                    flowOf(emptyList())
+                } else {
+                    historySourceFlow.map { all ->
+                        val (sortKey, sortDir) = sortParams
+                        val filtered = all.filter { history -> history.matchesHistoryStatusFilter(status) }
+                        val sorted = sortHistories(filtered, sortKey, sortDir)
+                        when (mode) {
+                            HistoryViewMode.BY_DATE -> buildDateGroupedItems(sorted)
+                            HistoryViewMode.BY_RULE -> buildRuleGroupedItems(sorted)
+                            HistoryViewMode.BY_STATUS -> buildStatusGroupedItems(sorted)
+                        }
+                    }
                 }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 

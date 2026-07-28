@@ -8,6 +8,16 @@ import androidx.room.Update
 import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
 import kotlinx.coroutines.flow.Flow
 
+data class HistoryStatusAvailability(
+    val hasSuccess: Boolean,
+    val hasFailed: Boolean,
+    val hasPartial: Boolean,
+    val hasNoChanges: Boolean,
+    val hasCancelled: Boolean,
+    val hasUndone: Boolean,
+    val hasPartialUndone: Boolean,
+)
+
 @Dao
 interface RunHistoryDao {
     @Query("SELECT * FROM run_history ORDER BY startedAt DESC")
@@ -21,6 +31,36 @@ interface RunHistoryDao {
 
     @Query("SELECT COUNT(*) FROM run_history WHERE status = :status")
     suspend fun countHistoryByStatus(status: String): Int
+
+    @Query(
+        """
+        WITH filtered_history AS (
+            SELECT status, totalFilesMoved, totalFilesFailed, isReversed
+            FROM run_history
+            WHERE (:ruleId IS NULL OR ruleId = :ruleId)
+        )
+        SELECT
+            EXISTS(
+                SELECT 1 FROM filtered_history
+                WHERE status = 'SUCCESS'
+                    AND NOT (totalFilesMoved = 0 AND totalFilesFailed = 0)
+                    AND isReversed = 0
+            ) AS hasSuccess,
+            EXISTS(SELECT 1 FROM filtered_history WHERE status = 'FAILED') AS hasFailed,
+            EXISTS(SELECT 1 FROM filtered_history WHERE status = 'PARTIAL_FAILURE') AS hasPartial,
+            EXISTS(
+                SELECT 1 FROM filtered_history
+                WHERE status = 'SUCCESS' AND totalFilesMoved = 0 AND totalFilesFailed = 0
+            ) AS hasNoChanges,
+            EXISTS(SELECT 1 FROM filtered_history WHERE status = 'CANCELLED') AS hasCancelled,
+            EXISTS(
+                SELECT 1 FROM filtered_history
+                WHERE status = 'UNDONE' OR isReversed = 1
+            ) AS hasUndone,
+            EXISTS(SELECT 1 FROM filtered_history WHERE status = 'PARTIAL_UNDONE') AS hasPartialUndone
+        """,
+    )
+    fun observeHistoryStatusAvailability(ruleId: Long?): Flow<HistoryStatusAvailability>
 
     @Query("SELECT * FROM run_history ORDER BY startedAt DESC")
     fun getAllHistoryPagedLastRanDesc(): PagingSource<Int, RunHistoryEntity>
