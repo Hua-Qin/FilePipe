@@ -31,6 +31,7 @@ import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.ImportRulesUseCase
+import dev.bikram.filepipe.domain.usecase.InvalidBackupRuleRegexException
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.ui.theme.CustomFontStorage
 import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
@@ -472,12 +473,21 @@ class SettingsViewModel
                         },
                         onFailure = {
                             DiagnosticLog.record(context, "Backup merge import failed", it)
-                            postUserMessage(
-                                context.getString(
-                                    R.string.settings_backup_import_failed,
-                                    it.message.orEmpty(),
-                                ),
-                            )
+                            if (it is InvalidBackupRuleRegexException) {
+                                postUserMessage(
+                                    context.getString(
+                                        R.string.settings_backup_invalid_rule_regex,
+                                        it.ruleNames.joinToString(),
+                                    ),
+                                )
+                            } else {
+                                postUserMessage(
+                                    context.getString(
+                                        R.string.settings_backup_import_failed,
+                                        it.message.orEmpty(),
+                                    ),
+                                )
+                            }
                         },
                     )
                 }
@@ -487,6 +497,25 @@ class SettingsViewModel
                         importRulesUseCase.restoreFromBackupStream(stream)
                     }.fold(
                         onSuccess = { result ->
+                            runCatching {
+                                val restoredPreferences = userPreferencesRepository.getPreferencesSnapshot()
+                                val backupDestinations =
+                                    listOf(
+                                        restoredPreferences.exportFolderUri,
+                                        restoredPreferences.cloudExportFolderUri,
+                                    ).filter { destination -> destination.isNotBlank() }
+                                if (restoredPreferences.scheduledExportEnabled && backupDestinations.isNotEmpty()) {
+                                    enqueueScheduledExportWork()
+                                } else {
+                                    workManager.cancelUniqueWork(ScheduledRulesExportWorker.WORK_NAME)
+                                }
+                            }.onFailure { error ->
+                                DiagnosticLog.record(context, "Restored backup could not reconcile scheduled exports", error)
+                            }
+                            runCatching { updateCheckWorkScheduler.syncFromPreferences() }
+                                .onFailure { error ->
+                                    DiagnosticLog.record(context, "Restored backup could not reconcile update checks", error)
+                                }
                             val parts =
                                 buildList {
                                     add("${result.rulesImported} rules")
@@ -504,12 +533,21 @@ class SettingsViewModel
                         },
                         onFailure = {
                             DiagnosticLog.record(context, "Full backup restore failed", it)
-                            postUserMessage(
-                                context.getString(
-                                    R.string.settings_backup_restore_failed,
-                                    it.message.orEmpty(),
-                                ),
-                            )
+                            if (it is InvalidBackupRuleRegexException) {
+                                postUserMessage(
+                                    context.getString(
+                                        R.string.settings_backup_invalid_rule_regex,
+                                        it.ruleNames.joinToString(),
+                                    ),
+                                )
+                            } else {
+                                postUserMessage(
+                                    context.getString(
+                                        R.string.settings_backup_restore_failed,
+                                        it.message.orEmpty(),
+                                    ),
+                                )
+                            }
                         },
                     )
                 }

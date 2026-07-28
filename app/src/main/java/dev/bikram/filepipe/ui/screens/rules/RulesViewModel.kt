@@ -11,6 +11,7 @@ import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
@@ -18,6 +19,7 @@ import dev.bikram.filepipe.data.storage.isFilesystemAccessEffective
 import dev.bikram.filepipe.data.storage.isFolderPathAllFilesAccessLocationForRules
 import dev.bikram.filepipe.devtools.DevMockFileMove
 import dev.bikram.filepipe.di.IoDispatcher
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.RuleFolderSeverity
 import dev.bikram.filepipe.domain.assessRuleFolderAccess
 import dev.bikram.filepipe.domain.model.FileMoved
@@ -108,6 +110,7 @@ data class PendingDeleteConfirmation(
 
 /** How many affected file names to preview in the delete-confirmation dialog. */
 private const val DELETE_CONFIRM_SAMPLE_SIZE = 5
+private const val DELETE_CONFIRMATION_MAX_AGE_MS = 300_000L
 
 /**
  * Builds the delete confirmation for a manual run: flattens each delete rule's simulated results,
@@ -196,6 +199,8 @@ class RulesViewModel
         // A manual run deferred pending the user's delete confirmation, plus the confirmation shown
         // to the UI. Kept out of the main uiState combine (mirrors _manualRunCancelAnchor's pattern).
         private var pendingManualRun: PendingManualRun? = null
+        private var deleteConfirmationJob: Job? = null
+        private var deleteConfirmationRequestId = 0L
         private val _pendingDeleteConfirmation = MutableStateFlow<PendingDeleteConfirmation?>(null)
         val pendingDeleteConfirmation: StateFlow<PendingDeleteConfirmation?> = _pendingDeleteConfirmation.asStateFlow()
 
@@ -588,6 +593,8 @@ class RulesViewModel
             val anchor: ManualRunCancelAnchor,
             val useCache: Boolean,
             val runSimulationCheck: Boolean,
+            val preparedFileEntriesByRuleId: Map<Long, List<FileEntry>>,
+            val preparedAtMillis: Long,
         )
 
         /**
@@ -606,6 +613,7 @@ class RulesViewModel
                 requestDeleteConfirmation(rules, anchor, useCache, runSimulationCheck)
                 return
             }
+            invalidateDeleteConfirmation()
             startManualRun(rules, anchor, useCache, runSimulationCheck)
         }
 
@@ -620,32 +628,83 @@ class RulesViewModel
             useCache: Boolean,
             runSimulationCheck: Boolean,
         ) {
-            viewModelScope.launch {
-                val deleteRuleResults =
-                    rules
-                        .filter { it.operationMode == OperationMode.DELETE }
-                        .map { rule -> runCatching { simulateRuleUseCase(rule) }.getOrDefault(emptyList()) }
-                val confirmation = deleteConfirmationFor(deleteRuleResults)
-                if (confirmation == null) {
-                    // Nothing to delete; run normally — the sim check emits the "no files" message.
-                    startManualRun(rules, anchor, useCache, runSimulationCheck)
-                    return@launch
+            invalidateDeleteConfirmation()
+            val requestId = deleteConfirmationRequestId
+            val scanStartedAtMillis = System.currentTimeMillis()
+            deleteConfirmationJob =
+                viewModelScope.launch {
+                    val preparedFileEntriesByRuleId = mutableMapOf<Long, List<FileEntry>>()
+                    val deleteRuleResults =
+                        try {
+                            rules
+                                .filter { it.operationMode == OperationMode.DELETE }
+                                .map { rule ->
+                                    val preparedSimulation = simulateRuleUseCase.prepare(rule)
+                                    preparedFileEntriesByRuleId[rule.id] = preparedSimulation.fileEntries
+                                    preparedSimulation.previewResults
+                                }
+                        } catch (error: CancellationException) {
+                            throw error
+                        } catch (error: Exception) {
+                            if (deleteConfirmationRequestId == requestId) {
+                                DiagnosticLog.record(appContext, "Delete confirmation scan failed", error)
+                                postUserMessage(appContext.getString(R.string.rule_delete_confirmation_scan_failed))
+                            }
+                            return@launch
+                        }
+                    if (deleteConfirmationRequestId != requestId) return@launch
+
+                    val confirmation = deleteConfirmationFor(deleteRuleResults)
+                    if (confirmation == null) {
+                        // Nothing to delete; run normally - the sim check emits the "no files" message.
+                        startManualRun(rules, anchor, useCache, runSimulationCheck)
+                        return@launch
+                    }
+                    pendingManualRun =
+                        PendingManualRun(
+                            rules = rules,
+                            anchor = anchor,
+                            useCache = useCache,
+                            runSimulationCheck = runSimulationCheck,
+                            preparedFileEntriesByRuleId = preparedFileEntriesByRuleId,
+                            preparedAtMillis = scanStartedAtMillis,
+                        )
+                    _pendingDeleteConfirmation.value = confirmation
                 }
-                pendingManualRun = PendingManualRun(rules, anchor, useCache, runSimulationCheck)
-                _pendingDeleteConfirmation.value = confirmation
-            }
         }
 
         /** Proceeds with a delete run the user confirmed via the [PendingDeleteConfirmation] dialog. */
         fun confirmPendingDelete() {
             val pending = pendingManualRun ?: return
-            pendingManualRun = null
-            _pendingDeleteConfirmation.value = null
-            startManualRun(pending.rules, pending.anchor, pending.useCache, pending.runSimulationCheck)
+            if (System.currentTimeMillis() - pending.preparedAtMillis > DELETE_CONFIRMATION_MAX_AGE_MS) {
+                invalidateDeleteConfirmation()
+                requestDeleteConfirmation(
+                    rules = pending.rules,
+                    anchor = pending.anchor,
+                    useCache = pending.useCache,
+                    runSimulationCheck = pending.runSimulationCheck,
+                )
+                return
+            }
+            invalidateDeleteConfirmation()
+            startManualRun(
+                rules = pending.rules,
+                anchor = pending.anchor,
+                useCache = pending.useCache,
+                runSimulationCheck = false,
+                preparedFileEntriesByRuleId = pending.preparedFileEntriesByRuleId,
+            )
         }
 
         /** Cancels a pending delete run without deleting anything. */
         fun dismissPendingDelete() {
+            invalidateDeleteConfirmation()
+        }
+
+        private fun invalidateDeleteConfirmation() {
+            deleteConfirmationRequestId += 1
+            deleteConfirmationJob?.cancel()
+            deleteConfirmationJob = null
             pendingManualRun = null
             _pendingDeleteConfirmation.value = null
         }
@@ -662,6 +721,7 @@ class RulesViewModel
             anchor: ManualRunCancelAnchor,
             useCache: Boolean = false,
             runSimulationCheck: Boolean = false,
+            preparedFileEntriesByRuleId: Map<Long, List<FileEntry>> = emptyMap(),
         ) {
             if (rules.isEmpty()) return
             viewModelScope.launch {
@@ -697,6 +757,7 @@ class RulesViewModel
                                     rules,
                                     TriggerType.MANUAL,
                                     useCache = useCache || runSimulationCheck,
+                                    preparedFileEntriesByRuleId = preparedFileEntriesByRuleId,
                                 ) { progress ->
                                     _progressMap.update { current -> current + (progress.ruleId to progress) }
                                 }

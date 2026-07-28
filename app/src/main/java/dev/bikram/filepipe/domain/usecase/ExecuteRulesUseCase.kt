@@ -3,6 +3,7 @@ package dev.bikram.filepipe.domain.usecase
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
@@ -18,13 +19,21 @@ import dev.bikram.filepipe.domain.model.RunResult
 import dev.bikram.filepipe.domain.model.TriggerType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import javax.inject.Inject
+
+internal suspend fun <Input, Output> executeSequentially(
+    inputs: List<Input>,
+    executeInput: suspend (Input) -> Output,
+): List<Output> {
+    val outputs = ArrayList<Output>(inputs.size)
+    for (input in inputs) {
+        outputs += executeInput(input)
+    }
+    return outputs
+}
 
 class ExecuteRulesUseCase
     @Inject
@@ -39,19 +48,24 @@ class ExecuteRulesUseCase
             rules: List<Rule>,
             triggerType: TriggerType,
             useCache: Boolean = false,
+            preparedFileEntriesByRuleId: Map<Long, List<FileEntry>> = emptyMap(),
             onProgress: (RunProgress) -> Unit = {},
         ): List<RunResult> =
-            coroutineScope {
-                rules
-                    .map { rule ->
-                        async { executeRule(rule, triggerType, useCache, onProgress) }
-                    }.awaitAll()
+            executeSequentially(rules) { rule ->
+                executeRule(
+                    rule = rule,
+                    triggerType = triggerType,
+                    useCache = useCache,
+                    preparedFileEntries = preparedFileEntriesByRuleId[rule.id],
+                    onProgress = onProgress,
+                )
             }
 
         private suspend fun executeRule(
             rule: Rule,
             triggerType: TriggerType,
             useCache: Boolean,
+            preparedFileEntries: List<FileEntry>?,
             onProgress: (RunProgress) -> Unit,
         ): RunResult {
             val startedAt = System.currentTimeMillis()
@@ -70,26 +84,28 @@ class ExecuteRulesUseCase
                     isFilesystemAccessEffective(userPreferencesRepository.preferencesFlow.first().folderAccessMode)
                 // Collect all matching files across all source folders
                 val fileEntries =
-                    rule.sourceFolderPaths
-                        .distinctBy { path -> normalizeSourcePath(path, filesystemAccessEnabled) }
-                        .flatMap { sourcePath ->
-                            fileOperationRepository.listMatchingFiles(
-                                folderUriString = sourcePath,
-                                extensions = rule.fileExtensions,
-                                scanSubdirectories = rule.scanSubdirectories,
-                                filenamePattern = rule.filenamePattern,
-                                minFileSizeBytes = rule.minFileSizeBytes,
-                                maxFileSizeBytes = rule.maxFileSizeBytes,
-                                minAgeDays = rule.minAgeDays,
-                                maxAgeDays = rule.maxAgeDays,
-                                excludePatterns = rule.excludePatterns,
-                                filesystemAccessEnabled = filesystemAccessEnabled,
-                                orientation = rule.orientation,
-                                isRegexPattern = rule.isRegexPattern,
-                                isExcludeRegexPattern = rule.isExcludeRegexPattern,
-                                useCache = useCache,
-                            )
-                        }.distinctBy { entry -> entry.canonicalIdentity() }
+                    preparedFileEntries
+                        ?.distinctBy { entry -> entry.canonicalIdentity() }
+                        ?: rule.sourceFolderPaths
+                            .distinctBy { path -> normalizeSourcePath(path, filesystemAccessEnabled) }
+                            .flatMap { sourcePath ->
+                                fileOperationRepository.listMatchingFiles(
+                                    folderUriString = sourcePath,
+                                    extensions = rule.fileExtensions,
+                                    scanSubdirectories = rule.scanSubdirectories,
+                                    filenamePattern = rule.filenamePattern,
+                                    minFileSizeBytes = rule.minFileSizeBytes,
+                                    maxFileSizeBytes = rule.maxFileSizeBytes,
+                                    minAgeDays = rule.minAgeDays,
+                                    maxAgeDays = rule.maxAgeDays,
+                                    excludePatterns = rule.excludePatterns,
+                                    filesystemAccessEnabled = filesystemAccessEnabled,
+                                    orientation = rule.orientation,
+                                    isRegexPattern = rule.isRegexPattern,
+                                    isExcludeRegexPattern = rule.isExcludeRegexPattern,
+                                    useCache = useCache,
+                                )
+                            }.distinctBy { entry -> entry.canonicalIdentity() }
 
                 val total = fileEntries.size
                 totalPlanned = total
@@ -125,6 +141,7 @@ class ExecuteRulesUseCase
                                     null
                                 },
                             filesystemAccessEnabled = filesystemAccessEnabled,
+                            requireUnchangedSource = preparedFileEntries != null,
                         )
                     // Job may be cancelled as soon as moveFile returns; record the outcome so undo/history match disk.
                     withContext(NonCancellable) {

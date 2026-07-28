@@ -138,11 +138,21 @@ class RuleRepository
 
         suspend fun replaceAllRules(rules: List<Rule>) {
             val previousUris = allRuleFolderUris()
+            replaceAllRulesInDatabase(rules)
+            releaseUnusedRuleGrants(previousUris)
+        }
+
+        suspend fun replaceAllRulesInDatabase(rules: List<Rule>) {
             ruleDao.deleteAllRules()
             rules.forEachIndexed { index, rule ->
                 ruleDao.upsertRule(rule.copy(id = 0L, sortOrder = index).toEntity())
             }
-            releaseUnusedRuleGrants(previousUris)
+        }
+
+        suspend fun getAllRuleFolderUris(): Set<String> = allRuleFolderUris()
+
+        suspend fun releaseUnusedRuleGrants(candidateUris: Collection<String>) {
+            releaseUnusedRuleGrantsInternal(candidateUris)
         }
 
         @Suppress("ktlint:standard:function-expression-body")
@@ -152,7 +162,7 @@ class RuleRepository
                 .flatMapTo(linkedSetOf()) { ruleEntity -> ruleEntity.toDomain().folderUris() }
         }
 
-        private suspend fun releaseUnusedRuleGrants(candidateUris: Collection<String>) {
+        private suspend fun releaseUnusedRuleGrantsInternal(candidateUris: Collection<String>) {
             val preferences = userPreferencesRepository.getPreferencesSnapshot()
             val retainedUris =
                 allRuleFolderUris() +

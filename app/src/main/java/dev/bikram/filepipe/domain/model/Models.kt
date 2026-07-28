@@ -227,6 +227,9 @@ data class FileMoved(
     val undoStatus: FileUndoStatus = FileUndoStatus.PENDING,
 )
 
+val FileMoved.hasRecoverableDestination: Boolean
+    get() = !skipped && destinationUri.isNotBlank()
+
 // ---
 
 data class RunResult(
@@ -238,7 +241,7 @@ data class RunResult(
     val completedAt: Long,
     val copyCreatedDestFolderUris: List<String> = emptyList(),
 ) {
-    val totalMoved: Int get() = filesMoved.count { it.success && !it.skipped }
+    val totalMoved: Int get() = filesMoved.count { it.hasRecoverableDestination }
     val totalSkipped: Int get() = filesMoved.count { it.skipped }
     val totalFailed: Int get() = filesMoved.count { !it.success && !it.skipped }
     val status: RunStatus get() =

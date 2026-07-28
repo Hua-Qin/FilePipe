@@ -84,6 +84,7 @@ data class ScheduleBackupDto(
     val hour: Int,
     val minute: Int,
     val intervalHours: Int? = null,
+    val usesStartTime: Boolean? = null,
 )
 
 @Serializable
@@ -207,6 +208,7 @@ fun RuleSchedule.toBackupDto(): ScheduleBackupDto =
         hour = hour,
         minute = minute,
         intervalHours = repeatInterval,
+        usesStartTime = usesStartTime,
     )
 
 fun RunHistory.toBackupDto(
@@ -321,6 +323,7 @@ fun ScheduleBackupDto.toDomain(): RuleSchedule? {
         hour = hour,
         minute = minute,
         repeatInterval = intervalHours,
+        usesStartTime = usesStartTime ?: true,
     )
 }
 

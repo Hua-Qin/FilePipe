@@ -415,6 +415,7 @@
     <string name="settings_restore_backup">Restore backup</string>
     <string name="settings_backup_import_failed">Import failed: %1$s</string>
     <string name="settings_backup_restore_failed">Restore failed: %1$s</string>
+    <string name="settings_backup_invalid_rule_regex">The backup contains an invalid filename or exclusion pattern in: %1$s</string>
     <string name="settings_backup_import_restore_help_title">Import vs restore</string>
     <string name="settings_backup_import_restore_help_body">Import adds new rules from the file and updates rules that have the same name. Your run history and app settings stay as they are.\n\nRestore replaces everything in the app with the contents of the file: all rules, run history, and settings. Useful when moving to a new device.</string>
     <string name="settings_backup_help_icon_cd">Explain import and restore</string>
@@ -859,7 +860,11 @@
     <string name="operation_move">Move</string>
     <string name="operation_copy">Copy</string>
     <string name="operation_delete">Delete</string>
+    <string name="file_operation_incomplete_copy">The destination file did not receive all source data</string>
+    <string name="file_operation_source_changed_after_confirmation">The file changed after deletion was confirmed, so it was not deleted</string>
+    <string name="file_operation_source_delete_failed">The source file could not be deleted after it was copied</string>
     <string name="rule_operation_delete_warning">CAUTION: FILES WILL BE PERMANENTLY DELETED, WITH NO UNDO OPTION ANYWHERE.</string>
+    <string name="rule_delete_confirmation_scan_failed">Couldn\'t verify which files would be deleted. Nothing was changed.</string>
     <string name="delete_run_confirm_title">Permanently delete files?</string>
     <string name="delete_run_confirm_button">Delete permanently</string>
     <plurals name="delete_run_confirm_message">

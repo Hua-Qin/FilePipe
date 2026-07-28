@@ -23,6 +23,7 @@ import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.OperationMode
+import dev.bikram.filepipe.domain.model.hasRecoverableDestination
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -133,7 +134,7 @@ class UndoRunUseCase
             val movedFiles =
                 runHistoryRepository
                     .getFilesForRunOnce(historyId)
-                    .filter { it.success && !it.skipped && it.destinationUri.isNotBlank() }
+                    .filter { fileMoved -> fileMoved.hasRecoverableDestination }
             val pendingFiles = movedFiles.filter { shouldAttemptUndo(it.undoStatus) }
             val totalBytes = pendingFiles.sumOf { fileMoved -> fileMoved.fileSizeBytes.coerceAtLeast(0L) }
             var processedFiles = 0
@@ -186,7 +187,11 @@ class UndoRunUseCase
                             }
 
                             OperationMode.MOVE -> {
-                                undoMoveFile(fileMoved, filesystemAccessEnabled)
+                                if (fileMoved.success) {
+                                    undoMoveFile(fileMoved, filesystemAccessEnabled)
+                                } else {
+                                    undoCopyFile(fileMoved)
+                                }
                             }
 
                             OperationMode.DELETE -> {
@@ -274,7 +279,7 @@ class UndoRunUseCase
             val persistedUndoFiles =
                 runHistoryRepository
                     .getFilesForRunOnce(historyId)
-                    .filter { it.success && !it.skipped && it.destinationUri.isNotBlank() }
+                    .filter { fileMoved -> fileMoved.hasRecoverableDestination }
             val undoneFileCount = persistedUndoFiles.count { it.undoStatus == FileUndoStatus.UNDONE }
             if (persistedUndoFiles.isNotEmpty() && undoneFileCount == persistedUndoFiles.size) {
                 runHistoryRepository.markRunReversed(historyId)

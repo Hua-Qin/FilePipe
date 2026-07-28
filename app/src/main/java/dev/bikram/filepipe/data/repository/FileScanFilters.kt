@@ -64,7 +64,8 @@ internal fun matchesFilename(
     filenameRegexes: List<Regex>?,
     isRegexPattern: Boolean,
 ): Boolean {
-    if (filenameRegexes.isNullOrEmpty()) return true
+    if (filenameRegexes == null) return true
+    if (filenameRegexes.isEmpty()) return false
     return if (isRegexPattern) {
         filenameRegexes.any { it.containsMatchIn(name) }
     } else {
@@ -75,23 +76,28 @@ internal fun matchesFilename(
 internal fun buildExcludeRegexes(
     excludePatterns: List<String>,
     isRegexPattern: Boolean,
-): List<Regex> {
+): List<Regex>? {
     val nonBlank = excludePatterns.filter { it.isNotBlank() }
     if (nonBlank.isEmpty()) return emptyList()
     return if (isRegexPattern) {
-        nonBlank.mapNotNull { pattern ->
-            runCatching { Regex(pattern.trim(), RegexOption.IGNORE_CASE) }.getOrNull()
-        }
+        runCatching {
+            nonBlank.map { pattern ->
+                Regex(pattern.trim(), RegexOption.IGNORE_CASE)
+            }
+        }.getOrNull()
     } else {
-        nonBlank.map { globToRegex(it.trim()) }
+        nonBlank.map { pattern ->
+            globToRegex(pattern.trim())
+        }
     }
 }
 
 internal fun shouldExclude(
     name: String,
-    excludeRegexes: List<Regex>,
+    excludeRegexes: List<Regex>?,
     isRegexPattern: Boolean,
 ): Boolean {
+    if (excludeRegexes == null) return true
     if (excludeRegexes.isEmpty()) return false
     return if (isRegexPattern) {
         excludeRegexes.any { it.containsMatchIn(name) }

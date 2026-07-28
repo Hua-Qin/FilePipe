@@ -13,6 +13,7 @@ import dev.bikram.filepipe.domain.backupFileTimestamp
 import dev.bikram.filepipe.domain.export.buildAppBackupJson
 import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.RunStatus
+import dev.bikram.filepipe.domain.model.hasRecoverableDestination
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -96,11 +97,11 @@ class ExportRulesUseCase
             val snapshot = runHistoryRepository.getBackupSnapshot()
             val normalizedHistory =
                 snapshot.historyWithFiles.map { (run, files) ->
-                    val successFiles = files.filter { it.success && !it.skipped && it.destinationUri.isNotBlank() }
-                    val undoneFileCount = successFiles.count { it.undoStatus == FileUndoStatus.UNDONE }
+                    val recoverableFiles = files.filter { fileMoved -> fileMoved.hasRecoverableDestination }
+                    val undoneFileCount = recoverableFiles.count { fileMoved -> fileMoved.undoStatus == FileUndoStatus.UNDONE }
                     val effectiveRun =
                         when {
-                            successFiles.isNotEmpty() && undoneFileCount == successFiles.size -> {
+                            recoverableFiles.isNotEmpty() && undoneFileCount == recoverableFiles.size -> {
                                 run.copy(status = RunStatus.UNDONE, isReversed = true)
                             }
 

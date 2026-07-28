@@ -461,12 +461,6 @@ class FilePipeUpdateViewModel
                             withContext(mainDispatcher) {
                                 context.startActivity(installIntent)
                             }
-                            if (BuildConfig.FLAVOR == "github" && updateInfo.remoteApkAssetUpdatedAt.isNotBlank()) {
-                                userPreferencesRepository.writeGithubReleaseAck(
-                                    fingerprint = updateInfo.notificationDedupeKey(),
-                                    installedVersionName = BuildConfig.VERSION_NAME,
-                                )
-                            }
                         }
                     }
                 result.onFailure {

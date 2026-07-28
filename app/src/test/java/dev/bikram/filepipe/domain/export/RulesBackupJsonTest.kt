@@ -214,4 +214,46 @@ class RulesBackupJsonTest {
         val restoredRule = backup.rules.single().toDomain()
         assertEquals(OperationMode.DELETE, restoredRule.operationMode)
     }
+
+    @Test
+    fun intervalScheduleWithoutStartTimeSurvivesRoundTrip() {
+        val rule =
+            Rule(
+                name = "Every few hours",
+                sourceFolderPaths = listOf("content://source"),
+                destinationFolderPath = "content://destination",
+                fileExtensions = listOf("txt"),
+                schedule =
+                    RuleSchedule(
+                        type = ScheduleType.EVERY_N_HOURS,
+                        hour = 0,
+                        minute = 0,
+                        repeatInterval = 3,
+                        usesStartTime = false,
+                    ),
+            )
+
+        val restoredRule =
+            parseRulesBackupJson(buildAppBackupJson(listOf(rule)))
+                .getOrThrow()
+                .rules
+                .single()
+                .toDomain()
+
+        assertEquals(rule.schedule, restoredRule.schedule)
+        assertFalse(restoredRule.schedule!!.usesStartTime)
+    }
+
+    @Test
+    fun legacyIntervalScheduleDefaultsToUsingStartTime() {
+        val legacySchedule =
+            ScheduleBackupDto(
+                type = ScheduleType.EVERY_N_HOURS.name,
+                hour = 8,
+                minute = 30,
+                intervalHours = 2,
+            )
+
+        assertTrue(legacySchedule.toDomain()!!.usesStartTime)
+    }
 }

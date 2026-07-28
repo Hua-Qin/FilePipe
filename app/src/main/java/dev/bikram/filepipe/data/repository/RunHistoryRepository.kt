@@ -12,6 +12,7 @@ import dev.bikram.filepipe.data.local.dao.RunHistoryDao
 import dev.bikram.filepipe.data.local.entity.FileMovedEntity
 import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
 import dev.bikram.filepipe.data.local.entity.toDomain
+import dev.bikram.filepipe.data.local.entity.toEntity
 import dev.bikram.filepipe.domain.export.FileMovedBackupDto
 import dev.bikram.filepipe.domain.export.RunHistoryBackupDto
 import dev.bikram.filepipe.domain.model.FileMoved
@@ -74,6 +75,69 @@ class RunHistoryRepository
                         },
                 )
             }
+
+        suspend fun getRestoreRollbackSnapshot(): RestoreRollbackSnapshot =
+            appDatabase.withTransaction {
+                RestoreRollbackSnapshot(
+                    rulesIncludingTrash =
+                        ruleDao
+                            .getAllRulesIncludingTrashed()
+                            .map { ruleEntity -> ruleEntity.toDomain() },
+                    backupSnapshot =
+                        BackupSnapshot(
+                            rules =
+                                ruleDao
+                                    .getAllRulesOrderedBySortOrder()
+                                    .map { ruleEntity -> ruleEntity.toDomain() },
+                            historyWithFiles =
+                                runHistoryDao.getAllHistoryOnce().map { historyEntity ->
+                                    historyEntity.toDomain() to
+                                        fileMovedDao
+                                            .getFilesForRunOnce(historyEntity.id)
+                                            .map { fileMovedEntity -> fileMovedEntity.toDomain() }
+                                },
+                        ),
+                )
+            }
+
+        suspend fun restoreSnapshotAtomically(
+            rulesIncludingTrash: List<Rule>,
+            snapshot: BackupSnapshot,
+        ) {
+            appDatabase.withTransaction {
+                runHistoryDao.deleteAllHistory()
+                ruleDao.deleteAllRules()
+                rulesIncludingTrash.forEach { rule ->
+                    ruleDao.upsertRule(rule.toEntity())
+                }
+                snapshot.historyWithFiles.forEach { (history, files) ->
+                    runHistoryDao.insertHistory(
+                        RunHistoryEntity(
+                            id = history.id,
+                            ruleId = history.ruleId,
+                            ruleName = history.ruleName,
+                            triggeredBy = history.triggeredBy,
+                            startedAt = history.startedAt,
+                            completedAt = history.completedAt,
+                            status = history.status,
+                            totalFilesFound = history.totalFilesFound,
+                            cancelledUnprocessedCount = history.cancelledUnprocessedCount,
+                            totalFilesMoved = history.totalFilesMoved,
+                            totalFilesFailed = history.totalFilesFailed,
+                            errorMessage = history.errorMessage,
+                            isReversed = history.isReversed,
+                            operationMode = history.operationMode,
+                            copyCreatedDestFolderUris = history.copyCreatedDestFolderUris,
+                        ),
+                    )
+                    if (files.isNotEmpty()) {
+                        fileMovedDao.insertFilesMoved(
+                            files.map { fileMoved -> fileMoved.toEntity(history.id) },
+                        )
+                    }
+                }
+            }
+        }
 
         fun getHistoryForRule(ruleId: Long): Flow<List<RunHistory>> = runHistoryDao.getHistoryForRule(ruleId).map { it.map { entity -> entity.toDomain() } }
 
@@ -367,4 +431,9 @@ class RunHistoryRepository
 data class BackupSnapshot(
     val rules: List<Rule>,
     val historyWithFiles: List<Pair<RunHistory, List<FileMoved>>>,
+)
+
+data class RestoreRollbackSnapshot(
+    val rulesIncludingTrash: List<Rule>,
+    val backupSnapshot: BackupSnapshot,
 )
