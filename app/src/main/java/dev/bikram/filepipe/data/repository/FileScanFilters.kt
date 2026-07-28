@@ -11,6 +11,36 @@ import dev.bikram.filepipe.domain.model.isNoExtensionToken
  * as module-internal top-level functions in the same package.
  */
 
+internal data class FileScanFilterContext(
+    val extensions: List<String>,
+    val filenameRegexes: List<Regex>?,
+    val isRegexPattern: Boolean,
+    val excludeRegexes: List<Regex>?,
+    val isExcludeRegexPattern: Boolean,
+    val minFileSizeBytes: Long?,
+    val maxFileSizeBytes: Long?,
+    val minAgeMs: Long?,
+    val maxAgeMs: Long?,
+    val nowMs: Long,
+)
+
+internal fun passesCheapScanFilters(
+    fileName: String,
+    fileSizeBytes: Long,
+    lastModifiedMs: Long,
+    filters: FileScanFilterContext,
+): Boolean {
+    if (!matchesExtensions(fileName, filters.extensions)) return false
+    if (!matchesFilename(fileName, filters.filenameRegexes, filters.isRegexPattern)) return false
+    if (shouldExclude(fileName, filters.excludeRegexes, filters.isExcludeRegexPattern)) return false
+    if (filters.minFileSizeBytes != null && fileSizeBytes < filters.minFileSizeBytes) return false
+    if (filters.maxFileSizeBytes != null && fileSizeBytes > filters.maxFileSizeBytes) return false
+    if (filters.minAgeMs == null && filters.maxAgeMs == null) return true
+    val ageMs = filters.nowMs - lastModifiedMs
+    return (filters.minAgeMs == null || ageMs >= filters.minAgeMs) &&
+        (filters.maxAgeMs == null || ageMs <= filters.maxAgeMs)
+}
+
 internal fun mimeTypeFromName(name: String): String {
     val ext = name.substringAfterLast('.', "").lowercase()
     return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"

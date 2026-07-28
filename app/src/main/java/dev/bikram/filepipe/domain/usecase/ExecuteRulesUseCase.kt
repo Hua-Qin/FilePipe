@@ -3,6 +3,7 @@ package dev.bikram.filepipe.domain.usecase
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.data.repository.DestinationFolderCache
 import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
@@ -78,6 +79,7 @@ class ExecuteRulesUseCase
             var totalPlanned = 0
             var completedSuccessfulMoves = 0
             val copyCreatedDestFolders: MutableSet<String> = linkedSetOf()
+            val destinationFolderCache = DestinationFolderCache()
 
             try {
                 val filesystemAccessEnabled =
@@ -142,6 +144,7 @@ class ExecuteRulesUseCase
                                 },
                             filesystemAccessEnabled = filesystemAccessEnabled,
                             requireUnchangedSource = preparedFileEntries != null,
+                            destinationFolderCache = destinationFolderCache,
                         )
                     // Job may be cancelled as soon as moveFile returns; record the outcome so undo/history match disk.
                     withContext(NonCancellable) {

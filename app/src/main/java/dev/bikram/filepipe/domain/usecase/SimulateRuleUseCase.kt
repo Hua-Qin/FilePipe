@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.domain.usecase
 
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.data.repository.DestinationFolderCache
 import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.FileOperationRepository
 import dev.bikram.filepipe.data.repository.canonicalIdentity
@@ -31,6 +32,7 @@ class SimulateRuleUseCase
 
             val filesystemAccessEnabled =
                 isFilesystemAccessEffective(userPreferencesRepository.preferencesFlow.first().folderAccessMode)
+            val destinationFolderCache = DestinationFolderCache()
             val fileEntries =
                 rule.sourceFolderPaths
                     .distinctBy { path -> normalizeSourcePath(path, filesystemAccessEnabled) }
@@ -67,6 +69,7 @@ class SimulateRuleUseCase
                             destFolderUriString = rule.destinationFolderPath,
                             conflictPolicy = rule.conflictPolicy,
                             operationMode = rule.operationMode,
+                            destinationFolderCache = destinationFolderCache,
                             filesystemAccessEnabled = filesystemAccessEnabled,
                         )
                     },

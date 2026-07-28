@@ -27,6 +27,55 @@ class FileScanFiltersTest {
     }
 
     @Test
+    fun cheapFiltersRejectNonMatchingFilesBeforeOrientationProbe() {
+        val filters =
+            FileScanFilterContext(
+                extensions = listOf("jpg"),
+                filenameRegexes = buildFilenameRegexes("holiday*", isRegexPattern = false),
+                isRegexPattern = false,
+                excludeRegexes = buildExcludeRegexes(listOf("*private*"), isRegexPattern = false),
+                isExcludeRegexPattern = false,
+                minFileSizeBytes = 100L,
+                maxFileSizeBytes = 1_000L,
+                minAgeMs = 1_000L,
+                maxAgeMs = 10_000L,
+                nowMs = 20_000L,
+            )
+
+        assertTrue(passesCheapScanFilters("holiday.jpg", 500L, 15_000L, filters))
+        assertFalse(passesCheapScanFilters("holiday.png", 500L, 15_000L, filters))
+        assertFalse(passesCheapScanFilters("holiday-private.jpg", 500L, 15_000L, filters))
+        assertFalse(passesCheapScanFilters("holiday.jpg", 99L, 15_000L, filters))
+        assertFalse(passesCheapScanFilters("holiday.jpg", 500L, 19_500L, filters))
+    }
+
+    @Test
+    fun cheapFiltersPreserveInvalidRegexFailClosedBehavior() {
+        val invalidFilenameFilters =
+            FileScanFilterContext(
+                extensions = listOf("jpg"),
+                filenameRegexes = buildFilenameRegexes("[", isRegexPattern = true),
+                isRegexPattern = true,
+                excludeRegexes = emptyList(),
+                isExcludeRegexPattern = false,
+                minFileSizeBytes = null,
+                maxFileSizeBytes = null,
+                minAgeMs = null,
+                maxAgeMs = null,
+                nowMs = 0L,
+            )
+        val invalidExcludeFilters =
+            invalidFilenameFilters.copy(
+                filenameRegexes = null,
+                excludeRegexes = buildExcludeRegexes(listOf("["), isRegexPattern = true),
+                isExcludeRegexPattern = true,
+            )
+
+        assertFalse(passesCheapScanFilters("photo.jpg", 100L, 0L, invalidFilenameFilters))
+        assertFalse(passesCheapScanFilters("photo.jpg", 100L, 0L, invalidExcludeFilters))
+    }
+
+    @Test
     fun incompleteKnownSizeCopyIsRejected() {
         assertFalse(isCompleteCopy(expectedBytes = 100L, copiedBytes = 99L))
         assertTrue(isCompleteCopy(expectedBytes = 100L, copiedBytes = 100L))

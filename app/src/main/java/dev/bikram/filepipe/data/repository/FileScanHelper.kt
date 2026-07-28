@@ -8,12 +8,15 @@ import dev.bikram.filepipe.data.storage.folderPathForFilesystemAccess
 import dev.bikram.filepipe.data.storage.isCanonicalPathUnderAllowedSharedStorage
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.FileOrientation
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.TimeUnit
+
+internal const val MAX_SCAN_DEPTH = 32
 
 internal data class ScanCacheKey(
     val folderUriString: String,
@@ -64,7 +67,7 @@ internal suspend fun FileOperationRepository.listMatchingFilesScan(
     minAgeDays: Int? = null,
     maxAgeDays: Int? = null,
     excludePatterns: List<String> = emptyList(),
-    maxDepth: Int = 5,
+    maxDepth: Int = MAX_SCAN_DEPTH,
     filesystemAccessEnabled: Boolean = false,
     orientation: FileOrientation? = null,
     isRegexPattern: Boolean = false,
@@ -108,36 +111,56 @@ internal suspend fun FileOperationRepository.listMatchingFilesScan(
 
         if (!folder.exists() || !folder.canRead()) return@withContext emptyList()
 
-        val filenameRegexes = buildFilenameRegexes(filenamePattern, isRegexPattern)
-        val excludeRegexes = buildExcludeRegexes(excludePatterns, isExcludeRegexPattern)
-        val now = System.currentTimeMillis()
-        val minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
-        val maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
+        val filterContext =
+            FileScanFilterContext(
+                extensions = extensions,
+                filenameRegexes = buildFilenameRegexes(filenamePattern, isRegexPattern),
+                isRegexPattern = isRegexPattern,
+                excludeRegexes = buildExcludeRegexes(excludePatterns, isExcludeRegexPattern),
+                isExcludeRegexPattern = isExcludeRegexPattern,
+                minFileSizeBytes = minFileSizeBytes,
+                maxFileSizeBytes = maxFileSizeBytes,
+                minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
+                maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
+                nowMs = System.currentTimeMillis(),
+            )
 
         val scanContext = currentCoroutineContext()
+        var depthTruncated = false
 
         val candidates =
             try {
                 val rootDocumentId = DocumentsContract.getTreeDocumentId(treeUri)
-                collectSafFiles(treeUri, rootDocumentId, scanSubdirectories, maxDepth)
+                collectSafFiles(
+                    treeUri = treeUri,
+                    rootDocumentId = rootDocumentId,
+                    scanSubdirectories = scanSubdirectories,
+                    maxDepth = maxDepth,
+                    includeFile = { document ->
+                        passesCheapScanFilters(
+                            fileName = document.name,
+                            fileSizeBytes = document.size,
+                            lastModifiedMs = document.lastModifiedMs,
+                            filters = filterContext,
+                        )
+                    },
+                    onDepthLimitReached = { depthTruncated = true },
+                )
             } catch (_: SecurityException) {
                 return@withContext emptyList()
             } catch (_: IllegalArgumentException) {
                 return@withContext emptyList()
             }
 
+        if (depthTruncated) {
+            DiagnosticLog.record(
+                context,
+                "Recursive SAF scan reached the depth limit: folder=$effectiveFolderUriString, maxDepth=$maxDepth",
+            )
+        }
         candidates
             .asSequence()
-            .filter { (doc, _) -> matchesExtensions(doc.name, extensions) }
-            .filter { (doc, _) -> matchesFilename(doc.name, filenameRegexes, isRegexPattern) }
-            .filter { (doc, _) -> !shouldExclude(doc.name, excludeRegexes, isExcludeRegexPattern) }
-            .filter { (doc, _) -> minFileSizeBytes == null || doc.size >= minFileSizeBytes }
-            .filter { (doc, _) -> maxFileSizeBytes == null || doc.size <= maxFileSizeBytes }
             .filter { (doc, _) ->
-                if (minAgeMs == null && maxAgeMs == null) return@filter true
-                val ageMs = now - doc.lastModifiedMs
-                (minAgeMs == null || ageMs >= minAgeMs) && (maxAgeMs == null || ageMs <= maxAgeMs)
-            }.filter { (doc, _) ->
                 scanContext.ensureActive()
                 if (orientation == null) return@filter true
                 getDocumentUriOrientation(context, doc.name, doc.uri) == orientation
@@ -170,49 +193,70 @@ internal suspend fun FileOperationRepository.listMatchingFilesFromFilesystemRoot
     isExcludeRegexPattern: Boolean = false,
 ): List<FileEntry> {
     val scanContext = currentCoroutineContext()
-    val filenameRegexes = buildFilenameRegexes(filenamePattern, isRegexPattern)
-    val excludeRegexes = buildExcludeRegexes(excludePatterns, isExcludeRegexPattern)
-    val now = System.currentTimeMillis()
-    val minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
-    val maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) }
+    val filterContext =
+        FileScanFilterContext(
+            extensions = extensions,
+            filenameRegexes = buildFilenameRegexes(filenamePattern, isRegexPattern),
+            isRegexPattern = isRegexPattern,
+            excludeRegexes = buildExcludeRegexes(excludePatterns, isExcludeRegexPattern),
+            isExcludeRegexPattern = isExcludeRegexPattern,
+            minFileSizeBytes = minFileSizeBytes,
+            maxFileSizeBytes = maxFileSizeBytes,
+            minAgeMs = minAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
+            maxAgeMs = maxAgeDays?.let { TimeUnit.DAYS.toMillis(it.toLong()) },
+            nowMs = System.currentTimeMillis(),
+        )
+    var depthTruncated = false
     val sequence: Sequence<Pair<File, List<String>>> =
         if (scanSubdirectories) {
-            walkDiskFilesWithRelativeParents(rootDir, maxDepth, emptyList())
+            walkDiskFilesWithRelativeParents(
+                dir = rootDir,
+                maxDepth = maxDepth,
+                relativeParentSegments = emptyList(),
+                onDepthLimitReached = { depthTruncated = true },
+            )
         } else {
             (rootDir.listFiles()?.asSequence() ?: emptySequence())
                 .filter { it.isFile }
                 .map { it to emptyList() }
         }
-    return sequence
-        .onEach { scanContext.ensureActive() }
-        .filter { (file, _) -> matchesExtensions(file.name, extensions) }
-        .filter { (file, _) -> matchesFilename(file.name, filenameRegexes, isRegexPattern) }
-        .filter { (file, _) -> !shouldExclude(file.name, excludeRegexes, isExcludeRegexPattern) }
-        .filter { (file, _) -> minFileSizeBytes == null || file.length() >= minFileSizeBytes }
-        .filter { (file, _) -> maxFileSizeBytes == null || file.length() <= maxFileSizeBytes }
-        .filter { (file, _) ->
-            if (minAgeMs == null && maxAgeMs == null) return@filter true
-            val ageMs = now - file.lastModified()
-            (minAgeMs == null || ageMs >= minAgeMs) && (maxAgeMs == null || ageMs <= maxAgeMs)
-        }.filter { (file, _) ->
-            if (orientation == null) return@filter true
-            val fileOrientation = getDiskFileOrientation(file)
-            fileOrientation == orientation
-        }.map { (file, relativeParentSegments) ->
-            FileEntry(
-                uri = file.toUri(),
-                name = file.name,
-                size = file.length(),
-                lastModifiedMs = file.lastModified(),
-                relativeParentSegments = relativeParentSegments,
-            )
-        }.toList()
+    val results =
+        sequence
+            .onEach { scanContext.ensureActive() }
+            .filter { (file, _) ->
+                passesCheapScanFilters(
+                    fileName = file.name,
+                    fileSizeBytes = file.length(),
+                    lastModifiedMs = file.lastModified(),
+                    filters = filterContext,
+                )
+            }.filter { (file, _) ->
+                if (orientation == null) return@filter true
+                val fileOrientation = getDiskFileOrientation(file)
+                fileOrientation == orientation
+            }.map { (file, relativeParentSegments) ->
+                FileEntry(
+                    uri = file.toUri(),
+                    name = file.name,
+                    size = file.length(),
+                    lastModifiedMs = file.lastModified(),
+                    relativeParentSegments = relativeParentSegments,
+                )
+            }.toList()
+    if (depthTruncated) {
+        DiagnosticLog.record(
+            context,
+            "Recursive filesystem scan reached the depth limit: folder=${rootDir.path}, maxDepth=$maxDepth",
+        )
+    }
+    return results
 }
 
 internal fun walkDiskFilesWithRelativeParents(
     dir: File,
     maxDepth: Int,
     relativeParentSegments: List<String>,
+    onDepthLimitReached: (() -> Unit)? = null,
 ): Sequence<Pair<File, List<String>>> =
     sequence {
         if (maxDepth <= 0) return@sequence
@@ -221,13 +265,18 @@ internal fun walkDiskFilesWithRelativeParents(
             if (child.isFile) {
                 yield(child to relativeParentSegments)
             } else if (child.isDirectory && segment.isNotEmpty() && segment != "." && segment != "..") {
-                yieldAll(
-                    walkDiskFilesWithRelativeParents(
-                        child,
-                        maxDepth - 1,
-                        relativeParentSegments + segment,
-                    ),
-                )
+                if (maxDepth <= 1) {
+                    onDepthLimitReached?.invoke()
+                } else {
+                    yieldAll(
+                        walkDiskFilesWithRelativeParents(
+                            child,
+                            maxDepth - 1,
+                            relativeParentSegments + segment,
+                            onDepthLimitReached,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -315,6 +364,8 @@ internal suspend fun FileOperationRepository.collectSafFiles(
     rootDocumentId: String,
     scanSubdirectories: Boolean,
     maxDepth: Int,
+    includeFile: (SafDocEntry) -> Boolean = { true },
+    onDepthLimitReached: (() -> Unit)? = null,
 ): List<Pair<SafDocEntry, List<String>>> {
     val scanContext = currentCoroutineContext()
     val out = mutableListOf<Pair<SafDocEntry, List<String>>>()
@@ -327,12 +378,16 @@ internal suspend fun FileOperationRepository.collectSafFiles(
         if (depth <= 0) return
         for (child in querySafChildren(treeUri, parentDocumentId)) {
             scanContext.ensureActive()
-            if (child.isFile) {
+            if (child.isFile && includeFile(child)) {
                 out += child to relativeParents
             } else if (scanSubdirectories && child.isDirectory) {
                 val segment = child.name.trim()
                 if (segment.isNotEmpty() && segment != "." && segment != "..") {
-                    visit(child.documentId, relativeParents + segment, depth - 1)
+                    if (depth <= 1) {
+                        onDepthLimitReached?.invoke()
+                    } else {
+                        visit(child.documentId, relativeParents + segment, depth - 1)
+                    }
                 }
             }
         }

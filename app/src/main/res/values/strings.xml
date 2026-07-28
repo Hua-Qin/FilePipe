@@ -875,7 +875,7 @@
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>
     <string name="rule_scan_subdirs_label">Scan subfolders</string>
-    <string name="rule_scan_subdirs_support">Subfolders will be scanned too for matching files</string>
+    <string name="rule_scan_subdirs_support">Subfolders will be scanned up to 32 levels deep for matching files</string>
     <string name="rule_recreate_subfolders_label">Mirror subfolders to destination</string>
     <string name="rule_recreate_subfolders_support">Replicate the source folder hierarchy at the destination, instead of saving all matched files directly at the destination folder</string>
     <string name="rule_suppress_missing_source_card_label">Hide missing source folder warnings</string>

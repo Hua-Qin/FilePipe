@@ -60,7 +60,7 @@ class FileOperationRepository
             minAgeDays: Int? = null,
             maxAgeDays: Int? = null,
             excludePatterns: List<String> = emptyList(),
-            maxDepth: Int = 5,
+            maxDepth: Int = MAX_SCAN_DEPTH,
             filesystemAccessEnabled: Boolean = false,
             orientation: FileOrientation? = null,
             isRegexPattern: Boolean = false,
@@ -68,6 +68,7 @@ class FileOperationRepository
             useCache: Boolean = false,
         ): List<FileEntry> =
             withContext(ioDispatcher) {
+                val effectiveMaxDepth = maxDepth.coerceIn(0, MAX_SCAN_DEPTH)
                 val cacheKey =
                     ScanCacheKey(
                         folderUriString = folderUriString,
@@ -79,7 +80,7 @@ class FileOperationRepository
                         minAgeDays = minAgeDays,
                         maxAgeDays = maxAgeDays,
                         excludePatterns = excludePatterns,
-                        maxDepth = maxDepth,
+                        maxDepth = effectiveMaxDepth,
                         orientation = orientation,
                         filesystemAccessEnabled = filesystemAccessEnabled,
                         isRegexPattern = isRegexPattern,
@@ -106,7 +107,7 @@ class FileOperationRepository
                         minAgeDays = minAgeDays,
                         maxAgeDays = maxAgeDays,
                         excludePatterns = excludePatterns,
-                        maxDepth = maxDepth,
+                        maxDepth = effectiveMaxDepth,
                         filesystemAccessEnabled = filesystemAccessEnabled,
                         orientation = orientation,
                         isRegexPattern = isRegexPattern,
@@ -125,6 +126,7 @@ class FileOperationRepository
             conflictPolicy: ConflictPolicy,
             operationMode: OperationMode,
             destFoldersCreatedCollector: MutableCollection<String>? = null,
+            destinationFolderCache: DestinationFolderCache? = null,
             filesystemAccessEnabled: Boolean = false,
             requireUnchangedSource: Boolean = false,
         ): FileMoved =
@@ -193,6 +195,7 @@ class FileOperationRepository
                             conflictPolicy,
                             operationMode,
                             destFoldersCreatedCollector,
+                            destinationFolderCache,
                         )
                     }
 
@@ -203,6 +206,7 @@ class FileOperationRepository
                             conflictPolicy,
                             operationMode,
                             destFoldersCreatedCollector,
+                            destinationFolderCache,
                         )
                     }
                 }
@@ -213,6 +217,7 @@ class FileOperationRepository
             destFolderUriString: String,
             conflictPolicy: ConflictPolicy,
             operationMode: OperationMode = OperationMode.MOVE,
+            destinationFolderCache: DestinationFolderCache? = null,
             filesystemAccessEnabled: Boolean = false,
         ): PreviewFileResult =
             withContext(ioDispatcher) {
@@ -248,6 +253,7 @@ class FileOperationRepository
                     destFolderUriString = effectiveDestFolder,
                     conflictPolicy = conflictPolicy,
                     simulatedRootPath = simulatedRootPath,
+                    destinationFolderCache = destinationFolderCache,
                 )
             }
 

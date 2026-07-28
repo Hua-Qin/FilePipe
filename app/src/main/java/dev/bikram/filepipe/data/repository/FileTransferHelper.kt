@@ -160,6 +160,7 @@ internal fun FileOperationRepository.moveFileFilesystemToDocument(
     conflictPolicy: ConflictPolicy,
     operationMode: OperationMode,
     destFoldersCreatedCollector: MutableCollection<String>?,
+    destinationFolderCache: DestinationFolderCache?,
 ): FileMoved {
     val sourcePath =
         sourceEntry.uri.path ?: return FileMoved(
@@ -184,9 +185,10 @@ internal fun FileOperationRepository.moveFileFilesystemToDocument(
         )
     }
 
+    val cachedDestTree = destinationFolderCache?.safRoots?.get(destFolderUriString)
     val destTree =
         try {
-            DocumentFile.fromTreeUri(context, destFolderUriString.toUri())
+            cachedDestTree ?: DocumentFile.fromTreeUri(context, destFolderUriString.toUri())
         } catch (e: SecurityException) {
             return FileMoved(
                 fileName = sourceEntry.name,
@@ -206,6 +208,9 @@ internal fun FileOperationRepository.moveFileFilesystemToDocument(
             success = false,
             errorMessage = "Invalid destination folder URI",
         )
+    if (cachedDestTree == null) {
+        destinationFolderCache?.safRoots?.put(destFolderUriString, destTree)
+    }
 
     if (!destTree.exists() || !destTree.canWrite()) {
         return FileMoved(
@@ -220,7 +225,13 @@ internal fun FileOperationRepository.moveFileFilesystemToDocument(
     }
 
     val destParent =
-        ensureDestParentFolder(destTree, sourceEntry.relativeParentSegments, destFoldersCreatedCollector)
+        ensureDestParentFolder(
+            destTree = destTree,
+            destinationRoot = destFolderUriString,
+            relativeParentSegments = sourceEntry.relativeParentSegments,
+            destFoldersCreatedCollector = destFoldersCreatedCollector,
+            destinationFolderCache = destinationFolderCache,
+        )
             ?: return FileMoved(
                 fileName = sourceEntry.name,
                 sourceUri = sourceEntry.uri.toString(),
@@ -494,10 +505,12 @@ internal fun FileOperationRepository.moveFileDocumentToDocument(
     conflictPolicy: ConflictPolicy,
     operationMode: OperationMode,
     destFoldersCreatedCollector: MutableCollection<String>?,
+    destinationFolderCache: DestinationFolderCache?,
 ): FileMoved {
+    val cachedDestTree = destinationFolderCache?.safRoots?.get(destFolderUriString)
     val destTree =
         try {
-            DocumentFile.fromTreeUri(context, destFolderUriString.toUri())
+            cachedDestTree ?: DocumentFile.fromTreeUri(context, destFolderUriString.toUri())
         } catch (e: SecurityException) {
             return FileMoved(
                 fileName = sourceEntry.name,
@@ -517,6 +530,9 @@ internal fun FileOperationRepository.moveFileDocumentToDocument(
             success = false,
             errorMessage = "Invalid destination folder URI",
         )
+    if (cachedDestTree == null) {
+        destinationFolderCache?.safRoots?.put(destFolderUriString, destTree)
+    }
 
     if (!destTree.exists() || !destTree.canWrite()) {
         return FileMoved(
@@ -531,7 +547,13 @@ internal fun FileOperationRepository.moveFileDocumentToDocument(
     }
 
     val destParent =
-        ensureDestParentFolder(destTree, sourceEntry.relativeParentSegments, destFoldersCreatedCollector)
+        ensureDestParentFolder(
+            destTree = destTree,
+            destinationRoot = destFolderUriString,
+            relativeParentSegments = sourceEntry.relativeParentSegments,
+            destFoldersCreatedCollector = destFoldersCreatedCollector,
+            destinationFolderCache = destinationFolderCache,
+        )
             ?: return FileMoved(
                 fileName = sourceEntry.name,
                 sourceUri = sourceEntry.uri.toString(),
@@ -854,13 +876,35 @@ internal fun ensureDestParentFolderFile(
 
 internal fun FileOperationRepository.ensureDestParentFolder(
     destTree: DocumentFile,
+    destinationRoot: String,
     relativeParentSegments: List<String>,
     destFoldersCreatedCollector: MutableCollection<String>? = null,
+    destinationFolderCache: DestinationFolderCache? = null,
 ): DocumentFile? {
+    val normalizedSegments = normalizeDestinationParentSegments(relativeParentSegments)
+    val fullPathKey =
+        SafDestinationParentKey(
+            destinationRoot = destinationRoot,
+            relativeParentSegments = normalizedSegments,
+        )
+    destinationFolderCache?.safParents?.get(fullPathKey)?.let { cachedParent ->
+        return cachedParent
+    }
+
     var current = destTree
-    for (rawSegment in relativeParentSegments) {
-        val segment = rawSegment.trim()
-        if (segment.isEmpty() || segment == "." || segment == "..") continue
+    val resolvedSegments = mutableListOf<String>()
+    for (segment in normalizedSegments) {
+        resolvedSegments += segment
+        val prefixKey =
+            SafDestinationParentKey(
+                destinationRoot = destinationRoot,
+                relativeParentSegments = resolvedSegments.toList(),
+            )
+        val cachedPrefix = destinationFolderCache?.safParents?.get(prefixKey)
+        if (cachedPrefix != null) {
+            current = cachedPrefix
+            continue
+        }
         val next = current.findFile(segment)
         current =
             when {
@@ -878,7 +922,9 @@ internal fun FileOperationRepository.ensureDestParentFolder(
                     created
                 }
             }
+        destinationFolderCache?.safParents?.put(prefixKey, current)
     }
+    destinationFolderCache?.safParents?.put(fullPathKey, current)
     return current
 }
 
@@ -1004,10 +1050,12 @@ internal fun FileOperationRepository.simulateSafMove(
     destFolderUriString: String,
     conflictPolicy: ConflictPolicy,
     simulatedRootPath: String,
+    destinationFolderCache: DestinationFolderCache?,
 ): PreviewFileResult {
+    val cachedDestTree = destinationFolderCache?.safRoots?.get(destFolderUriString)
     val destTree =
         try {
-            DocumentFile.fromTreeUri(context, destFolderUriString.toUri())
+            cachedDestTree ?: DocumentFile.fromTreeUri(context, destFolderUriString.toUri())
         } catch (_: IllegalArgumentException) {
             null
         } catch (_: SecurityException) {
@@ -1016,8 +1064,19 @@ internal fun FileOperationRepository.simulateSafMove(
     if (destTree == null || !destTree.exists()) {
         return unchangedPreviewResult(sourceEntry, simulatedRootPath)
     }
+    if (cachedDestTree == null) {
+        destinationFolderCache?.safRoots?.put(destFolderUriString, destTree)
+    }
 
-    return when (val resolution = peekDestParentForPreview(destTree, sourceEntry.relativeParentSegments)) {
+    return when (
+        val resolution =
+            peekDestParentForPreview(
+                destTree = destTree,
+                destinationRoot = destFolderUriString,
+                relativeParentSegments = sourceEntry.relativeParentSegments,
+                destinationFolderCache = destinationFolderCache,
+            )
+    ) {
         is DestParentPreview.Partial, is DestParentPreview.BlockedByFile -> {
             unchangedPreviewResult(sourceEntry, simulatedRootPath)
         }
@@ -1120,19 +1179,51 @@ internal fun peekDestParentForPreviewFile(
 
 internal fun peekDestParentForPreview(
     destTree: DocumentFile,
+    destinationRoot: String,
     relativeParentSegments: List<String>,
+    destinationFolderCache: DestinationFolderCache? = null,
 ): DestParentPreview {
+    val normalizedSegments = normalizeDestinationParentSegments(relativeParentSegments)
+    val fullPathKey =
+        SafDestinationParentKey(
+            destinationRoot = destinationRoot,
+            relativeParentSegments = normalizedSegments,
+        )
+    destinationFolderCache?.safParents?.get(fullPathKey)?.let { cachedParent ->
+        return DestParentPreview.Resolved(cachedParent)
+    }
+
     var current = destTree
-    for (rawSegment in relativeParentSegments) {
-        val segment = rawSegment.trim()
-        if (segment.isEmpty() || segment == "." || segment == "..") continue
+    val resolvedSegments = mutableListOf<String>()
+    for (segment in normalizedSegments) {
+        resolvedSegments += segment
+        val prefixKey =
+            SafDestinationParentKey(
+                destinationRoot = destinationRoot,
+                relativeParentSegments = resolvedSegments.toList(),
+            )
+        val cachedPrefix = destinationFolderCache?.safParents?.get(prefixKey)
+        if (cachedPrefix != null) {
+            current = cachedPrefix
+            continue
+        }
         val next = current.findFile(segment)
         when {
-            next == null -> return DestParentPreview.Partial
-            !next.isDirectory -> return DestParentPreview.BlockedByFile
-            else -> current = next
+            next == null -> {
+                return DestParentPreview.Partial
+            }
+
+            !next.isDirectory -> {
+                return DestParentPreview.BlockedByFile
+            }
+
+            else -> {
+                current = next
+                destinationFolderCache?.safParents?.put(prefixKey, current)
+            }
         }
     }
+    destinationFolderCache?.safParents?.put(fullPathKey, current)
     return DestParentPreview.Resolved(current)
 }
 
