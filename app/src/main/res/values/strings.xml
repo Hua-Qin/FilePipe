@@ -176,6 +176,17 @@
     <string name="history_detail_title">Run details</string>
     <string name="history_detail_files_header">Files (%1$d)</string>
     <string name="history_detail_no_file_records">No file records for this run.</string>
+    <string name="history_run_interrupted">The run was interrupted when the app process ended.</string>
+    <string name="history_detail_run_summary">Run summary</string>
+    <string name="history_detail_trigger_label">Trigger</string>
+    <string name="history_detail_started_label">Started</string>
+    <string name="history_detail_completed_label">Completed</string>
+    <string name="history_detail_duration_label">Duration</string>
+    <string name="history_detail_duration_seconds">%1$d s</string>
+    <string name="history_detail_error_label">Error</string>
+    <string name="history_detail_summary_label">%1$s: </string>
+    <string name="history_detail_source_path">From: %1$s</string>
+    <string name="history_detail_file_skipped">Skipped</string>
     <string name="history_two_pane_empty_title">No run selected</string>
     <string name="history_two_pane_empty_message">Run details will appear here when history is available.</string>
     <string name="history_two_pane_trash_title">Trash selected</string>
@@ -259,6 +270,7 @@
     <string name="status_in_progress">Running</string>
     <string name="status_cancelled">Cancelled</string>
     <string name="status_undone">Undone</string>
+    <string name="status_partially_undone">Partially undone</string>
     <string name="status_no_changes">No changes</string>
 
     <plurals name="undo_success_restored">
@@ -279,6 +291,7 @@
     </plurals>
     <string name="undo_failed_prefix">Undo failed: %s</string>
     <string name="undo_unknown_error">Unknown error</string>
+    <string name="undo_original_source_conflict">A file already exists at the original location</string>
     <string name="history_detail_run_undone">This run has been undone</string>
 
     <!-- Permission screen -->
@@ -359,6 +372,8 @@
     <string name="onboarding_wizard_start_blank_desc">Choose your own file types</string>
 
     <!-- Settings -->
+    <string name="settings_export_folder_permission_failed">Could not acquire persistent permission for the selected folder</string>
+    <string name="settings_cloud_backup_configuration_failed">The backup was exported once, but automatic cloud backups could not be configured</string>
     <string name="settings_folder_access_section">Folder access</string>
     <string name="settings_folder_access_saf_only">Selective access</string>
     <string name="settings_folder_access_all_files">All files access</string>
@@ -391,11 +406,11 @@
     <string name="settings_black_theme_effect_disabled">Can not enable in black theme</string>
     <string name="settings_backup_section">Backup &amp; restore</string>
     <string name="settings_choose_local_backup_folder">Choose local backup folder</string>
-    <string name="settings_choose_cloud_backup_file">Choose cloud backup file</string>
-    <string name="settings_local_backup_folder_hint">Folder for exporting backups (rules, history, settings)</string>
-    <string name="settings_cloud_backup_folder_hint">File on cloud for exporting backups (rules, history, settings)</string>
+    <string name="settings_choose_cloud_backup_file">Choose cloud backup folder</string>
+    <string name="settings_local_backup_folder_hint">Local folder for exporting backups (notes, lists, settings)</string>
+    <string name="settings_cloud_backup_folder_hint">Cloud folder for exporting backups (notes, lists, settings)</string>
     <string name="settings_local_backup_folder_cleared">Local backup folder reset</string>
-    <string name="settings_cloud_backup_file_cleared">Cloud backup file reset</string>
+    <string name="settings_cloud_backup_file_cleared">Cloud backup folder reset</string>
     <string name="settings_export_select_folder_first">Select a local or cloud backup folder first</string>
     <string name="settings_export_success">%1$s exported</string>
     <string name="settings_backup_export_success">Backup exported</string>
@@ -409,6 +424,9 @@
     <string name="settings_fab_open_help">Help and FAQs</string>
     <string name="settings_import_rules">Import backup</string>
     <string name="settings_restore_backup">Restore backup</string>
+    <string name="settings_backup_import_failed">Import failed: %1$s</string>
+    <string name="settings_backup_restore_failed">Restore failed: %1$s</string>
+    <string name="settings_backup_invalid_rule_regex">The backup contains an invalid filename or exclusion pattern in: %1$s</string>
     <string name="settings_backup_import_restore_help_title">Import vs restore</string>
     <string name="settings_backup_import_restore_help_body">Import adds new rules from the file and updates rules that have the same name. Your run history and app settings stay as they are.\n\nRestore replaces everything in the app with the contents of the file: all rules, run history, and settings. Useful when moving to a new device.</string>
     <string name="settings_backup_help_icon_cd">Explain import and restore</string>
@@ -417,6 +435,20 @@
         <item quantity="other">Rules imported: %1$d added, %2$d updated</item>
     </plurals>
     <string name="settings_restore_success">Backup restored (%1$s)</string>
+    <plurals name="settings_restore_part_rules">
+        <item quantity="one">%1$d rule</item>
+        <item quantity="other">%1$d rules</item>
+    </plurals>
+    <plurals name="settings_restore_part_history_runs">
+        <item quantity="one">%1$d history run</item>
+        <item quantity="other">%1$d history runs</item>
+    </plurals>
+    <string name="settings_restore_part_settings">settings</string>
+    <plurals name="settings_restore_folders_need_reselection">
+        <item quantity="one">%1$d restored folder could not be accessed. Select it again in settings.</item>
+        <item quantity="other">%1$d restored folders could not be accessed. Select them again in settings.</item>
+    </plurals>
+    <string name="settings_restore_automation_disabled_no_folder">Automatic backups were turned off because no accessible backup folder was restored.</string>
     <string name="settings_auto_export_on_change">Auto-export on app exit</string>
     <string name="settings_auto_export_on_change_hint">Saves a full backup to configured backup folders when you exit after making changes</string>
     <string name="settings_scheduled_export">Daily scheduled backup</string>
@@ -577,6 +609,7 @@
     <string name="dev_options_info_history_failed">History failed</string>
     <string name="dev_options_info_history_cancelled">History cancelled</string>
     <string name="dev_options_info_history_undone">History undone</string>
+    <string name="dev_options_info_history_partially_undone">History partially undone</string>
     <string name="dev_options_info_moved_file_rows">Moved-file rows</string>
     <string name="dev_options_info_database_file_size">Database file size</string>
     <string name="dev_options_info_cached_update_apk">Cached update APK</string>
@@ -811,6 +844,7 @@
     <string name="settings_save_update_apk_to_downloads">Save update APK to Download folder</string>
     <string name="settings_update_apk_save_to_downloads_failed">Update downloaded, but saving a copy to Download failed</string>
     <string name="settings_update_check_failed">Couldn\'t check for updates</string>
+    <string name="settings_update_download_failed">Could not download update</string>
     <string name="settings_check_for_updates">Check for updates</string>
     <string name="settings_open_fdroid">Open F-Droid</string>
     <string name="settings_download_install">Download update (v%1$s)</string>
@@ -841,7 +875,7 @@
     <!-- Rule detail — new fields -->
     <string name="preview_rule">Preview matching files</string>
     <string name="rule_scan_subdirs_label">Scan subfolders</string>
-    <string name="rule_scan_subdirs_support">Subfolders will be scanned too for matching files</string>
+    <string name="rule_scan_subdirs_support">Subfolders will be scanned up to 32 levels deep for matching files</string>
     <string name="rule_recreate_subfolders_label">Mirror subfolders to destination</string>
     <string name="rule_recreate_subfolders_support">Replicate the source folder hierarchy at the destination, instead of saving all matched files directly at the destination folder</string>
     <string name="rule_suppress_missing_source_card_label">Hide missing source folder warnings</string>
@@ -852,7 +886,11 @@
     <string name="operation_move">Move</string>
     <string name="operation_copy">Copy</string>
     <string name="operation_delete">Delete</string>
+    <string name="file_operation_incomplete_copy">The destination file did not receive all source data</string>
+    <string name="file_operation_source_changed_after_confirmation">The file changed after deletion was confirmed, so it was not deleted</string>
+    <string name="file_operation_source_delete_failed">The source file could not be deleted after it was copied</string>
     <string name="rule_operation_delete_warning">CAUTION: FILES WILL BE PERMANENTLY DELETED, WITH NO UNDO OPTION ANYWHERE.</string>
+    <string name="rule_delete_confirmation_scan_failed">Couldn\'t verify which files would be deleted. Nothing was changed.</string>
     <string name="delete_run_confirm_title">Permanently delete files?</string>
     <string name="delete_run_confirm_button">Delete permanently</string>
     <plurals name="delete_run_confirm_message">
@@ -932,6 +970,8 @@
     <string name="advanced_max_size_label">Max size (MB)</string>
     <string name="advanced_min_age_label">Min age (days)</string>
     <string name="advanced_max_age_label">Max age (days)</string>
+    <string name="rule_error_age_out_of_range">Age must be between 1 and %1$d days</string>
+    <string name="rule_error_minimum_age_exceeds_maximum">Minimum age cannot be greater than maximum age</string>
     <string name="advanced_exclude_patterns_label">Exclude patterns, comma separated</string>
     <string name="advanced_exclude_placeholder">e.g. .nomedia</string>
     <string name="advanced_exclude_patterns_regex_label">Exclude RegEx pattern</string>

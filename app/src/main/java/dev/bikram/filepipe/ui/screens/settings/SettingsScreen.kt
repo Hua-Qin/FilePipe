@@ -572,23 +572,13 @@ fun SettingsScreen(
             val target = pendingBackupFolderTarget
             pendingBackupFolderTarget = null
             if (uri != null) {
-                val path = safTreeUriToPath(uri) ?: uri.toString()
                 when (target) {
                     BackupFolderTarget.Cloud -> viewModel.setCloudExportFolderUri(uri.toString())
 
                     BackupFolderTarget.Local,
                     null,
-                    -> viewModel.setExportFolderUri(path)
+                    -> viewModel.setExportFolderUri(uri.toString())
                 }
-            }
-        }
-
-    val cloudBackupDocumentLauncher =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.CreateDocument("application/json"),
-        ) { uri: Uri? ->
-            if (uri != null) {
-                viewModel.completeCloudBackupDocumentSelection(uri)
             }
         }
 
@@ -1236,7 +1226,8 @@ fun SettingsScreen(
                                 folderLauncher.launch(null)
                             },
                             onPickCloudFolder = {
-                                cloudBackupDocumentLauncher.launch("filepipe_cloud_backup.json")
+                                pendingBackupFolderTarget = BackupFolderTarget.Cloud
+                                folderLauncher.launch(null)
                             },
                             onLaunchImportMerge = {
                                 pendingBackupPickAction = BackupImportPickAction.ImportMerge

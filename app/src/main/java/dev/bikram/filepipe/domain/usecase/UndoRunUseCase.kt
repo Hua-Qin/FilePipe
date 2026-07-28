@@ -7,6 +7,7 @@ import android.util.Log
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileEntry
 import dev.bikram.filepipe.data.repository.FileOperationRepository
@@ -20,20 +21,31 @@ import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.OperationMode
+import dev.bikram.filepipe.domain.model.hasRecoverableDestination
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
+import javax.inject.Singleton
 
 data class UndoResult(
     val totalReversed: Int,
     val totalFailed: Int,
     val errors: List<String>,
     val operationMode: OperationMode = OperationMode.MOVE,
+    val isAlreadyInProgress: Boolean = false,
 )
 
 data class UndoProgress(
@@ -45,6 +57,7 @@ data class UndoProgress(
 
 private const val TAG = "UndoRunUseCase"
 
+@Singleton
 class UndoRunUseCase
     @Inject
     constructor(
@@ -55,226 +68,225 @@ class UndoRunUseCase
         private val userPreferencesRepository: UserPreferencesRepository,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) {
+        private val _activeUndoProgress = MutableStateFlow<Map<Long, Float>>(emptyMap())
+        val activeUndoProgress: StateFlow<Map<Long, Float>> = _activeUndoProgress.asStateFlow()
+        private val undoMutex = Mutex()
+
+        fun isUndoInProgress(historyId: Long): Boolean = _activeUndoProgress.value.containsKey(historyId)
+
+        fun getUndoProgress(historyId: Long): Float? = _activeUndoProgress.value[historyId]
+
         suspend operator fun invoke(
             historyId: Long,
             onProgress: (UndoProgress) -> Unit = {},
         ): UndoResult =
             withContext(ioDispatcher) {
-                val history =
-                    runHistoryRepository.getHistoryById(historyId)
-                        ?: return@withContext UndoResult(0, 0, listOf("Run not found"))
-
-                if (history.isEffectivelyUndone()) {
+                if (!undoMutex.tryLock()) {
                     return@withContext UndoResult(
-                        0,
-                        0,
-                        listOf("This run has already been undone"),
-                        operationMode = history.operationMode,
+                        totalReversed = 0,
+                        totalFailed = 0,
+                        errors = emptyList(),
+                        isAlreadyInProgress = true,
                     )
                 }
-
-                val operationMode = history.operationMode
-                if (operationMode == OperationMode.DELETE) {
-                    return@withContext UndoResult(
-                        0,
-                        0,
-                        listOf("Delete operations cannot be undone"),
-                        operationMode = OperationMode.DELETE,
-                    )
-                }
-
-                val movedFiles =
-                    runHistoryRepository
-                        .getFilesForRunOnce(historyId)
-                        .filter { it.success && !it.skipped && it.destinationUri.isNotBlank() }
-                val totalBytes = movedFiles.sumOf { fileMoved -> fileMoved.fileSizeBytes.coerceAtLeast(0L) }
-                var processedFiles = 0
-                var processedBytes = 0L
-                onProgress(
-                    UndoProgress(
-                        processedFiles = processedFiles,
-                        totalFiles = movedFiles.size,
-                        processedBytes = processedBytes,
-                        totalBytes = totalBytes,
-                    ),
-                )
-
-                if (isMockMoveRun(operationMode, movedFiles)) {
-                    return@withContext undoMockRun(
-                        historyId = historyId,
-                        movedFiles = movedFiles,
-                        totalBytes = totalBytes,
-                        onProgress = onProgress,
-                    )
-                }
-
-                val filesystemAccessEnabled =
-                    isFilesystemAccessEffective(userPreferencesRepository.preferencesFlow.first().folderAccessMode)
-
-                var reversed = 0
-                var failed = 0
-                val errors = mutableListOf<String>()
-                val copyDeletedDestinationUris = mutableListOf<String>()
-
-                movedFiles.forEach { fileMoved ->
+                _activeUndoProgress.update { it + (historyId to 0f) }
+                try {
+                    performUndo(historyId, onProgress)
+                } finally {
                     try {
+                        withContext(NonCancellable) {
+                            syncRunUndoStatus(historyId)
+                        }
+                    } finally {
+                        _activeUndoProgress.update { it - historyId }
+                        undoMutex.unlock()
+                    }
+                }
+            }
+
+        private suspend fun performUndo(
+            historyId: Long,
+            onProgress: (UndoProgress) -> Unit,
+        ): UndoResult {
+            val history =
+                runHistoryRepository.getHistoryById(historyId)
+                    ?: return UndoResult(0, 0, listOf("Run not found"))
+
+            if (history.isEffectivelyUndone()) {
+                return UndoResult(
+                    0,
+                    0,
+                    listOf("This run has already been undone"),
+                    operationMode = history.operationMode,
+                )
+            }
+
+            val operationMode = history.operationMode
+            if (operationMode == OperationMode.DELETE) {
+                return UndoResult(
+                    0,
+                    0,
+                    listOf("Delete operations cannot be undone"),
+                    operationMode = OperationMode.DELETE,
+                )
+            }
+
+            val movedFiles =
+                runHistoryRepository
+                    .getFilesForRunOnce(historyId)
+                    .filter { fileMoved -> fileMoved.hasRecoverableDestination }
+            val pendingFiles = movedFiles.filter { shouldAttemptUndo(it.undoStatus) }
+            val totalBytes = pendingFiles.sumOf { fileMoved -> fileMoved.fileSizeBytes.coerceAtLeast(0L) }
+            var processedFiles = 0
+            var processedBytes = 0L
+            onProgress(
+                UndoProgress(
+                    processedFiles = processedFiles,
+                    totalFiles = pendingFiles.size,
+                    processedBytes = processedBytes,
+                    totalBytes = totalBytes,
+                ),
+            )
+
+            if (pendingFiles.isEmpty()) {
+                runHistoryRepository.markRunReversed(historyId)
+                return UndoResult(
+                    totalReversed = 0,
+                    totalFailed = 0,
+                    errors = emptyList(),
+                    operationMode = operationMode,
+                )
+            }
+
+            if (isMockMoveRun(operationMode, movedFiles)) {
+                return undoMockRun(
+                    historyId = historyId,
+                    movedFiles = pendingFiles,
+                    totalBytes = totalBytes,
+                    onProgress = onProgress,
+                )
+            }
+
+            val filesystemAccessEnabled =
+                isFilesystemAccessEffective(userPreferencesRepository.preferencesFlow.first().folderAccessMode)
+
+            var reversed = 0
+            var failed = 0
+            val errors = mutableListOf<String>()
+            val copyDeletedDestinationUris = mutableListOf<String>()
+
+            pendingFiles.forEach { fileMoved ->
+                var physicalUndoCompleted = false
+                var outcomeCounted = false
+                try {
+                    runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.IN_PROGRESS)
+                    val outcome =
                         when (operationMode) {
                             OperationMode.COPY -> {
-                                if (fileMoved.destinationUri.startsWith("file:")) {
-                                    val path = fileMoved.destinationUri.toUri().path
-                                    if (path.isNullOrBlank()) {
-                                        errors.add("${fileMoved.fileName}: invalid destination path")
-                                        failed++
-                                        return@forEach
-                                    }
-                                    val destFile = File(path)
-                                    if (!destFile.isFile) {
-                                        reversed++
-                                        return@forEach
-                                    }
-                                    val deleted =
-                                        try {
-                                            destFile.delete()
-                                        } catch (_: SecurityException) {
-                                            false
-                                        }
-                                    if (deleted) {
-                                        reversed++
-                                        copyDeletedDestinationUris.add(fileMoved.destinationUri)
-                                    } else {
-                                        failed++
-                                        errors.add("${fileMoved.fileName}: could not delete at destination")
-                                    }
-                                } else {
-                                    val destUri = fileMoved.destinationUri.toUri()
-                                    val destDoc = DocumentFile.fromSingleUri(context, destUri)
-                                    if (destDoc == null) {
-                                        errors.add("${fileMoved.fileName}: could not open destination document")
-                                        failed++
-                                        return@forEach
-                                    }
-                                    if (!destDoc.exists()) {
-                                        reversed++
-                                        return@forEach
-                                    }
-                                    val deleted =
-                                        try {
-                                            destDoc.delete()
-                                        } catch (_: SecurityException) {
-                                            false
-                                        }
-                                    if (deleted) {
-                                        reversed++
-                                        copyDeletedDestinationUris.add(fileMoved.destinationUri)
-                                    } else {
-                                        failed++
-                                        errors.add("${fileMoved.fileName}: could not delete at destination")
-                                    }
-                                }
+                                undoCopyFile(fileMoved)
                             }
 
                             OperationMode.MOVE -> {
-                                val destUri = fileMoved.destinationUri.toUri()
-                                val sourceFolderUriString = parentSourceFolderForUndo(fileMoved.sourceUri)
-                                if (sourceFolderUriString == null) {
-                                    errors.add("${fileMoved.fileName}: cannot determine original source folder")
-                                    failed++
-                                    return@forEach
-                                }
-                                val sizeBytes =
-                                    when {
-                                        fileMoved.destinationUri.startsWith("file:") -> {
-                                            val path = destUri.path
-                                            if (path.isNullOrBlank()) {
-                                                errors.add("${fileMoved.fileName}: invalid destination path")
-                                                failed++
-                                                return@forEach
-                                            }
-                                            val destFile = File(path)
-                                            if (!destFile.isFile) {
-                                                errors.add("${fileMoved.fileName}: file no longer exists at destination")
-                                                failed++
-                                                return@forEach
-                                            }
-                                            destFile.length()
-                                        }
-
-                                        else -> {
-                                            val destDoc = DocumentFile.fromSingleUri(context, destUri)
-                                            if (destDoc == null || !destDoc.exists()) {
-                                                errors.add("${fileMoved.fileName}: file no longer exists at destination")
-                                                failed++
-                                                return@forEach
-                                            }
-                                            destDoc.length()
-                                        }
-                                    }
-
-                                val sourceEntry =
-                                    FileEntry(
-                                        uri = destUri,
-                                        name = fileMoved.fileName,
-                                        size = sizeBytes,
-                                        relativeParentSegments = fileMoved.relativeParentSegments,
-                                    )
-
-                                val reverseResult =
-                                    fileOperationRepository.moveFile(
-                                        sourceEntry = sourceEntry,
-                                        destFolderUriString = sourceFolderUriString,
-                                        conflictPolicy = ConflictPolicy.RENAME_SUFFIX,
-                                        operationMode = OperationMode.MOVE,
-                                        filesystemAccessEnabled = filesystemAccessEnabled,
-                                    )
-
-                                if (reverseResult.success) {
-                                    reversed++
+                                if (fileMoved.success) {
+                                    undoMoveFile(fileMoved, filesystemAccessEnabled)
                                 } else {
-                                    failed++
-                                    reverseResult.errorMessage?.let { errors.add("${fileMoved.fileName}: $it") }
+                                    undoCopyFile(fileMoved)
                                 }
                             }
+
+                            OperationMode.DELETE -> {
+                                SingleFileUndoOutcome(
+                                    reversed = false,
+                                    failed = true,
+                                    physicalUndoCompleted = false,
+                                    error = "${fileMoved.fileName}: cannot undo delete",
+                                )
+                            }
                         }
-                    } finally {
-                        processedFiles++
-                        processedBytes += fileMoved.fileSizeBytes.coerceAtLeast(0L)
-                        onProgress(
-                            UndoProgress(
-                                processedFiles = processedFiles,
-                                totalFiles = movedFiles.size,
-                                processedBytes = processedBytes,
-                                totalBytes = totalBytes,
-                            ),
-                        )
+                    if (outcome.reversed) reversed++
+                    if (outcome.failed) failed++
+                    physicalUndoCompleted = outcome.physicalUndoCompleted
+                    outcomeCounted = outcome.reversed || outcome.failed
+                    outcome.error?.let { errors.add(it) }
+                    outcome.copyDeletedDestinationUri?.let { copyDeletedDestinationUris.add(it) }
+
+                    if (outcome.reversed) {
+                        runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.UNDONE)
+                    } else if (outcome.failed) {
+                        runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.FAILED)
                     }
-                }
-
-                if (operationMode == OperationMode.COPY && history.copyCreatedDestFolderUris.isNotEmpty()) {
-                    deleteEmptyRecordedCopyFolders(history.copyCreatedDestFolderUris)
-                }
-
-                if (reversed > 0) {
-                    runHistoryRepository.markRunReversed(historyId)
-                }
-
-                if (operationMode == OperationMode.COPY && copyDeletedDestinationUris.isNotEmpty()) {
-                    val destTreeUriString =
-                        history.ruleId?.let { ruleId ->
-                            ruleRepository.getRuleById(ruleId)?.destinationFolderPath?.takeIf { it.isNotBlank() }
-                        }
-                    if (destTreeUriString != null) {
-                        deleteEmptyDestSubfoldersAfterCopyUndo(destTreeUriString, copyDeletedDestinationUris)
+                } catch (cancellation: CancellationException) {
+                    throw cancellation
+                } catch (error: Exception) {
+                    if (!outcomeCounted) {
+                        failed++
                     }
-                }
-
-                if (failed > 0) {
-                    DiagnosticLog.record(
-                        context,
-                        "Undo completed with failures: historyId=$historyId, reversed=$reversed, failed=$failed",
+                    errors.add(
+                        "${fileMoved.fileName}: ${error.message ?: context.getString(R.string.undo_unknown_error)}",
                     )
+                    if (undoStatusAfterFailure(physicalUndoCompleted) == FileUndoStatus.FAILED) {
+                        runCatching {
+                            runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.FAILED)
+                        }.onFailure { persistenceError ->
+                            Log.e(TAG, "Failed to persist undo failure for file ${fileMoved.id}", persistenceError)
+                        }
+                    }
+                } finally {
+                    processedFiles++
+                    processedBytes += fileMoved.fileSizeBytes.coerceAtLeast(0L)
+                    val undoProg =
+                        UndoProgress(
+                            processedFiles = processedFiles,
+                            totalFiles = pendingFiles.size,
+                            processedBytes = processedBytes,
+                            totalBytes = totalBytes,
+                        )
+                    val fraction =
+                        when {
+                            totalBytes > 0L -> processedBytes.toFloat() / totalBytes.toFloat()
+                            pendingFiles.isNotEmpty() -> processedFiles.toFloat() / pendingFiles.size.toFloat()
+                            else -> 1f
+                        }.coerceIn(0f, 1f)
+                    _activeUndoProgress.update { it + (historyId to fraction) }
+                    onProgress(undoProg)
                 }
-                return@withContext UndoResult(reversed, failed, errors, operationMode = operationMode)
             }
+
+            if (operationMode == OperationMode.COPY && history.copyCreatedDestFolderUris.isNotEmpty()) {
+                deleteEmptyRecordedCopyFolders(history.copyCreatedDestFolderUris)
+            }
+
+            if (operationMode == OperationMode.COPY && copyDeletedDestinationUris.isNotEmpty()) {
+                val destTreeUriString =
+                    history.ruleId?.let { ruleId ->
+                        ruleRepository.getRuleById(ruleId)?.destinationFolderPath?.takeIf { it.isNotBlank() }
+                    }
+                if (destTreeUriString != null) {
+                    deleteEmptyDestSubfoldersAfterCopyUndo(destTreeUriString, copyDeletedDestinationUris)
+                }
+            }
+
+            if (failed > 0) {
+                DiagnosticLog.record(
+                    context,
+                    "Undo completed with failures: historyId=$historyId, reversed=$reversed, failed=$failed",
+                )
+            }
+            return UndoResult(reversed, failed, errors, operationMode = operationMode)
+        }
+
+        private suspend fun syncRunUndoStatus(historyId: Long) {
+            val persistedUndoFiles =
+                runHistoryRepository
+                    .getFilesForRunOnce(historyId)
+                    .filter { fileMoved -> fileMoved.hasRecoverableDestination }
+            val undoneFileCount = persistedUndoFiles.count { it.undoStatus == FileUndoStatus.UNDONE }
+            if (persistedUndoFiles.isNotEmpty() && undoneFileCount == persistedUndoFiles.size) {
+                runHistoryRepository.markRunReversed(historyId)
+            } else if (undoneFileCount > 0) {
+                runHistoryRepository.markRunPartiallyUndone(historyId)
+            }
+        }
 
         private fun isMockMoveRun(
             operationMode: OperationMode,
@@ -295,10 +307,30 @@ class UndoRunUseCase
             totalBytes: Long,
             onProgress: (UndoProgress) -> Unit,
         ): UndoResult {
+            if (movedFiles.isEmpty()) {
+                _activeUndoProgress.update { it + (historyId to 1f) }
+                onProgress(UndoProgress(0, 0, 0L, 0L))
+                runHistoryRepository.markRunReversed(historyId)
+                return UndoResult(
+                    totalReversed = 0,
+                    totalFailed = 0,
+                    errors = emptyList(),
+                    operationMode = OperationMode.MOVE,
+                )
+            }
             var processedBytes = 0L
             movedFiles.forEachIndexed { index, fileMoved ->
+                runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.IN_PROGRESS)
                 delay(DevMockFileMove.FILE_OPERATION_DELAY_MILLIS)
                 processedBytes += fileMoved.fileSizeBytes.coerceAtLeast(0L)
+                runHistoryRepository.markFileUndoStatus(fileMoved.id, FileUndoStatus.UNDONE)
+                val fraction =
+                    when {
+                        totalBytes > 0L -> processedBytes.toFloat() / totalBytes.toFloat()
+                        movedFiles.isNotEmpty() -> (index + 1).toFloat() / movedFiles.size.toFloat()
+                        else -> 1f
+                    }.coerceIn(0f, 1f)
+                _activeUndoProgress.update { it + (historyId to fraction) }
                 onProgress(
                     UndoProgress(
                         processedFiles = index + 1,
@@ -308,6 +340,7 @@ class UndoRunUseCase
                     ),
                 )
             }
+            _activeUndoProgress.update { it + (historyId to 1f) }
             runHistoryRepository.markRunReversed(historyId)
             return UndoResult(
                 totalReversed = movedFiles.size,
@@ -369,7 +402,7 @@ class UndoRunUseCase
                         } catch (_: Exception) {
                             null
                         }
-                    if (children != null && children.isNotEmpty()) continue
+                    if (children?.isEmpty() != true) continue
                     deleteDocumentUriWithFallback(folderUri)
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to delete empty dest subfolder $folderDocumentId", e)
@@ -430,7 +463,7 @@ class UndoRunUseCase
                             } catch (_: Exception) {
                                 null
                             }
-                        if (!listed.isNullOrEmpty()) continue
+                        if (listed?.isEmpty() != true) continue
                         try {
                             dir.delete()
                         } catch (_: Exception) {
@@ -464,7 +497,7 @@ class UndoRunUseCase
                         } catch (_: Exception) {
                             null
                         }
-                    if (!children.isNullOrEmpty()) continue
+                    if (children?.isEmpty() != true) continue
                     deleteDocumentUriWithFallback(folderUri)
                 } catch (e: Exception) {
                     Log.w(TAG, "Failed to delete empty recorded copy folder $uriString", e)
@@ -504,8 +537,13 @@ class UndoRunUseCase
                 val dir = File(folderPath)
                 try {
                     if (!dir.isDirectory) continue
-                    val listed = dir.list()
-                    if (listed != null && listed.isNotEmpty()) continue
+                    val listed =
+                        try {
+                            dir.list()
+                        } catch (_: Exception) {
+                            null
+                        }
+                    if (listed?.isEmpty() != true) continue
                     dir.delete()
                 } catch (_: Exception) {
                 }
@@ -557,6 +595,33 @@ class UndoRunUseCase
             return null
         }
 
+        private fun originalSourceMatches(fileMoved: FileMoved): Boolean =
+            try {
+                when {
+                    fileMoved.sourceUri.startsWith("file:") -> {
+                        val path = fileMoved.sourceUri.toUri().path
+                        val sourceFile = path?.let(::File)
+                        sourceFile != null &&
+                            sourceFile.isFile &&
+                            (fileMoved.fileSizeBytes <= 0L || sourceFile.length() == fileMoved.fileSizeBytes)
+                    }
+
+                    fileMoved.sourceUri.startsWith("content://") -> {
+                        val sourceDocument = DocumentFile.fromSingleUri(context, fileMoved.sourceUri.toUri())
+                        sourceDocument != null &&
+                            sourceDocument.exists() &&
+                            sourceDocument.isFile &&
+                            (fileMoved.fileSizeBytes <= 0L || sourceDocument.length() == fileMoved.fileSizeBytes)
+                    }
+
+                    else -> {
+                        false
+                    }
+                }
+            } catch (_: Exception) {
+                false
+            }
+
         /**
          * Derives the parent folder as a SAF tree URI string from a document URI.
          * e.g. content://...document/primary%3ADCIM%2FCamera%2Fphoto.jpg
@@ -581,4 +646,173 @@ class UndoRunUseCase
                 null
             }
         }
+
+        private suspend fun undoCopyFile(fileMoved: FileMoved): SingleFileUndoOutcome {
+            if (fileMoved.destinationUri.startsWith("file:")) {
+                val path = fileMoved.destinationUri.toUri().path
+                if (path.isNullOrBlank()) {
+                    return SingleFileUndoOutcome(
+                        reversed = false,
+                        failed = true,
+                        physicalUndoCompleted = false,
+                        error = "${fileMoved.fileName}: invalid destination path",
+                    )
+                }
+                val destFile = File(path)
+                if (!destFile.isFile) {
+                    return SingleFileUndoOutcome(reversed = true, failed = false, physicalUndoCompleted = true)
+                }
+                val deleted =
+                    try {
+                        destFile.delete()
+                    } catch (_: SecurityException) {
+                        false
+                    }
+                return if (deleted) {
+                    SingleFileUndoOutcome(
+                        reversed = true,
+                        failed = false,
+                        physicalUndoCompleted = true,
+                        copyDeletedDestinationUri = fileMoved.destinationUri,
+                    )
+                } else {
+                    SingleFileUndoOutcome(
+                        reversed = false,
+                        failed = true,
+                        physicalUndoCompleted = false,
+                        error = "${fileMoved.fileName}: could not delete at destination",
+                    )
+                }
+            } else {
+                val destUri = fileMoved.destinationUri.toUri()
+                val destDoc = DocumentFile.fromSingleUri(context, destUri)
+                if (destDoc == null) {
+                    return SingleFileUndoOutcome(
+                        reversed = false,
+                        failed = true,
+                        physicalUndoCompleted = false,
+                        error = "${fileMoved.fileName}: could not open destination document",
+                    )
+                }
+                if (!destDoc.exists()) {
+                    return SingleFileUndoOutcome(reversed = true, failed = false, physicalUndoCompleted = true)
+                }
+                val deleted =
+                    try {
+                        destDoc.delete()
+                    } catch (_: SecurityException) {
+                        false
+                    }
+                return if (deleted) {
+                    SingleFileUndoOutcome(
+                        reversed = true,
+                        failed = false,
+                        physicalUndoCompleted = true,
+                        copyDeletedDestinationUri = fileMoved.destinationUri,
+                    )
+                } else {
+                    SingleFileUndoOutcome(
+                        reversed = false,
+                        failed = true,
+                        physicalUndoCompleted = false,
+                        error = "${fileMoved.fileName}: could not delete at destination",
+                    )
+                }
+            }
+        }
+
+        private suspend fun undoMoveFile(
+            fileMoved: FileMoved,
+            filesystemAccessEnabled: Boolean,
+        ): SingleFileUndoOutcome {
+            val destUri = fileMoved.destinationUri.toUri()
+            val sourceFolderUriString =
+                parentSourceFolderForUndo(fileMoved.sourceUri)
+                    ?: return SingleFileUndoOutcome(
+                        reversed = false,
+                        failed = true,
+                        physicalUndoCompleted = false,
+                        error = "${fileMoved.fileName}: cannot determine original source folder",
+                    )
+            val wasInterrupted = fileMoved.undoStatus == FileUndoStatus.IN_PROGRESS
+            val sizeBytes = getDestinationFileSizeBytes(fileMoved)
+            if (sizeBytes == null) {
+                return if (wasInterrupted && originalSourceMatches(fileMoved)) {
+                    SingleFileUndoOutcome(reversed = true, failed = false, physicalUndoCompleted = true)
+                } else {
+                    SingleFileUndoOutcome(
+                        reversed = false,
+                        failed = true,
+                        physicalUndoCompleted = false,
+                        error = "${fileMoved.fileName}: file no longer exists at destination",
+                    )
+                }
+            }
+
+            val sourceEntry =
+                FileEntry(
+                    uri = destUri,
+                    name = fileMoved.fileName,
+                    size = sizeBytes,
+                    relativeParentSegments = fileMoved.relativeParentSegments,
+                )
+            val reverseResult =
+                fileOperationRepository.moveFile(
+                    sourceEntry = sourceEntry,
+                    destFolderUriString = sourceFolderUriString,
+                    conflictPolicy = ConflictPolicy.SKIP,
+                    operationMode = OperationMode.MOVE,
+                    filesystemAccessEnabled = filesystemAccessEnabled,
+                )
+            return if (reverseResult.success && !reverseResult.skipped) {
+                SingleFileUndoOutcome(reversed = true, failed = false, physicalUndoCompleted = true)
+            } else {
+                val reverseError =
+                    reverseResult.errorMessage
+                        ?: context.getString(R.string.undo_original_source_conflict)
+                SingleFileUndoOutcome(
+                    reversed = false,
+                    failed = true,
+                    physicalUndoCompleted = false,
+                    error = "${fileMoved.fileName}: $reverseError",
+                )
+            }
+        }
+
+        private fun getDestinationFileSizeBytes(fileMoved: FileMoved): Long? {
+            val destUri = fileMoved.destinationUri.toUri()
+            return if (fileMoved.destinationUri.startsWith("file:")) {
+                val path = destUri.path
+                if (path.isNullOrBlank()) return null
+                val destFile = File(path)
+                if (!destFile.isFile) return null
+                destFile.length()
+            } else {
+                val destDoc = DocumentFile.fromSingleUri(context, destUri)
+                if (destDoc == null || !destDoc.exists()) return null
+                destDoc.length()
+            }
+        }
     }
+
+private data class SingleFileUndoOutcome(
+    val reversed: Boolean,
+    val failed: Boolean,
+    val physicalUndoCompleted: Boolean,
+    val error: String? = null,
+    val copyDeletedDestinationUri: String? = null,
+)
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun shouldAttemptUndo(undoStatus: FileUndoStatus): Boolean {
+    return undoStatus != FileUndoStatus.UNDONE
+}
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun undoStatusAfterFailure(physicalUndoCompleted: Boolean): FileUndoStatus {
+    return if (physicalUndoCompleted) {
+        FileUndoStatus.IN_PROGRESS
+    } else {
+        FileUndoStatus.FAILED
+    }
+}

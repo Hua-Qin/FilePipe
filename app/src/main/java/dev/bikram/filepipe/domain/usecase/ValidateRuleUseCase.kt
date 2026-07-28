@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.domain.usecase
 
+import dev.bikram.filepipe.data.repository.normalizeSourcePath
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleSchedule
@@ -18,6 +19,15 @@ class ValidateRuleUseCase
         }
 
         operator fun invoke(rule: Rule): Result {
+            val destinationIdentity =
+                rule.destinationFolderPath
+                    .takeIf { it.isNotBlank() }
+                    ?.let { path -> normalizeSourcePath(path, filesystemAccessEnabled = false) }
+            val hasSameSourceAndDestination =
+                destinationIdentity != null &&
+                    rule.sourceFolderPaths.any { sourcePath ->
+                        normalizeSourcePath(sourcePath, filesystemAccessEnabled = false) == destinationIdentity
+                    }
             val errors =
                 buildList {
                     if (rule.name.isBlank()) add("Rule name is required")
@@ -27,8 +37,7 @@ class ValidateRuleUseCase
                     }
                     if (rule.fileExtensions.isEmpty()) add("At least one file type is required")
                     if (rule.operationMode != OperationMode.DELETE &&
-                        rule.destinationFolderPath.isNotBlank() &&
-                        rule.sourceFolderPaths.any { it == rule.destinationFolderPath }
+                        hasSameSourceAndDestination
                     ) {
                         add("Source and destination folders cannot be the same")
                     }

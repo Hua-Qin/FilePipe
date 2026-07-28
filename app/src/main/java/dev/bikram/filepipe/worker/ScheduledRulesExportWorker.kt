@@ -38,17 +38,25 @@ class ScheduledRulesExportWorker
                     Result.success()
                 },
                 onFailure = { error ->
+                    val attemptNumber = runAttemptCount + 1
+                    val willRetry = attemptNumber < MAX_RUN_ATTEMPTS_PER_PERIOD
                     DiagnosticLog.record(
                         context,
-                        "Scheduled backup export failed: destinations=${backupDestinations.size}, attempt=$runAttemptCount",
+                        "Scheduled backup export failed: destinations=${backupDestinations.size}, " +
+                            "attempt=$attemptNumber, willRetry=$willRetry",
                         error,
                     )
-                    Result.retry()
+                    if (willRetry) {
+                        Result.retry()
+                    } else {
+                        Result.failure()
+                    }
                 },
             )
         }
 
         companion object {
             const val WORK_NAME = "scheduled_rules_export"
+            private const val MAX_RUN_ATTEMPTS_PER_PERIOD = 3
         }
     }

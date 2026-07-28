@@ -1,3 +1,32 @@
+## v3.9.6 Improvements & Fixes
+
+### 🛠 Improved Features
+- Partially completed undos are now tracked per file and can be retried without repeating files that were already restored.
+- History now loads, filters, sorts, and groups large numbers of runs more efficiently.
+- Backup imports use less memory, exports avoid exposing incomplete files, and local or cloud backups can use persistent destination folders.
+- Recursive scans now cover up to 32 folder levels while avoiding unnecessary file processing.
+- Rules selected together run in order and avoid processing equivalent source folders or files twice.
+- File-size filters now accept fractional megabytes, including decimal-comma input.
+- Folder permissions that are no longer needed are released automatically.
+- Update download actions now use a clearer, consistent layout.
+
+### 🐛 Bug Fixes
+- Incomplete copies and moves that fail to remove their source are no longer reported as successful.
+- Permanent deletion skips files changed after confirmation and refreshes confirmations that are too old.
+- Fixed overlapping, interrupted, and partially failed undo operations.
+- Fixed repeated Save taps potentially creating duplicate rules.
+- Fixed stale previews and folder checks reappearing after dismissal or replacement.
+- Invalid regular expressions, age ranges, equivalent source and destination folders, and unusable folder permissions are now rejected safely.
+- Backup restoration no longer leaves rules, history, or settings partially restored after errors.
+- Restored backups now correctly preserve schedules, folder access, undo progress, and history outcomes.
+- Update checks now handle stalled connections and server errors, use safe APK filenames, and no longer hide updates merely because the installer opened.
+- Background maintenance and backup tasks no longer retry indefinitely.
+- Runs interrupted by an app or device restart no longer remain stuck as in progress.
+- Database migration failures no longer risk silently deleting rules and history.
+- Cancelling a manual run no longer clears the selected rules.
+
+---
+
 ## v3.9.5 Delete operation, more file types
 
 ### ✨ New Features

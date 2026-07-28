@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.net.toUri
 import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -39,6 +40,11 @@ private val customSeedHexListJson =
 data class GithubReleaseAckState(
     val fingerprint: String?,
     val forInstalledVersion: String?,
+)
+
+data class SettingsRestoreOutcome(
+    val foldersNeedingReselection: Int,
+    val automationsDisabled: Boolean,
 )
 
 private fun decodeCustomSeedHexList(json: String?): List<String> {
@@ -705,69 +711,53 @@ class UserPreferencesRepository
             }
         }
 
-        suspend fun applySettingsFromBackup(dto: SettingsBackupDto) {
-            val exportUriString = dto.exportFolderUri
-            if (exportUriString.startsWith("content://")) {
-                runCatching {
-                    context.contentResolver.takePersistableUriPermission(
-                        exportUriString.toUri(),
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                    )
+        private fun canRetainRestoredFolder(folderUriString: String): Boolean {
+            if (folderUriString.isBlank() || !folderUriString.startsWith("content://")) return true
+            val folderUri = folderUriString.toUri()
+            val resolver = context.contentResolver
+            val alreadyPersisted =
+                resolver.persistedUriPermissions.any { permission ->
+                    permission.uri == folderUri && permission.isReadPermission && permission.isWritePermission
                 }
+            if (alreadyPersisted) return true
+            val permissionFlags =
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            if (runCatching { resolver.takePersistableUriPermission(folderUri, permissionFlags) }.isFailure) {
+                return false
             }
-            val cloudExportUriString = dto.cloudExportFolderUri
-            if (cloudExportUriString.startsWith("content://")) {
-                runCatching {
-                    context.contentResolver.takePersistableUriPermission(
-                        cloudExportUriString.toUri(),
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                    )
+            return resolver.persistedUriPermissions.any { permission ->
+                permission.uri == folderUri && permission.isReadPermission && permission.isWritePermission
+            }
+        }
+
+        suspend fun applySettingsFromBackup(dto: SettingsBackupDto): SettingsRestoreOutcome {
+            var foldersNeedingReselection = 0
+            val exportUriString =
+                dto.exportFolderUri.takeIf(::canRetainRestoredFolder).orEmpty().also {
+                    if (dto.exportFolderUri.isNotBlank() && it.isBlank()) foldersNeedingReselection += 1
                 }
-            }
+            val cloudExportUriString =
+                dto.cloudExportFolderUri.takeIf(::canRetainRestoredFolder).orEmpty().also {
+                    if (dto.cloudExportFolderUri.isNotBlank() && it.isBlank()) foldersNeedingReselection += 1
+                }
+            val restoredBookmarks =
+                dto.bookmarkedFolders
+                    .filter { folder -> folder.isNotBlank() }
+                    .filter { folder ->
+                        val canRetain = canRetainRestoredFolder(folder)
+                        if (!canRetain) foldersNeedingReselection += 1
+                        canRetain
+                    }
+            val hasBackupDestination = exportUriString.isNotBlank() || cloudExportUriString.isNotBlank()
+            val automationsDisabled =
+                !hasBackupDestination && (dto.autoExportOnRuleChange || dto.scheduledExportEnabled)
             dataStore.edit { prefs ->
-                if (isLegacyBlackThemeModeName(dto.themeMode)) {
-                    prefs[PrefKeys.THEME_MODE] = AppThemeMode.DARK.name
-                    prefs[PrefKeys.USE_BLACK_THEME] = true
-                } else {
-                    val parsedThemeMode =
-                        runCatching { AppThemeMode.valueOf(dto.themeMode) }.getOrDefault(AppThemeMode.SYSTEM)
-                    prefs[PrefKeys.THEME_MODE] = parsedThemeMode.migrated().name
-                    dto.useBlackTheme?.let { value ->
-                        prefs[PrefKeys.USE_BLACK_THEME] = value
-                    }
-                }
-
-                val parsedColorSource =
-                    dto.colorSource?.let { raw ->
-                        runCatching { AppColorSource.valueOf(raw) }.getOrNull()?.migrated()
-                    }
-                when {
-                    parsedColorSource != null -> {
-                        prefs[PrefKeys.COLOR_SOURCE] = parsedColorSource.name
-                        prefs.remove(PrefKeys.USE_MATERIAL_YOU)
-                    }
-
-                    dto.useMaterialYou == true -> {
-                        prefs.remove(PrefKeys.COLOR_SOURCE)
-                        prefs[PrefKeys.USE_MATERIAL_YOU] = true
-                    }
-
-                    dto.useMaterialYou == false -> {
-                        prefs.remove(PrefKeys.COLOR_SOURCE)
-                        prefs[PrefKeys.USE_MATERIAL_YOU] = false
-                    }
-                }
-
-                dto.themePaletteStyle?.let { raw ->
-                    runCatching { ThemePaletteStyle.valueOf(raw) }.getOrNull()?.let { style ->
-                        prefs[PrefKeys.THEME_PALETTE_STYLE] = style.name
-                    }
-                }
+                prefs.applyThemeAndAppearanceBackupSettings(dto)
 
                 prefs[PrefKeys.EXPORT_FOLDER_URI] = exportUriString
                 prefs[PrefKeys.CLOUD_EXPORT_FOLDER_URI] = cloudExportUriString
-                prefs[PrefKeys.AUTO_EXPORT_ON_CHANGE] = dto.autoExportOnRuleChange
-                prefs[PrefKeys.SCHEDULED_EXPORT] = dto.scheduledExportEnabled
+                prefs[PrefKeys.AUTO_EXPORT_ON_CHANGE] = dto.autoExportOnRuleChange && hasBackupDestination
+                prefs[PrefKeys.SCHEDULED_EXPORT] = dto.scheduledExportEnabled && hasBackupDestination
                 prefs[PrefKeys.LOG_RETENTION_DAYS] = dto.logRetentionDays
 
                 runCatching { SwipeAction.valueOf(dto.swipeStartToEnd) }.getOrNull()?.let { action ->
@@ -804,7 +794,7 @@ class UserPreferencesRepository
                         .joinToString("|")
 
                 prefs[PrefKeys.BOOKMARKED_FOLDERS] =
-                    dto.bookmarkedFolders.filter { it.isNotBlank() }.joinToString("|")
+                    restoredBookmarks.joinToString("|")
 
                 prefs[PrefKeys.HAS_SEEN_INTRO] = dto.hasSeenIntro
                 prefs[PrefKeys.HAPTIC_FEEDBACK] = dto.hapticFeedbackEnabled
@@ -844,67 +834,7 @@ class UserPreferencesRepository
                     }
                 }
 
-                val restoredList: List<String>? =
-                    when {
-                        dto.customSeedHexes != null -> {
-                            dto.customSeedHexes
-                        }
-
-                        !dto.activeCustomSeedHex.isNullOrBlank() -> {
-                            listOf(dto.activeCustomSeedHex.trim())
-                        }
-
-                        !dto.customSeedHex.isNullOrBlank() -> {
-                            listOf(dto.customSeedHex.trim())
-                        }
-
-                        else -> {
-                            null
-                        }
-                    }
-                if (restoredList != null) {
-                    val normalizedList = restoredList.mapNotNull { normalizeCustomSeedHexOrNull(it) }.distinct()
-                    prefs[PrefKeys.CUSTOM_SEED_HEX_LIST] =
-                        customSeedHexListJson.encodeToString(normalizedList)
-                    if (normalizedList.isEmpty()) {
-                        prefs.remove(PrefKeys.ACTIVE_CUSTOM_SEED_HEX)
-                        val sourceAfterColor =
-                            prefs[PrefKeys.COLOR_SOURCE]?.let { raw ->
-                                runCatching { AppColorSource.valueOf(raw) }.getOrNull()
-                            }
-                        if (sourceAfterColor == AppColorSource.CUSTOM) {
-                            prefs[PrefKeys.COLOR_SOURCE] = AppColorSource.DEFAULT.name
-                        }
-                    } else {
-                        val activeCandidate =
-                            when {
-                                !dto.activeCustomSeedHex.isNullOrBlank() -> {
-                                    normalizeCustomSeedHexOrNull(dto.activeCustomSeedHex.trim())
-                                }
-
-                                !dto.customSeedHex.isNullOrBlank() -> {
-                                    normalizeCustomSeedHexOrNull(dto.customSeedHex.trim())
-                                }
-
-                                else -> {
-                                    normalizedList.firstOrNull()
-                                }
-                            }
-                        val activeNorm =
-                            when {
-                                activeCandidate != null &&
-                                    normalizedList.any { normalizeCustomSeedHexOrNull(it) == activeCandidate } -> {
-                                    activeCandidate
-                                }
-
-                                else -> {
-                                    normalizeCustomSeedHexOrNull(normalizedList.first()) ?: normalizedList.first()
-                                }
-                            }
-                        prefs[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] = activeNorm
-                    }
-                    prefs.remove(PrefKeys.CUSTOM_SEED_HEX)
-                }
+                prefs.applyCustomSeedBackupSettings(dto)
 
                 val restoredFontPath = dto.customFontPath.trim()
                 if (restoredFontPath.isNotBlank() && java.io.File(restoredFontPath).isFile) {
@@ -919,6 +849,115 @@ class UserPreferencesRepository
                     prefs.remove(PrefKeys.CUSTOM_FONT_PATH)
                     prefs.remove(PrefKeys.CUSTOM_FONT_NAME)
                 }
+            }
+            return SettingsRestoreOutcome(
+                foldersNeedingReselection = foldersNeedingReselection,
+                automationsDisabled = automationsDisabled,
+            )
+        }
+
+        private fun MutablePreferences.applyThemeAndAppearanceBackupSettings(dto: SettingsBackupDto) {
+            if (isLegacyBlackThemeModeName(dto.themeMode)) {
+                this[PrefKeys.THEME_MODE] = AppThemeMode.DARK.name
+                this[PrefKeys.USE_BLACK_THEME] = true
+            } else {
+                val parsedThemeMode =
+                    runCatching { AppThemeMode.valueOf(dto.themeMode) }.getOrDefault(AppThemeMode.SYSTEM)
+                this[PrefKeys.THEME_MODE] = parsedThemeMode.migrated().name
+                dto.useBlackTheme?.let { value ->
+                    this[PrefKeys.USE_BLACK_THEME] = value
+                }
+            }
+
+            val parsedColorSource =
+                dto.colorSource?.let { raw ->
+                    runCatching { AppColorSource.valueOf(raw) }.getOrNull()?.migrated()
+                }
+            when {
+                parsedColorSource != null -> {
+                    this[PrefKeys.COLOR_SOURCE] = parsedColorSource.name
+                    this.remove(PrefKeys.USE_MATERIAL_YOU)
+                }
+
+                dto.useMaterialYou == true -> {
+                    this.remove(PrefKeys.COLOR_SOURCE)
+                    this[PrefKeys.USE_MATERIAL_YOU] = true
+                }
+
+                dto.useMaterialYou == false -> {
+                    this.remove(PrefKeys.COLOR_SOURCE)
+                    this[PrefKeys.USE_MATERIAL_YOU] = false
+                }
+            }
+
+            dto.themePaletteStyle?.let { raw ->
+                runCatching { ThemePaletteStyle.valueOf(raw) }.getOrNull()?.let { style ->
+                    this[PrefKeys.THEME_PALETTE_STYLE] = style.name
+                }
+            }
+        }
+
+        private fun MutablePreferences.applyCustomSeedBackupSettings(dto: SettingsBackupDto) {
+            val restoredList: List<String>? =
+                when {
+                    dto.customSeedHexes != null -> {
+                        dto.customSeedHexes
+                    }
+
+                    !dto.activeCustomSeedHex.isNullOrBlank() -> {
+                        listOf(dto.activeCustomSeedHex.trim())
+                    }
+
+                    !dto.customSeedHex.isNullOrBlank() -> {
+                        listOf(dto.customSeedHex.trim())
+                    }
+
+                    else -> {
+                        null
+                    }
+                }
+            if (restoredList != null) {
+                val normalizedList = restoredList.mapNotNull { normalizeCustomSeedHexOrNull(it) }.distinct()
+                this[PrefKeys.CUSTOM_SEED_HEX_LIST] =
+                    customSeedHexListJson.encodeToString(normalizedList)
+                if (normalizedList.isEmpty()) {
+                    this.remove(PrefKeys.ACTIVE_CUSTOM_SEED_HEX)
+                    val sourceAfterColor =
+                        this[PrefKeys.COLOR_SOURCE]?.let { raw ->
+                            runCatching { AppColorSource.valueOf(raw) }.getOrNull()
+                        }
+                    if (sourceAfterColor == AppColorSource.CUSTOM) {
+                        this[PrefKeys.COLOR_SOURCE] = AppColorSource.DEFAULT.name
+                    }
+                } else {
+                    val activeCandidate =
+                        when {
+                            !dto.activeCustomSeedHex.isNullOrBlank() -> {
+                                normalizeCustomSeedHexOrNull(dto.activeCustomSeedHex.trim())
+                            }
+
+                            !dto.customSeedHex.isNullOrBlank() -> {
+                                normalizeCustomSeedHexOrNull(dto.customSeedHex.trim())
+                            }
+
+                            else -> {
+                                normalizedList.firstOrNull()
+                            }
+                        }
+                    val activeNorm =
+                        when {
+                            activeCandidate != null &&
+                                normalizedList.any { normalizeCustomSeedHexOrNull(it) == activeCandidate } -> {
+                                activeCandidate
+                            }
+
+                            else -> {
+                                normalizeCustomSeedHexOrNull(normalizedList.first()) ?: normalizedList.first()
+                            }
+                        }
+                    this[PrefKeys.ACTIVE_CUSTOM_SEED_HEX] = activeNorm
+                }
+                this.remove(PrefKeys.CUSTOM_SEED_HEX)
             }
         }
     }

@@ -11,6 +11,36 @@ import dev.bikram.filepipe.domain.model.isNoExtensionToken
  * as module-internal top-level functions in the same package.
  */
 
+internal data class FileScanFilterContext(
+    val extensions: List<String>,
+    val filenameRegexes: List<Regex>?,
+    val isRegexPattern: Boolean,
+    val excludeRegexes: List<Regex>?,
+    val isExcludeRegexPattern: Boolean,
+    val minFileSizeBytes: Long?,
+    val maxFileSizeBytes: Long?,
+    val minAgeMs: Long?,
+    val maxAgeMs: Long?,
+    val nowMs: Long,
+)
+
+internal fun passesCheapScanFilters(
+    fileName: String,
+    fileSizeBytes: Long,
+    lastModifiedMs: Long,
+    filters: FileScanFilterContext,
+): Boolean {
+    if (!matchesExtensions(fileName, filters.extensions)) return false
+    if (!matchesFilename(fileName, filters.filenameRegexes, filters.isRegexPattern)) return false
+    if (shouldExclude(fileName, filters.excludeRegexes, filters.isExcludeRegexPattern)) return false
+    if (filters.minFileSizeBytes != null && fileSizeBytes < filters.minFileSizeBytes) return false
+    if (filters.maxFileSizeBytes != null && fileSizeBytes > filters.maxFileSizeBytes) return false
+    if (filters.minAgeMs == null && filters.maxAgeMs == null) return true
+    val ageMs = filters.nowMs - lastModifiedMs
+    return (filters.minAgeMs == null || ageMs >= filters.minAgeMs) &&
+        (filters.maxAgeMs == null || ageMs <= filters.maxAgeMs)
+}
+
 internal fun mimeTypeFromName(name: String): String {
     val ext = name.substringAfterLast('.', "").lowercase()
     return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
@@ -64,7 +94,8 @@ internal fun matchesFilename(
     filenameRegexes: List<Regex>?,
     isRegexPattern: Boolean,
 ): Boolean {
-    if (filenameRegexes.isNullOrEmpty()) return true
+    if (filenameRegexes == null) return true
+    if (filenameRegexes.isEmpty()) return false
     return if (isRegexPattern) {
         filenameRegexes.any { it.containsMatchIn(name) }
     } else {
@@ -75,23 +106,28 @@ internal fun matchesFilename(
 internal fun buildExcludeRegexes(
     excludePatterns: List<String>,
     isRegexPattern: Boolean,
-): List<Regex> {
+): List<Regex>? {
     val nonBlank = excludePatterns.filter { it.isNotBlank() }
     if (nonBlank.isEmpty()) return emptyList()
     return if (isRegexPattern) {
-        nonBlank.mapNotNull { pattern ->
-            runCatching { Regex(pattern.trim(), RegexOption.IGNORE_CASE) }.getOrNull()
-        }
+        runCatching {
+            nonBlank.map { pattern ->
+                Regex(pattern.trim(), RegexOption.IGNORE_CASE)
+            }
+        }.getOrNull()
     } else {
-        nonBlank.map { globToRegex(it.trim()) }
+        nonBlank.map { pattern ->
+            globToRegex(pattern.trim())
+        }
     }
 }
 
 internal fun shouldExclude(
     name: String,
-    excludeRegexes: List<Regex>,
+    excludeRegexes: List<Regex>?,
     isRegexPattern: Boolean,
 ): Boolean {
+    if (excludeRegexes == null) return true
     if (excludeRegexes.isEmpty()) return false
     return if (isRegexPattern) {
         excludeRegexes.any { it.containsMatchIn(name) }

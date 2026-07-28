@@ -3,6 +3,7 @@ package dev.bikram.filepipe.domain.export
 import dev.bikram.filepipe.data.preferences.AppPreferences
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
+import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
@@ -16,8 +17,70 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
 
 class RulesBackupJsonTest {
+    @Test
+    fun backupCanBeDecodedDirectlyFromStream() {
+        val json =
+            buildAppBackupJson(
+                rules =
+                    listOf(
+                        Rule(
+                            name = "Streamed",
+                            sourceFolderPaths = listOf("content://source"),
+                            destinationFolderPath = "content://destination",
+                            fileExtensions = listOf("txt"),
+                        ),
+                    ),
+            )
+
+        val backup =
+            ByteArrayInputStream(json.toByteArray(Charsets.UTF_8)).use { inputStream ->
+                parseRulesBackupJson(inputStream).getOrThrow()
+            }
+
+        assertEquals("Streamed", backup.rules.single().name)
+    }
+
+    @Test
+    fun legacyFileUndoStatusDefaultsToPending() {
+        val legacyBackup =
+            parseRulesBackupJson(
+                """
+                {
+                  "version": 11,
+                  "rules": [],
+                  "history": [{
+                    "ruleName": "Legacy",
+                    "triggeredBy": "MANUAL",
+                    "startedAt": 100,
+                    "status": "SUCCESS",
+                    "totalFilesMoved": 1,
+                    "totalFilesFailed": 0,
+                    "files": [{
+                      "fileName": "legacy.txt",
+                      "sourceUri": "content://source/legacy.txt",
+                      "destinationUri": "content://destination/legacy.txt",
+                      "fileSizeBytes": 10,
+                      "movedAt": 123,
+                      "success": true
+                    }]
+                  }]
+                }
+                """.trimIndent(),
+            ).getOrThrow()
+
+        assertEquals(
+            FileUndoStatus.PENDING.name,
+            legacyBackup.history
+                .single()
+                .files
+                .single()
+                .undoStatus,
+        )
+    }
+
     @Test
     fun appBackupRoundTripPreservesRulesHistoryFilesAndSettings() {
         val rule =
@@ -56,6 +119,7 @@ class RulesBackupJsonTest {
                 relativeParentSegments = listOf("Camera", "Raw"),
                 movedAt = 123L,
                 success = true,
+                undoStatus = FileUndoStatus.UNDONE,
             )
         val history =
             RunHistory(
@@ -101,6 +165,7 @@ class RulesBackupJsonTest {
         assertEquals("COPY", restoredHistory.operationMode)
         assertEquals(listOf("content://destination/Camera"), restoredHistory.copyCreatedDestFolderUris)
         assertEquals(listOf("Camera", "Raw"), restoredHistory.files.single().relativeParentSegments)
+        assertEquals(FileUndoStatus.UNDONE.name, restoredHistory.files.single().undoStatus)
 
         val restoredSettings = backup.settings!!
         assertTrue(restoredSettings.autoExportOnRuleChange)
@@ -148,5 +213,47 @@ class RulesBackupJsonTest {
         val backup = parseRulesBackupJson(buildAppBackupJson(listOf(rule), emptyList(), null)).getOrThrow()
         val restoredRule = backup.rules.single().toDomain()
         assertEquals(OperationMode.DELETE, restoredRule.operationMode)
+    }
+
+    @Test
+    fun intervalScheduleWithoutStartTimeSurvivesRoundTrip() {
+        val rule =
+            Rule(
+                name = "Every few hours",
+                sourceFolderPaths = listOf("content://source"),
+                destinationFolderPath = "content://destination",
+                fileExtensions = listOf("txt"),
+                schedule =
+                    RuleSchedule(
+                        type = ScheduleType.EVERY_N_HOURS,
+                        hour = 0,
+                        minute = 0,
+                        repeatInterval = 3,
+                        usesStartTime = false,
+                    ),
+            )
+
+        val restoredRule =
+            parseRulesBackupJson(buildAppBackupJson(listOf(rule)))
+                .getOrThrow()
+                .rules
+                .single()
+                .toDomain()
+
+        assertEquals(rule.schedule, restoredRule.schedule)
+        assertFalse(restoredRule.schedule!!.usesStartTime)
+    }
+
+    @Test
+    fun legacyIntervalScheduleDefaultsToUsingStartTime() {
+        val legacySchedule =
+            ScheduleBackupDto(
+                type = ScheduleType.EVERY_N_HOURS.name,
+                hour = 8,
+                minute = 30,
+                intervalHours = 2,
+            )
+
+        assertTrue(legacySchedule.toDomain()!!.usesStartTime)
     }
 }

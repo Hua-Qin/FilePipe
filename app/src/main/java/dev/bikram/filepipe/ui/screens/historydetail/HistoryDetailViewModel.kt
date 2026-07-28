@@ -5,6 +5,8 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
@@ -18,10 +20,9 @@ import dev.bikram.filepipe.ui.navigation.Screen
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -40,43 +41,58 @@ class HistoryDetailViewModel
     ) : ViewModel() {
         private val historyId: Long = savedStateHandle[Screen.HistoryDetail.ARG_HISTORY_ID] ?: 0L
 
-        private val _history = MutableStateFlow<RunHistory?>(null)
-        val history: StateFlow<RunHistory?> = _history.asStateFlow()
+        val history: StateFlow<RunHistory?> =
+            runHistoryRepository
+                .observeHistoryById(historyId)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
-        private val _isUndoing = MutableStateFlow(false)
-        val isUndoing: StateFlow<Boolean> = _isUndoing.asStateFlow()
+        val isUndoing: StateFlow<Boolean> =
+            undoRunUseCase.activeUndoProgress
+                .map { it.containsKey(historyId) }
+                .stateIn(
+                    viewModelScope,
+                    SharingStarted.WhileSubscribed(5_000),
+                    undoRunUseCase.isUndoInProgress(historyId),
+                )
 
-        private val _undoProgress = MutableStateFlow<Float?>(null)
-        val undoProgress: StateFlow<Float?> = _undoProgress.asStateFlow()
+        val undoProgress: StateFlow<Float?> =
+            undoRunUseCase.activeUndoProgress
+                .map { it[historyId] }
+                .stateIn(
+                    viewModelScope,
+                    SharingStarted.WhileSubscribed(5_000),
+                    undoRunUseCase.getUndoProgress(historyId),
+                )
 
         val pendingHistoryUndoRequest: StateFlow<PendingHistoryUndoRequest?> =
             pendingShortcutRepository.pendingHistoryUndoRequest
 
-        val files: StateFlow<List<FileMoved>> =
+        val filesPagingFlow: Flow<PagingData<FileMoved>> =
             runHistoryRepository
-                .getFilesForRun(historyId)
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+                .getFilesForRunPaged(historyId)
+                .cachedIn(viewModelScope)
+
+        val fileCount: StateFlow<Int> =
+            runHistoryRepository
+                .observeFileCountForRun(historyId)
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
         // One-shot snackbar messages: a Channel so each is delivered exactly once.
         private val _userMessages = Channel<String>(Channel.BUFFERED)
         val userMessages: Flow<String> = _userMessages.receiveAsFlow()
 
-        init {
-            viewModelScope.launch {
-                _history.value = runHistoryRepository.getHistoryById(historyId)
-            }
-        }
-
         fun undoRun() {
-            if (!_isUndoing.compareAndSet(expect = false, update = true)) return
+            if (undoRunUseCase.isUndoInProgress(historyId)) return
             launchUndo()
         }
 
         fun undoRunFromNotification(request: PendingHistoryUndoRequest) {
             if (request.historyId != historyId) return
-            if (!_isUndoing.compareAndSet(expect = false, update = true)) return
             if (!pendingShortcutRepository.consumePendingHistoryUndo(request)) {
-                _isUndoing.value = false
+                return
+            }
+            if (undoRunUseCase.isUndoInProgress(historyId)) {
+                NotificationManagerCompat.from(appContext).cancel(request.notificationId)
                 return
             }
             launchUndo(notificationId = request.notificationId)
@@ -84,35 +100,19 @@ class HistoryDetailViewModel
 
         private fun launchUndo(notificationId: Int? = null) {
             viewModelScope.launch {
+                if (undoRunUseCase.isUndoInProgress(historyId)) return@launch
                 try {
-                    _undoProgress.value = 0f
                     val result =
                         withContext(NonCancellable) {
-                            undoRunUseCase(historyId) { progress ->
-                                _undoProgress.value =
-                                    when {
-                                        progress.totalBytes > 0L -> {
-                                            progress.processedBytes.toFloat() / progress.totalBytes.toFloat()
-                                        }
-
-                                        progress.totalFiles > 0 -> {
-                                            progress.processedFiles.toFloat() / progress.totalFiles.toFloat()
-                                        }
-
-                                        else -> {
-                                            0f
-                                        }
-                                    }.coerceIn(0f, 1f)
-                            }
+                            undoRunUseCase(historyId)
                         }
-                    _userMessages.trySend(result.toUserMessage(appContext))
-                    _history.value = runHistoryRepository.getHistoryById(historyId)
+                    result.toUserMessage(appContext)?.let { message ->
+                        _userMessages.trySend(message)
+                    }
                 } finally {
                     notificationId?.let { completedNotificationId ->
                         NotificationManagerCompat.from(appContext).cancel(completedNotificationId)
                     }
-                    _undoProgress.value = null
-                    _isUndoing.value = false
                 }
             }
         }

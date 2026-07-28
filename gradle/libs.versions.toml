@@ -12,7 +12,7 @@ datastore = "1.2.1"
 detekt = "2.0.0-alpha.5"
 documentfile = "1.1.0"
 exifinterface = "1.4.2"
-gradleVersionsPlugin = "0.54.0"
+gradleVersionsPlugin = "0.56.0"
 hilt = "2.60.1"
 hiltNav = "1.4.0"
 java = "21"
@@ -89,4 +89,4 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
 version-catalog-update = "nl.littlerobots.version-catalog-update:1.1.0"
-versions = { id = "com.github.ben-manes.versions", version.ref = "gradleVersionsPlugin" }
+versions = { id = "io.github.ben-manes.versions", version.ref = "gradleVersionsPlugin" }

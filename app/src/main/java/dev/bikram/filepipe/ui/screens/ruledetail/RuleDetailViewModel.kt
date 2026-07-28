@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.ui.screens.ruledetail
 
+import android.content.Context
 import android.os.Environment
 import android.provider.DocumentsContract
 import androidx.core.net.toUri
@@ -7,6 +8,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.R
 import dev.bikram.filepipe.data.preferences.FolderAccessMode
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.FileOperationRepository
@@ -38,6 +41,9 @@ import dev.bikram.filepipe.domain.usecase.SimulateRuleUseCase
 import dev.bikram.filepipe.domain.usecase.ValidateRuleUseCase
 import dev.bikram.filepipe.ui.navigation.Screen
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -51,7 +57,10 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import java.io.File
+import java.math.BigDecimal
+import java.math.RoundingMode
 import javax.inject.Inject
 
 data class RuleDetailUiState(
@@ -82,6 +91,7 @@ data class RuleDetailUiState(
     val orientation: FileOrientation? = null,
     val isLoading: Boolean = true,
     val isSaved: Boolean = false,
+    val isSaving: Boolean = false,
     val errors: List<String> = emptyList(),
     val previewFiles: List<PreviewFileResult>? = null,
     val isPreviewLoading: Boolean = false,
@@ -186,6 +196,55 @@ private fun RuleDetailUiState.withSnapshot(snapshot: RuleSnapshot): RuleDetailUi
         isSaved = false,
     )
 
+private val BYTES_PER_MEGABYTE = BigDecimal.valueOf(1024L * 1024L)
+internal const val MAX_FILE_AGE_DAYS = 36_500
+
+internal enum class AgeFilterValidationError {
+    OUT_OF_RANGE,
+    MINIMUM_EXCEEDS_MAXIMUM,
+}
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun formatFileSizeMegabytes(bytes: Long): String {
+    return BigDecimal
+        .valueOf(bytes)
+        .divide(BYTES_PER_MEGABYTE)
+        .stripTrailingZeros()
+        .toPlainString()
+}
+
+internal fun parseFileSizeMegabytes(value: String): Long? {
+    val megabytes = value.trim().replace(',', '.').toBigDecimalOrNull() ?: return null
+    if (megabytes <= BigDecimal.ZERO) return null
+    return runCatching {
+        megabytes
+            .multiply(BYTES_PER_MEGABYTE)
+            .setScale(0, RoundingMode.HALF_UP)
+            .longValueExact()
+    }.getOrNull()
+}
+
+internal fun validateAgeFilterValues(
+    minimumAgeDays: String,
+    maximumAgeDays: String,
+): AgeFilterValidationError? {
+    val minimumValue = minimumAgeDays.trim().takeIf { it.isNotEmpty() }?.toLongOrNull()
+    val maximumValue = maximumAgeDays.trim().takeIf { it.isNotEmpty() }?.toLongOrNull()
+    val minimumIsInvalid =
+        minimumAgeDays.isNotBlank() &&
+            (minimumValue == null || minimumValue !in 1..MAX_FILE_AGE_DAYS.toLong())
+    val maximumIsInvalid =
+        maximumAgeDays.isNotBlank() &&
+            (maximumValue == null || maximumValue !in 1..MAX_FILE_AGE_DAYS.toLong())
+    if (minimumIsInvalid || maximumIsInvalid) {
+        return AgeFilterValidationError.OUT_OF_RANGE
+    }
+    if (minimumValue != null && maximumValue != null && minimumValue > maximumValue) {
+        return AgeFilterValidationError.MINIMUM_EXCEEDS_MAXIMUM
+    }
+    return null
+}
+
 @HiltViewModel
 class RuleDetailViewModel
     @Inject
@@ -199,6 +258,7 @@ class RuleDetailViewModel
         private val userPreferencesRepository: UserPreferencesRepository,
         private val fileOperationRepository: FileOperationRepository,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+        @param:ApplicationContext private val appContext: Context,
     ) : ViewModel() {
         private val ruleId: Long = savedStateHandle[Screen.RuleDetail.ARG_RULE_ID] ?: Screen.RuleDetail.NEW_RULE_ID
         private val templateIndex: Int = savedStateHandle[Screen.RuleDetail.ARG_TEMPLATE_INDEX] ?: -1
@@ -209,6 +269,10 @@ class RuleDetailViewModel
         val uiState: StateFlow<RuleDetailUiState> = _uiState.asStateFlow()
 
         private val _baseline = MutableStateFlow<RuleSnapshot?>(null)
+        private val saveMutex = Mutex()
+        private var folderAccessRecomputeJob: Job? = null
+        private var previewJob: Job? = null
+        private var previewRequestId = 0L
 
         val isDirty: StateFlow<Boolean> =
             combine(_uiState, _baseline) { state, baseline ->
@@ -265,8 +329,8 @@ class RuleDetailViewModel
                             iconEmoji = rule.iconEmoji,
                             filenamePattern = rule.filenamePattern ?: "",
                             isRegexPattern = rule.isRegexPattern,
-                            minFileSizeMb = rule.minFileSizeBytes?.let { bytes -> "${bytes / 1024 / 1024}" } ?: "",
-                            maxFileSizeMb = rule.maxFileSizeBytes?.let { bytes -> "${bytes / 1024 / 1024}" } ?: "",
+                            minFileSizeMb = rule.minFileSizeBytes?.let(::formatFileSizeMegabytes) ?: "",
+                            maxFileSizeMb = rule.maxFileSizeBytes?.let(::formatFileSizeMegabytes) ?: "",
                             minAgeDays = rule.minAgeDays?.toString() ?: "",
                             maxAgeDays = rule.maxAgeDays?.toString() ?: "",
                             excludePatternsText = rule.excludePatterns.joinToString(", "),
@@ -285,37 +349,40 @@ class RuleDetailViewModel
             }
 
         private fun scheduleFolderAccessRecompute() {
-            viewModelScope.launch(ioDispatcher) {
-                val prefs = userPreferencesRepository.preferencesFlow.first()
-                val filesystemAccessEnabled = isFilesystemAccessEffective(prefs.folderAccessMode)
-                val allFilesGranted = Environment.isExternalStorageManager()
-                val snapshot = _uiState.value
-                val sourceIssues =
-                    snapshot.sourceFolderPaths
-                        .mapNotNull { path ->
-                            val result = fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)
-                            if (result == FolderAccessResult.Accessible) null else path to result
-                        }.toMap()
-                val destinationIssue =
-                    if (snapshot.destinationFolderPath.isBlank()) {
-                        null
-                    } else {
-                        val result =
-                            fileOperationRepository.resolveFolderAccess(
-                                snapshot.destinationFolderPath,
-                                filesystemAccessEnabled,
-                            )
-                        if (result == FolderAccessResult.Accessible) null else result
+            folderAccessRecomputeJob?.cancel()
+            val snapshot = _uiState.value
+            folderAccessRecomputeJob =
+                viewModelScope.launch(ioDispatcher) {
+                    val prefs = userPreferencesRepository.preferencesFlow.first()
+                    val filesystemAccessEnabled = isFilesystemAccessEffective(prefs.folderAccessMode)
+                    val allFilesGranted = Environment.isExternalStorageManager()
+                    val sourceIssues =
+                        snapshot.sourceFolderPaths
+                            .mapNotNull { path ->
+                                val result = fileOperationRepository.resolveFolderAccess(path, filesystemAccessEnabled)
+                                if (result == FolderAccessResult.Accessible) null else path to result
+                            }.toMap()
+                    val destinationIssue =
+                        if (snapshot.destinationFolderPath.isBlank()) {
+                            null
+                        } else {
+                            val result =
+                                fileOperationRepository.resolveFolderAccess(
+                                    snapshot.destinationFolderPath,
+                                    filesystemAccessEnabled,
+                                )
+                            if (result == FolderAccessResult.Accessible) null else result
+                        }
+                    currentCoroutineContext().ensureActive()
+                    _uiState.update {
+                        it.copy(
+                            folderAccessMode = prefs.folderAccessMode,
+                            allFilesAccessGranted = allFilesGranted,
+                            inaccessibleSourceIssues = sourceIssues,
+                            destinationFolderAccessIssue = destinationIssue,
+                        )
                     }
-                _uiState.update {
-                    it.copy(
-                        folderAccessMode = prefs.folderAccessMode,
-                        allFilesAccessGranted = allFilesGranted,
-                        inaccessibleSourceIssues = sourceIssues,
-                        destinationFolderAccessIssue = destinationIssue,
-                    )
                 }
-            }
         }
 
         fun refreshFolderAccessAfterPermissionChange() {
@@ -577,7 +644,12 @@ class RuleDetailViewModel
             scheduleFolderAccessRecompute()
         }
 
-        fun dismissPreview() = _uiState.update { it.copy(previewFiles = null) }
+        fun dismissPreview() {
+            previewRequestId += 1
+            previewJob?.cancel()
+            previewJob = null
+            _uiState.update { state -> state.copy(previewFiles = null, isPreviewLoading = false) }
+        }
 
         fun discardChanges() {
             val baseline = _baseline.value ?: return
@@ -585,53 +657,82 @@ class RuleDetailViewModel
             scheduleFolderAccessRecompute()
         }
 
-        fun loadPreview() =
-            viewModelScope.launch {
-                val state = _uiState.value
-                if (state.sourceFolderPaths.isEmpty() ||
-                    state.fileExtensions.isEmpty() ||
-                    (state.operationMode != OperationMode.DELETE && state.destinationFolderPath.isBlank())
-                ) {
-                    return@launch
-                }
-                _uiState.update { it.copy(isPreviewLoading = true, previewFiles = null) }
-                val rule = buildRuleFromState(state)
-                val files = simulateRuleUseCase(rule)
-                _uiState.update { it.copy(previewFiles = files, isPreviewLoading = false) }
+        fun loadPreview() {
+            val state = _uiState.value
+            if (state.sourceFolderPaths.isEmpty() ||
+                state.fileExtensions.isEmpty() ||
+                (state.operationMode != OperationMode.DELETE && state.destinationFolderPath.isBlank())
+            ) {
+                return
             }
+            previewJob?.cancel()
+            previewRequestId += 1
+            val requestId = previewRequestId
+            _uiState.update { currentState -> currentState.copy(isPreviewLoading = true, previewFiles = null) }
+            previewJob =
+                viewModelScope.launch {
+                    val rule = buildRuleFromState(state)
+                    val files = simulateRuleUseCase(rule)
+                    if (previewRequestId != requestId) return@launch
+                    _uiState.update { currentState ->
+                        currentState.copy(previewFiles = files, isPreviewLoading = false)
+                    }
+                }
+        }
 
         fun save() =
             viewModelScope.launch {
-                if (_uiState.value.operationMode == OperationMode.DELETE) {
-                    _uiState.update { it.copy(destinationFolderPath = "") }
-                }
-                val state = _uiState.value
-                val rule = buildRuleFromState(state)
+                if (!saveMutex.tryLock()) return@launch
+                _uiState.update { it.copy(isSaving = true) }
+                try {
+                    if (_uiState.value.operationMode == OperationMode.DELETE) {
+                        _uiState.update { it.copy(destinationFolderPath = "") }
+                    }
+                    val state = _uiState.value
+                    val rule = buildRuleFromState(state)
+                    val ruleErrors =
+                        (validateRuleUseCase(rule) as? ValidateRuleUseCase.Result.Invalid)
+                            ?.errors
+                            .orEmpty()
+                    val ageFilterError =
+                        when (validateAgeFilterValues(state.minAgeDays, state.maxAgeDays)) {
+                            AgeFilterValidationError.OUT_OF_RANGE -> {
+                                appContext.getString(R.string.rule_error_age_out_of_range, MAX_FILE_AGE_DAYS)
+                            }
 
-                when (val result = validateRuleUseCase(rule)) {
-                    is ValidateRuleUseCase.Result.Invalid -> {
-                        _uiState.update { it.copy(errors = result.errors) }
+                            AgeFilterValidationError.MINIMUM_EXCEEDS_MAXIMUM -> {
+                                appContext.getString(R.string.rule_error_minimum_age_exceeds_maximum)
+                            }
+
+                            null -> {
+                                null
+                            }
+                        }
+                    val validationErrors = ruleErrors + listOfNotNull(ageFilterError)
+                    if (validationErrors.isNotEmpty()) {
+                        _uiState.update { it.copy(errors = validationErrors) }
                         return@launch
                     }
 
-                    is ValidateRuleUseCase.Result.Valid -> {}
-                }
+                    val savedId = ruleRepository.saveRule(rule)
+                    val savedRule = rule.copy(id = savedId)
 
-                val savedId = ruleRepository.saveRule(rule)
-                val savedRule = rule.copy(id = savedId)
+                    if (savedRule.isEnabled && savedRule.schedule != null) {
+                        scheduleRulesUseCase.scheduleRule(savedRule)
+                    } else {
+                        scheduleRulesUseCase.cancelRule(savedRule)
+                    }
 
-                if (savedRule.isEnabled && savedRule.schedule != null) {
-                    scheduleRulesUseCase.scheduleRule(savedRule)
-                } else {
-                    scheduleRulesUseCase.cancelRule(savedRule)
+                    _uiState.update {
+                        it.copy(id = savedId, errors = emptyList())
+                    }
+                    _baseline.value = _uiState.value.toSnapshot()
+                    rulesAutoExportTrigger.maybeExportAfterRuleChange()
+                    _uiState.update { it.copy(isSaved = true) }
+                } finally {
+                    _uiState.update { it.copy(isSaving = false) }
+                    saveMutex.unlock()
                 }
-
-                _uiState.update {
-                    it.copy(id = savedId, errors = emptyList())
-                }
-                _baseline.value = _uiState.value.toSnapshot()
-                rulesAutoExportTrigger.maybeExportAfterRuleChange()
-                _uiState.update { it.copy(isSaved = true) }
             }
 
         fun restoreRule() =
@@ -675,15 +776,9 @@ class RuleDetailViewModel
                 iconEmoji = state.iconEmoji?.takeIf { it.isNotBlank() },
                 filenamePattern = state.filenamePattern.takeIf { it.isNotBlank() },
                 minFileSizeBytes =
-                    state.minFileSizeMb
-                        .toLongOrNull()
-                        ?.takeIf { it > 0 }
-                        ?.let { it * 1024 * 1024 },
+                    parseFileSizeMegabytes(state.minFileSizeMb),
                 maxFileSizeBytes =
-                    state.maxFileSizeMb
-                        .toLongOrNull()
-                        ?.takeIf { it > 0 }
-                        ?.let { it * 1024 * 1024 },
+                    parseFileSizeMegabytes(state.maxFileSizeMb),
                 minAgeDays = state.minAgeDays.toIntOrNull()?.takeIf { it > 0 },
                 maxAgeDays = state.maxAgeDays.toIntOrNull()?.takeIf { it > 0 },
                 excludePatterns =

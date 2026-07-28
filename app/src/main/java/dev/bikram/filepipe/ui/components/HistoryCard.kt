@@ -200,6 +200,7 @@ fun StatusChip(
                     RunStatus.IN_PROGRESS -> stringResource(R.string.status_in_progress) to MaterialTheme.colorScheme.secondaryContainer
                     RunStatus.CANCELLED -> stringResource(R.string.status_cancelled) to MaterialTheme.colorScheme.surfaceVariant
                     RunStatus.UNDONE -> stringResource(R.string.status_undone) to MaterialTheme.colorScheme.surfaceVariant
+                    RunStatus.PARTIAL_UNDONE -> stringResource(R.string.status_partially_undone) to MaterialTheme.colorScheme.tertiaryContainer
                 }
             }
         }

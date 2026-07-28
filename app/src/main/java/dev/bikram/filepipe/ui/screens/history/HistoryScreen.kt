@@ -131,7 +131,6 @@ fun HistoryScreen(
     val availableStatusFilters by viewModel.availableStatusFilters.collectAsStateWithLifecycle()
     val trashedRules by viewModel.trashedRules.collectAsStateWithLifecycle()
     val pagingItems = viewModel.historyPagingFlow.collectAsLazyPagingItems()
-    val filteredItems by viewModel.filteredHistoryItems.collectAsStateWithLifecycle()
     val hasAnyHistory by viewModel.hasAnyHistory.collectAsStateWithLifecycle()
     val isSmallLandscape = isSmallLandscape()
 
@@ -145,18 +144,12 @@ fun HistoryScreen(
     var groupMenuExpanded by remember { mutableStateOf(false) }
 
     val isInitialLoad = pagingItems.loadState.refresh is LoadState.Loading
-    val isUsingPaging = !uiState.isFilterActive
     val reducedMotion = LocalReducedMotion.current
     val pagingListState = rememberLazyListState()
-    val filteredListState = rememberLazyListState()
     val trashListState = rememberLazyListState()
     val pagingListScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = pagingListState,
-        )
-    val filteredListScrollEnabled =
-        rememberContentOverflowScrollEnabled(
-            listState = filteredListState,
         )
     val trashListScrollEnabled =
         rememberContentOverflowScrollEnabled(
@@ -192,6 +185,7 @@ fun HistoryScreen(
             HistoryStatusFilter.NO_CHANGES to stringResource(R.string.status_no_changes),
             HistoryStatusFilter.CANCELLED to stringResource(R.string.status_cancelled),
             HistoryStatusFilter.UNDONE to stringResource(R.string.status_undone),
+            HistoryStatusFilter.PARTIAL_UNDONE to stringResource(R.string.status_partially_undone),
         )
 
     if (showClearConfirm) {
@@ -445,12 +439,8 @@ fun HistoryScreen(
     ) { innerPadding ->
         val density = LocalDensity.current
         val activeListState =
-            remember(section, isUsingPaging, trashListState, pagingListState, filteredListState) {
-                when {
-                    section == HistorySection.TRASH -> trashListState
-                    isUsingPaging -> pagingListState
-                    else -> filteredListState
-                }
+            remember(section, trashListState, pagingListState) {
+                if (section == HistorySection.TRASH) trashListState else pagingListState
             }
         val topAlphaMultiplier by remember(activeListState) {
             derivedStateOf {
@@ -499,10 +489,8 @@ fun HistoryScreen(
             val targetIsEmpty =
                 if (targetSection == HistorySection.TRASH) {
                     trashedRules.isEmpty()
-                } else if (isUsingPaging) {
-                    !isInitialLoad && pagingItems.itemCount == 0
                 } else {
-                    filteredItems.isEmpty()
+                    !isInitialLoad && pagingItems.itemCount == 0
                 }
 
             if (targetIsEmpty) {
@@ -617,7 +605,7 @@ fun HistoryScreen(
                         )
                     }
                 }
-            } else if (isUsingPaging) {
+            } else {
                 LazyColumn(
                     state = pagingListState,
                     modifier =
@@ -668,64 +656,6 @@ fun HistoryScreen(
                                 )
                             }
 
-                            is HistoryItem.RuleHeader -> {}
-
-                            is HistoryItem.StatusHeader -> {}
-
-                            is HistoryItem.Entry -> {
-                                SwipeToDismissHistoryCard(
-                                    history = item.history,
-                                    onClick = { onHistoryClick(item.history.id) },
-                                    onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
-                                    isActiveInDetailPane = item.history.id == activeHistoryId,
-                                    modifier = Modifier.animateItem(),
-                                )
-                            }
-
-                            null -> {}
-                        }
-                    }
-                }
-            } else {
-                LazyColumn(
-                    state = filteredListState,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .wrapContentWidth(Alignment.CenterHorizontally)
-                            .widthIn(max = 720.dp)
-                            .then(scrollBlurModifier),
-                    contentPadding =
-                        PaddingValues(
-                            start = listStartPadding,
-                            end = listEndPadding,
-                            top = innerPadding.calculateTopPadding() + 8.dp,
-                            bottom = innerPadding.calculateBottomPadding() + contentPadding.calculateBottomPadding(),
-                        ),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    userScrollEnabled = filteredListScrollEnabled,
-                ) {
-                    items(
-                        items = filteredItems,
-                        key = { item ->
-                            when (item) {
-                                is HistoryItem.Entry -> "entry_${item.history.id}"
-                                is HistoryItem.DateHeader -> "header_${item.label}"
-                                is HistoryItem.RuleHeader -> "rule_${item.ruleName}"
-                                is HistoryItem.StatusHeader -> "status_${item.section.name}"
-                            }
-                        },
-                    ) { item ->
-                        when (item) {
-                            is HistoryItem.DateHeader -> {
-                                Text(
-                                    text = item.label,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.padding(vertical = 4.dp).animateItem(),
-                                )
-                            }
-
                             is HistoryItem.RuleHeader -> {
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).animateItem(),
@@ -773,6 +703,8 @@ fun HistoryScreen(
                                     modifier = Modifier.animateItem(),
                                 )
                             }
+
+                            null -> {}
                         }
                     }
                 }
@@ -1057,6 +989,7 @@ private fun historyStatusSectionTitle(section: HistoryStatusSection): String =
         HistoryStatusSection.NO_CHANGES -> stringResource(R.string.status_no_changes)
         HistoryStatusSection.IN_PROGRESS -> stringResource(R.string.history_status_header_in_progress)
         HistoryStatusSection.CANCELLED -> stringResource(R.string.status_cancelled)
+        HistoryStatusSection.PARTIAL_UNDONE -> stringResource(R.string.status_partially_undone)
         HistoryStatusSection.UNDONE -> stringResource(R.string.status_undone)
     }
 

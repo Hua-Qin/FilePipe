@@ -1,11 +1,24 @@
 package dev.bikram.filepipe.domain.usecase
 
+import android.content.Context
+import androidx.room.withTransaction
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.filepipe.AppDatabase
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.data.repository.BackupSnapshot
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
+import dev.bikram.filepipe.diagnostics.DiagnosticLog
+import dev.bikram.filepipe.domain.export.AppBackup
+import dev.bikram.filepipe.domain.export.RunHistoryBackupDto
 import dev.bikram.filepipe.domain.export.parseRulesBackupJson
 import dev.bikram.filepipe.domain.export.toDomain
+import dev.bikram.filepipe.domain.model.Rule
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
+import java.io.InputStream
 import javax.inject.Inject
 
 enum class BackupImportPickAction {
@@ -22,11 +35,34 @@ data class RestoreBackupResult(
     val rulesImported: Int,
     val historyRunsImported: Int,
     val settingsRestored: Boolean,
+    val foldersNeedingReselection: Int,
+    val automationsDisabled: Boolean,
 )
+
+class InvalidBackupRuleRegexException(
+    val ruleNames: List<String>,
+) : IllegalArgumentException("Backup contains invalid rule regular expressions")
+
+internal fun findRulesWithInvalidRegexPatterns(rules: List<Rule>): List<String> =
+    rules
+        .filter { rule ->
+            val invalidFilenameRegex =
+                rule.isRegexPattern &&
+                    !rule.filenamePattern.isNullOrBlank() &&
+                    runCatching { Regex(rule.filenamePattern) }.isFailure
+            val invalidExcludeRegex =
+                rule.isExcludeRegexPattern &&
+                    rule.excludePatterns.any { pattern ->
+                        pattern.isNotBlank() && runCatching { Regex(pattern.trim()) }.isFailure
+                    }
+            invalidFilenameRegex || invalidExcludeRegex
+        }.map { rule -> rule.name }
 
 class ImportRulesUseCase
     @Inject
     constructor(
+        @param:ApplicationContext private val context: Context,
+        private val appDatabase: AppDatabase,
         private val ruleRepository: RuleRepository,
         private val runHistoryRepository: RunHistoryRepository,
         private val scheduleRulesUseCase: ScheduleRulesUseCase,
@@ -38,6 +74,20 @@ class ImportRulesUseCase
          */
         suspend fun mergeRulesFromJson(jsonText: String): Result<MergeRulesImportResult> {
             val backup = parseRulesBackupJson(jsonText).getOrElse { return Result.failure(it) }
+            return mergeRules(backup)
+        }
+
+        suspend fun mergeRulesFromStream(inputStream: InputStream): Result<MergeRulesImportResult> {
+            val backup = parseRulesBackupJson(inputStream).getOrElse { return Result.failure(it) }
+            return mergeRules(backup)
+        }
+
+        private suspend fun mergeRules(backup: AppBackup): Result<MergeRulesImportResult> {
+            val incomingRules = backup.rules.map { ruleDto -> ruleDto.toDomain() }
+            val invalidRegexRuleNames = findRulesWithInvalidRegexPatterns(incomingRules)
+            if (invalidRegexRuleNames.isNotEmpty()) {
+                return Result.failure(InvalidBackupRuleRegexException(invalidRegexRuleNames))
+            }
             val existingByName =
                 ruleRepository
                     .getAllRules()
@@ -47,16 +97,15 @@ class ImportRulesUseCase
                     .toMutableMap()
 
             val rulesFromFile =
-                backup.rules
-                    .groupBy { dto -> dto.name }
+                incomingRules
+                    .groupBy { rule -> rule.name }
                     .mapValues { entry -> entry.value.last() }
                     .values
 
             var rulesAdded = 0
             var rulesUpdated = 0
 
-            for (dto in rulesFromFile) {
-                val incoming = dto.toDomain()
+            for (incoming in rulesFromFile) {
                 val existing = existingByName[incoming.name]
                 if (existing != null) {
                     scheduleRulesUseCase.cancelRuleById(existing.id)
@@ -94,31 +143,90 @@ class ImportRulesUseCase
          */
         suspend fun restoreFromBackupJson(jsonText: String): Result<RestoreBackupResult> {
             val backup = parseRulesBackupJson(jsonText).getOrElse { return Result.failure(it) }
-            val oldIds = ruleRepository.getAllRuleIds()
-            oldIds.forEach { ruleId -> scheduleRulesUseCase.cancelRuleById(ruleId) }
+            return restoreFromBackup(backup)
+        }
 
-            val rules = backup.rules.map { it.toDomain() }
-            ruleRepository.replaceAllRules(rules)
-            val savedOrdered = ruleRepository.getAllRulesOrderedBySortOrder()
-            val nameToFirstRuleId =
-                savedOrdered
-                    .groupBy { rule -> rule.name }
-                    .mapValues { entry -> entry.value.first().id }
+        suspend fun restoreFromBackupStream(inputStream: InputStream): Result<RestoreBackupResult> {
+            val backup = parseRulesBackupJson(inputStream).getOrElse { return Result.failure(it) }
+            return restoreFromBackup(backup)
+        }
 
-            runHistoryRepository.replaceHistoryFromBackup(backup.history) { dto ->
-                val index = dto.ruleIndexInBackup
-                if (index != null && index in savedOrdered.indices) {
-                    savedOrdered[index].id
-                } else {
-                    nameToFirstRuleId[dto.ruleName]
-                }
+        private suspend fun restoreFromBackup(backup: AppBackup): Result<RestoreBackupResult> {
+            val rules = backup.rules.map { ruleDto -> ruleDto.toDomain() }
+            val invalidRegexRuleNames = findRulesWithInvalidRegexPatterns(rules)
+            if (invalidRegexRuleNames.isNotEmpty()) {
+                return Result.failure(InvalidBackupRuleRegexException(invalidRegexRuleNames))
             }
 
-            val settingsApplied = backup.settings != null
-            backup.settings?.let { userPreferencesRepository.applySettingsFromBackup(it) }
+            val rollbackSnapshot = runHistoryRepository.getRestoreRollbackSnapshot()
+            val previousSnapshot = rollbackSnapshot.backupSnapshot
+            val previousRulesIncludingTrash = rollbackSnapshot.rulesIncludingTrash
+            val previousPreferences = userPreferencesRepository.getPreferencesSnapshot()
+            val oldIds = ruleRepository.getAllRuleIds()
+            val previousUris =
+                ruleRepository.getAllRuleFolderUris() +
+                    setOf(previousPreferences.exportFolderUri, previousPreferences.cloudExportFolderUri) +
+                    previousPreferences.bookmarkedFolders
 
-            savedOrdered.filter { rule -> rule.isEnabled && rule.schedule != null }.forEach { rule ->
-                scheduleRulesUseCase.scheduleRule(rule)
+            val savedOrdered =
+                try {
+                    replaceRoomBackupData(rules, backup.history)
+                } catch (error: CancellationException) {
+                    throw error
+                } catch (error: Exception) {
+                    return Result.failure(error)
+                }
+
+            val settingsApplied = backup.settings != null
+            var foldersNeedingReselection = 0
+            var automationsDisabled = false
+            try {
+                backup.settings?.let { settings ->
+                    val settingsOutcome = userPreferencesRepository.applySettingsFromBackup(settings)
+                    foldersNeedingReselection = settingsOutcome.foldersNeedingReselection
+                    automationsDisabled = settingsOutcome.automationsDisabled
+                }
+            } catch (error: CancellationException) {
+                withContext(NonCancellable) {
+                    rollbackRoomRestore(
+                        rulesIncludingTrash = previousRulesIncludingTrash,
+                        snapshot = previousSnapshot,
+                        importedRules = rules,
+                        backup = backup,
+                        originalError = error,
+                    )
+                }
+                throw error
+            } catch (error: Exception) {
+                withContext(NonCancellable) {
+                    rollbackRoomRestore(
+                        rulesIncludingTrash = previousRulesIncludingTrash,
+                        snapshot = previousSnapshot,
+                        importedRules = rules,
+                        backup = backup,
+                        originalError = error,
+                    )
+                }
+                return Result.failure(error)
+            }
+
+            withContext(NonCancellable) {
+                oldIds.forEach { ruleId ->
+                    runCatching { scheduleRulesUseCase.cancelRuleById(ruleId) }
+                        .onFailure { error ->
+                            DiagnosticLog.record(context, "Restored backup could not cancel old rule schedule: ruleId=$ruleId", error)
+                        }
+                }
+                runCatching { ruleRepository.releaseUnusedRuleGrants(previousUris) }
+                    .onFailure { error ->
+                        DiagnosticLog.record(context, "Restored backup could not release old folder grants", error)
+                    }
+                savedOrdered.filter { rule -> rule.isEnabled && rule.schedule != null }.forEach { rule ->
+                    runCatching { scheduleRulesUseCase.scheduleRule(rule) }
+                        .onFailure { error ->
+                            DiagnosticLog.record(context, "Restored backup could not schedule rule: ruleId=${rule.id}", error)
+                        }
+                }
             }
 
             return Result.success(
@@ -126,7 +234,61 @@ class ImportRulesUseCase
                     rulesImported = savedOrdered.size,
                     historyRunsImported = backup.history.size,
                     settingsRestored = settingsApplied,
+                    foldersNeedingReselection = foldersNeedingReselection,
+                    automationsDisabled = automationsDisabled,
                 ),
             )
+        }
+
+        private suspend fun replaceRoomBackupData(
+            rules: List<Rule>,
+            backupRuns: List<RunHistoryBackupDto>,
+        ): List<Rule> =
+            appDatabase.withTransaction {
+                ruleRepository.replaceAllRulesInDatabase(rules)
+                val savedOrdered = ruleRepository.getAllRulesOrderedBySortOrder()
+                val nameToFirstRuleId =
+                    savedOrdered
+                        .groupBy { rule -> rule.name }
+                        .mapValues { entry -> entry.value.first().id }
+                runHistoryRepository.replaceHistoryFromBackup(backupRuns) { historyDto ->
+                    val ruleIndex = historyDto.ruleIndexInBackup
+                    if (ruleIndex != null) {
+                        savedOrdered.getOrNull(ruleIndex)?.id
+                    } else {
+                        nameToFirstRuleId[historyDto.ruleName]
+                    }
+                }
+                savedOrdered
+            }
+
+        private suspend fun rollbackRoomRestore(
+            rulesIncludingTrash: List<Rule>,
+            snapshot: BackupSnapshot,
+            importedRules: List<Rule>,
+            backup: AppBackup,
+            originalError: Throwable,
+        ) {
+            runCatching {
+                runHistoryRepository.restoreSnapshotAtomically(rulesIncludingTrash, snapshot)
+            }.exceptionOrNull()?.let { rollbackError ->
+                originalError.addSuppressed(rollbackError)
+            }
+            val importedUris =
+                buildSet {
+                    importedRules.forEach { rule ->
+                        addAll(rule.sourceFolderPaths)
+                        add(rule.destinationFolderPath)
+                    }
+                    backup.settings?.let { settings ->
+                        add(settings.exportFolderUri)
+                        add(settings.cloudExportFolderUri)
+                        addAll(settings.bookmarkedFolders)
+                    }
+                }
+            runCatching { ruleRepository.releaseUnusedRuleGrants(importedUris) }
+                .onFailure { cleanupError ->
+                    originalError.addSuppressed(cleanupError)
+                }
         }
     }

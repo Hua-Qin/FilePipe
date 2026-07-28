@@ -3,6 +3,8 @@ package dev.bikram.filepipe.data.repository
 import dev.bikram.filepipe.data.local.dao.RuleDao
 import dev.bikram.filepipe.data.local.entity.toDomain
 import dev.bikram.filepipe.data.local.entity.toEntity
+import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
+import dev.bikram.filepipe.data.storage.PersistedUriGrantManager
 import dev.bikram.filepipe.domain.model.Rule
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -14,6 +16,8 @@ class RuleRepository
     @Inject
     constructor(
         private val ruleDao: RuleDao,
+        private val userPreferencesRepository: UserPreferencesRepository,
+        private val persistedUriGrantManager: PersistedUriGrantManager,
     ) {
         companion object {
             const val TRASH_RETENTION_MILLIS: Long = 30L * 24L * 60L * 60L * 1000L
@@ -28,6 +32,8 @@ class RuleRepository
         suspend fun getRuleByIdIncludingTrashed(id: Long): Rule? = ruleDao.getRuleByIdIncludingTrashed(id)?.toDomain()
 
         suspend fun getAllRulesOrderedBySortOrder(): List<Rule> = ruleDao.getAllRulesOrderedBySortOrder().map { entity -> entity.toDomain() }
+
+        suspend fun getAllRulesIncludingTrashed(): List<Rule> = ruleDao.getAllRulesIncludingTrashed().map { entity -> entity.toDomain() }
 
         suspend fun getEnabledRules(): List<Rule> = ruleDao.getEnabledRules().map { it.toDomain() }
 
@@ -47,21 +53,30 @@ class RuleRepository
             }
             val edited = rule.toEntity()
             val stored = ruleDao.getRuleByIdIncludingTrashed(rule.id)
-            return ruleDao.upsertRule(
-                if (stored == null) {
-                    edited
-                } else {
-                    edited.copy(
-                        cardModeOverride = stored.cardModeOverride,
-                        lastRunStartedAt = stored.lastRunStartedAt,
-                        createdAt = stored.createdAt,
-                        trashedAt = stored.trashedAt,
-                    )
-                },
-            )
+            val savedRuleId =
+                ruleDao.upsertRule(
+                    if (stored == null) {
+                        edited
+                    } else {
+                        edited.copy(
+                            cardModeOverride = stored.cardModeOverride,
+                            lastRunStartedAt = stored.lastRunStartedAt,
+                            createdAt = stored.createdAt,
+                            trashedAt = stored.trashedAt,
+                        )
+                    },
+                )
+            stored?.toDomain()?.let { previousRule ->
+                releaseUnusedRuleGrants(previousRule.folderUris())
+            }
+            return savedRuleId
         }
 
-        suspend fun updateRule(rule: Rule) = ruleDao.updateRule(rule.toEntity())
+        suspend fun updateRule(rule: Rule) {
+            val previousRule = ruleDao.getRuleByIdIncludingTrashed(rule.id)?.toDomain()
+            ruleDao.updateRule(rule.toEntity())
+            previousRule?.let { releaseUnusedRuleGrants(it.folderUris()) }
+        }
 
         /** One transaction so observers emit once; preserves drag order until sort mode updates. */
         suspend fun persistOrderedSortIndices(ordered: List<Rule>) {
@@ -93,22 +108,71 @@ class RuleRepository
 
         suspend fun clearCardModeOverrides() = ruleDao.clearCardModeOverrides()
 
-        suspend fun deleteRuleForever(ruleId: Long) = ruleDao.deleteRuleById(ruleId)
+        suspend fun deleteRuleForever(ruleId: Long) {
+            val deletedRule = ruleDao.getRuleByIdIncludingTrashed(ruleId)?.toDomain()
+            ruleDao.deleteRuleById(ruleId)
+            deletedRule?.let { releaseUnusedRuleGrants(it.folderUris()) }
+        }
 
-        suspend fun autoEmptyTrashOlderThan(cutoffMillis: Long) = ruleDao.deleteTrashedRulesOlderThan(cutoffMillis)
+        suspend fun autoEmptyTrashOlderThan(cutoffMillis: Long) {
+            val previousUris = allRuleFolderUris()
+            ruleDao.deleteTrashedRulesOlderThan(cutoffMillis)
+            releaseUnusedRuleGrants(previousUris)
+        }
 
-        suspend fun emptyTrashForever() = ruleDao.deleteAllTrashedRules()
+        suspend fun emptyTrashForever() {
+            val previousUris = allRuleFolderUris()
+            ruleDao.deleteAllTrashedRules()
+            releaseUnusedRuleGrants(previousUris)
+        }
 
         suspend fun deleteRule(ruleId: Long) = deleteRuleForever(ruleId)
 
         suspend fun getAllRuleIds(): List<Long> = ruleDao.getAllRuleIds()
 
-        suspend fun deleteAllRules() = ruleDao.deleteAllRules()
+        suspend fun deleteAllRules() {
+            val previousUris = allRuleFolderUris()
+            ruleDao.deleteAllRules()
+            releaseUnusedRuleGrants(previousUris)
+        }
 
         suspend fun replaceAllRules(rules: List<Rule>) {
+            val previousUris = allRuleFolderUris()
+            replaceAllRulesInDatabase(rules)
+            releaseUnusedRuleGrants(previousUris)
+        }
+
+        suspend fun replaceAllRulesInDatabase(rules: List<Rule>) {
             ruleDao.deleteAllRules()
             rules.forEachIndexed { index, rule ->
                 ruleDao.upsertRule(rule.copy(id = 0L, sortOrder = index).toEntity())
             }
+        }
+
+        suspend fun getAllRuleFolderUris(): Set<String> = allRuleFolderUris()
+
+        suspend fun releaseUnusedRuleGrants(candidateUris: Collection<String>) {
+            releaseUnusedRuleGrantsInternal(candidateUris)
+        }
+
+        @Suppress("ktlint:standard:function-expression-body")
+        private suspend fun allRuleFolderUris(): Set<String> {
+            return ruleDao
+                .getAllRulesIncludingTrashed()
+                .flatMapTo(linkedSetOf()) { ruleEntity -> ruleEntity.toDomain().folderUris() }
+        }
+
+        private suspend fun releaseUnusedRuleGrantsInternal(candidateUris: Collection<String>) {
+            val preferences = userPreferencesRepository.getPreferencesSnapshot()
+            val retainedUris =
+                allRuleFolderUris() +
+                    setOf(preferences.exportFolderUri, preferences.cloudExportFolderUri) +
+                    preferences.bookmarkedFolders
+            persistedUriGrantManager.releaseUnused(candidateUris, retainedUris)
+        }
+
+        @Suppress("ktlint:standard:function-expression-body")
+        private fun Rule.folderUris(): Set<String> {
+            return sourceFolderPaths.toSet() + destinationFolderPath
         }
     }

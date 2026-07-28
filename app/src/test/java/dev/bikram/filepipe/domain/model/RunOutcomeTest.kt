@@ -55,6 +55,31 @@ class RunOutcomeTest {
     }
 
     @Test
+    fun failedSourceDeletionKeepsDestinationRecoverable() {
+        val partialMove =
+            RunResult(
+                ruleId = 1L,
+                ruleName = "Downloads",
+                historyId = 9L,
+                filesMoved =
+                    listOf(
+                        moved(
+                            fileName = "duplicate.pdf",
+                            success = false,
+                            destinationCreated = true,
+                        ),
+                    ),
+                startedAt = 1L,
+                completedAt = 2L,
+            )
+
+        assertEquals(1, partialMove.totalMoved)
+        assertEquals(1, partialMove.totalFailed)
+        assertEquals(RunStatus.PARTIAL_FAILURE, partialMove.status)
+        assertTrue(partialMove.filesMoved.single().hasRecoverableDestination)
+    }
+
+    @Test
     fun undoStateTreatsLegacyReversedRowsAndUndoneStatusAsUndone() {
         assertTrue(history(status = RunStatus.SUCCESS, isReversed = true).isEffectivelyUndone())
         assertTrue(history(status = RunStatus.UNDONE, isReversed = false).isEffectivelyUndone())
@@ -65,11 +90,12 @@ class RunOutcomeTest {
         fileName: String,
         success: Boolean,
         skipped: Boolean = false,
+        destinationCreated: Boolean = success,
     ): FileMoved =
         FileMoved(
             fileName = fileName,
             sourceUri = "content://source/$fileName",
-            destinationUri = "content://destination/$fileName",
+            destinationUri = if (destinationCreated) "content://destination/$fileName" else "",
             fileSizeBytes = 100L,
             success = success,
             skipped = skipped,

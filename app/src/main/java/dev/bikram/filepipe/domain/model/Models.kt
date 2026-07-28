@@ -189,7 +189,7 @@ data class RunHistory(
 
 enum class TriggerType { MANUAL, SCHEDULED }
 
-enum class RunStatus { IN_PROGRESS, SUCCESS, PARTIAL_FAILURE, FAILED, CANCELLED, UNDONE }
+enum class RunStatus { IN_PROGRESS, SUCCESS, PARTIAL_FAILURE, FAILED, CANCELLED, UNDONE, PARTIAL_UNDONE }
 
 /** Successful run with zero files moved and zero failures (shown as "No changes", not "Success"). */
 fun RunHistory.isNoChangesRun(): Boolean = status == RunStatus.SUCCESS && totalFilesMoved == 0 && totalFilesFailed == 0
@@ -205,9 +205,12 @@ enum class HistoryStatusFilter {
     NO_CHANGES,
     CANCELLED,
     UNDONE,
+    PARTIAL_UNDONE,
 }
 
 // ---
+
+enum class FileUndoStatus { PENDING, IN_PROGRESS, UNDONE, FAILED }
 
 data class FileMoved(
     val id: Long = 0,
@@ -221,7 +224,11 @@ data class FileMoved(
     val success: Boolean,
     val skipped: Boolean = false,
     val errorMessage: String? = null,
+    val undoStatus: FileUndoStatus = FileUndoStatus.PENDING,
 )
+
+val FileMoved.hasRecoverableDestination: Boolean
+    get() = !skipped && destinationUri.isNotBlank()
 
 // ---
 
@@ -234,7 +241,7 @@ data class RunResult(
     val completedAt: Long,
     val copyCreatedDestFolderUris: List<String> = emptyList(),
 ) {
-    val totalMoved: Int get() = filesMoved.count { it.success && !it.skipped }
+    val totalMoved: Int get() = filesMoved.count { it.hasRecoverableDestination }
     val totalSkipped: Int get() = filesMoved.count { it.skipped }
     val totalFailed: Int get() = filesMoved.count { !it.success && !it.skipped }
     val status: RunStatus get() =

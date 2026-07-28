@@ -22,8 +22,8 @@ import dev.bikram.filepipe.data.preferences.ThemePaletteStyle
 import dev.bikram.filepipe.data.preferences.UpdateCheckSchedule
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
+import dev.bikram.filepipe.data.storage.PersistedUriGrantManager
 import dev.bikram.filepipe.data.storage.isFilesystemFolderPathString
-import dev.bikram.filepipe.data.storage.treeUriFromDocumentUri
 import dev.bikram.filepipe.di.IoDispatcher
 import dev.bikram.filepipe.diagnostics.DiagnosticLog
 import dev.bikram.filepipe.domain.backupFileTimestamp
@@ -31,6 +31,7 @@ import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.usecase.BackupImportPickAction
 import dev.bikram.filepipe.domain.usecase.ExportRulesUseCase
 import dev.bikram.filepipe.domain.usecase.ImportRulesUseCase
+import dev.bikram.filepipe.domain.usecase.InvalidBackupRuleRegexException
 import dev.bikram.filepipe.domain.usecase.RulesAutoExportTrigger
 import dev.bikram.filepipe.ui.theme.CustomFontStorage
 import dev.bikram.filepipe.update.UpdateCheckWorkScheduler
@@ -49,6 +50,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
+import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -64,6 +67,7 @@ class SettingsViewModel
         private val rulesAutoExportTrigger: RulesAutoExportTrigger,
         private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
         private val ruleRepository: RuleRepository,
+        private val persistedUriGrantManager: PersistedUriGrantManager,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         val preferencesFlow = userPreferencesRepository.preferencesFlow
@@ -184,27 +188,58 @@ class SettingsViewModel
 
         fun setExportFolderUri(uriString: String) =
             viewModelScope.launch {
-                persistBackupFolderUri(uriString)
+                val previousUri = userPreferencesRepository.getPreferencesSnapshot().exportFolderUri
+                if (!persistBackupFolderUri(uriString)) {
+                    postUserMessage(context.getString(R.string.settings_export_folder_permission_failed))
+                    return@launch
+                }
                 userPreferencesRepository.setExportFolderUri(uriString)
+                releaseReplacedBackupGrant(previousUri)
                 disableAutomationsIfNoBackupDestination()
             }
 
         fun setCloudExportFolderUri(uriString: String) =
             viewModelScope.launch {
-                persistBackupFolderUri(uriString)
+                val previousUri = userPreferencesRepository.getPreferencesSnapshot().cloudExportFolderUri
+                if (!persistBackupFolderUri(uriString)) {
+                    postUserMessage(context.getString(R.string.settings_export_folder_permission_failed))
+                    return@launch
+                }
                 userPreferencesRepository.setCloudExportFolderUri(uriString)
+                releaseReplacedBackupGrant(previousUri)
                 disableAutomationsIfNoBackupDestination()
             }
 
-        private suspend fun persistBackupFolderUri(uriString: String) {
+        private suspend fun persistBackupFolderUri(uriString: String): Boolean {
             if (uriString.startsWith("content://")) {
-                runCatching {
+                return runCatching {
                     context.contentResolver.takePersistableUriPermission(
                         uriString.toUri(),
                         Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                     )
+                    true
+                }.getOrElse { error ->
+                    DiagnosticLog.record(context, "Failed to take persistable URI permission for $uriString", error)
+                    false
                 }
             }
+            return true
+        }
+
+        private suspend fun releaseReplacedBackupGrant(previousUri: String) {
+            if (!previousUri.startsWith("content://")) return
+            val preferences = userPreferencesRepository.getPreferencesSnapshot()
+            val retainedRuleUris =
+                ruleRepository
+                    .getAllRulesIncludingTrashed()
+                    .flatMap { rule -> rule.sourceFolderPaths + rule.destinationFolderPath }
+            persistedUriGrantManager.releaseUnused(
+                candidateUris = listOf(previousUri),
+                retainedUris =
+                    retainedRuleUris +
+                        listOf(preferences.exportFolderUri, preferences.cloudExportFolderUri) +
+                        preferences.bookmarkedFolders,
+            )
         }
 
         private suspend fun disableAutomationsIfNoBackupDestination() {
@@ -353,75 +388,14 @@ class SettingsViewModel
             viewModelScope.launch {
                 exportRulesUseCase.exportBackupJsonToDocumentUri(targetUri).fold(
                     onSuccess = { displayName ->
-                        val prefs = userPreferencesRepository.getPreferencesSnapshot()
-                        if (prefs.exportFolderUri.isBlank()) {
-                            val treeUri = treeUriFromDocumentUri(context, targetUri)
-                            if (treeUri != null) {
-                                persistBackupFolderUri(treeUri.toString())
-                                userPreferencesRepository.setExportFolderUri(treeUri.toString())
-                            }
-                        }
                         postUserMessage(context.getString(R.string.settings_export_success, displayName))
                     },
                     onFailure = { err ->
                         DiagnosticLog.record(context, "Manual backup export failed", err)
-                        postUserMessage("Export failed: ${err.message}")
+                        postUserMessage(context.getString(R.string.settings_backup_export_failed, err.message.orEmpty()))
                     },
                 )
             }
-
-        fun completeCloudBackupDocumentSelection(targetUri: Uri) =
-            viewModelScope.launch {
-                persistBackupFolderUri(targetUri.toString())
-                userPreferencesRepository.setCloudExportFolderUri(targetUri.toString())
-                exportRulesUseCase.exportBackupJsonToDocumentUri(targetUri).fold(
-                    onSuccess = {
-                        val providerName = providerDisplayName(targetUri.authority)
-                        postUserMessage(
-                            if (providerName != null) {
-                                context.getString(R.string.settings_backup_export_success_to, providerName)
-                            } else {
-                                context.getString(R.string.settings_backup_export_success)
-                            },
-                        )
-                    },
-                    onFailure = { err ->
-                        DiagnosticLog.record(context, "Cloud backup export failed", err)
-                        postUserMessage(
-                            context.getString(
-                                R.string.settings_backup_export_failed,
-                                err.message.orEmpty(),
-                            ),
-                        )
-                    },
-                )
-            }
-
-        private fun providerDisplayName(authority: String?): String? {
-            val providerAuthority = authority?.takeIf { it.isNotBlank() } ?: return null
-            val normalizedAuthority = providerAuthority.lowercase()
-            return when {
-                normalizedAuthority.contains("google.android.apps.docs") -> {
-                    context.getString(R.string.cloud_provider_google_drive)
-                }
-
-                normalizedAuthority.contains("skydrive") || normalizedAuthority.contains("onedrive") -> {
-                    context.getString(R.string.cloud_provider_onedrive)
-                }
-
-                normalizedAuthority.contains("dropbox") -> {
-                    context.getString(R.string.cloud_provider_dropbox)
-                }
-
-                normalizedAuthority.contains("box.android") -> {
-                    context.getString(R.string.cloud_provider_box)
-                }
-
-                else -> {
-                    null
-                }
-            }
-        }
 
         private fun defaultManualExportFileName(): String {
             val stamp = backupFileTimestamp()
@@ -461,26 +435,32 @@ class SettingsViewModel
                 )
             }
 
+        @Suppress("ktlint:standard:function-expression-body")
+        private suspend fun <ImportResult> importBackupFromUri(
+            uri: Uri,
+            importBlock: suspend (InputStream) -> Result<ImportResult>,
+        ): Result<ImportResult> {
+            return withContext(ioDispatcher) {
+                runCatching {
+                    val inputStream =
+                        context.contentResolver.openInputStream(uri)
+                            ?: throw IOException("Could not open backup input stream")
+                    inputStream.use { stream ->
+                        importBlock(stream).getOrThrow()
+                    }
+                }
+            }
+        }
+
         fun importFromUri(
             uri: Uri,
             action: BackupImportPickAction,
         ) = viewModelScope.launch {
-            val text =
-                withContext(ioDispatcher) {
-                    runCatching {
-                        context.contentResolver.openInputStream(uri)?.use { stream ->
-                            stream.readBytes().decodeToString()
-                        }
-                    }
-                }.onFailure { error ->
-                    DiagnosticLog.record(context, "Backup file read failed for $action", error)
-                }.getOrNull() ?: run {
-                    postUserMessage("Could not read file")
-                    return@launch
-                }
             when (action) {
                 BackupImportPickAction.ImportMerge -> {
-                    importRulesUseCase.mergeRulesFromJson(text).fold(
+                    importBackupFromUri(uri) { stream ->
+                        importRulesUseCase.mergeRulesFromStream(stream)
+                    }.fold(
                         onSuccess = { result ->
                             postUserMessage(
                                 context.resources.getQuantityString(
@@ -493,21 +473,70 @@ class SettingsViewModel
                         },
                         onFailure = {
                             DiagnosticLog.record(context, "Backup merge import failed", it)
-                            postUserMessage("Import failed: ${it.message}")
+                            if (it is InvalidBackupRuleRegexException) {
+                                postUserMessage(
+                                    context.getString(
+                                        R.string.settings_backup_invalid_rule_regex,
+                                        it.ruleNames.joinToString(),
+                                    ),
+                                )
+                            } else {
+                                postUserMessage(
+                                    context.getString(
+                                        R.string.settings_backup_import_failed,
+                                        it.message.orEmpty(),
+                                    ),
+                                )
+                            }
                         },
                     )
                 }
 
                 BackupImportPickAction.RestoreFull -> {
-                    importRulesUseCase.restoreFromBackupJson(text).fold(
+                    importBackupFromUri(uri) { stream ->
+                        importRulesUseCase.restoreFromBackupStream(stream)
+                    }.fold(
                         onSuccess = { result ->
+                            runCatching {
+                                val restoredPreferences = userPreferencesRepository.getPreferencesSnapshot()
+                                val backupDestinations =
+                                    listOf(
+                                        restoredPreferences.exportFolderUri,
+                                        restoredPreferences.cloudExportFolderUri,
+                                    ).filter { destination -> destination.isNotBlank() }
+                                if (restoredPreferences.scheduledExportEnabled && backupDestinations.isNotEmpty()) {
+                                    enqueueScheduledExportWork()
+                                } else {
+                                    workManager.cancelUniqueWork(ScheduledRulesExportWorker.WORK_NAME)
+                                }
+                            }.onFailure { error ->
+                                DiagnosticLog.record(context, "Restored backup could not reconcile scheduled exports", error)
+                            }
+                            runCatching { updateCheckWorkScheduler.syncFromPreferences() }
+                                .onFailure { error ->
+                                    DiagnosticLog.record(context, "Restored backup could not reconcile update checks", error)
+                                }
                             val parts =
                                 buildList {
-                                    add("${result.rulesImported} rules")
+                                    add(
+                                        context.resources.getQuantityString(
+                                            R.plurals.settings_restore_part_rules,
+                                            result.rulesImported,
+                                            result.rulesImported,
+                                        ),
+                                    )
                                     if (result.historyRunsImported > 0) {
-                                        add("${result.historyRunsImported} history runs")
+                                        add(
+                                            context.resources.getQuantityString(
+                                                R.plurals.settings_restore_part_history_runs,
+                                                result.historyRunsImported,
+                                                result.historyRunsImported,
+                                            ),
+                                        )
                                     }
-                                    if (result.settingsRestored) add("settings")
+                                    if (result.settingsRestored) {
+                                        add(context.getString(R.string.settings_restore_part_settings))
+                                    }
                                 }
                             postUserMessage(
                                 context.getString(
@@ -515,10 +544,36 @@ class SettingsViewModel
                                     parts.joinToString(", "),
                                 ),
                             )
+                            if (result.foldersNeedingReselection > 0) {
+                                postUserMessage(
+                                    context.resources.getQuantityString(
+                                        R.plurals.settings_restore_folders_need_reselection,
+                                        result.foldersNeedingReselection,
+                                        result.foldersNeedingReselection,
+                                    ),
+                                )
+                            }
+                            if (result.automationsDisabled) {
+                                postUserMessage(context.getString(R.string.settings_restore_automation_disabled_no_folder))
+                            }
                         },
                         onFailure = {
                             DiagnosticLog.record(context, "Full backup restore failed", it)
-                            postUserMessage("Restore failed: ${it.message}")
+                            if (it is InvalidBackupRuleRegexException) {
+                                postUserMessage(
+                                    context.getString(
+                                        R.string.settings_backup_invalid_rule_regex,
+                                        it.ruleNames.joinToString(),
+                                    ),
+                                )
+                            } else {
+                                postUserMessage(
+                                    context.getString(
+                                        R.string.settings_backup_restore_failed,
+                                        it.message.orEmpty(),
+                                    ),
+                                )
+                            }
                         },
                     )
                 }

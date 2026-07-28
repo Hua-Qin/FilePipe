@@ -9,6 +9,7 @@ import android.graphics.ImageDecoder
 import android.media.MediaMetadataRetriever
 import android.media.ThumbnailUtils
 import android.net.Uri
+import android.text.format.Formatter
 import android.util.LruCache
 import android.util.Size
 import android.webkit.MimeTypeMap
@@ -32,7 +33,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ElevatedCard
@@ -70,6 +70,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.paging.compose.itemKey
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.OperationMode
@@ -122,7 +124,8 @@ fun HistoryDetailScreen(
     viewModel: HistoryDetailViewModel = hiltViewModel(),
 ) {
     val history by viewModel.history.collectAsStateWithLifecycle()
-    val files by viewModel.files.collectAsStateWithLifecycle()
+    val files = viewModel.filesPagingFlow.collectAsLazyPagingItems()
+    val fileCount by viewModel.fileCount.collectAsStateWithLifecycle()
     val isUndoing by viewModel.isUndoing.collectAsStateWithLifecycle()
     val undoProgress by viewModel.undoProgress.collectAsStateWithLifecycle()
     val pendingHistoryUndoRequest by viewModel.pendingHistoryUndoRequest.collectAsStateWithLifecycle()
@@ -150,7 +153,7 @@ fun HistoryDetailScreen(
 
     LaunchedEffect(history?.id, pendingHistoryUndoRequest, isUndoing) {
         val request = pendingHistoryUndoRequest ?: return@LaunchedEffect
-        if (history?.id == request.historyId && !isUndoing) {
+        if (history?.id == request.historyId) {
             viewModel.undoRunFromNotification(request)
         }
     }
@@ -219,17 +222,22 @@ fun HistoryDetailScreen(
                             undoProgress = undoProgress,
                         )
                     }
-                    if (files.isNotEmpty()) {
+                    if (fileCount > 0) {
                         item {
                             Text(
-                                stringResource(R.string.history_detail_files_header, files.size),
+                                stringResource(R.string.history_detail_files_header, fileCount),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
                             )
                         }
-                        items(files, key = { it.id }) { file ->
-                            FileMovedCard(file, modifier = Modifier.animateItem())
+                        items(
+                            count = files.itemCount,
+                            key = files.itemKey { file -> file.id },
+                        ) { fileIndex ->
+                            files[fileIndex]?.let { file ->
+                                FileMovedCard(file, modifier = Modifier.animateItem())
+                            }
                         }
                     } else {
                         item {
@@ -298,7 +306,7 @@ private fun RunSummaryCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Run Summary", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.history_detail_run_summary), style = MaterialTheme.typography.titleMedium)
                 StatusChip(
                     status = if (history.isEffectivelyUndone()) RunStatus.UNDONE else history.status,
                     noChanges = history.isNoChangesRun(),
@@ -306,18 +314,21 @@ private fun RunSummaryCard(
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             SummaryRow(
-                "Trigger",
+                stringResource(R.string.history_detail_trigger_label),
                 when (history.triggeredBy) {
-                    TriggerType.MANUAL -> "Manual"
-                    TriggerType.SCHEDULED -> "Scheduled"
+                    TriggerType.MANUAL -> stringResource(R.string.history_triggered_manual)
+                    TriggerType.SCHEDULED -> stringResource(R.string.history_triggered_scheduled)
                 },
             )
             val cardContext = LocalContext.current
-            SummaryRow("Started", formatTime(cardContext, history.startedAt))
+            SummaryRow(stringResource(R.string.history_detail_started_label), formatTime(cardContext, history.startedAt))
             history.completedAt?.let { completed ->
-                SummaryRow("Completed", formatTime(cardContext, completed))
+                SummaryRow(stringResource(R.string.history_detail_completed_label), formatTime(cardContext, completed))
                 val durationSec = (completed - history.startedAt) / 1000
-                SummaryRow("Duration", "${durationSec}s")
+                SummaryRow(
+                    stringResource(R.string.history_detail_duration_label),
+                    stringResource(R.string.history_detail_duration_seconds, durationSec),
+                )
             }
             SummaryRow(
                 stringResource(
@@ -330,7 +341,7 @@ private fun RunSummaryCard(
                 history.totalFilesMoved.toString(),
             )
             if (history.totalFilesFailed > 0) {
-                SummaryRow("Failed", history.totalFilesFailed.toString())
+                SummaryRow(stringResource(R.string.status_failed), history.totalFilesFailed.toString())
             }
             if (history.cancelledUnprocessedCount > 0) {
                 SummaryRow(
@@ -339,7 +350,7 @@ private fun RunSummaryCard(
                 )
             }
             history.errorMessage?.let { msg ->
-                SummaryRow("Error", msg)
+                SummaryRow(stringResource(R.string.history_detail_error_label), msg)
             }
             if (history.isEffectivelyUndone()) {
                 Spacer(Modifier.height(4.dp))
@@ -348,11 +359,7 @@ private fun RunSummaryCard(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary,
                 )
-            } else if (
-                history.totalFilesMoved > 0 &&
-                history.operationMode != OperationMode.DELETE &&
-                (history.status == RunStatus.SUCCESS || history.status == RunStatus.CANCELLED)
-            ) {
+            } else if (isRunUndoable(history)) {
                 Spacer(Modifier.height(8.dp))
                 FilePipeButton(
                     onClick = onUndo,
@@ -403,7 +410,7 @@ private fun SummaryRow(
 ) {
     Row(modifier = Modifier.fillMaxWidth()) {
         Text(
-            "$label: ",
+            stringResource(R.string.history_detail_summary_label, label),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(0.4f),
@@ -494,7 +501,10 @@ private fun FileMovedCard(
                 }
 
                 Text(
-                    "From: ${folderDisplayPath(file.sourceUri, internalStorageDisplayName)}",
+                    stringResource(
+                        R.string.history_detail_source_path,
+                        folderDisplayPath(file.sourceUri, internalStorageDisplayName),
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
@@ -502,7 +512,10 @@ private fun FileMovedCard(
                 )
                 if (isSuccess && file.destinationUri.isNotBlank()) {
                     Text(
-                        "To: ${folderDisplayPath(file.destinationUri, internalStorageDisplayName)}",
+                        stringResource(
+                            R.string.preview_destination_path,
+                            folderDisplayPath(file.destinationUri, internalStorageDisplayName),
+                        ),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
@@ -514,15 +527,14 @@ private fun FileMovedCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val sizeKb = file.fileSizeBytes / 1024
                     Text(
-                        if (sizeKb > 1024) "${sizeKb / 1024} MB" else "$sizeKb KB",
+                        Formatter.formatFileSize(context, file.fileSizeBytes),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.outline,
                     )
                     if (file.skipped) {
                         Text(
-                            "skipped",
+                            stringResource(R.string.history_detail_file_skipped),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.outline,
                         )
@@ -984,6 +996,19 @@ private fun openFileWithDefaultApp(
         Toast.makeText(context, context.getString(R.string.history_file_open_no_app), Toast.LENGTH_SHORT).show()
     } catch (_: RuntimeException) {
         Toast.makeText(context, context.getString(R.string.history_file_open_failed), Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun isRunUndoable(history: RunHistory): Boolean {
+    if (history.totalFilesMoved <= 0 || history.operationMode == OperationMode.DELETE) return false
+    return when (history.status) {
+        RunStatus.SUCCESS,
+        RunStatus.CANCELLED,
+        RunStatus.PARTIAL_FAILURE,
+        RunStatus.PARTIAL_UNDONE,
+        -> true
+
+        else -> false
     }
 }
 

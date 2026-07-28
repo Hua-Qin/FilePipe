@@ -8,6 +8,7 @@ import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.domain.model.ConflictPolicy
 import dev.bikram.filepipe.domain.model.FileMoved
 import dev.bikram.filepipe.domain.model.FileOrientation
+import dev.bikram.filepipe.domain.model.FileUndoStatus
 import dev.bikram.filepipe.domain.model.OperationMode
 import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RuleIcon
@@ -18,12 +19,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNames
+import kotlinx.serialization.json.decodeFromStream
+import java.io.InputStream
 
 /**
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
  * (`@Database`); Room KSP does not allow that annotation to reference this constant.
  */
-const val APP_DATABASE_SCHEMA_VERSION = 11
+const val APP_DATABASE_SCHEMA_VERSION = 12
 
 /**
  * Root object for `filepipe_backup_*.json`.
@@ -81,6 +84,7 @@ data class ScheduleBackupDto(
     val hour: Int,
     val minute: Int,
     val intervalHours: Int? = null,
+    val usesStartTime: Boolean? = null,
 )
 
 @Serializable
@@ -116,6 +120,7 @@ data class FileMovedBackupDto(
     val success: Boolean,
     val skipped: Boolean = false,
     val errorMessage: String? = null,
+    val undoStatus: String = FileUndoStatus.PENDING.name,
 )
 
 @Serializable
@@ -203,6 +208,7 @@ fun RuleSchedule.toBackupDto(): ScheduleBackupDto =
         hour = hour,
         minute = minute,
         intervalHours = repeatInterval,
+        usesStartTime = usesStartTime,
     )
 
 fun RunHistory.toBackupDto(
@@ -237,6 +243,7 @@ fun FileMoved.toBackupDto(): FileMovedBackupDto =
         success = success,
         skipped = skipped,
         errorMessage = errorMessage,
+        undoStatus = undoStatus.name,
     )
 
 fun AppPreferences.toBackupDto(): SettingsBackupDto =
@@ -316,6 +323,7 @@ fun ScheduleBackupDto.toDomain(): RuleSchedule? {
         hour = hour,
         minute = minute,
         repeatInterval = intervalHours,
+        usesStartTime = usesStartTime ?: true,
     )
 }
 
@@ -347,4 +355,9 @@ fun buildRulesBackupJson(rules: List<Rule>): String = buildAppBackupJson(rules)
 fun parseRulesBackupJson(text: String): Result<AppBackup> =
     runCatching {
         jsonFormatter.decodeFromString<AppBackup>(text)
+    }
+
+fun parseRulesBackupJson(inputStream: InputStream): Result<AppBackup> =
+    runCatching {
+        jsonFormatter.decodeFromStream<AppBackup>(inputStream)
     }
