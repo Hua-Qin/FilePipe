@@ -35,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -185,10 +187,7 @@ private fun colorsTooSimilar(
     second: Color,
     maxLuminanceDelta: Float = 0.07f,
 ): Boolean {
-    val luminanceDelta =
-        kotlin.math.abs(
-            ColorUtils.calculateLuminance(first.toArgb()) - ColorUtils.calculateLuminance(second.toArgb()),
-        )
+    val luminanceDelta = kotlin.math.abs(first.luminance() - second.luminance())
     return luminanceDelta < maxLuminanceDelta
 }
 
@@ -200,25 +199,21 @@ private fun ColorScheme.separateMaterialYouSecondaryContainerWhenNeeded(darkThem
     if (!colorsTooSimilar(secondaryContainer, surfaceContainerHighest)) {
         return this
     }
-    val accentTargetArgb =
-        ColorUtils.blendARGB(
-            primaryContainer.toArgb(),
-            primary.toArgb(),
+    val accentTarget =
+        lerp(
+            primaryContainer,
+            primary,
             if (darkTheme) 0.38f else 0.28f,
         )
     val blendAmount = if (darkTheme) 0.50f else 0.40f
     return copy(
         secondaryContainer =
-            Color(
-                ColorUtils.blendARGB(secondaryContainer.toArgb(), accentTargetArgb, blendAmount),
-            ),
+            lerp(secondaryContainer, accentTarget, blendAmount),
         onSecondaryContainer =
-            Color(
-                ColorUtils.blendARGB(
-                    onSecondaryContainer.toArgb(),
-                    onPrimaryContainer.toArgb(),
-                    if (darkTheme) 0.35f else 0.30f,
-                ),
+            lerp(
+                onSecondaryContainer,
+                onPrimaryContainer,
+                if (darkTheme) 0.35f else 0.30f,
             ),
     )
 }

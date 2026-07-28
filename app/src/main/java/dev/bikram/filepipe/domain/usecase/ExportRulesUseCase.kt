@@ -198,6 +198,7 @@ class ExportRulesUseCase
                     mimeType,
                     temporaryName,
                 ) ?: throw IOException("Failed to create temporary backup document")
+            var fallbackDestinationUri: Uri? = null
             try {
                 writeDocumentBytes(temporaryUri, backupBytes)
                 val publishedUri =
@@ -205,18 +206,22 @@ class ExportRulesUseCase
                         DocumentsContract.renameDocument(resolver, temporaryUri, fileName)
                     }.getOrNull()
                 if (publishedUri == null) {
-                    val destinationUri =
+                    val createdDestinationUri =
                         DocumentsContract.createDocument(
                             resolver,
                             documentTreeUri,
                             mimeType,
                             fileName,
                         ) ?: throw IOException("Failed to create backup document")
-                    writeDocumentBytes(destinationUri, backupBytes)
+                    fallbackDestinationUri = createdDestinationUri
+                    writeDocumentBytes(createdDestinationUri, backupBytes)
                     runCatching { resolver.delete(temporaryUri, null, null) }
                 }
             } catch (error: Exception) {
                 runCatching { resolver.delete(temporaryUri, null, null) }
+                fallbackDestinationUri?.let { destinationUri ->
+                    runCatching { resolver.delete(destinationUri, null, null) }
+                }
                 throw error
             }
         }

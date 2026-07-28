@@ -55,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -94,6 +95,7 @@ import dev.bikram.filepipe.ui.navigation.LocalSharedTransitionScope
 import dev.bikram.filepipe.ui.screens.settings.FilePipeUpdateViewModel
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
+import kotlinx.coroutines.launch
 
 @OptIn(
     ExperimentalMaterial3Api::class,
@@ -112,6 +114,7 @@ fun DevOptionsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val lazyListState =
         rememberLazyListState(
@@ -428,10 +431,10 @@ fun DevOptionsScreen(
                                             )
                                     },
                                     DevAction(stringResource(R.string.dev_options_action_copy_diagnostics)) {
-                                        copyDiagnostics(context, state)
+                                        scope.launch { copyDiagnostics(context, state) }
                                     },
                                     DevAction(stringResource(R.string.dev_options_action_share_diagnostics)) {
-                                        shareDiagnostics(context, state)
+                                        scope.launch { shareDiagnostics(context, state) }
                                     },
                                     DevAction(stringResource(R.string.dev_options_action_clear_diagnostics_log)) {
                                         viewModel.clearDiagnosticsLog()
@@ -1097,7 +1100,7 @@ private fun groupPositionFor(
         else -> GroupPosition.MIDDLE
     }
 
-private fun shareDiagnostics(
+private suspend fun shareDiagnostics(
     context: Context,
     state: DevOptionsUiState,
 ) {
@@ -1122,7 +1125,7 @@ private fun shareDiagnostics(
     }
 }
 
-private fun copyDiagnostics(
+private suspend fun copyDiagnostics(
     context: Context,
     state: DevOptionsUiState,
 ) {

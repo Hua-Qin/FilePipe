@@ -712,7 +712,9 @@ class UserPreferencesRepository
         }
 
         private fun canRetainRestoredFolder(folderUriString: String): Boolean {
-            if (folderUriString.isBlank() || !folderUriString.startsWith("content://")) return true
+            if (folderUriString.isBlank()) return true
+            // Unlike Remember, FilePipe supports raw paths through All Files Access, so they remain valid restore targets.
+            if (!folderUriString.startsWith("content://")) return true
             val folderUri = folderUriString.toUri()
             val resolver = context.contentResolver
             val alreadyPersisted =

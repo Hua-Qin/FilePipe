@@ -1,1 +1,1 @@
-FilePipe: Auto file organizer
+FilePipe: Auto Files Organizer

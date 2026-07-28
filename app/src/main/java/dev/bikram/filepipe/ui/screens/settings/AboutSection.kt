@@ -37,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -71,6 +72,7 @@ import dev.bikram.filepipe.ui.feedback.tapSoundClickable
 import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.theme.compactControlShape
 import dev.bikram.filepipe.ui.theme.pillShape
+import kotlinx.coroutines.launch
 
 private const val REMEMBER_FDROID_PACKAGE_ID = "dev.bikram.remember.gh"
 private const val OBTAINX_FDROID_PACKAGE_ID = "dev.bikram.obtainx"
@@ -383,39 +385,43 @@ private fun rememberDiagnosticsShareAction(
     context: Context,
     chooserTitle: String,
     preferences: AppPreferences,
-): () -> Unit =
-    remember(context, chooserTitle, preferences) {
+): () -> Unit {
+    val scope = rememberCoroutineScope()
+    return remember(context, chooserTitle, preferences, scope) {
         {
-            runCatching {
-                DiagnosticLog.record(context, "Diagnostic log shared from Settings")
-                val diagnosticsFile = DiagnosticLog.createShareFile(context, preferences)
-                val uri =
-                    FileProvider.getUriForFile(
-                        context,
-                        "${context.packageName}.fileprovider",
-                        diagnosticsFile,
-                    )
-                val sendIntent =
-                    Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_STREAM, uri)
-                        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.settings_share_diagnostics_subject))
-                        putExtra(Intent.EXTRA_TITLE, context.getString(R.string.settings_share_diagnostics))
-                        clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, uri)
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    }
-                context.startActivity(Intent.createChooser(sendIntent, chooserTitle))
-            }.onFailure { error ->
-                DiagnosticLog.record(context, "Diagnostic log share failed", error)
-                Toast
-                    .makeText(
-                        context,
-                        context.getString(R.string.settings_share_diagnostics_failed),
-                        Toast.LENGTH_SHORT,
-                    ).show()
+            scope.launch {
+                runCatching {
+                    DiagnosticLog.record(context, "Diagnostic log shared from Settings")
+                    val diagnosticsFile = DiagnosticLog.createShareFile(context, preferences)
+                    val uri =
+                        FileProvider.getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            diagnosticsFile,
+                        )
+                    val sendIntent =
+                        Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.settings_share_diagnostics_subject))
+                            putExtra(Intent.EXTRA_TITLE, context.getString(R.string.settings_share_diagnostics))
+                            clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, uri)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                    context.startActivity(Intent.createChooser(sendIntent, chooserTitle))
+                }.onFailure { error ->
+                    DiagnosticLog.record(context, "Diagnostic log share failed", error)
+                    Toast
+                        .makeText(
+                            context,
+                            context.getString(R.string.settings_share_diagnostics_failed),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                }
             }
         }
     }
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable

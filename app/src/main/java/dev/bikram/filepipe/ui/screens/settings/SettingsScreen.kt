@@ -573,7 +573,7 @@ fun SettingsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    var pendingBackupFolderTarget by remember { mutableStateOf<BackupFolderTarget?>(null) }
+    var pendingBackupFolderTarget by rememberSaveable { mutableStateOf<BackupFolderTarget?>(null) }
     val folderLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.OpenDocumentTree(),
@@ -583,10 +583,8 @@ fun SettingsScreen(
             if (uri != null) {
                 when (target) {
                     BackupFolderTarget.Cloud -> viewModel.setCloudExportFolderUri(uri.toString())
-
-                    BackupFolderTarget.Local,
-                    null,
-                    -> viewModel.setExportFolderUri(uri.toString())
+                    BackupFolderTarget.Local -> viewModel.setExportFolderUri(uri.toString())
+                    null -> Unit
                 }
             }
         }
