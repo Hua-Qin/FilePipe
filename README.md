@@ -27,9 +27,9 @@ That's exactly what <b>FilePipe</b> does. Set a rule, pick a schedule, and let t
 ### 📂 Rule-Based Automation
 
 - **Templates**: Get started instantly with presets for screenshots, images, video, music, downloads, documents, and more.
-- **Advanced Filtering**: Go beyond extensions with name patterns, wildcards, file size limits, media orientation (portrait/lanscape) and age-based rules.
+- **Advanced Filtering**: Go beyond extensions with name patterns, wildcards, regular expressions, file size limits, media orientation (portrait/lanscape) and age-based rules.
 - **Recursive Scanning**: Deep-dive into subfolders to find every matching file. Optionally mirror folder structure at the destination.
-- **Action control**: Choose the action - move or copy. And conflict resolution method - skip, overwrite or rename. 
+- **Action control**: Choose the action - move, copy or delete. And conflict resolution method - skip, overwrite or rename. 
 
 ### ⚡ Power User Workflow
 

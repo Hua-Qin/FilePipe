@@ -1,3 +1,25 @@
+## v3.9.6
+
+### 🛠 Improved Features
+- Partially completed undos are now shown separately and can be retried without repeating files that were already restored.
+- Backups are written more safely, use less memory when imported, and can be stored as versioned files in a cloud folder.
+- Reduced memory use when loading the History screen.
+- Unused folder permissions are released automatically.
+- Rule size filters now support fractional megabyte values, and age filters provide clearer validation.
+
+### 🐛 Bug Fixes
+- Fixed overlapping source folders sometimes processing the same file more than once.
+- Fixed equivalent source and destination folders bypassing validation.
+- Fixed repeated Save taps potentially creating duplicate rules.
+- Fixed cancelling a manual run clearing the selected rules.
+- Fixed folder-access warnings occasionally showing stale results.
+- Improved interrupted and partial undo recovery, conflict reporting, and empty-folder cleanup.
+- Fixed background maintenance and backup jobs retrying indefinitely after repeated failures.
+- Fixed invalid backup-folder permissions being saved.
+- Reduced the chance of background notification collisions.
+
+---
+
 ## v3.9.5 Delete operation, more file types
 
 ### ✨ New Features

@@ -1726,7 +1726,7 @@ internal fun canonicalSafTreeIdentity(uriString: String): String =
                     return@runCatching uriString.trimEnd('/')
                 }
             }
-        val decodedDocumentId = URLDecoder.decode(documentId.replace("+", "%2B"), Charsets.UTF_8)
+        val decodedDocumentId = URLDecoder.decode(documentId.replace("+", "%2B"), "UTF-8")
         "content://${parsedUri.authority.lowercase()}/$decodedDocumentId"
     }.getOrElse {
         uriString.trimEnd('/')

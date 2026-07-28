@@ -348,16 +348,7 @@ private fun RunSummaryCard(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.secondary,
                 )
-            } else if (
-                history.totalFilesMoved > 0 &&
-                history.operationMode != OperationMode.DELETE &&
-                (
-                    history.status == RunStatus.SUCCESS ||
-                        history.status == RunStatus.CANCELLED ||
-                        history.status == RunStatus.PARTIAL_FAILURE ||
-                        history.status == RunStatus.PARTIAL_UNDONE
-                )
-            ) {
+            } else if (isRunUndoable(history)) {
                 Spacer(Modifier.height(8.dp))
                 FilePipeButton(
                     onClick = onUndo,
@@ -989,6 +980,19 @@ private fun openFileWithDefaultApp(
         Toast.makeText(context, context.getString(R.string.history_file_open_no_app), Toast.LENGTH_SHORT).show()
     } catch (_: RuntimeException) {
         Toast.makeText(context, context.getString(R.string.history_file_open_failed), Toast.LENGTH_SHORT).show()
+    }
+}
+
+private fun isRunUndoable(history: RunHistory): Boolean {
+    if (history.totalFilesMoved <= 0 || history.operationMode == OperationMode.DELETE) return false
+    return when (history.status) {
+        RunStatus.SUCCESS,
+        RunStatus.CANCELLED,
+        RunStatus.PARTIAL_FAILURE,
+        RunStatus.PARTIAL_UNDONE,
+        -> true
+
+        else -> false
     }
 }
 

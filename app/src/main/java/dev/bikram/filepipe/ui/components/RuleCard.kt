@@ -1055,11 +1055,11 @@ private fun LabeledInfoSingleLine(
         )
         val valueStyle = MaterialTheme.typography.bodyMedium
         val textMeasurer = rememberTextMeasurer()
-        val context = LocalContext.current
+        val moreCountFormat = stringResource(R.string.rule_card_more_count)
         BoxWithConstraints(modifier = Modifier.weight(1f)) {
             val availableWidth = constraints.maxWidth
             val valueText =
-                remember(values, maxVisibleValues, availableWidth, valueStyle) {
+                remember(values, maxVisibleValues, availableWidth, valueStyle, moreCountFormat) {
                     var visibleCount = minOf(values.size, maxVisibleValues).coerceAtLeast(1)
                     var candidate: String
                     while (true) {
@@ -1070,7 +1070,7 @@ private fun LabeledInfoSingleLine(
                                 values.take(visibleCount).joinTo(this, ", ")
                                 if (hiddenCount > 0) {
                                     append(", ")
-                                    append(context.getString(R.string.rule_card_more_count, hiddenCount))
+                                    append(java.lang.String.format(java.util.Locale.getDefault(), moreCountFormat, hiddenCount))
                                 }
                             }
                         if (visibleCount == 1) break
