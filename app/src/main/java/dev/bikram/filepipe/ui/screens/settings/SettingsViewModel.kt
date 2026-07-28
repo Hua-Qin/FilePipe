@@ -49,6 +49,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
+import java.io.InputStream
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -493,26 +495,32 @@ class SettingsViewModel
                 )
             }
 
+        @Suppress("ktlint:standard:function-expression-body")
+        private suspend fun <ImportResult> importBackupFromUri(
+            uri: Uri,
+            importBlock: suspend (InputStream) -> Result<ImportResult>,
+        ): Result<ImportResult> {
+            return withContext(ioDispatcher) {
+                runCatching {
+                    val inputStream =
+                        context.contentResolver.openInputStream(uri)
+                            ?: throw IOException("Could not open backup input stream")
+                    inputStream.use { stream ->
+                        importBlock(stream).getOrThrow()
+                    }
+                }
+            }
+        }
+
         fun importFromUri(
             uri: Uri,
             action: BackupImportPickAction,
         ) = viewModelScope.launch {
-            val text =
-                withContext(ioDispatcher) {
-                    runCatching {
-                        context.contentResolver.openInputStream(uri)?.use { stream ->
-                            stream.readBytes().decodeToString()
-                        }
-                    }
-                }.onFailure { error ->
-                    DiagnosticLog.record(context, "Backup file read failed for $action", error)
-                }.getOrNull() ?: run {
-                    postUserMessage("Could not read file")
-                    return@launch
-                }
             when (action) {
                 BackupImportPickAction.ImportMerge -> {
-                    importRulesUseCase.mergeRulesFromJson(text).fold(
+                    importBackupFromUri(uri) { stream ->
+                        importRulesUseCase.mergeRulesFromStream(stream)
+                    }.fold(
                         onSuccess = { result ->
                             postUserMessage(
                                 context.resources.getQuantityString(
@@ -525,13 +533,20 @@ class SettingsViewModel
                         },
                         onFailure = {
                             DiagnosticLog.record(context, "Backup merge import failed", it)
-                            postUserMessage("Import failed: ${it.message}")
+                            postUserMessage(
+                                context.getString(
+                                    R.string.settings_backup_import_failed,
+                                    it.message.orEmpty(),
+                                ),
+                            )
                         },
                     )
                 }
 
                 BackupImportPickAction.RestoreFull -> {
-                    importRulesUseCase.restoreFromBackupJson(text).fold(
+                    importBackupFromUri(uri) { stream ->
+                        importRulesUseCase.restoreFromBackupStream(stream)
+                    }.fold(
                         onSuccess = { result ->
                             val parts =
                                 buildList {
@@ -550,7 +565,12 @@ class SettingsViewModel
                         },
                         onFailure = {
                             DiagnosticLog.record(context, "Full backup restore failed", it)
-                            postUserMessage("Restore failed: ${it.message}")
+                            postUserMessage(
+                                context.getString(
+                                    R.string.settings_backup_restore_failed,
+                                    it.message.orEmpty(),
+                                ),
+                            )
                         },
                     )
                 }

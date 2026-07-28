@@ -45,6 +45,36 @@ class ValidateRuleUseCaseTest {
     }
 
     @Test
+    fun filesystemDestinationWithTrailingSlashMatchesSource() {
+        val result =
+            validate(
+                baseRule().copy(
+                    sourceFolderPaths = listOf("/storage/emulated/0/Download"),
+                    destinationFolderPath = "/storage/emulated/0/Download/",
+                ),
+            ) as ValidateRuleUseCase.Result.Invalid
+
+        assertTrue(result.errors.contains("Source and destination folders cannot be the same"))
+    }
+
+    @Test
+    fun equivalentSafTreeAndDocumentUrisMatch() {
+        val result =
+            validate(
+                baseRule().copy(
+                    sourceFolderPaths =
+                        listOf(
+                            "content://com.android.externalstorage.documents/tree/primary%3ADownload",
+                        ),
+                    destinationFolderPath =
+                        "content://com.android.externalstorage.documents/document/primary%3ADownload",
+                ),
+            ) as ValidateRuleUseCase.Result.Invalid
+
+        assertTrue(result.errors.contains("Source and destination folders cannot be the same"))
+    }
+
+    @Test
     fun scheduledRulesValidateTheirRequiredTimeFields() {
         val weeklyErrors =
             validate(

@@ -413,6 +413,8 @@
     <string name="settings_fab_open_help">Help and FAQs</string>
     <string name="settings_import_rules">Import backup</string>
     <string name="settings_restore_backup">Restore backup</string>
+    <string name="settings_backup_import_failed">Import failed: %1$s</string>
+    <string name="settings_backup_restore_failed">Restore failed: %1$s</string>
     <string name="settings_backup_import_restore_help_title">Import vs restore</string>
     <string name="settings_backup_import_restore_help_body">Import adds new rules from the file and updates rules that have the same name. Your run history and app settings stay as they are.\n\nRestore replaces everything in the app with the contents of the file: all rules, run history, and settings. Useful when moving to a new device.</string>
     <string name="settings_backup_help_icon_cd">Explain import and restore</string>

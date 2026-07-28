@@ -3,9 +3,11 @@ package dev.bikram.filepipe.domain.usecase
 import dev.bikram.filepipe.data.preferences.UserPreferencesRepository
 import dev.bikram.filepipe.data.repository.RuleRepository
 import dev.bikram.filepipe.data.repository.RunHistoryRepository
+import dev.bikram.filepipe.domain.export.AppBackup
 import dev.bikram.filepipe.domain.export.parseRulesBackupJson
 import dev.bikram.filepipe.domain.export.toDomain
 import kotlinx.coroutines.flow.first
+import java.io.InputStream
 import javax.inject.Inject
 
 enum class BackupImportPickAction {
@@ -38,6 +40,15 @@ class ImportRulesUseCase
          */
         suspend fun mergeRulesFromJson(jsonText: String): Result<MergeRulesImportResult> {
             val backup = parseRulesBackupJson(jsonText).getOrElse { return Result.failure(it) }
+            return mergeRules(backup)
+        }
+
+        suspend fun mergeRulesFromStream(inputStream: InputStream): Result<MergeRulesImportResult> {
+            val backup = parseRulesBackupJson(inputStream).getOrElse { return Result.failure(it) }
+            return mergeRules(backup)
+        }
+
+        private suspend fun mergeRules(backup: AppBackup): Result<MergeRulesImportResult> {
             val existingByName =
                 ruleRepository
                     .getAllRules()
@@ -94,6 +105,15 @@ class ImportRulesUseCase
          */
         suspend fun restoreFromBackupJson(jsonText: String): Result<RestoreBackupResult> {
             val backup = parseRulesBackupJson(jsonText).getOrElse { return Result.failure(it) }
+            return restoreFromBackup(backup)
+        }
+
+        suspend fun restoreFromBackupStream(inputStream: InputStream): Result<RestoreBackupResult> {
+            val backup = parseRulesBackupJson(inputStream).getOrElse { return Result.failure(it) }
+            return restoreFromBackup(backup)
+        }
+
+        private suspend fun restoreFromBackup(backup: AppBackup): Result<RestoreBackupResult> {
             val oldIds = ruleRepository.getAllRuleIds()
             oldIds.forEach { ruleId -> scheduleRulesUseCase.cancelRuleById(ruleId) }
 

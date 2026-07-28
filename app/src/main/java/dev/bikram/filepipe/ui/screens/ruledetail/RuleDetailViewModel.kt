@@ -51,7 +51,10 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import java.io.File
+import java.math.BigDecimal
+import java.math.RoundingMode
 import javax.inject.Inject
 
 data class RuleDetailUiState(
@@ -82,6 +85,7 @@ data class RuleDetailUiState(
     val orientation: FileOrientation? = null,
     val isLoading: Boolean = true,
     val isSaved: Boolean = false,
+    val isSaving: Boolean = false,
     val errors: List<String> = emptyList(),
     val previewFiles: List<PreviewFileResult>? = null,
     val isPreviewLoading: Boolean = false,
@@ -186,6 +190,28 @@ private fun RuleDetailUiState.withSnapshot(snapshot: RuleSnapshot): RuleDetailUi
         isSaved = false,
     )
 
+private val BYTES_PER_MEGABYTE = BigDecimal.valueOf(1024L * 1024L)
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun formatFileSizeMegabytes(bytes: Long): String {
+    return BigDecimal
+        .valueOf(bytes)
+        .divide(BYTES_PER_MEGABYTE)
+        .stripTrailingZeros()
+        .toPlainString()
+}
+
+internal fun parseFileSizeMegabytes(value: String): Long? {
+    val megabytes = value.trim().replace(',', '.').toBigDecimalOrNull() ?: return null
+    if (megabytes <= BigDecimal.ZERO) return null
+    return runCatching {
+        megabytes
+            .multiply(BYTES_PER_MEGABYTE)
+            .setScale(0, RoundingMode.HALF_UP)
+            .longValueExact()
+    }.getOrNull()
+}
+
 @HiltViewModel
 class RuleDetailViewModel
     @Inject
@@ -209,6 +235,7 @@ class RuleDetailViewModel
         val uiState: StateFlow<RuleDetailUiState> = _uiState.asStateFlow()
 
         private val _baseline = MutableStateFlow<RuleSnapshot?>(null)
+        private val saveMutex = Mutex()
 
         val isDirty: StateFlow<Boolean> =
             combine(_uiState, _baseline) { state, baseline ->
@@ -265,8 +292,8 @@ class RuleDetailViewModel
                             iconEmoji = rule.iconEmoji,
                             filenamePattern = rule.filenamePattern ?: "",
                             isRegexPattern = rule.isRegexPattern,
-                            minFileSizeMb = rule.minFileSizeBytes?.let { bytes -> "${bytes / 1024 / 1024}" } ?: "",
-                            maxFileSizeMb = rule.maxFileSizeBytes?.let { bytes -> "${bytes / 1024 / 1024}" } ?: "",
+                            minFileSizeMb = rule.minFileSizeBytes?.let(::formatFileSizeMegabytes) ?: "",
+                            maxFileSizeMb = rule.maxFileSizeBytes?.let(::formatFileSizeMegabytes) ?: "",
                             minAgeDays = rule.minAgeDays?.toString() ?: "",
                             maxAgeDays = rule.maxAgeDays?.toString() ?: "",
                             excludePatternsText = rule.excludePatterns.joinToString(", "),
@@ -602,36 +629,43 @@ class RuleDetailViewModel
 
         fun save() =
             viewModelScope.launch {
-                if (_uiState.value.operationMode == OperationMode.DELETE) {
-                    _uiState.update { it.copy(destinationFolderPath = "") }
-                }
-                val state = _uiState.value
-                val rule = buildRuleFromState(state)
+                if (!saveMutex.tryLock()) return@launch
+                _uiState.update { it.copy(isSaving = true) }
+                try {
+                    if (_uiState.value.operationMode == OperationMode.DELETE) {
+                        _uiState.update { it.copy(destinationFolderPath = "") }
+                    }
+                    val state = _uiState.value
+                    val rule = buildRuleFromState(state)
 
-                when (val result = validateRuleUseCase(rule)) {
-                    is ValidateRuleUseCase.Result.Invalid -> {
-                        _uiState.update { it.copy(errors = result.errors) }
-                        return@launch
+                    when (val result = validateRuleUseCase(rule)) {
+                        is ValidateRuleUseCase.Result.Invalid -> {
+                            _uiState.update { it.copy(errors = result.errors) }
+                            return@launch
+                        }
+
+                        is ValidateRuleUseCase.Result.Valid -> {}
                     }
 
-                    is ValidateRuleUseCase.Result.Valid -> {}
-                }
+                    val savedId = ruleRepository.saveRule(rule)
+                    val savedRule = rule.copy(id = savedId)
 
-                val savedId = ruleRepository.saveRule(rule)
-                val savedRule = rule.copy(id = savedId)
+                    if (savedRule.isEnabled && savedRule.schedule != null) {
+                        scheduleRulesUseCase.scheduleRule(savedRule)
+                    } else {
+                        scheduleRulesUseCase.cancelRule(savedRule)
+                    }
 
-                if (savedRule.isEnabled && savedRule.schedule != null) {
-                    scheduleRulesUseCase.scheduleRule(savedRule)
-                } else {
-                    scheduleRulesUseCase.cancelRule(savedRule)
+                    _uiState.update {
+                        it.copy(id = savedId, errors = emptyList())
+                    }
+                    _baseline.value = _uiState.value.toSnapshot()
+                    rulesAutoExportTrigger.maybeExportAfterRuleChange()
+                    _uiState.update { it.copy(isSaved = true) }
+                } finally {
+                    _uiState.update { it.copy(isSaving = false) }
+                    saveMutex.unlock()
                 }
-
-                _uiState.update {
-                    it.copy(id = savedId, errors = emptyList())
-                }
-                _baseline.value = _uiState.value.toSnapshot()
-                rulesAutoExportTrigger.maybeExportAfterRuleChange()
-                _uiState.update { it.copy(isSaved = true) }
             }
 
         fun restoreRule() =
@@ -675,15 +709,9 @@ class RuleDetailViewModel
                 iconEmoji = state.iconEmoji?.takeIf { it.isNotBlank() },
                 filenamePattern = state.filenamePattern.takeIf { it.isNotBlank() },
                 minFileSizeBytes =
-                    state.minFileSizeMb
-                        .toLongOrNull()
-                        ?.takeIf { it > 0 }
-                        ?.let { it * 1024 * 1024 },
+                    parseFileSizeMegabytes(state.minFileSizeMb),
                 maxFileSizeBytes =
-                    state.maxFileSizeMb
-                        .toLongOrNull()
-                        ?.takeIf { it > 0 }
-                        ?.let { it * 1024 * 1024 },
+                    parseFileSizeMegabytes(state.maxFileSizeMb),
                 minAgeDays = state.minAgeDays.toIntOrNull()?.takeIf { it > 0 },
                 maxAgeDays = state.maxAgeDays.toIntOrNull()?.takeIf { it > 0 },
                 excludePatterns =

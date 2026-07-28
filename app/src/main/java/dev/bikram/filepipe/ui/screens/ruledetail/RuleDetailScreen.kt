@@ -1868,7 +1868,7 @@ fun RuleDetailScreen(
                                             label = { Text(stringResource(R.string.advanced_min_size_label)) },
                                             singleLine = true,
                                             enabled = !isReadOnly,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                             modifier = Modifier.weight(1f),
                                         )
                                         OutlinedTextField(
@@ -1877,7 +1877,7 @@ fun RuleDetailScreen(
                                             label = { Text(stringResource(R.string.advanced_max_size_label)) },
                                             singleLine = true,
                                             enabled = !isReadOnly,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                             modifier = Modifier.weight(1f),
                                         )
                                     }
@@ -2258,6 +2258,7 @@ fun RuleDetailScreen(
                                     if (state.errors.isNotEmpty()) dismissedBottomBarKey = null
                                     viewModel.save()
                                 },
+                                enabled = !state.isSaving,
                                 modifier = Modifier.weight(1f),
                                 shape = pillShape,
                             ) {
@@ -2394,6 +2395,7 @@ fun RuleDetailScreen(
                             if (state.errors.isNotEmpty()) dismissedBottomBarKey = null
                             viewModel.save()
                         },
+                        enabled = !state.isSaving,
                     ) {
                         Text(
                             text = stringResource(R.string.save_and_exit),

@@ -19,6 +19,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNames
+import kotlinx.serialization.json.decodeFromStream
+import java.io.InputStream
 
 /**
  * Backup JSON / Room DB schema version. Must match the **literal** `version` on [dev.bikram.filepipe.AppDatabase]
@@ -350,4 +352,9 @@ fun buildRulesBackupJson(rules: List<Rule>): String = buildAppBackupJson(rules)
 fun parseRulesBackupJson(text: String): Result<AppBackup> =
     runCatching {
         jsonFormatter.decodeFromString<AppBackup>(text)
+    }
+
+fun parseRulesBackupJson(inputStream: InputStream): Result<AppBackup> =
+    runCatching {
+        jsonFormatter.decodeFromStream<AppBackup>(inputStream)
     }

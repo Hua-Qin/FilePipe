@@ -17,8 +17,32 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.ByteArrayInputStream
 
 class RulesBackupJsonTest {
+    @Test
+    fun backupCanBeDecodedDirectlyFromStream() {
+        val json =
+            buildAppBackupJson(
+                rules =
+                    listOf(
+                        Rule(
+                            name = "Streamed",
+                            sourceFolderPaths = listOf("content://source"),
+                            destinationFolderPath = "content://destination",
+                            fileExtensions = listOf("txt"),
+                        ),
+                    ),
+            )
+
+        val backup =
+            ByteArrayInputStream(json.toByteArray(Charsets.UTF_8)).use { inputStream ->
+                parseRulesBackupJson(inputStream).getOrThrow()
+            }
+
+        assertEquals("Streamed", backup.rules.single().name)
+    }
+
     @Test
     fun legacyFileUndoStatusDefaultsToPending() {
         val legacyBackup =
