@@ -48,9 +48,16 @@ class UpdateCheckerImpl
                 runCatching {
                     val url = URL("https://api.github.com/repos/${BuildConfig.GITHUB_REPO}/releases/latest")
                     val connection = url.openConnection() as HttpURLConnection
+                    connection.instanceFollowRedirects = true
+                    connection.connectTimeout = 15_000
+                    connection.readTimeout = 20_000
                     connection.setRequestProperty("Accept", "application/vnd.github+json")
                     val responseText =
                         try {
+                            connection.connect()
+                            if (connection.responseCode !in 200..299) {
+                                error("GitHub returned HTTP ${connection.responseCode}")
+                            }
                             connection.inputStream.use { it.readBytes().decodeToString() }
                         } finally {
                             connection.disconnect()
@@ -92,9 +99,16 @@ class UpdateCheckerImpl
             runCatching {
                 val url = URL("https://f-droid.org/api/v1/packages/${context.packageName}")
                 val connection = url.openConnection() as HttpURLConnection
+                connection.instanceFollowRedirects = true
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 20_000
                 connection.setRequestProperty("Accept", "application/json")
                 val responseText =
                     try {
+                        connection.connect()
+                        if (connection.responseCode !in 200..299) {
+                            error("F-Droid returned HTTP ${connection.responseCode}")
+                        }
                         connection.inputStream.use { it.readBytes().decodeToString() }
                     } finally {
                         connection.disconnect()

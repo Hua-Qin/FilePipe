@@ -176,6 +176,16 @@
     <string name="history_detail_title">Run details</string>
     <string name="history_detail_files_header">Files (%1$d)</string>
     <string name="history_detail_no_file_records">No file records for this run.</string>
+    <string name="history_detail_run_summary">Run summary</string>
+    <string name="history_detail_trigger_label">Trigger</string>
+    <string name="history_detail_started_label">Started</string>
+    <string name="history_detail_completed_label">Completed</string>
+    <string name="history_detail_duration_label">Duration</string>
+    <string name="history_detail_duration_seconds">%1$d s</string>
+    <string name="history_detail_error_label">Error</string>
+    <string name="history_detail_summary_label">%1$s: </string>
+    <string name="history_detail_source_path">From: %1$s</string>
+    <string name="history_detail_file_skipped">Skipped</string>
     <string name="history_two_pane_empty_title">No run selected</string>
     <string name="history_two_pane_empty_message">Run details will appear here when history is available.</string>
     <string name="history_two_pane_trash_title">Trash selected</string>
@@ -424,6 +434,20 @@
         <item quantity="other">Rules imported: %1$d added, %2$d updated</item>
     </plurals>
     <string name="settings_restore_success">Backup restored (%1$s)</string>
+    <plurals name="settings_restore_part_rules">
+        <item quantity="one">%1$d rule</item>
+        <item quantity="other">%1$d rules</item>
+    </plurals>
+    <plurals name="settings_restore_part_history_runs">
+        <item quantity="one">%1$d history run</item>
+        <item quantity="other">%1$d history runs</item>
+    </plurals>
+    <string name="settings_restore_part_settings">settings</string>
+    <plurals name="settings_restore_folders_need_reselection">
+        <item quantity="one">%1$d restored folder could not be accessed. Select it again in settings.</item>
+        <item quantity="other">%1$d restored folders could not be accessed. Select them again in settings.</item>
+    </plurals>
+    <string name="settings_restore_automation_disabled_no_folder">Automatic backups were turned off because no accessible backup folder was restored.</string>
     <string name="settings_auto_export_on_change">Auto-export on app exit</string>
     <string name="settings_auto_export_on_change_hint">Saves a full backup to configured backup folders when you exit after making changes</string>
     <string name="settings_scheduled_export">Daily scheduled backup</string>
@@ -819,6 +843,7 @@
     <string name="settings_save_update_apk_to_downloads">Save update APK to Download folder</string>
     <string name="settings_update_apk_save_to_downloads_failed">Update downloaded, but saving a copy to Download failed</string>
     <string name="settings_update_check_failed">Couldn\'t check for updates</string>
+    <string name="settings_update_download_failed">Could not download update</string>
     <string name="settings_check_for_updates">Check for updates</string>
     <string name="settings_open_fdroid">Open F-Droid</string>
     <string name="settings_download_install">Download update (v%1$s)</string>

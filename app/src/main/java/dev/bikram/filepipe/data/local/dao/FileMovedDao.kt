@@ -1,5 +1,6 @@
 package dev.bikram.filepipe.data.local.dao
 
+import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
@@ -11,6 +12,12 @@ import kotlinx.coroutines.flow.Flow
 interface FileMovedDao {
     @Query("SELECT * FROM files_moved WHERE runHistoryId = :runHistoryId ORDER BY movedAt ASC")
     fun getFilesForRun(runHistoryId: Long): Flow<List<FileMovedEntity>>
+
+    @Query("SELECT * FROM files_moved WHERE runHistoryId = :runHistoryId ORDER BY movedAt ASC, id ASC")
+    fun getFilesForRunPaged(runHistoryId: Long): PagingSource<Int, FileMovedEntity>
+
+    @Query("SELECT COUNT(*) FROM files_moved WHERE runHistoryId = :runHistoryId")
+    fun observeFileCountForRun(runHistoryId: Long): Flow<Int>
 
     @Query("SELECT * FROM files_moved WHERE runHistoryId = :runHistoryId ORDER BY movedAt ASC")
     suspend fun getFilesForRunOnce(runHistoryId: Long): List<FileMovedEntity>

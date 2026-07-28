@@ -194,6 +194,8 @@ class RulesViewModel
         private val _selectedRuleIds = MutableStateFlow<Set<Long>>(emptySet())
         private val _progressMap = MutableStateFlow<Map<Long, RunProgress>>(emptyMap())
         private val _previewState = MutableStateFlow<PreviewState?>(null)
+        private var previewJob: Job? = null
+        private var previewRequestId = 0L
         private val _manualRunCancelAnchor = MutableStateFlow<ManualRunCancelAnchor>(ManualRunCancelAnchor.None)
 
         // A manual run deferred pending the user's delete confirmation, plus the confirmation shown
@@ -367,81 +369,99 @@ class RulesViewModel
                 }.launchIn(viewModelScope)
         }
 
-        fun startPreview(rule: Rule) =
-            viewModelScope.launch {
-                if (DevMockFileMove.isMockRule(rule)) {
+        fun startPreview(rule: Rule) {
+            previewJob?.cancel()
+            previewRequestId += 1
+            val requestId = previewRequestId
+            previewJob =
+                viewModelScope.launch {
+                    if (DevMockFileMove.isMockRule(rule)) {
+                        if (previewRequestId != requestId) return@launch
+                        _previewState.value =
+                            PreviewState(
+                                ruleName = rule.name,
+                                isLoading = false,
+                                results = mockFileMovePreviewResults(),
+                                ruleGroups =
+                                    listOf(
+                                        PreviewRuleGroup(
+                                            ruleId = rule.id,
+                                            ruleName = rule.name,
+                                            operationMode = OperationMode.MOVE,
+                                            results = mockFileMovePreviewResults(),
+                                        ),
+                                    ),
+                            )
+                        return@launch
+                    }
+                    if (previewRequestId != requestId) return@launch
+                    _previewState.value = PreviewState(ruleName = rule.name, isLoading = true)
+                    val results = simulateRuleUseCase(rule)
+                    if (previewRequestId != requestId) return@launch
                     _previewState.value =
                         PreviewState(
                             ruleName = rule.name,
                             isLoading = false,
-                            results = mockFileMovePreviewResults(),
+                            results = results,
                             ruleGroups =
                                 listOf(
                                     PreviewRuleGroup(
                                         ruleId = rule.id,
                                         ruleName = rule.name,
-                                        operationMode = OperationMode.MOVE,
-                                        results = mockFileMovePreviewResults(),
+                                        operationMode = rule.operationMode,
+                                        results = results,
                                     ),
                                 ),
                         )
-                    return@launch
                 }
-                _previewState.value = PreviewState(ruleName = rule.name, isLoading = true)
-                val results = simulateRuleUseCase(rule)
-                _previewState.value =
-                    PreviewState(
-                        ruleName = rule.name,
-                        isLoading = false,
-                        results = results,
-                        ruleGroups =
-                            listOf(
-                                PreviewRuleGroup(
-                                    ruleId = rule.id,
-                                    ruleName = rule.name,
-                                    operationMode = rule.operationMode,
-                                    results = results,
-                                ),
-                            ),
-                    )
-            }
+        }
 
-        fun startPreviewSelected() =
-            viewModelScope.launch {
-                val selectedRules = _rules.value.filter { rule -> rule.id in _selectedRuleIds.value }
-                if (selectedRules.isEmpty()) return@launch
-                _previewState.value =
-                    PreviewState(
-                        ruleName = "",
-                        isLoading = true,
-                        selectedRuleCount = selectedRules.size,
-                    )
-                val ruleGroups =
-                    selectedRules.map { rule ->
-                        val results =
-                            if (DevMockFileMove.isMockRule(rule)) {
-                                mockFileMovePreviewResults()
-                            } else {
-                                simulateRuleUseCase(rule)
-                            }
-                        PreviewRuleGroup(
-                            ruleId = rule.id,
-                            ruleName = rule.name,
-                            operationMode = rule.operationMode,
-                            results = results,
+        fun startPreviewSelected() {
+            val selectedRules = _rules.value.filter { rule -> rule.id in _selectedRuleIds.value }
+            if (selectedRules.isEmpty()) return
+            previewJob?.cancel()
+            previewRequestId += 1
+            val requestId = previewRequestId
+            previewJob =
+                viewModelScope.launch {
+                    if (previewRequestId != requestId) return@launch
+                    _previewState.value =
+                        PreviewState(
+                            ruleName = "",
+                            isLoading = true,
+                            selectedRuleCount = selectedRules.size,
                         )
-                    }
-                _previewState.value =
-                    PreviewState(
-                        ruleName = "",
-                        isLoading = false,
-                        results = ruleGroups.flatMap { it.results },
-                        selectedRuleCount = selectedRules.size,
-                        ruleGroups = ruleGroups,
-                    )
-            }
+                    val ruleGroups =
+                        selectedRules.map { rule ->
+                            val results =
+                                if (DevMockFileMove.isMockRule(rule)) {
+                                    mockFileMovePreviewResults()
+                                } else {
+                                    simulateRuleUseCase(rule)
+                                }
+                            PreviewRuleGroup(
+                                ruleId = rule.id,
+                                ruleName = rule.name,
+                                operationMode = rule.operationMode,
+                                results = results,
+                            )
+                        }
+                    if (previewRequestId != requestId) return@launch
+                    _previewState.value =
+                        PreviewState(
+                            ruleName = "",
+                            isLoading = false,
+                            results = ruleGroups.flatMap { it.results },
+                            selectedRuleCount = selectedRules.size,
+                            ruleGroups = ruleGroups,
+                        )
+                }
+        }
 
         fun dismissPreview() {
+            previewRequestId += 1
+            previewJob?.cancel()
+            previewJob = null
             _previewState.value = null
         }
 
@@ -455,7 +475,7 @@ class RulesViewModel
                     .filter { rule -> rule.isEnabled }
             if (rulesToRun.isEmpty()) return
 
-            _previewState.value = null
+            dismissPreview()
             if (rulesToRun.size == 1 && DevMockFileMove.isMockRule(rulesToRun.first())) {
                 enqueueMockFileMoveRun(rulesToRun.first())
                 return

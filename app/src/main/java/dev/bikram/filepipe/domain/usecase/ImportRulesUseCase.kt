@@ -35,6 +35,8 @@ data class RestoreBackupResult(
     val rulesImported: Int,
     val historyRunsImported: Int,
     val settingsRestored: Boolean,
+    val foldersNeedingReselection: Int,
+    val automationsDisabled: Boolean,
 )
 
 class InvalidBackupRuleRegexException(
@@ -176,8 +178,14 @@ class ImportRulesUseCase
                 }
 
             val settingsApplied = backup.settings != null
+            var foldersNeedingReselection = 0
+            var automationsDisabled = false
             try {
-                backup.settings?.let { settings -> userPreferencesRepository.applySettingsFromBackup(settings) }
+                backup.settings?.let { settings ->
+                    val settingsOutcome = userPreferencesRepository.applySettingsFromBackup(settings)
+                    foldersNeedingReselection = settingsOutcome.foldersNeedingReselection
+                    automationsDisabled = settingsOutcome.automationsDisabled
+                }
             } catch (error: CancellationException) {
                 withContext(NonCancellable) {
                     rollbackRoomRestore(
@@ -226,6 +234,8 @@ class ImportRulesUseCase
                     rulesImported = savedOrdered.size,
                     historyRunsImported = backup.history.size,
                     settingsRestored = settingsApplied,
+                    foldersNeedingReselection = foldersNeedingReselection,
+                    automationsDisabled = automationsDisabled,
                 ),
             )
         }

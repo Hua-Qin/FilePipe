@@ -271,6 +271,8 @@ class RuleDetailViewModel
         private val _baseline = MutableStateFlow<RuleSnapshot?>(null)
         private val saveMutex = Mutex()
         private var folderAccessRecomputeJob: Job? = null
+        private var previewJob: Job? = null
+        private var previewRequestId = 0L
 
         val isDirty: StateFlow<Boolean> =
             combine(_uiState, _baseline) { state, baseline ->
@@ -642,7 +644,12 @@ class RuleDetailViewModel
             scheduleFolderAccessRecompute()
         }
 
-        fun dismissPreview() = _uiState.update { it.copy(previewFiles = null) }
+        fun dismissPreview() {
+            previewRequestId += 1
+            previewJob?.cancel()
+            previewJob = null
+            _uiState.update { state -> state.copy(previewFiles = null, isPreviewLoading = false) }
+        }
 
         fun discardChanges() {
             val baseline = _baseline.value ?: return
@@ -650,20 +657,28 @@ class RuleDetailViewModel
             scheduleFolderAccessRecompute()
         }
 
-        fun loadPreview() =
-            viewModelScope.launch {
-                val state = _uiState.value
-                if (state.sourceFolderPaths.isEmpty() ||
-                    state.fileExtensions.isEmpty() ||
-                    (state.operationMode != OperationMode.DELETE && state.destinationFolderPath.isBlank())
-                ) {
-                    return@launch
-                }
-                _uiState.update { it.copy(isPreviewLoading = true, previewFiles = null) }
-                val rule = buildRuleFromState(state)
-                val files = simulateRuleUseCase(rule)
-                _uiState.update { it.copy(previewFiles = files, isPreviewLoading = false) }
+        fun loadPreview() {
+            val state = _uiState.value
+            if (state.sourceFolderPaths.isEmpty() ||
+                state.fileExtensions.isEmpty() ||
+                (state.operationMode != OperationMode.DELETE && state.destinationFolderPath.isBlank())
+            ) {
+                return
             }
+            previewJob?.cancel()
+            previewRequestId += 1
+            val requestId = previewRequestId
+            _uiState.update { currentState -> currentState.copy(isPreviewLoading = true, previewFiles = null) }
+            previewJob =
+                viewModelScope.launch {
+                    val rule = buildRuleFromState(state)
+                    val files = simulateRuleUseCase(rule)
+                    if (previewRequestId != requestId) return@launch
+                    _uiState.update { currentState ->
+                        currentState.copy(previewFiles = files, isPreviewLoading = false)
+                    }
+                }
+        }
 
         fun save() =
             viewModelScope.launch {

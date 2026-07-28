@@ -465,7 +465,7 @@ class FilePipeUpdateViewModel
                     }
                 result.onFailure {
                     DiagnosticLog.record(context, "Update APK download/install failed", it)
-                    postUserMessage("Download failed: ${it.message}")
+                    postUserMessage(context.getString(R.string.settings_update_download_failed))
                 }
                 _downloadProgress.value = null
             }

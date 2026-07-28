@@ -392,7 +392,7 @@ class SettingsViewModel
                     },
                     onFailure = { err ->
                         DiagnosticLog.record(context, "Manual backup export failed", err)
-                        postUserMessage("Export failed: ${err.message}")
+                        postUserMessage(context.getString(R.string.settings_backup_export_failed, err.message.orEmpty()))
                     },
                 )
             }
@@ -518,11 +518,25 @@ class SettingsViewModel
                                 }
                             val parts =
                                 buildList {
-                                    add("${result.rulesImported} rules")
+                                    add(
+                                        context.resources.getQuantityString(
+                                            R.plurals.settings_restore_part_rules,
+                                            result.rulesImported,
+                                            result.rulesImported,
+                                        ),
+                                    )
                                     if (result.historyRunsImported > 0) {
-                                        add("${result.historyRunsImported} history runs")
+                                        add(
+                                            context.resources.getQuantityString(
+                                                R.plurals.settings_restore_part_history_runs,
+                                                result.historyRunsImported,
+                                                result.historyRunsImported,
+                                            ),
+                                        )
                                     }
-                                    if (result.settingsRestored) add("settings")
+                                    if (result.settingsRestored) {
+                                        add(context.getString(R.string.settings_restore_part_settings))
+                                    }
                                 }
                             postUserMessage(
                                 context.getString(
@@ -530,6 +544,18 @@ class SettingsViewModel
                                     parts.joinToString(", "),
                                 ),
                             )
+                            if (result.foldersNeedingReselection > 0) {
+                                postUserMessage(
+                                    context.resources.getQuantityString(
+                                        R.plurals.settings_restore_folders_need_reselection,
+                                        result.foldersNeedingReselection,
+                                        result.foldersNeedingReselection,
+                                    ),
+                                )
+                            }
+                            if (result.automationsDisabled) {
+                                postUserMessage(context.getString(R.string.settings_restore_automation_disabled_no_folder))
+                            }
                         },
                         onFailure = {
                             DiagnosticLog.record(context, "Full backup restore failed", it)

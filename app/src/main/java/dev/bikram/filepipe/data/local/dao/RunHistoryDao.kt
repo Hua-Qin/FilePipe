@@ -4,7 +4,9 @@ import androidx.paging.PagingSource
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Update
+import androidx.sqlite.db.SupportSQLiteQuery
 import dev.bikram.filepipe.data.local.entity.RunHistoryEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -16,6 +18,16 @@ data class HistoryStatusAvailability(
     val hasCancelled: Boolean,
     val hasUndone: Boolean,
     val hasPartialUndone: Boolean,
+)
+
+data class HistoryRuleCount(
+    val ruleName: String,
+    val count: Int,
+)
+
+data class HistoryStatusSectionCount(
+    val section: Int,
+    val count: Int,
 )
 
 @Dao
@@ -62,6 +74,18 @@ interface RunHistoryDao {
     )
     fun observeHistoryStatusAvailability(ruleId: Long?): Flow<HistoryStatusAvailability>
 
+    @RawQuery(observedEntities = [RunHistoryEntity::class])
+    fun getHistoryPaged(query: SupportSQLiteQuery): PagingSource<Int, RunHistoryEntity>
+
+    @RawQuery(observedEntities = [RunHistoryEntity::class])
+    fun observeHistoryIds(query: SupportSQLiteQuery): Flow<List<Long>>
+
+    @RawQuery(observedEntities = [RunHistoryEntity::class])
+    fun observeHistoryRuleCounts(query: SupportSQLiteQuery): Flow<List<HistoryRuleCount>>
+
+    @RawQuery(observedEntities = [RunHistoryEntity::class])
+    fun observeHistoryStatusSectionCounts(query: SupportSQLiteQuery): Flow<List<HistoryStatusSectionCount>>
+
     @Query("SELECT * FROM run_history ORDER BY startedAt DESC")
     fun getAllHistoryPagedLastRanDesc(): PagingSource<Int, RunHistoryEntity>
 
@@ -91,6 +115,9 @@ interface RunHistoryDao {
 
     @Query("SELECT * FROM run_history WHERE id = :id")
     suspend fun getHistoryById(id: Long): RunHistoryEntity?
+
+    @Query("SELECT * FROM run_history WHERE id = :id")
+    fun observeHistoryById(id: Long): Flow<RunHistoryEntity?>
 
     @Query("SELECT * FROM run_history WHERE ruleId = :ruleId ORDER BY startedAt DESC")
     fun getHistoryForRule(ruleId: Long): Flow<List<RunHistoryEntity>>
