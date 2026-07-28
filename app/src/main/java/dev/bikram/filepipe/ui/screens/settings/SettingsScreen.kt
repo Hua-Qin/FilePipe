@@ -352,21 +352,30 @@ fun SettingsScreen(
                 if (BuildConfig.SHOW_UPDATES) add("updates")
             }
         }
-    val collapsedSettingsSectionKeys =
-        remember(preferences.settingsCollapsedSectionKeys, settingsExpandableSectionKeys) {
+    var collapsedSettingsSectionKeys by rememberSaveable {
+        mutableStateOf<Set<String>?>(null)
+    }
+    val currentCollapsedSectionKeys =
+        collapsedSettingsSectionKeys
+            ?: preferences.settingsCollapsedSectionKeys
+                .filter { it in settingsExpandableSectionKeys }
+                .toSet()
+    LaunchedEffect(preferences.settingsCollapsedSectionKeys, settingsExpandableSectionKeys) {
+        collapsedSettingsSectionKeys =
             preferences.settingsCollapsedSectionKeys
                 .filter { sectionKey -> sectionKey in settingsExpandableSectionKeys }
                 .toSet()
-                .ifEmpty { SettingsScreenSessionState.collapsedSectionKeys }
-        }
+    }
 
     fun updateCollapsedSettingsSectionKeys(sectionKeys: Set<String>) {
-        viewModel.setSettingsCollapsedSectionKeys(sectionKeys.filter { sectionKey -> sectionKey in settingsExpandableSectionKeys })
+        val filteredSectionKeys = sectionKeys.filter { sectionKey -> sectionKey in settingsExpandableSectionKeys }.toSet()
+        collapsedSettingsSectionKeys = filteredSectionKeys
+        viewModel.setSettingsCollapsedSectionKeys(filteredSectionKeys)
     }
 
     val allSettingsSectionsCollapsed =
         settingsExpandableSectionKeys.all { sectionKey ->
-            sectionKey in collapsedSettingsSectionKeys
+            sectionKey in currentCollapsedSectionKeys
         }
     var folderAccessHighlight by rememberSaveable { mutableStateOf(false) }
     var folderAccessHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
@@ -380,8 +389,8 @@ fun SettingsScreen(
                 "notifications" -> "schedule"
                 else -> key
             }
-        val wasCollapsed = settingsSectionKey in collapsedSettingsSectionKeys
-        updateCollapsedSettingsSectionKeys(collapsedSettingsSectionKeys - settingsSectionKey)
+        val wasCollapsed = settingsSectionKey in currentCollapsedSectionKeys
+        updateCollapsedSettingsSectionKeys(currentCollapsedSectionKeys - settingsSectionKey)
         if (wasCollapsed) delay(SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS)
         val targetIndex =
             when (key) {
@@ -544,7 +553,7 @@ fun SettingsScreen(
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_STOP) {
-                    SettingsScreenSessionState.collapsedSectionKeys = collapsedSettingsSectionKeys
+                    SettingsScreenSessionState.collapsedSectionKeys = currentCollapsedSectionKeys
                     SettingsScreenSessionState.listFirstVisibleItemIndex = settingsLazyListState.firstVisibleItemIndex
                     SettingsScreenSessionState.listFirstVisibleItemScrollOffset = settingsLazyListState.firstVisibleItemScrollOffset
                 }
@@ -789,9 +798,9 @@ fun SettingsScreen(
                                 onClick = {
                                     updateCollapsedSettingsSectionKeys(
                                         if (allSettingsSectionsCollapsed) {
-                                            collapsedSettingsSectionKeys - settingsExpandableSectionKeys
+                                            currentCollapsedSectionKeys - settingsExpandableSectionKeys
                                         } else {
-                                            collapsedSettingsSectionKeys + settingsExpandableSectionKeys
+                                            currentCollapsedSectionKeys + settingsExpandableSectionKeys
                                         },
                                     )
                                 },
@@ -841,7 +850,7 @@ fun SettingsScreen(
                         sectionKey = SettingsSectionKey.Appearance.routeKey,
                         iconName = SettingsSectionKey.Appearance.iconName,
                         title = stringResource(R.string.settings_appearance_section),
-                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        collapsedSectionKeys = currentCollapsedSectionKeys,
                         onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                         showHeader = showSectionHeaders,
                         forceExpanded = forceExpandedSections,
@@ -904,7 +913,7 @@ fun SettingsScreen(
                             sectionKey = SettingsSectionKey.FolderAccess.routeKey,
                             iconName = SettingsSectionKey.FolderAccess.iconName,
                             title = stringResource(R.string.settings_folder_access_section),
-                            collapsedSectionKeys = collapsedSettingsSectionKeys,
+                            collapsedSectionKeys = currentCollapsedSectionKeys,
                             onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                             showHeader = showSectionHeaders,
                             forceExpanded = forceExpandedSections,
@@ -1059,7 +1068,7 @@ fun SettingsScreen(
                             sectionKey = SettingsSectionKey.Schedule.routeKey,
                             iconName = SettingsSectionKey.Schedule.iconName,
                             title = stringResource(R.string.settings_schedule_section),
-                            collapsedSectionKeys = collapsedSettingsSectionKeys,
+                            collapsedSectionKeys = currentCollapsedSectionKeys,
                             onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                             showHeader = showSectionHeaders,
                             forceExpanded = forceExpandedSections,
@@ -1157,7 +1166,7 @@ fun SettingsScreen(
                         sectionKey = SettingsSectionKey.TouchSound.routeKey,
                         iconName = SettingsSectionKey.TouchSound.iconName,
                         title = stringResource(R.string.settings_touch_sound_section),
-                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        collapsedSectionKeys = currentCollapsedSectionKeys,
                         onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                         showHeader = showSectionHeaders,
                         forceExpanded = forceExpandedSections,
@@ -1184,7 +1193,7 @@ fun SettingsScreen(
                         sectionKey = SettingsSectionKey.SwipeActions.routeKey,
                         iconName = SettingsSectionKey.SwipeActions.iconName,
                         title = stringResource(R.string.settings_swipe_gestures_section),
-                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        collapsedSectionKeys = currentCollapsedSectionKeys,
                         onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                         showHeader = showSectionHeaders,
                         forceExpanded = forceExpandedSections,
@@ -1212,7 +1221,7 @@ fun SettingsScreen(
                         sectionKey = SettingsSectionKey.Backup.routeKey,
                         iconName = SettingsSectionKey.Backup.iconName,
                         title = stringResource(R.string.settings_backup_section),
-                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        collapsedSectionKeys = currentCollapsedSectionKeys,
                         onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                         showHeader = showSectionHeaders,
                         forceExpanded = forceExpandedSections,
@@ -1255,7 +1264,7 @@ fun SettingsScreen(
                             sectionKey = SettingsSectionKey.Updates.routeKey,
                             iconName = SettingsSectionKey.Updates.iconName,
                             title = stringResource(R.string.settings_updates_section),
-                            collapsedSectionKeys = collapsedSettingsSectionKeys,
+                            collapsedSectionKeys = currentCollapsedSectionKeys,
                             onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                             showHeader = showSectionHeaders,
                             forceExpanded = forceExpandedSections,

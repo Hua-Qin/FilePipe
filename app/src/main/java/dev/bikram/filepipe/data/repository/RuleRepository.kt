@@ -35,6 +35,8 @@ class RuleRepository
 
         suspend fun getAllRulesIncludingTrashed(): List<Rule> = ruleDao.getAllRulesIncludingTrashed().map { entity -> entity.toDomain() }
 
+        fun observeAllRulesIncludingTrashed(): Flow<List<Rule>> = ruleDao.observeAllRulesIncludingTrashed().map { entities -> entities.map { it.toDomain() } }
+
         suspend fun getEnabledRules(): List<Rule> = ruleDao.getEnabledRules().map { it.toDomain() }
 
         /**

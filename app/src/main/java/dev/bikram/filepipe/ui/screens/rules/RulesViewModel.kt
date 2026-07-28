@@ -43,6 +43,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -767,10 +768,26 @@ class RulesViewModel
                             // simulation now only picks the feedback - a run that affects no files
                             // reports that instead of pulling the user into History.
                             val affectsFiles =
-                                !runSimulationCheck ||
-                                    rules.any { rule ->
-                                        simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
+                                try {
+                                    !runSimulationCheck ||
+                                        rules.any { rule ->
+                                            simulateRuleUseCase(rule).any { result -> !result.wouldSkip }
+                                        }
+                                } catch (e: CancellationException) {
+                                    withContext(NonCancellable) {
+                                        rules.forEach { rule ->
+                                            val hId =
+                                                runHistoryRepository.startRun(
+                                                    ruleId = rule.id,
+                                                    ruleName = rule.name,
+                                                    triggerType = TriggerType.MANUAL,
+                                                    operationMode = rule.operationMode,
+                                                )
+                                            runHistoryRepository.finishRunUserCancelled(hId, 0)
+                                        }
                                     }
+                                    throw e
+                                }
 
                             val results =
                                 executeRulesUseCase(
@@ -844,8 +861,17 @@ class RulesViewModel
                                     ),
                             )
                         var runCompleted = false
+                        var mockHistoryId: Long? = null
                         try {
                             val startedAt = System.currentTimeMillis()
+                            val historyId =
+                                runHistoryRepository.startRun(
+                                    ruleId = rule.id,
+                                    ruleName = rule.name,
+                                    triggerType = TriggerType.MANUAL,
+                                    operationMode = OperationMode.MOVE,
+                                )
+                            mockHistoryId = historyId
                             fileNames.forEachIndexed { index, fileName ->
                                 if (!isActive) throw CancellationException("User cancelled")
                                 _progressMap.update { current ->
@@ -877,13 +903,6 @@ class RulesViewModel
                                         )
                                 )
                             }
-                            val historyId =
-                                runHistoryRepository.startRun(
-                                    ruleId = rule.id,
-                                    ruleName = rule.name,
-                                    triggerType = TriggerType.MANUAL,
-                                    operationMode = OperationMode.MOVE,
-                                )
                             val completedAt = System.currentTimeMillis()
                             val movedFiles =
                                 fileNames.mapIndexed { index, fileName ->
@@ -906,10 +925,13 @@ class RulesViewModel
                                     completedAt = completedAt,
                                 ),
                             )
-                            _navigateAfterRun.emit(RulesRunNavigation.HistoryDetail(historyId))
+                            mockHistoryId = null
                             runCompleted = true
+                            _navigateAfterRun.emit(RulesRunNavigation.HistoryDetail(historyId))
                         } catch (_: CancellationException) {
-                            // The mock run never touches storage, so cancellation only clears UI progress.
+                            mockHistoryId?.let { id ->
+                                runHistoryRepository.finishRunUserCancelled(id, fileNames.size)
+                            }
                         } finally {
                             manualRunForegroundCoordinator.setManualRunActive(false)
                             synchronized(manualRunJobLock) {

@@ -27,8 +27,10 @@ import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunResult
 import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.TriggerType
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -210,6 +212,19 @@ class RunHistoryRepository
             }.flow.map { pagingData -> pagingData.map { entity -> entity.toDomain() } }
         }
 
+        fun observeVisibleHistoryCount(
+            ruleId: Long?,
+            statusFilter: HistoryStatusFilter,
+        ): Flow<Int> {
+            val (whereClause, arguments) = buildHistoryWhereClause(ruleId, statusFilter)
+            return runHistoryDao.observeFilteredHistoryCount(
+                SimpleSQLiteQuery(
+                    "SELECT COUNT(*) FROM run_history $whereClause",
+                    arguments,
+                ),
+            )
+        }
+
         fun observeVisibleHistoryIds(
             ruleId: Long?,
             statusFilter: HistoryStatusFilter,
@@ -359,56 +374,60 @@ class RunHistoryRepository
             historyId: Long,
             totalPlanned: Int,
         ) {
-            val history = runHistoryDao.getHistoryById(historyId) ?: return
-            runHistoryDao.updateHistory(
-                history.copy(
-                    completedAt = System.currentTimeMillis(),
-                    status = RunStatus.CANCELLED,
-                    totalFilesFound = totalPlanned,
-                    cancelledUnprocessedCount = totalPlanned,
-                    totalFilesMoved = 0,
-                    totalFilesFailed = 0,
-                    errorMessage = null,
-                ),
-            )
+            withContext(NonCancellable) {
+                val history = runHistoryDao.getHistoryById(historyId) ?: return@withContext
+                runHistoryDao.updateHistory(
+                    history.copy(
+                        completedAt = System.currentTimeMillis(),
+                        status = RunStatus.CANCELLED,
+                        totalFilesFound = totalPlanned,
+                        cancelledUnprocessedCount = totalPlanned,
+                        totalFilesMoved = 0,
+                        totalFilesFailed = 0,
+                        errorMessage = null,
+                    ),
+                )
+            }
         }
 
         suspend fun completeRunUserCancelledPartial(
             result: RunResult,
             totalPlanned: Int,
         ) {
-            appDatabase.withTransaction {
-                val history = runHistoryDao.getHistoryById(result.historyId) ?: return@withTransaction
-                val unprocessed = (totalPlanned - result.filesMoved.size).coerceAtLeast(0)
-                runHistoryDao.updateHistory(
-                    history.copy(
-                        completedAt = result.completedAt,
-                        status = RunStatus.CANCELLED,
-                        totalFilesFound = totalPlanned,
-                        cancelledUnprocessedCount = unprocessed,
-                        totalFilesMoved = result.totalMoved,
-                        totalFilesFailed = result.totalFailed,
-                        errorMessage = null,
-                        copyCreatedDestFolderUris = result.copyCreatedDestFolderUris,
-                    ),
-                )
-                fileMovedDao.insertFilesMoved(
-                    result.filesMoved.map { fileMoved ->
-                        FileMovedEntity(
-                            runHistoryId = result.historyId,
-                            fileName = fileMoved.fileName,
-                            sourceUri = fileMoved.sourceUri,
-                            destinationUri = fileMoved.destinationUri,
-                            fileSizeBytes = fileMoved.fileSizeBytes,
-                            relativeParentSegments = fileMoved.relativeParentSegments,
-                            movedAt = fileMoved.movedAt,
-                            success = fileMoved.success,
-                            skipped = fileMoved.skipped,
-                            errorMessage = fileMoved.errorMessage,
-                            undoStatus = fileMoved.undoStatus,
-                        )
-                    },
-                )
+            withContext(NonCancellable) {
+                appDatabase.withTransaction {
+                    val history = runHistoryDao.getHistoryById(result.historyId) ?: return@withTransaction
+                    val unprocessed = (totalPlanned - result.filesMoved.size).coerceAtLeast(0)
+                    runHistoryDao.updateHistory(
+                        history.copy(
+                            completedAt = result.completedAt,
+                            status = RunStatus.CANCELLED,
+                            totalFilesFound = totalPlanned,
+                            cancelledUnprocessedCount = unprocessed,
+                            totalFilesMoved = result.totalMoved,
+                            totalFilesFailed = result.totalFailed,
+                            errorMessage = null,
+                            copyCreatedDestFolderUris = result.copyCreatedDestFolderUris,
+                        ),
+                    )
+                    fileMovedDao.insertFilesMoved(
+                        result.filesMoved.map { fileMoved ->
+                            FileMovedEntity(
+                                runHistoryId = result.historyId,
+                                fileName = fileMoved.fileName,
+                                sourceUri = fileMoved.sourceUri,
+                                destinationUri = fileMoved.destinationUri,
+                                fileSizeBytes = fileMoved.fileSizeBytes,
+                                relativeParentSegments = fileMoved.relativeParentSegments,
+                                movedAt = fileMoved.movedAt,
+                                success = fileMoved.success,
+                                skipped = fileMoved.skipped,
+                                errorMessage = fileMoved.errorMessage,
+                                undoStatus = fileMoved.undoStatus,
+                            )
+                        },
+                    )
+                }
             }
         }
 
@@ -435,6 +454,13 @@ class RunHistoryRepository
 
         suspend fun deleteHistoryById(historyId: Long) {
             runHistoryDao.deleteHistoryById(historyId)
+        }
+
+        suspend fun deleteFilteredHistory(
+            ruleId: Long?,
+            statusFilter: HistoryStatusFilter,
+        ) {
+            runHistoryDao.deleteFilteredHistory(ruleId, statusFilter.name)
         }
 
         suspend fun pruneOldHistory(retentionDays: Int) {

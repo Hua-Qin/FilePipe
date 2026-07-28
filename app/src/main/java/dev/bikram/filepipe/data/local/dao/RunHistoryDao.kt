@@ -78,6 +78,9 @@ interface RunHistoryDao {
     fun getHistoryPaged(query: SupportSQLiteQuery): PagingSource<Int, RunHistoryEntity>
 
     @RawQuery(observedEntities = [RunHistoryEntity::class])
+    fun observeFilteredHistoryCount(query: SupportSQLiteQuery): Flow<Int>
+
+    @RawQuery(observedEntities = [RunHistoryEntity::class])
     fun observeHistoryIds(query: SupportSQLiteQuery): Flow<List<Long>>
 
     @RawQuery(observedEntities = [RunHistoryEntity::class])
@@ -146,6 +149,40 @@ interface RunHistoryDao {
 
     @Query("DELETE FROM run_history WHERE id = :id")
     suspend fun deleteHistoryById(id: Long)
+
+    @Query(
+        """
+        DELETE FROM run_history
+        WHERE (:ruleId IS NULL OR ruleId = :ruleId)
+            AND (
+                :statusFilter = 'ALL'
+                OR (
+                    :statusFilter = 'SUCCESS'
+                    AND status = 'SUCCESS'
+                    AND NOT (totalFilesMoved = 0 AND totalFilesFailed = 0)
+                    AND isReversed = 0
+                )
+                OR (:statusFilter = 'FAILED' AND status = 'FAILED')
+                OR (:statusFilter = 'PARTIAL' AND status = 'PARTIAL_FAILURE')
+                OR (
+                    :statusFilter = 'NO_CHANGES'
+                    AND status = 'SUCCESS'
+                    AND totalFilesMoved = 0
+                    AND totalFilesFailed = 0
+                )
+                OR (:statusFilter = 'CANCELLED' AND status = 'CANCELLED')
+                OR (
+                    :statusFilter = 'UNDONE'
+                    AND (status = 'UNDONE' OR isReversed = 1)
+                )
+                OR (:statusFilter = 'PARTIAL_UNDONE' AND status = 'PARTIAL_UNDONE')
+            )
+        """,
+    )
+    suspend fun deleteFilteredHistory(
+        ruleId: Long?,
+        statusFilter: String,
+    ): Int
 
     @Query("DELETE FROM run_history")
     suspend fun deleteAllHistory()

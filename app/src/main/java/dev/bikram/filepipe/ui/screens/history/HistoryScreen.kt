@@ -130,6 +130,7 @@ fun HistoryScreen(
     val section by viewModel.section.collectAsStateWithLifecycle()
     val availableStatusFilters by viewModel.availableStatusFilters.collectAsStateWithLifecycle()
     val trashedRules by viewModel.trashedRules.collectAsStateWithLifecycle()
+    val rulesMap by viewModel.rulesMap.collectAsStateWithLifecycle()
     val pagingItems = viewModel.historyPagingFlow.collectAsLazyPagingItems()
     val hasAnyHistory by viewModel.hasAnyHistory.collectAsStateWithLifecycle()
     val isSmallLandscape = isSmallLandscape()
@@ -147,6 +148,13 @@ fun HistoryScreen(
     val reducedMotion = LocalReducedMotion.current
     val pagingListState = rememberLazyListState()
     val trashListState = rememberLazyListState()
+    val filterRowState = rememberLazyListState()
+
+    LaunchedEffect(uiState.statusFilter) {
+        if (uiState.statusFilter == HistoryStatusFilter.ALL) {
+            filterRowState.animateScrollToItem(0)
+        }
+    }
     val pagingListScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = pagingListState,
@@ -188,10 +196,26 @@ fun HistoryScreen(
             HistoryStatusFilter.PARTIAL_UNDONE to stringResource(R.string.status_partially_undone),
         )
 
+    val isFilterActive by viewModel.isFilterActive.collectAsStateWithLifecycle()
+
     if (showClearConfirm) {
         FilePipeConfirmDialog(
-            title = stringResource(R.string.history_clear_confirm_title),
-            text = stringResource(R.string.history_clear_confirm_message),
+            title =
+                stringResource(
+                    if (isFilterActive) {
+                        R.string.history_clear_filtered_confirm_title
+                    } else {
+                        R.string.history_clear_confirm_title
+                    },
+                ),
+            text =
+                stringResource(
+                    if (isFilterActive) {
+                        R.string.history_clear_filtered_confirm_message
+                    } else {
+                        R.string.history_clear_confirm_message
+                    },
+                ),
             confirmLabel = stringResource(R.string.history_clear),
             onConfirm = {
                 showClearConfirm = false
@@ -399,6 +423,7 @@ fun HistoryScreen(
                 }
                 if (section == HistorySection.RUNS && hasAnyHistory) {
                     LazyRow(
+                        state = filterRowState,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
@@ -697,6 +722,7 @@ fun HistoryScreen(
                             is HistoryItem.Entry -> {
                                 SwipeToDismissHistoryCard(
                                     history = item.history,
+                                    rule = item.history.ruleId?.let { rulesMap[it] },
                                     onClick = { onHistoryClick(item.history.id) },
                                     onDelete = { viewModel.deleteHistoryEntry(item.history.id) },
                                     isActiveInDetailPane = item.history.id == activeHistoryId,
@@ -1000,6 +1026,7 @@ private fun SwipeToDismissHistoryCard(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     isActiveInDetailPane: Boolean = false,
+    rule: Rule? = null,
 ) {
     val hapticEnabled = LocalHapticEnabled.current
     val cardShape = MaterialTheme.shapes.medium
@@ -1053,6 +1080,7 @@ private fun SwipeToDismissHistoryCard(
             history = history,
             onClick = onClick,
             isActiveInDetailPane = isActiveInDetailPane,
+            rule = rule,
         )
     }
 }

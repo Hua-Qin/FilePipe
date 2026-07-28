@@ -1,3 +1,15 @@
+## v3.9.7 Run history improvements
+
+### 🛠 Improved Features
+- Delete only the history entries matching the active status filter without removing unrelated runs.
+- History cards now show each rule’s icon, and the operation icon (copy, move, or delete), for easier visual parsing.
+- Cancelled runs are now reliably recorded as cancelled, including cancellations during preparation or after processing some files.
+
+### 🐛 Bug Fixes
+- Settings sections now expand or collapse correctly.
+
+---
+
 ## v3.9.6 Improvements & Fixes
 
 ### 🛠 Improved Features

@@ -303,6 +303,8 @@ fun AppNavigation(
     val settingsVm: SettingsViewModel = hiltViewModel()
     val updateVm: FilePipeUpdateViewModel = hiltViewModel()
     val hasAnyHistory by historyVm.hasAnyHistory.collectAsStateWithLifecycle()
+    val isHistoryFilterActive by historyVm.isFilterActive.collectAsStateWithLifecycle()
+    val hasAnyVisibleHistory by historyVm.hasAnyVisibleHistory.collectAsStateWithLifecycle()
     val historySection by historyVm.section.collectAsStateWithLifecycle()
     val trashedRules by historyVm.trashedRules.collectAsStateWithLifecycle()
     val hasAnyTrashedRules = trashedRules.isNotEmpty()
@@ -570,10 +572,24 @@ fun AppNavigation(
                 currentDestination?.hierarchy?.any { it.route == item.screen.route } == true
             }?.screen
 
-    if (showClearHistoryDialog && hasAnyHistory) {
+    if (showClearHistoryDialog && (if (isHistoryFilterActive) hasAnyVisibleHistory else hasAnyHistory)) {
         FilePipeConfirmDialog(
-            title = stringResource(R.string.history_clear_confirm_title),
-            text = stringResource(R.string.history_clear_confirm_message),
+            title =
+                stringResource(
+                    if (isHistoryFilterActive) {
+                        R.string.history_clear_filtered_confirm_title
+                    } else {
+                        R.string.history_clear_confirm_title
+                    },
+                ),
+            text =
+                stringResource(
+                    if (isHistoryFilterActive) {
+                        R.string.history_clear_filtered_confirm_message
+                    } else {
+                        R.string.history_clear_confirm_message
+                    },
+                ),
             confirmLabel = stringResource(R.string.history_clear),
             onConfirm = {
                 showClearHistoryDialog = false
@@ -854,6 +870,8 @@ fun AppNavigation(
                                             MainNavFabSlot(
                                                 currentTab = Screen.History,
                                                 hasAnyHistory = hasAnyHistory,
+                                                isHistoryFilterActive = isHistoryFilterActive,
+                                                hasAnyVisibleHistory = hasAnyVisibleHistory,
                                                 historySection = historySection,
                                                 hasAnyTrashedRules = hasAnyTrashedRules,
                                                 onAddRule = {},
@@ -950,6 +968,8 @@ fun AppNavigation(
                                                 MainNavFabSlot(
                                                     currentTab = Screen.Settings,
                                                     hasAnyHistory = hasAnyHistory,
+                                                    isHistoryFilterActive = isHistoryFilterActive,
+                                                    hasAnyVisibleHistory = hasAnyVisibleHistory,
                                                     historySection = historySection,
                                                     hasAnyTrashedRules = hasAnyTrashedRules,
                                                     onAddRule = {},
@@ -1210,6 +1230,8 @@ fun AppNavigation(
                                     MainNavFabSlot(
                                         currentTab = currentTab,
                                         hasAnyHistory = hasAnyHistory,
+                                        isHistoryFilterActive = isHistoryFilterActive,
+                                        hasAnyVisibleHistory = hasAnyVisibleHistory,
                                         historySection = historySection,
                                         hasAnyTrashedRules = hasAnyTrashedRules,
                                         onAddRule = {
@@ -2381,6 +2403,8 @@ private fun CenteredPillWithSideFab(
 private fun MainNavFabSlot(
     currentTab: Screen?,
     hasAnyHistory: Boolean,
+    isHistoryFilterActive: Boolean = false,
+    hasAnyVisibleHistory: Boolean = false,
     historySection: HistorySection,
     hasAnyTrashedRules: Boolean,
     onAddRule: () -> Unit,
@@ -2415,9 +2439,10 @@ private fun MainNavFabSlot(
                     },
                 )
             val isSmallLandscape = isSmallLandscape()
+            val effectiveHasHistory = if (isHistoryFilterActive) hasAnyVisibleHistory else hasAnyHistory
             val shouldShowFab =
                 if (isSmallLandscape) {
-                    if (inTrash) hasAnyTrashedRules else hasAnyHistory
+                    if (inTrash) hasAnyTrashedRules else effectiveHasHistory
                 } else {
                     true
                 }
@@ -2431,7 +2456,7 @@ private fun MainNavFabSlot(
                         )
                     },
                     description = description,
-                    enabled = if (inTrash) hasAnyTrashedRules else hasAnyHistory,
+                    enabled = if (inTrash) hasAnyTrashedRules else effectiveHasHistory,
                     onClick = if (inTrash) onEmptyTrash else onClearHistory,
                 )
             }

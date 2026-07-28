@@ -1,6 +1,7 @@
 package dev.bikram.filepipe.ui.screens.settings
 
 import android.content.Context
+import android.net.Uri
 import android.provider.DocumentsContract
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -96,9 +97,29 @@ internal fun backupDestinationDisplayLabel(
     if (!DocumentsContract.isTreeUri(uri)) {
         providerDisplayName(context, uri.authority)?.let { return it }
     }
+    val providerName =
+        providerDisplayName(context, uri.authority)
+            ?.takeUnless { displayName -> displayName == uri.authority }
+    val relativeTreePath =
+        runCatching {
+            val treeId = DocumentsContract.getTreeDocumentId(uri)
+            val decodedTreeId = Uri.decode(treeId)
+            decodedTreeId.substringAfter(':', decodedTreeId)
+        }.getOrNull()
     val documentName = DocumentFile.fromTreeUri(context, uri)?.name
-    return documentName?.takeIf { it.isNotBlank() }
-        ?: displayPath(uriString, internalStorageRootDisplayName)
+    val folderLabel =
+        if (providerName != null) {
+            documentName?.takeIf { it.isNotBlank() }
+                ?: relativeTreePath?.takeIf { it.isNotBlank() }
+        } else {
+            relativeTreePath?.takeIf { it.isNotBlank() }
+                ?: documentName?.takeIf { it.isNotBlank() }
+        } ?: displayPath(uriString, internalStorageRootDisplayName)
+    return if (providerName != null && !folderLabel.equals(providerName, ignoreCase = true)) {
+        context.getString(R.string.cloud_provider_folder_path, providerName, folderLabel)
+    } else {
+        folderLabel
+    }
 }
 
 internal fun providerDisplayName(

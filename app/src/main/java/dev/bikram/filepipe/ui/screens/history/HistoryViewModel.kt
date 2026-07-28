@@ -18,6 +18,7 @@ import dev.bikram.filepipe.data.repository.RunHistoryRepository
 import dev.bikram.filepipe.domain.model.HistorySortDirection
 import dev.bikram.filepipe.domain.model.HistorySortKey
 import dev.bikram.filepipe.domain.model.HistoryStatusFilter
+import dev.bikram.filepipe.domain.model.Rule
 import dev.bikram.filepipe.domain.model.RunHistory
 import dev.bikram.filepipe.domain.model.RunStatus
 import dev.bikram.filepipe.domain.model.isEffectivelyUndone
@@ -95,7 +96,7 @@ data class HistoryUiState(
     val sortDirection: HistorySortDirection = HistorySortDirection.DESCENDING,
 ) {
     val isFilterActive: Boolean
-        get() = statusFilter != HistoryStatusFilter.ALL || viewMode != HistoryViewMode.BY_DATE
+        get() = statusFilter != HistoryStatusFilter.ALL
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -155,6 +156,12 @@ class HistoryViewModel
             ruleRepository
                 .getTrashedRules()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+        val rulesMap: StateFlow<Map<Long, Rule>> =
+            ruleRepository
+                .observeAllRulesIncludingTrashed()
+                .map { rules -> rules.associateBy { it.id } }
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
         val availableStatusFilters: StateFlow<Set<HistoryStatusFilter>> =
             runHistoryRepository
@@ -271,6 +278,29 @@ class HistoryViewModel
                 }
             }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+        val hasAnyVisibleHistory: StateFlow<Boolean> =
+            combine(
+                _statusFilter,
+                _section,
+            ) { status, section ->
+                status to section
+            }.flatMapLatest { (status, section) ->
+                if (section == HistorySection.TRASH) {
+                    flowOf(false)
+                } else {
+                    runHistoryRepository
+                        .observeVisibleHistoryCount(
+                            ruleId = filterRuleId,
+                            statusFilter = status,
+                        ).map { count -> count > 0 }
+                }
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+        val isFilterActive: StateFlow<Boolean> =
+            combine(uiState, _section) { state, currentSection ->
+                currentSection == HistorySection.RUNS && (state.isFilterActive || filterRuleId != null)
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
         // One-shot snackbar messages: a Channel so each is delivered exactly once (no rotation
         // replay, no conflation of identical/rapid messages).
         private val _userMessages = Channel<String>(Channel.BUFFERED)
@@ -301,12 +331,20 @@ class HistoryViewModel
 
         fun clearFilters() {
             _statusFilter.value = HistoryStatusFilter.ALL
-            _viewMode.value = HistoryViewMode.BY_DATE
         }
 
         fun clearAllHistory() =
             viewModelScope.launch {
-                runHistoryRepository.clearAllHistory()
+                val currentStatusFilter = _statusFilter.value
+                val clearFilteredHistory =
+                    _section.value == HistorySection.RUNS &&
+                        (currentStatusFilter != HistoryStatusFilter.ALL || filterRuleId != null)
+                if (clearFilteredHistory) {
+                    runHistoryRepository.deleteFilteredHistory(filterRuleId, currentStatusFilter)
+                } else {
+                    runHistoryRepository.clearAllHistory()
+                }
+                clearFilters()
             }
 
         fun deleteHistoryEntry(historyId: Long) =

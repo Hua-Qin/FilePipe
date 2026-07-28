@@ -259,6 +259,8 @@
     <string name="history_clear">Clear history</string>
     <string name="history_clear_confirm_title">Clear all history?</string>
     <string name="history_clear_confirm_message">This removes all run records and file move details. Rules are not affected.</string>
+    <string name="history_clear_filtered_confirm_title">Clear filtered history?</string>
+    <string name="history_clear_filtered_confirm_message">This removes matching run records and file move details. Other history records and rules are not affected.</string>
     <string name="history_file_location_unavailable">File location not available</string>
     <string name="history_file_open_no_app">No app found to open this file type</string>
     <string name="history_file_open_failed">Couldn\'t open this file</string>
@@ -421,6 +423,7 @@
     <string name="cloud_provider_onedrive">OneDrive</string>
     <string name="cloud_provider_dropbox">Dropbox</string>
     <string name="cloud_provider_box">Box</string>
+    <string name="cloud_provider_folder_path">%1$s / %2$s</string>
     <string name="settings_fab_open_help">Help and FAQs</string>
     <string name="settings_import_rules">Import backup</string>
     <string name="settings_restore_backup">Restore backup</string>

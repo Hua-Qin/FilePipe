@@ -28,6 +28,9 @@ interface RuleDao {
     @Query("SELECT * FROM rules")
     suspend fun getAllRulesIncludingTrashed(): List<RuleEntity>
 
+    @Query("SELECT * FROM rules")
+    fun observeAllRulesIncludingTrashed(): Flow<List<RuleEntity>>
+
     @Query("SELECT * FROM rules WHERE isEnabled = 1 AND trashedAt IS NULL")
     suspend fun getEnabledRules(): List<RuleEntity>
 
