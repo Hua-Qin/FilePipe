@@ -40,4 +40,15 @@ class GithubUpdateDecisionTest {
             ),
         )
     }
+
+    @Test
+    fun stableReleaseIsNewerThanMatchingPreview() {
+        assertTrue(isRemoteVersionNewer("v3.9.8", "3.9.8-preview-239"))
+        assertFalse(isRemoteVersionNewer("v3.9.8-Preview-239", "3.9.8"))
+    }
+
+    @Test
+    fun newerPreviewRunIsNewer() {
+        assertTrue(isRemoteVersionNewer("v3.9.8-Preview-240", "3.9.8-preview-239"))
+    }
 }

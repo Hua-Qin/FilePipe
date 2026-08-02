@@ -52,6 +52,8 @@ val hasReleaseSigning =
         releaseStorePassword != null &&
         releaseKeyAlias != null &&
         releaseKeyPassword != null
+val previewVersionSuffix =
+    providers.gradleProperty("previewVersionSuffix").orNull?.takeIf { it.isNotBlank() }
 
 extensions.configure<ApplicationExtension>("android") {
     val filePipeApplicationId = "dev.bikram.filepipe"
@@ -94,6 +96,7 @@ extensions.configure<ApplicationExtension>("android") {
         // Declare before devRelease so initWith(getByName("release")) always resolves (Gradle
         // registers build types in declaration order; release signing above is optional).
         release {
+            versionNameSuffix = previewVersionSuffix
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

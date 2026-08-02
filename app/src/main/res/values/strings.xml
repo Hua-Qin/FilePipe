@@ -794,7 +794,7 @@
     <string name="diagnostics_value_configured_reference_format">configured: %1$s reference</string>
     <string name="about_share_text">Finally found a solid app to auto-organize my phone\'s storage. %1$s. Check it out: %2$s</string>
     <string name="toast_about_link_copied">Link copied</string>
-    <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
+    <string name="about_author_github_profile_url" translatable="false">https://bikram-agarwal.github.io/</string>
 
     <!-- Onboarding -->
     <string name="app_tagline">Organize your files automatically</string>
