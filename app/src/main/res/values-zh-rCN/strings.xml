@@ -1,0 +1,1022 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FilePipe</string>
+
+    <!-- 底部导航标签 -->
+    <string name="nav_rules">规则</string>
+    <string name="nav_history">历史记录</string>
+    <string name="nav_settings">设置</string>
+
+    <!-- 规则页面 -->
+    <string name="rules_empty_title">暂无规则</string>
+    <string name="rules_empty_subtitle">点击「添加规则」创建你的第一个整理规则</string>
+    <string name="rules_add_rule">添加规则</string>
+    <string name="rules_two_pane_empty_title">未选择规则</string>
+    <string name="rules_two_pane_empty_message">创建或选择一个规则以在此处查看详情。</string>
+    <string name="rules_two_pane_empty_action">创建规则</string>
+    <string name="rule_card_types_none">无</string>
+    <string name="rule_card_from">来源</string>
+    <string name="rule_card_from_none">无来源</string>
+    <string name="rule_card_more_count">+%1$d</string>
+    <string name="rule_card_destination_not_set">未设置</string>
+    <string name="rule_card_to">目标</string>
+    <string name="rule_card_expand_cd">展开 %1$s</string>
+    <string name="rule_card_collapse_cd">折叠 %1$s</string>
+    <string name="rule_card_select_cd">选择 %1$s</string>
+    <string name="rule_card_deselect_cd">取消选择 %1$s</string>
+    <string name="rule_card_stale_folder_warning">一个或多个条件需要关注</string>
+    <string name="rule_card_progress_moving_file">正在移动 %1$s（%2$d / %3$d）</string>
+    <string name="rule_card_progress_copying_file">正在复制 %1$s（%2$d / %3$d）</string>
+    <string name="rule_card_progress_deleting_file">正在删除 %1$s（%2$d / %3$d）</string>
+    <plurals name="rule_card_progress_files_moved_summary">
+        <item quantity="one">%1$d / %2$d 个文件已移动</item>
+        <item quantity="other">%1$d / %2$d 个文件已移动</item>
+    </plurals>
+    <plurals name="rule_card_progress_files_copied_summary">
+        <item quantity="one">%1$d / %2$d 个文件已复制</item>
+        <item quantity="other">%1$d / %2$d 个文件已复制</item>
+    </plurals>
+    <plurals name="rule_card_progress_files_deleted_summary">
+        <item quantity="one">%1$d / %2$d 个文件已删除</item>
+        <item quantity="other">%1$d / %2$d 个文件已删除</item>
+    </plurals>
+    <string name="rule_card_progress_error">错误：%1$s</string>
+    <string name="rule_card_progress_no_matching_files">未找到匹配的文件</string>
+    <string name="rule_card_progress_scanning">正在扫描…</string>
+    <string name="rule_card_progress_unknown_file">未知文件</string>
+    <string name="shortcut_run_rule_label">运行：%1$s</string>
+
+    <!-- 规则详情页面 -->
+    <string name="rule_detail_redundant_subfolder_removed">已移除冗余子文件夹：%1$s</string>
+    <string name="new_rule">新规则</string>
+    <string name="edit_rule">编辑规则</string>
+    <string name="rule_details">规则详情</string>
+    <string name="rule_name_label">规则名称</string>
+    <string name="rule_name_placeholder">例如：照片备份</string>
+    <string name="rule_detail_folder_access_summary_unavailable">一个或多个文件夹缺失或不再可用。点击上方高亮的路径来修复它们。</string>
+    <string name="rule_detail_folder_access_summary_permission">一个或多个文件夹需要重新授权。点击上方高亮的路径并重新授予访问权限。</string>
+    <string name="rule_detail_folder_access_summary_filesystem">一个或多个文件夹需要重新授权或需要「所有文件访问」权限。点击上方高亮的路径，或在设置中更改访问模式。</string>
+    <string name="rule_detail_open_faq">常见问题</string>
+    <string name="rule_open_all_files_settings">打开所有文件访问设置</string>
+    <string name="filesystem_folder_picker_title">选择文件夹</string>
+    <string name="filesystem_folder_picker_devices">设备</string>
+    <string name="filesystem_folder_picker_internal_storage">内部存储</string>
+    <string name="filesystem_folder_picker_sd_card">SD 卡</string>
+    <string name="filesystem_folder_picker_cancel">取消</string>
+    <string name="filesystem_folder_picker_use_folder">使用此文件夹</string>
+    <string name="filesystem_folder_picker_empty">此处没有子文件夹。你仍然可以使用此文件夹。</string>
+    <string name="filesystem_folder_picker_new_folder">新建文件夹</string>
+    <string name="filesystem_folder_picker_new_folder_title">创建文件夹</string>
+    <string name="filesystem_folder_picker_new_folder_name_label">文件夹名称</string>
+    <string name="filesystem_folder_picker_new_folder_create">创建</string>
+    <string name="filesystem_folder_picker_new_folder_error_empty">请输入文件夹名称</string>
+    <string name="filesystem_folder_picker_new_folder_error_invalid">该名称不被允许</string>
+    <string name="filesystem_folder_picker_new_folder_error_exists">同名文件夹已存在</string>
+    <string name="filesystem_folder_picker_new_folder_error_cannot_write">无法在此创建文件夹</string>
+    <string name="filesystem_folder_picker_new_folder_error_failed">无法创建文件夹</string>
+    <string name="source_folders_label">来源文件夹</string>
+    <string name="add_source_folder">选择文件夹</string>
+    <string name="destination_label">目标文件夹</string>
+    <string name="pick_folder">选择文件夹</string>
+    <string name="change_destination">更改文件夹</string>
+    <string name="rule_icon_picker_cd">选择规则图标</string>
+    <string name="rule_icon_label_default">默认</string>
+    <string name="rule_icon_label_image">图片</string>
+    <string name="rule_icon_label_screenshot">截图</string>
+    <string name="rule_icon_label_video">视频</string>
+    <string name="rule_icon_label_music">音乐</string>
+    <string name="rule_icon_label_download">下载</string>
+    <string name="rule_icon_label_document">文档</string>
+    <string name="rule_icon_label_installable">安装包</string>
+    <string name="rule_section_extensions_title">文件扩展名</string>
+    <string name="rule_section_extensions_subtitle">此规则适用的文件类型</string>
+    <string name="rule_section_source_subtitle">从这些文件夹扫描文件</string>
+    <string name="rule_section_destination_subtitle">匹配的文件将存放到此处</string>
+    <string name="rule_section_schedule_subtitle">可选的自动运行</string>
+    <string name="remove_schedule">移除计划</string>
+    <string name="add_schedule_chip">添加计划</string>
+    <string name="unsaved_changes_title">未保存的更改</string>
+    <string name="unsaved_changes_message">你想做什么？</string>
+    <string name="discard_changes">放弃</string>
+    <string name="keep_editing">继续编辑</string>
+    <string name="save_and_exit">保存并退出</string>
+    <string name="schedule_label">计划（可选）</string>
+    <string name="schedule_card_label">运行</string>
+    <string name="schedule_frequency">频率</string>
+    <string name="schedule_daily">每天</string>
+    <string name="schedule_weekly">每周</string>
+    <string name="schedule_day">星期</string>
+    <string name="schedule_time">时间</string>
+    <string name="schedule_dialog_title">设置计划</string>
+    <string name="schedule_hourly">每小时</string>
+    <string name="schedule_interval_hours">每隔（小时）</string>
+    <string name="schedule_interval_hours_helper">1-24 小时。更长的间隔请使用「天」。</string>
+    <string name="schedule_interval_days_helper">1-365 天。</string>
+    <string name="schedule_interval_weeks_helper">1-52 周。</string>
+    <string name="schedule_remove_short">移除</string>
+    <string name="schedule_every">每</string>
+    <string name="schedule_unit_hours">小时</string>
+    <string name="schedule_unit_days">天</string>
+    <string name="schedule_unit_weeks">周</string>
+    <string name="schedule_choose_start_time">选择开始时间</string>
+    <string name="schedule_start_time">开始时间</string>
+    <string name="schedule_every_hour">每小时</string>
+    <string name="schedule_every_hours">每 %1$d 小时</string>
+    <string name="schedule_every_hour_starting">从 %1$s 开始每小时</string>
+    <string name="schedule_every_hours_starting">从 %2$s 开始每 %1$d 小时</string>
+    <string name="schedule_daily_at">每天 %1$s</string>
+    <string name="schedule_every_days_at">每 %1$d 天的 %2$s</string>
+    <string name="schedule_weekly_on">每周 %1$s 的 %2$s</string>
+    <string name="schedule_every_weeks_on">每 %1$d 周的 %2$s %3$s</string>
+    <string name="day_sun">周日</string>
+    <string name="day_mon">周一</string>
+    <string name="day_tue">周二</string>
+    <string name="day_wed">周三</string>
+    <string name="day_thu">周四</string>
+    <string name="day_fri">周五</string>
+    <string name="day_sat">周六</string>
+    <string name="schedule_pick_time">选择时间</string>
+    <string name="schedule_time_picker_title">选择时间</string>
+    <string name="schedule_time_input_mode_cd">使用键盘输入时间</string>
+    <string name="schedule_time_dial_mode_cd">使用时钟选择时间</string>
+    <string name="rule_icon_sheet_title">规则图标</string>
+    <string name="rule_icon_emoji_section">表情符号</string>
+    <string name="rule_icon_preset_section">预设图标</string>
+    <string name="rule_icon_custom_slot_cd">自定义表情</string>
+    <string name="rule_icon_apply_emoji_cd">应用自定义表情</string>
+    <string name="save">保存</string>
+    <string name="cancel">取消</string>
+    <string name="close">关闭</string>
+    <string name="delete">删除</string>
+    <string name="delete_forever">永久删除</string>
+    <string name="restore">恢复</string>
+    <string name="move_to_trash">移到回收站</string>
+    <string name="undo">撤销</string>
+    <string name="action_edit">编辑</string>
+    <string name="action_expand">展开</string>
+    <string name="action_collapse">折叠</string>
+    <string name="action_expand_collapse">展开 / 折叠</string>
+    <string name="action_duplicate">复制</string>
+    <string name="nav_back">返回</string>
+    <string name="delete_rule">删除规则</string>
+    <string name="duplicate_rule">复制规则</string>
+    <string name="view_history">查看历史</string>
+    <string name="rules_expand_all">全部展开</string>
+    <string name="rules_collapse_all">全部折叠</string>
+
+    <!-- 运行页面 -->
+    <string name="run_select_all">全选</string>
+    <string name="run_deselect_all">取消全选</string>
+    <string name="run_cancel_selection">取消选择</string>
+    <string name="run_button">运行所选</string>
+    <string name="run_now">立即运行</string>
+
+    <!-- 历史页面 -->
+    <string name="history_no_files_affected">无文件变更</string>
+    <string name="history_detail_title">运行详情</string>
+    <string name="history_detail_files_header">文件（%1$d）</string>
+    <string name="history_detail_no_file_records">本次运行没有文件记录。</string>
+    <string name="history_run_interrupted">应用进程结束时运行被中断。</string>
+    <string name="history_detail_run_summary">运行摘要</string>
+    <string name="history_detail_trigger_label">触发方式</string>
+    <string name="history_detail_started_label">开始时间</string>
+    <string name="history_detail_completed_label">完成时间</string>
+    <string name="history_detail_duration_label">持续时间</string>
+    <string name="history_detail_duration_seconds">%1$d 秒</string>
+    <string name="history_detail_error_label">错误</string>
+    <string name="history_detail_summary_label">%1$s：</string>
+    <string name="history_detail_source_path">来自：%1$s</string>
+    <string name="history_detail_file_skipped">已跳过</string>
+    <string name="history_two_pane_empty_title">未选择运行</string>
+    <string name="history_two_pane_empty_message">当有历史记录时，运行详情将显示在此处。</string>
+    <string name="history_two_pane_trash_title">已选择回收站</string>
+    <string name="history_two_pane_trash_message">已删除的规则保留在列表中。切换回运行视图可查看运行详情。</string>
+    <string name="history_detail_files_moved_label">已移动文件</string>
+    <string name="history_detail_files_copied_label">已复制文件</string>
+    <string name="history_detail_files_deleted_label">已删除文件</string>
+    <plurals name="history_detail_undo_files">
+        <item quantity="one">撤销（%d 个文件）</item>
+        <item quantity="other">撤销（%d 个文件）</item>
+    </plurals>
+    <string name="history_detail_not_processed_cancelled_label">未处理（已取消）</string>
+    <string name="history_empty_title">暂无历史记录</string>
+    <string name="history_empty_subtitle">运行一些规则以在此查看文件移动历史</string>
+    <string name="history_filter_rule_header">仅显示此规则的运行记录</string>
+    <string name="history_date_today">今天</string>
+    <string name="history_date_yesterday">昨天</string>
+    <string name="history_section_runs">运行</string>
+    <string name="history_section_trash">回收站</string>
+    <string name="history_trash_empty_title">回收站为空</string>
+    <string name="history_trash_empty_subtitle">已删除的规则先进入此处，保留 30 天</string>
+    <string name="history_trash_retention_notice">回收站中的项目将在 30 天后永久删除</string>
+    <string name="history_trash_restore_rule">恢复规则</string>
+    <string name="history_expires_today">今天过期</string>
+    <plurals name="history_days_left">
+        <item quantity="one">还剩 %1$d 天</item>
+        <item quantity="other">还剩 %1$d 天</item>
+    </plurals>
+    <string name="history_trash_delete_forever_confirm_title">永久删除规则？</string>
+    <string name="history_trash_delete_forever_confirm_message">「%1$s」将被永久删除且无法恢复。</string>
+    <string name="history_trash_empty_confirm_title">永久删除所有规则？</string>
+    <string name="history_trash_empty_confirm_message">回收站中的所有规则将被永久删除且无法恢复。</string>
+    <string name="history_trash_empty_action">清空回收站</string>
+    <string name="rule_moved_to_trash">「%1$s」已移至回收站</string>
+    <plurals name="rules_moved_to_trash">
+        <item quantity="one">%1$d 个规则已移至回收站</item>
+        <item quantity="other">%1$d 个规则已移至回收站</item>
+    </plurals>
+    <plurals name="rules_move_to_trash_confirm_title">
+        <item quantity="one">将 %1$d 个规则移至回收站？</item>
+        <item quantity="other">将 %1$d 个规则移至回收站？</item>
+    </plurals>
+    <plurals name="rules_selection_count">
+        <item quantity="one">已选择 %1$d 个规则</item>
+        <item quantity="other">已选择 %1$d 个规则</item>
+    </plurals>
+    <string name="rules_move_to_trash_confirm_message">所选规则的计划运行将被暂停。你可以在 30 天内从「历史记录 → 回收站」恢复它们。</string>
+    <string name="history_triggered_manual">手动</string>
+    <string name="history_triggered_scheduled">定时</string>
+    <plurals name="history_files_moved">
+        <item quantity="one">%d 个文件已移动</item>
+        <item quantity="other">%d 个文件已移动</item>
+    </plurals>
+    <plurals name="history_files_copied">
+        <item quantity="one">%d 个文件已复制</item>
+        <item quantity="other">%d 个文件已复制</item>
+    </plurals>
+    <plurals name="history_files_deleted">
+        <item quantity="one">%d 个文件已删除</item>
+        <item quantity="other">%d 个文件已删除</item>
+    </plurals>
+    <plurals name="history_files_failed">
+        <item quantity="one">%d 个失败</item>
+        <item quantity="other">%d 个失败</item>
+    </plurals>
+    <plurals name="history_files_cancelled_remaining">
+        <item quantity="one">%d 个未处理（已取消）</item>
+        <item quantity="other">%d 个未处理（已取消）</item>
+    </plurals>
+    <string name="history_clear">清除历史</string>
+    <string name="history_clear_confirm_title">清除所有历史记录？</string>
+    <string name="history_clear_confirm_message">这将移除所有运行记录和文件移动详情。规则不受影响。</string>
+    <string name="history_clear_filtered_confirm_title">清除筛选的历史记录？</string>
+    <string name="history_clear_filtered_confirm_message">这将移除匹配的运行记录和文件移动详情。其他历史记录和规则不受影响。</string>
+    <string name="history_file_location_unavailable">文件位置不可用</string>
+    <string name="history_file_open_no_app">未找到可打开此文件类型的应用</string>
+    <string name="history_file_open_failed">无法打开此文件</string>
+
+    <!-- 状态标签 -->
+    <string name="status_success">成功</string>
+    <string name="status_partial">部分完成</string>
+    <string name="status_failed">失败</string>
+    <string name="status_in_progress">运行中</string>
+    <string name="status_cancelled">已取消</string>
+    <string name="status_undone">已撤销</string>
+    <string name="status_partially_undone">部分撤销</string>
+    <string name="status_no_changes">无变更</string>
+
+    <plurals name="undo_success_restored">
+        <item quantity="one">%d 个文件已恢复到原文件夹</item>
+        <item quantity="other">%d 个文件已恢复到原文件夹</item>
+    </plurals>
+    <plurals name="undo_success_deleted_destination">
+        <item quantity="one">%d 个文件已在目标位置删除</item>
+        <item quantity="other">%d 个文件已在目标位置删除</item>
+    </plurals>
+    <plurals name="undo_partial_restored">
+        <item quantity="one">部分撤销：%1$d 个已恢复，%2$d 个失败</item>
+        <item quantity="other">部分撤销：%1$d 个已恢复，%2$d 个失败</item>
+    </plurals>
+    <plurals name="undo_partial_deleted_destination">
+        <item quantity="one">部分撤销：%1$d 个在目标位置删除，%2$d 个失败</item>
+        <item quantity="other">部分撤销：%1$d 个在目标位置删除，%2$d 个失败</item>
+    </plurals>
+    <string name="undo_failed_prefix">撤销失败：%s</string>
+    <string name="undo_unknown_error">未知错误</string>
+    <string name="undo_original_source_conflict">原始位置已存在同名文件</string>
+    <string name="history_detail_run_undone">此次运行已被撤销</string>
+
+    <!-- 权限页面 -->
+
+    <!-- 通知 -->
+    <string name="notification_channel_name">FilePipe</string>
+    <string name="notification_channel_desc">整理文件时显示进度</string>
+    <string name="notification_running">运行中：%s</string>
+    <plurals name="notification_running_batch">
+        <item quantity="one">正在运行 %d 个规则…</item>
+        <item quantity="other">正在运行 %d 个规则…</item>
+    </plurals>
+    <string name="notification_preparing">准备中…</string>
+    <string name="notification_working">处理中…</string>
+    <string name="notification_finishing">正在完成…</string>
+    <string name="notification_run_stopped_early">已提前停止 — 部分文件未被处理</string>
+    <string name="notification_run_failed_abbr">已停止：%1$s</string>
+    <string name="notification_moving_n_of_m">正在移动 %1$d / %2$d</string>
+    <string name="notification_copying_n_of_m">正在复制 %1$d / %2$d</string>
+    <string name="notification_deleting_n_of_m">正在删除 %1$d / %2$d</string>
+    <string name="notification_batch_rule_file">%1$s · %2$s</string>
+
+    <!-- 规则搜索 -->
+    <!-- 历史搜索 / 筛选 -->
+    <string name="history_sort_menu">排序</string>
+    <string name="history_sort_last_ran_newest">最近运行（最新优先）</string>
+    <string name="history_sort_last_ran_oldest">最近运行（最旧优先）</string>
+    <string name="history_sort_rule_name_az">规则名称（A 到 Z）</string>
+    <string name="history_sort_rule_name_za">规则名称（Z 到 A）</string>
+    <string name="rules_sort_my_order">我的排序</string>
+    <string name="history_filter_all">全部</string>
+    <string name="history_group_menu">分组运行</string>
+    <string name="history_group_by_date">按日期分组</string>
+    <string name="history_group_by_rule">按规则分组</string>
+    <string name="history_group_by_status">按状态分组</string>
+    <string name="history_status_header_in_progress">进行中</string>
+    <!-- 引导文件夹访问 -->
+    <string name="onboarding_permissions_learn_more">了解更多</string>
+    <string name="onboarding_permissions_change_anytime_footer">你可以随时在设置中更改此选项</string>
+    <string name="onboarding_permissions_instruction_heading">在下一个屏幕：</string>
+    <string name="onboarding_permissions_instruction_step1">启用「允许访问以管理所有文件」</string>
+    <string name="onboarding_permissions_instruction_step2">返回本应用</string>
+    <string name="onboarding_permissions_open_settings">打开系统设置</string>
+    <string name="onboarding_permissions_access_not_granted">尚未授予访问权限</string>
+    <string name="onboarding_permissions_mode_all_files">所有文件（推荐）</string>
+    <string name="onboarding_permissions_mode_selective">选择性访问</string>
+    <string name="onboarding_permissions_allow_all_files">使用所有文件访问</string>
+    <string name="onboarding_permissions_grant_all_files">授予所有文件访问权限</string>
+    <string name="onboarding_permissions_use_selective_access">使用选择性访问</string>
+    <string name="onboarding_permissions_all_files_pitch_title">一个权限，覆盖所有文件夹</string>
+    <string name="onboarding_permissions_all_files_pitch_subtitle">FilePipe 需要所有文件访问权限来跨下载、存储根目录等位置进行整理。</string>
+    <string name="onboarding_permissions_all_files_hook_once">只需设置一次</string>
+    <string name="onboarding_permissions_all_files_rest_once">- 之后不会再出现权限提示</string>
+    <string name="onboarding_permissions_all_files_hook_everywhere">处处可用</string>
+    <string name="onboarding_permissions_all_files_rest_everywhere">- 下载、SD 卡、存储根目录、应用文件夹</string>
+    <string name="onboarding_permissions_all_files_hook_device">仅在本设备上</string>
+    <string name="onboarding_permissions_all_files_rest_device">- FilePipe 不会上传你的文件</string>
+    <string name="onboarding_permissions_all_files_hook_fast">更快</string>
+    <string name="onboarding_permissions_all_files_rest_fast">- 更快的扫描和移动，即使面对大型文件库</string>
+    <string name="onboarding_permissions_selective_pitch_title">你的选择，逐文件夹</string>
+    <string name="onboarding_permissions_selective_pitch_subtitle">FilePipe 将使用 Android 基础权限逐个整理你授权的文件夹。</string>
+    <string name="onboarding_permissions_selective_hook_privacy">更多隐私</string>
+    <string name="onboarding_permissions_selective_rest_privacy">- 应用仅查看你选择的文件夹</string>
+    <string name="onboarding_permissions_selective_hook_control">你掌控访问</string>
+    <string name="onboarding_permissions_selective_rest_control">- 每个文件夹访问都需要单独批准</string>
+    <string name="onboarding_permissions_selective_hook_limits">系统限制</string>
+    <string name="onboarding_permissions_selective_rest_limits">- Android 阻止选择下载文件夹和存储根目录</string>
+    <string name="onboarding_permissions_selective_hook_speed">较慢</string>
+    <string name="onboarding_permissions_selective_rest_speed">- 适用于大型文件库和大文件</string>
+    <string name="onboarding_permissions_sheet_footer_tip">💡 不确定？选择「所有文件访问」—— 适用于大多数设置。你可以随时在设置中更改。</string>
+
+    <!-- 引导向导 -->
+    <string name="onboarding_wizard_title">创建你的第一个规则</string>
+    <string name="onboarding_wizard_subtitle">选择一个模板、从零开始，或跳过自行设置</string>
+    <string name="onboarding_wizard_back_to_permissions">返回</string>
+    <string name="onboarding_wizard_skip">跳过</string>
+    <string name="onboarding_wizard_start_blank">空白开始</string>
+    <string name="onboarding_wizard_start_blank_desc">自行选择文件类型</string>
+
+    <!-- 设置 -->
+    <string name="settings_export_folder_permission_failed">无法获取所选文件夹的持久权限</string>
+    <string name="settings_cloud_backup_configuration_failed">备份已导出一次，但无法配置自动云备份</string>
+    <string name="settings_folder_access_section">文件夹访问</string>
+    <string name="settings_folder_access_saf_only">选择性访问</string>
+    <string name="settings_folder_access_all_files">所有文件访问</string>
+    <string name="settings_folder_access_all_files_status_granted_unused">所有文件访问：开启（未使用）</string>
+    <string name="settings_folder_access_all_files_status_granted_used">所有文件访问：开启</string>
+    <string name="settings_folder_access_all_files_status_not_granted_required">所有文件访问：未授予（必需）</string>
+    <string name="settings_folder_access_all_files_status_not_granted_idle">所有文件访问：关闭</string>
+    <string name="settings_folder_access_switched_selective_zero_rules">已切换到「选择性访问」模式</string>
+    <plurals name="settings_folder_access_switched_selective_snackbar">
+        <item quantity="one">已切换到「选择性访问」模式。\n%1$d 个规则需要更新文件夹访问</item>
+        <item quantity="other">已切换到「选择性访问」模式。\n%1$d 个规则需要更新文件夹访问</item>
+    </plurals>
+    <string name="settings_folder_access_open_manage">管理「所有文件访问」</string>
+    <string name="settings_folder_access_grant_all_files">授予「所有文件访问」</string>
+    <string name="settings_folder_access_switch_to_saf_title">切换到「选择性访问」？</string>
+    <string name="settings_folder_access_switch_to_saf_body">现有规则将停止工作。你需要重新选择每个规则使用的文件夹。你可以随时切换回「所有文件访问」。</string>
+    <string name="settings_folder_access_switch_confirm">切换</string>
+    <string name="settings_appearance_section">外观</string>
+    <string name="settings_section_expand_cd">展开 %1$s 部分</string>
+    <string name="settings_section_collapse_cd">折叠 %1$s 部分</string>
+    <string name="settings_expand_all_sections_cd">展开所有设置部分</string>
+    <string name="settings_collapse_all_sections_cd">折叠所有设置部分</string>
+    <string name="settings_gradient_background">渐变背景</string>
+    <string name="settings_gradient_background_desc">使用主题颜色的色调背景</string>
+    <string name="settings_enhanced_shading">增强对比度</string>
+    <string name="settings_enhanced_shading_desc">在深色模式下使卡片更暗，在浅色模式下更亮</string>
+    <string name="settings_surface_shading">表面着色</string>
+    <string name="settings_surface_shading_desc">调整主题颜色对表面的着色强度</string>
+    <string name="settings_use_black_theme">使用纯黑深色主题</string>
+    <string name="settings_black_theme_effect_disabled">在黑色主题中无法启用</string>
+    <string name="settings_backup_section">备份与恢复</string>
+    <string name="settings_choose_local_backup_folder">选择本地备份文件夹</string>
+    <string name="settings_choose_cloud_backup_file">选择云备份文件夹</string>
+    <string name="settings_local_backup_folder_hint">用于导出备份（笔记、列表、设置）的本地文件夹</string>
+    <string name="settings_cloud_backup_folder_hint">用于导出备份（笔记、列表、设置）的云文件夹</string>
+    <string name="settings_local_backup_folder_cleared">本地备份文件夹已重置</string>
+    <string name="settings_cloud_backup_file_cleared">云备份文件夹已重置</string>
+    <string name="settings_export_select_folder_first">请先选择本地或云备份文件夹</string>
+    <string name="settings_export_success">%1$s 已导出</string>
+    <string name="settings_backup_export_success">备份已导出</string>
+    <string name="settings_backup_export_success_to">备份已导出到 %1$s</string>
+    <string name="settings_backup_export_failed">导出失败：%1$s</string>
+    <string name="settings_export_now">导出备份</string>
+    <string name="cloud_provider_google_drive">Google Drive</string>
+    <string name="cloud_provider_onedrive">OneDrive</string>
+    <string name="cloud_provider_dropbox">Dropbox</string>
+    <string name="cloud_provider_box">Box</string>
+    <string name="cloud_provider_folder_path">%1$s / %2$s</string>
+    <string name="settings_fab_open_help">帮助与常见问题</string>
+    <string name="settings_import_rules">导入备份</string>
+    <string name="settings_restore_backup">恢复备份</string>
+    <string name="settings_backup_import_failed">导入失败：%1$s</string>
+    <string name="settings_backup_restore_failed">恢复失败：%1$s</string>
+    <string name="settings_backup_invalid_rule_regex">备份中包含无效的文件名或排除模式：%1$s</string>
+    <string name="settings_backup_import_restore_help_title">导入与恢复</string>
+    <string name="settings_backup_import_restore_help_body">导入从文件中添加新规则并更新同名规则。你的运行历史和应用设置保持不变。\n\n恢复用文件内容替换应用中的所有内容：所有规则、运行历史和设置。在迁移到新设备时很有用。</string>
+    <string name="settings_backup_help_icon_cd">说明导入和恢复</string>
+    <plurals name="settings_import_merge_success">
+        <item quantity="one">规则导入：新增 %1$d 条，更新 %2$d 条</item>
+        <item quantity="other">规则导入：新增 %1$d 条，更新 %2$d 条</item>
+    </plurals>
+    <string name="settings_restore_success">备份已恢复（%1$s）</string>
+    <plurals name="settings_restore_part_rules">
+        <item quantity="one">%1$d 个规则</item>
+        <item quantity="other">%1$d 个规则</item>
+    </plurals>
+    <plurals name="settings_restore_part_history_runs">
+        <item quantity="one">%1$d 条历史运行</item>
+        <item quantity="other">%1$d 条历史运行</item>
+    </plurals>
+    <string name="settings_restore_part_settings">设置</string>
+    <plurals name="settings_restore_folders_need_reselection">
+        <item quantity="one">%1$d 个已恢复的文件夹无法访问。请在设置中重新选择。</item>
+        <item quantity="other">%1$d 个已恢复的文件夹无法访问。请在设置中重新选择。</item>
+    </plurals>
+    <string name="settings_restore_automation_disabled_no_folder">自动备份已关闭，因为没有可访问的备份文件夹被恢复。</string>
+    <string name="settings_auto_export_on_change">应用退出时自动导出</string>
+    <string name="settings_auto_export_on_change_hint">更改后退出时将完整备份保存到配置的备份文件夹</string>
+    <string name="settings_scheduled_export">每日定时备份</string>
+    <string name="settings_scheduled_export_hint">每天自动备份一次到配置的备份文件夹</string>
+    <plurals name="settings_backup_exported_to_destinations">
+        <item quantity="one">备份已导出到 %1$d 个文件夹</item>
+        <item quantity="other">备份已导出到 %1$d 个文件夹</item>
+    </plurals>
+    <string name="theme_light">浅色</string>
+    <string name="theme_dark">深色</string>
+    <string name="theme_system">跟随系统</string>
+    <string name="theme_material_you">Material You</string>
+    <string name="theme_color_forest">森林</string>
+    <string name="theme_color_ember">余烬</string>
+    <string name="theme_color_grove">树丛</string>
+    <string name="theme_color_honey">蜜糖</string>
+    <string name="theme_color_ocean">海洋</string>
+    <string name="theme_color_iris">鸢尾</string>
+    <string name="theme_color_dusk">暮色</string>
+    <string name="theme_color_berry">浆果</string>
+    <string name="theme_color_custom">自定义</string>
+    <string name="settings_palette_style">调色板样式</string>
+    <string name="settings_palette">调色板</string>
+    <string name="settings_theme_preview_named">预览 · %1$s</string>
+    <string name="settings_theme_preview_customize">自定义</string>
+    <string name="settings_theme_preview_surface_ladder">表面阶梯</string>
+    <string name="settings_theme_preview_accent_containers">强调容器</string>
+    <string name="settings_theme_preview_label_lowest">最低</string>
+    <string name="settings_theme_preview_label_surface">表面</string>
+    <string name="settings_theme_preview_label_low">低</string>
+    <string name="settings_theme_preview_label_base">基础</string>
+    <string name="settings_theme_preview_label_high">高</string>
+    <string name="settings_theme_preview_label_highest">最高</string>
+    <string name="settings_theme_preview_label_primary">主要</string>
+    <string name="settings_theme_preview_label_secondary">次要</string>
+    <string name="settings_theme_preview_label_tertiary">第三</string>
+    <string name="settings_theme_preview_sample">Aa</string>
+    <string name="settings_custom_seed_slider_title">选择主色调</string>
+    <string name="settings_custom_seed_slider_title_secondary">选择次色调</string>
+    <string name="settings_custom_seed_slider_title_tertiary">选择第三色调</string>
+    <string name="settings_custom_seed_dialog_title">添加自定义强调色</string>
+    <string name="settings_custom_seed_remove_title">移除此颜色？</string>
+    <string name="settings_custom_seed_remove_message">它将从已保存的自定义颜色中移除</string>
+    <string name="theme_palette_tonal_spot">色调点</string>
+    <string name="theme_palette_neutral">中性</string>
+    <string name="theme_palette_vibrant">鲜明</string>
+    <string name="theme_palette_expressive">表现</string>
+    <string name="theme_palette_rainbow">彩虹</string>
+    <string name="theme_palette_fruit_salad">水果沙拉</string>
+    <string name="theme_palette_monochrome">单色</string>
+    <string name="theme_palette_fidelity">保真</string>
+    <string name="theme_palette_content">内容</string>
+    <string name="settings_byline">由 Bikram Agarwal 用心打造</string>
+    <string name="settings_about_section">关于</string>
+    <string name="app_version_format">%1$s 版本 %2$s</string>
+    <string name="about_build_variant_format">%1$s，%2$s</string>
+    <string name="build_flavor_github">GitHub</string>
+    <string name="build_flavor_fdroid">F-Droid</string>
+    <string name="build_flavor_playstore">PlayStore</string>
+    <string name="build_type_debug">调试版</string>
+    <string name="build_type_dev_release">开发发布版</string>
+    <string name="build_type_release">发布版</string>
+    <string name="settings_rate_on_play_store">在 Play 商店评分</string>
+    <string name="settings_star_on_github">在 GitHub 加星</string>
+    <string name="settings_share_app">分享</string>
+    <string name="settings_about_other_apps">Bikram 的其他应用</string>
+    <string name="settings_about_remember_name">Remember</string>
+    <string name="settings_about_remember_tagline">笔记、任务、提醒 — 正确完成</string>
+    <string name="settings_about_obtainx_name">ObtainX</string>
+    <string name="settings_about_obtainx_tagline">直接从源头获取应用更新</string>
+    <string name="settings_about_website">网站</string>
+    <string name="settings_about_privacy_policy">隐私政策</string>
+    <string name="settings_about_terms">服务条款</string>
+    <string name="settings_about_filepipe_website_url" translatable="false">https://bikram-agarwal.github.io/filepipe/</string>
+    <string name="settings_about_filepipe_privacy_url" translatable="false">https://bikram-agarwal.github.io/filepipe/privacy/</string>
+    <string name="settings_about_filepipe_terms_url" translatable="false">https://bikram-agarwal.github.io/filepipe/terms/</string>
+    <string name="settings_about_remember_play_store_url" translatable="false">https://play.google.com/store/apps/details?id=dev.bikram.remember</string>
+    <string name="settings_about_remember_website_url" translatable="false">https://bikram-agarwal.github.io/remember</string>
+    <string name="settings_about_obtainx_website_url" translatable="false">https://bikram-agarwal.github.io/obtainx</string>
+    <string name="settings_share_diagnostics">分享诊断日志</string>
+    <string name="settings_share_diagnostics_chooser">分享诊断日志</string>
+    <string name="settings_share_diagnostics_subject">FilePipe 诊断日志</string>
+    <string name="settings_share_diagnostics_failed">无法分享诊断日志</string>
+    <string name="settings_developer_options_section">开发者选项</string>
+    <string name="settings_developer_options_unlocked">开发者选项已启用</string>
+    <string name="settings_developer_options_disabled">开发者选项已禁用</string>
+    <plurals name="settings_developer_options_taps_remaining">
+        <item quantity="one">还需点击 %1$d 次</item>
+        <item quantity="other">还需点击 %1$d 次</item>
+    </plurals>
+    <string name="dev_options_title">开发者选项</string>
+    <string name="dev_options_back">返回</string>
+    <string name="dev_options_mode_subtitle">禁用以在设置中隐藏此页面</string>
+    <string name="dev_options_warning">这些是开发者工具，不是正式应用功能。除非你知道自己在做什么，否则请勿使用。某些操作会永久改变应用状态。</string>
+    <string name="dev_options_section_overview">概览</string>
+    <string name="dev_options_section_info">信息</string>
+    <string name="dev_options_section_permissions_storage">权限与存储</string>
+    <string name="dev_options_section_database">数据库</string>
+    <string name="dev_options_section_workers">工作进程与调度</string>
+    <string name="dev_options_section_saf_access_grants">文件夹访问授权</string>
+    <string name="dev_options_section_mock_operations">模拟操作</string>
+    <string name="dev_options_section_diagnostics">诊断</string>
+    <string name="dev_options_section_settings">设置</string>
+    <string name="dev_options_section_settings_reset">重置</string>
+    <string name="dev_options_action_open_app_details">应用详情</string>
+    <string name="dev_options_action_notification_settings">通知设置</string>
+    <string name="dev_options_action_manage_all_files_access">管理所有文件访问</string>
+    <string name="dev_options_action_battery_optimization">电池优化</string>
+    <string name="dev_options_action_sync_scheduled_rules">同步定时规则</string>
+    <string name="dev_options_action_sync_update_checks">同步更新检查</string>
+    <string name="dev_options_action_sync_log_pruning">同步日志修剪</string>
+    <string name="dev_options_action_add_mock_large_file_move_rule">添加模拟规则</string>
+    <string name="dev_options_action_add_mock_saf_permission_lost_rule">添加 SAF 权限丢失模拟规则</string>
+    <string name="dev_options_action_add_mock_saf_download_rule">添加 SAF 下载访问模拟规则</string>
+    <string name="dev_options_action_remove_mock_rules">移除模拟规则和历史</string>
+    <string name="dev_options_action_arm_update_promo">模拟更新流程</string>
+    <string name="dev_options_action_start_play_bar">模拟 PlayStore 更新流程</string>
+    <string name="dev_options_action_post_mock_update_notification">模拟更新通知</string>
+    <string name="dev_options_action_post_mock_file_operation_notification">模拟文件移动通知</string>
+    <string name="dev_options_action_reset_github_ack">重置跳过的更新版本</string>
+    <string name="dev_options_action_clear_update_dedupe">清除更新通知去重</string>
+    <string name="dev_options_action_delete_cached_update_apk">删除缓存的更新 APK</string>
+    <string name="dev_options_action_share_diagnostics">导出诊断日志</string>
+    <string name="dev_options_action_copy_diagnostics">复制诊断日志</string>
+    <string name="dev_options_action_clear_diagnostics_log">清除诊断日志</string>
+    <string name="dev_options_action_force_crash">强制崩溃</string>
+    <string name="dev_options_action_reset_first_launch_flag">重置首次启动标志</string>
+    <string name="dev_options_action_reset_settings_preferences">重置所有首选项</string>
+    <string name="dev_options_dialog_force_crash_title">强制崩溃？</string>
+    <string name="dev_options_dialog_force_crash_message">FilePipe 将立即崩溃，以便测试崩溃处理。</string>
+    <string name="dev_options_dialog_force_crash_confirm">立即崩溃</string>
+    <string name="dev_options_dialog_reset_settings_title">重置所有首选项？</string>
+    <string name="dev_options_dialog_reset_settings_message">这将重置设置页面中显示的首选项并再次隐藏开发者选项。你的规则、历史、书签、文件夹访问模式和移动文件记录保持不变。</string>
+    <string name="dev_options_dialog_reset_settings_confirm">重置设置</string>
+    <string name="dev_options_info_version">版本</string>
+    <string name="dev_options_info_package">包名</string>
+    <string name="dev_options_info_variant">变体</string>
+    <string name="dev_options_info_installer">安装程序</string>
+    <string name="dev_options_info_android">Android 版本</string>
+    <string name="dev_options_info_device">设备</string>
+    <string name="dev_options_info_target_sdk">目标 SDK</string>
+    <string name="dev_options_info_database">数据库</string>
+    <string name="dev_options_info_first_install">首次安装</string>
+    <string name="dev_options_info_last_update">最后更新</string>
+    <string name="dev_options_info_folder_access_mode">文件夹访问模式</string>
+    <string name="dev_options_info_all_files_access">所有文件访问</string>
+    <string name="dev_options_info_notifications_enabled">通知已启用</string>
+    <string name="dev_options_info_battery_optimization">电池优化</string>
+    <string name="dev_options_info_backup_destinations">备份目标</string>
+    <string name="dev_options_info_exact_alarm_access">精确闹钟访问</string>
+    <string name="dev_options_info_rules">规则</string>
+    <string name="dev_options_info_enabled_rules">已启用规则</string>
+    <string name="dev_options_info_scheduled_rules">定时规则</string>
+    <string name="dev_options_info_history_runs">历史运行</string>
+    <string name="dev_options_info_history_in_progress">进行中的历史</string>
+    <string name="dev_options_info_history_success">成功的历史</string>
+    <string name="dev_options_info_history_partial_failure">部分失败的历史</string>
+    <string name="dev_options_info_history_failed">失败的历史</string>
+    <string name="dev_options_info_history_cancelled">已取消的历史</string>
+    <string name="dev_options_info_history_undone">已撤销的历史</string>
+    <string name="dev_options_info_history_partially_undone">部分撤销的历史</string>
+    <string name="dev_options_info_moved_file_rows">移动文件行数</string>
+    <string name="dev_options_info_database_file_size">数据库文件大小</string>
+    <string name="dev_options_info_cached_update_apk">缓存的更新 APK</string>
+    <string name="dev_options_info_cache_free_space">缓存可用空间</string>
+    <string name="dev_options_info_files_free_space">文件可用空间</string>
+    <string name="dev_options_info_log_prune">日志修剪</string>
+    <string name="dev_options_info_update_checks">更新检查</string>
+    <string name="dev_options_info_scheduled_exports">定时导出</string>
+    <string name="dev_options_info_scheduled_rule_workers">定时规则工作进程</string>
+    <string name="dev_options_value_unknown">未知</string>
+    <string name="dev_options_value_ignored">已忽略</string>
+    <string name="dev_options_value_active">活跃</string>
+    <string name="dev_options_value_not_cached">未缓存</string>
+    <string name="dev_options_value_not_scheduled">未定时</string>
+    <string name="dev_options_value_no_scheduled_rules">无定时规则</string>
+    <string name="dev_options_value_variant_format">%1$s · %2$s</string>
+    <string name="dev_options_value_version_format">%1$s (%2$d)</string>
+    <string name="dev_options_value_device_format">%1$s %2$s</string>
+    <string name="dev_options_value_android_format">%1$s (SDK %2$d)</string>
+    <string name="dev_options_value_database_format">%1$s / v%2$d</string>
+    <plurals name="dev_options_value_configured_count_format">
+        <item quantity="one">已配置 %1$d</item>
+        <item quantity="other">已配置 %1$d</item>
+    </plurals>
+    <plurals name="dev_options_value_total_count_format">
+        <item quantity="one">共 %1$d</item>
+        <item quantity="other">共 %1$d</item>
+    </plurals>
+    <string name="dev_options_value_worker_state_count_format">%1$s：%2$d</string>
+    <plurals name="dev_options_value_no_per_rule_workers_format">
+        <item quantity="one">%1$d 个已配置，未找到按规则工作进程</item>
+        <item quantity="other">%1$d 个已配置，未找到按规则工作进程</item>
+    </plurals>
+    <plurals name="dev_options_value_configured_worker_states_format">
+        <item quantity="one">%1$d 个已配置；%2$s</item>
+        <item quantity="other">%1$d 个已配置；%2$s</item>
+    </plurals>
+    <string name="dev_options_saf_access_empty">无规则或持久化 SAF 访问授权</string>
+    <string name="dev_options_saf_access_read">读</string>
+    <string name="dev_options_saf_access_write">写</string>
+    <string name="dev_options_saf_access_read_write">读/写</string>
+    <string name="dev_options_saf_access_none">无</string>
+    <string name="dev_options_folder_access_granted">已授权</string>
+    <string name="dev_options_folder_access_missing">缺失</string>
+    <string name="dev_options_folder_access_source">来源</string>
+    <string name="dev_options_folder_access_source_format">来源 %1$d</string>
+    <string name="dev_options_folder_access_target">目标</string>
+    <string name="dev_options_folder_access_unassociated_title">未关联的授权</string>
+    <string name="dev_options_folder_access_unassociated_grant_format">授权 %1$d</string>
+    <string name="dev_options_folder_access_type_saf">SAF</string>
+    <string name="dev_options_folder_access_type_all_files">所有文件</string>
+    <string name="dev_options_folder_access_no_folders">未配置源或目标文件夹</string>
+    <string name="dev_options_saf_grant_uri_format">%1$s</string>
+    <string name="dev_options_bytes_gb_format">%1$.2f GB</string>
+    <string name="dev_options_bytes_mb_format">%1$.2f MB</string>
+    <string name="dev_options_bytes_kb_format">%1$.1f KB</string>
+    <string name="dev_options_bytes_b_format">%1$d B</string>
+    <string name="dev_options_mock_update_release_notes">开发者选项模拟更新</string>
+    <string name="dev_options_diagnostics_clip_label">FilePipe 诊断</string>
+    <string name="dev_options_diagnostics_copied">诊断已复制</string>
+    <string name="dev_options_event_scheduled_rules_synced">定时规则已同步</string>
+    <string name="dev_options_event_update_check_worker_synced">更新检查工作进程已同步</string>
+    <string name="dev_options_event_log_prune_worker_synced">日志修剪工作进程已同步</string>
+    <string name="dev_options_event_updates_hidden">此版本的更新已隐藏</string>
+    <string name="dev_options_event_mock_update_notification_requested">已请求模拟更新通知</string>
+    <string name="dev_options_event_mock_file_operation_notification_requested">已请求模拟文件操作通知</string>
+    <string name="dev_options_event_mock_large_file_rule_added">模拟规则已添加</string>
+    <string name="dev_options_event_mock_large_file_rule_exists">模拟规则已存在</string>
+    <string name="dev_options_event_mock_saf_permission_lost_rule_added">SAF 权限丢失模拟规则已添加</string>
+    <string name="dev_options_event_mock_saf_download_rule_added">SAF 下载访问模拟规则已添加</string>
+    <string name="dev_options_event_mock_folder_issue_rule_exists">文件夹问题模拟规则已存在</string>
+    <string name="dev_options_event_mock_rules_removed">模拟规则和历史已移除</string>
+    <string name="dev_options_event_github_ack_reset">跳过的 GitHub 发布确认已重置</string>
+    <string name="dev_options_event_update_dedupe_cleared">更新通知去重已清除</string>
+    <string name="dev_options_event_cached_update_apk_deleted">缓存的更新 APK 已删除</string>
+    <string name="dev_options_event_no_cached_update_apk">未找到缓存的更新 APK</string>
+    <string name="dev_options_event_diagnostics_log_cleared">诊断日志已清除</string>
+    <string name="dev_options_event_settings_preferences_reset">设置首选项已重置</string>
+    <string name="dev_options_event_first_launch_flag_reset">首次启动标志已重置</string>
+    <string name="dev_options_forced_crash_message">开发者选项强制崩溃</string>
+    <string name="dev_options_mock_file_operation_rule_name">模拟文件清理</string>
+    <string name="dev_options_mock_large_file_rule_name">模拟移动</string>
+    <string name="dev_options_mock_saf_permission_lost_rule_name">模拟 SAF 权限丢失</string>
+    <string name="dev_options_mock_saf_download_rule_name">模拟 SAF 下载受阻</string>
+    <string name="dev_options_mock_file_operation_large_file_name">archive-video-100mb.mp4</string>
+    <string name="dev_options_mock_file_operation_progress">%1$s - 100 MB 的 %2$d%%</string>
+    <string name="dev_options_mock_file_operation_file_2">invoice.pdf</string>
+    <string name="dev_options_mock_file_operation_file_3">camera-video.mp4</string>
+    <string-array name="dev_options_mock_large_file_names">
+        <item>conference-recording-01.mp4</item>
+        <item>camera-roll-raw-01.mov</item>
+        <item>family-photo-archive.jpg</item>
+        <item>screenshot-home-screen.png</item>
+        <item>podcast-mixdown.mp3</item>
+        <item>ambient-session.flac</item>
+        <item>invoice-march.pdf</item>
+        <item>project-brief.docx</item>
+        <item>backup-bundle.zip</item>
+        <item>unknown-import.dat</item>
+    </string-array>
+    <string name="diagnostics_title">FilePipe 诊断</string>
+    <string name="diagnostics_generated_format">生成时间：%1$s</string>
+    <string name="diagnostics_package_format">包名：%1$s</string>
+    <string name="diagnostics_version_format">版本：%1$s (%2$d)</string>
+    <string name="diagnostics_flavor_format">版本类型：%1$s</string>
+    <string name="diagnostics_build_type_format">构建类型：%1$s</string>
+    <string name="diagnostics_device_format">设备：%1$s %2$s</string>
+    <string name="diagnostics_android_format">Android：%1$s (SDK %2$d)</string>
+    <string name="diagnostics_section_environment">环境</string>
+    <string name="diagnostics_locale_format">区域设置：%1$s</string>
+    <string name="diagnostics_timezone_format">时区：%1$s</string>
+    <string name="diagnostics_uptime_format">运行时间：%1$d 毫秒</string>
+    <string name="diagnostics_elapsed_realtime_format">实际运行时间：%1$d 毫秒</string>
+    <string name="diagnostics_font_scale_format">字体缩放：%1$.2f</string>
+    <string name="diagnostics_screen_dp_format">屏幕 dp：%1$d x %2$d，最小=%3$d</string>
+    <string name="diagnostics_display_pixels_format">显示像素：%1$d x %2$d</string>
+    <string name="diagnostics_display_density_format">显示密度：density=%1$.2f, scaledDensity=%2$.2f, dpi=%3$d</string>
+    <string name="diagnostics_target_sdk_format">目标 SDK：%1$s</string>
+    <string name="diagnostics_first_install_format">首次安装：%1$s</string>
+    <string name="diagnostics_last_update_format">最后更新：%1$s</string>
+    <string name="diagnostics_installer_format">安装程序：%1$s</string>
+    <string name="diagnostics_launcher_package_format">启动器包名：%1$s</string>
+    <plurals name="diagnostics_files_dir_space_format">
+        <item quantity="one">文件目录可用空间：%1$d 字节</item>
+        <item quantity="other">文件目录可用空间：%1$d 字节</item>
+    </plurals>
+    <plurals name="diagnostics_cache_dir_space_format">
+        <item quantity="one">缓存目录可用空间：%1$d 字节</item>
+        <item quantity="other">缓存目录可用空间：%1$d 字节</item>
+    </plurals>
+    <string name="diagnostics_external_storage_state_format">外部存储状态：%1$s</string>
+    <string name="diagnostics_section_permissions_app_access">权限与应用访问</string>
+    <string name="diagnostics_notifications_enabled_format">通知已启用：%1$s</string>
+    <string name="diagnostics_post_notifications_granted_format">POST_NOTIFICATIONS 已授予：%1$s</string>
+    <string name="diagnostics_all_files_access_granted_format">所有文件访问已授予：%1$s</string>
+    <string name="diagnostics_ignoring_battery_optimizations_format">忽略电池优化：%1$s</string>
+    <string name="diagnostics_exact_alarms_allowed_format">允许精确闹钟：%1$s</string>
+    <string name="diagnostics_section_settings">FilePipe 设置</string>
+    <string name="diagnostics_settings_snapshot_unavailable">设置快照不可用。</string>
+    <string name="diagnostics_theme_mode_format">主题模式：%1$s</string>
+    <string name="diagnostics_color_source_format">颜色来源：%1$s</string>
+    <string name="diagnostics_palette_style_format">调色板样式：%1$s</string>
+    <string name="diagnostics_saved_custom_seeds_format">已保存的自定义种子：%1$d</string>
+    <string name="diagnostics_active_custom_seed_format">活跃的自定义种子集：%1$s</string>
+    <string name="diagnostics_gradient_background_format">渐变背景：%1$s</string>
+    <string name="diagnostics_surface_shading_format">表面着色：%1$s</string>
+    <string name="diagnostics_folder_access_mode_format">文件夹访问模式：%1$s</string>
+    <string name="diagnostics_log_retention_days_format">日志保留天数：%1$d</string>
+    <string name="diagnostics_auto_export_rule_change_format">规则变更时自动导出：%1$s</string>
+    <string name="diagnostics_scheduled_export_enabled_format">定时导出已启用：%1$s</string>
+    <string name="diagnostics_local_backup_folder_format">本地备份文件夹：%1$s</string>
+    <string name="diagnostics_cloud_backup_folder_format">云备份文件夹：%1$s</string>
+    <string name="diagnostics_update_check_schedule_format">更新检查计划：%1$s</string>
+    <string name="diagnostics_notify_new_updates_format">通知新更新：%1$s</string>
+    <string name="diagnostics_save_apk_downloads_format">保存 GitHub APK 到下载：%1$s</string>
+    <string name="diagnostics_apk_downloads_copy_succeeded_format">APK 下载复制成功：%1$s</string>
+    <string name="diagnostics_haptics_enabled_format">触觉反馈已启用：%1$s</string>
+    <string name="diagnostics_progressive_blur_enabled_format">渐进式模糊已启用：%1$s</string>
+    <string name="diagnostics_swipe_start_to_end_format">滑动从起点到终点：%1$s</string>
+    <string name="diagnostics_swipe_end_to_start_format">滑动从终点到起点：%1$s</string>
+    <string name="diagnostics_bookmarked_folders_format">收藏文件夹：%1$d</string>
+    <string name="diagnostics_intro_seen_format">介绍已观看：%1$s</string>
+    <string name="diagnostics_in_app_review_never_ask_again_format">应用内评分不再询问：%1$s</string>
+    <string name="diagnostics_persisted_uri_permissions_format">持久化 URI 权限：%1$d</string>
+    <string name="diagnostics_persisted_uri_read_grants_format">持久化 URI 读授权：%1$d</string>
+    <string name="diagnostics_persisted_uri_write_grants_format">持久化 URI 写授权：%1$d</string>
+    <string name="diagnostics_persisted_tree_grants_format">持久化树授权：%1$d</string>
+    <string name="diagnostics_section_notification_channels">通知渠道</string>
+    <string name="diagnostics_no_channels_registered">未注册渠道。</string>
+    <string name="diagnostics_notification_channel_format">%1$s：重要性=%2$d，声音=%3$s，振动=%4$s，灯光=%5$s，免打扰绕过=%6$s，锁屏可见性=%7$d</string>
+    <string name="diagnostics_section_app_log">应用日志</string>
+    <string name="diagnostics_no_app_log_entries">尚未捕获应用日志条目。\n</string>
+    <string name="diagnostics_uncaught_exception_format">未捕获异常于 %1$s</string>
+    <string name="diagnostics_value_unknown">未知</string>
+    <string name="diagnostics_value_not_required">不需要</string>
+    <string name="diagnostics_value_not_configured">未配置</string>
+    <string name="diagnostics_value_configured_content_uri">已配置：内容 URI</string>
+    <string name="diagnostics_value_configured_filesystem_path">已配置：文件系统路径</string>
+    <string name="diagnostics_value_configured_reference_format">已配置：%1$s 引用</string>
+    <string name="about_share_text">终于找到了一个靠谱的应用来自动整理手机存储。%1$s。试试吧：%2$s</string>
+    <string name="toast_about_link_copied">链接已复制</string>
+    <string name="about_author_github_profile_url" translatable="false">https://bikram-agarwal.github.io/</string>
+
+    <!-- 引导 -->
+    <string name="app_tagline">自动整理你的文件</string>
+    <string name="onboarding_lets_begin">开始使用</string>
+    <string name="onboarding_byline">作者：Bikram Agarwal</string>
+    <!-- 反馈 / 新设置 -->
+    <string name="settings_touch_sound_section">触觉反馈</string>
+    <string name="settings_swipe_gestures_section">滑动手势</string>
+    <string name="settings_swipe_right">向右滑动</string>
+    <string name="settings_swipe_left">向左滑动</string>
+    <string name="settings_swipe_action_trash">回收站</string>
+    <string name="settings_swipe_action_history">历史记录</string>
+    <string name="settings_swipe_execute_hint">每次滑动执行一个操作。点击更改操作。</string>
+    <string name="settings_haptic_feedback">触觉反馈</string>
+    <string name="settings_haptic_feedback_desc">长按和滑动操作时的振动</string>
+    <string name="settings_progressive_blur">渐进式模糊</string>
+    <string name="settings_progressive_blur_desc">在部分位置使用毛玻璃模糊效果</string>
+    <string name="settings_custom_font_title">正在使用的字体</string>
+    <string name="settings_custom_font_default">默认系统字体</string>
+    <string name="settings_custom_font_choose">导入字体</string>
+    <string name="settings_custom_font_choose_explanation">从存储中选择自定义字体文件（.ttf 或 .otf）以应用于用户界面。</string>
+    <string name="settings_custom_font_success">自定义字体已成功应用。</string>
+    <string name="settings_custom_font_reset_success">已恢复为默认系统字体。</string>
+    <string name="settings_custom_font_error_invalid">加载失败：字体文件无效或已损坏。</string>
+    <string name="settings_schedule_section">计划</string>
+    <string name="settings_notifications">通知</string>
+    <string name="settings_notifications_desc">运行摘要和提醒</string>
+    <string name="settings_reliable_schedules">可靠的计划</string>
+    <string name="settings_reliable_schedules_desc_enabled">定时规则可在选定的时间运行</string>
+    <string name="settings_reliable_schedules_desc_disabled">启用以使定时规则在设定时间附近运行</string>
+    <string name="theme_black">黑色（OLED）</string>
+
+    <!-- 设置 – 更新（GitHub 构建） -->
+    <string name="settings_updates_section">更新</string>
+    <string name="settings_update_check_frequency">自动检查更新</string>
+    <string name="settings_update_schedule_app_start">启动时：应用启动时</string>
+    <string name="settings_update_schedule_daily_21">每天：每晚 9 点</string>
+    <string name="settings_update_schedule_monday_21">每周：每周一晚上 9 点</string>
+    <string name="settings_update_schedule_never">从不</string>
+    <string name="settings_notify_new_updates">获取新更新通知</string>
+    <string name="settings_notify_updates_need_auto_check">先启用「自动检查更新」</string>
+    <string name="settings_notify_updates_enable_notifications">允许 FilePipe 通知</string>
+    <string name="settings_update_available_button">有可用更新 - %1$s</string>
+    <string name="settings_update_skip_version">跳过版本</string>
+    <string name="settings_update_sheet_false_positive_tooltip">已在应用外安装更新？此屏幕可能仍显示该更新。点击「跳过版本」——在有新发布之前不会再提示。</string>
+    <string name="notification_channel_updates_name">应用更新</string>
+    <string name="notification_channel_updates_description">有新版本可用时提醒</string>
+    <string name="notification_update_available_title">有可用更新</string>
+    <string name="notification_update_available_text">版本 %1$s 已准备安装</string>
+    <string name="settings_save_update_apk_to_downloads">将更新 APK 保存到下载文件夹</string>
+    <string name="settings_update_apk_save_to_downloads_failed">更新已下载，但保存到下载文件夹失败</string>
+    <string name="settings_update_check_failed">无法检查更新</string>
+    <string name="settings_update_download_failed">无法下载更新</string>
+    <string name="settings_check_for_updates">检查更新</string>
+    <string name="settings_open_fdroid">打开 F-Droid</string>
+    <string name="settings_download_install">下载更新（v%1$s）</string>
+    <string name="settings_downloading">下载中…</string>
+    <string name="settings_downloading_percent">下载中 %1$d%%</string>
+    <string name="settings_installing">安装中…</string>
+    <string name="settings_update_available">v%1$s 可用</string>
+    <string name="settings_up_to_date">你已是最新版本</string>
+    <string name="settings_changelog_load_failed">无法加载更新日志</string>
+    <string name="settings_changelog_previous">上一页</string>
+    <string name="settings_changelog_next">下一页</string>
+    <string name="settings_changelog_page_indicator">第 %1$d / %2$d 页</string>
+    <string name="settings_play_in_app_update_failed">无法启动更新。请再次尝试「检查更新」。</string>
+    <string name="settings_play_in_app_update_canceled">更新已取消。你可以在设置中的「更新」重新尝试。</string>
+    <string name="update_bar_available_title">有可用更新</string>
+    <string name="update_bar_available_action">检查</string>
+    <string name="update_fab_label">更新</string>
+    <string name="main_alert_fab_label">警报</string>
+    <string name="play_update_bar_downloading_title">正在下载更新</string>
+    <string name="play_update_bar_downloading">来自 Play 商店…</string>
+    <string name="play_update_bar_downloading_bytes">%1$s / %2$s</string>
+    <string name="play_update_bar_install_title">新版本已就绪</string>
+    <string name="play_update_bar_install_subtitle">重启以应用</string>
+    <string name="play_update_bar_install_action">安装并重启</string>
+    <string name="settings_update_play_in_progress_body">来自 Google Play 的更新已在进行中。继续打开 Play 并完成下载或安装。</string>
+    <string name="settings_update_resume_play">继续更新</string>
+
+    <!-- 规则详情 — 新字段 -->
+    <string name="preview_rule">预览匹配的文件</string>
+    <string name="rule_scan_subdirs_label">扫描子文件夹</string>
+    <string name="rule_scan_subdirs_support">子文件夹将被扫描至最多 32 层深度以查找匹配文件</string>
+    <string name="rule_recreate_subfolders_label">在目标位置镜像子文件夹</string>
+    <string name="rule_recreate_subfolders_support">在目标位置复制源文件夹层级结构，而不是将所有匹配文件直接保存在目标文件夹</string>
+    <string name="rule_suppress_missing_source_card_label">隐藏缺失源文件夹警告</string>
+    <string name="rule_suppress_missing_source_card_support">当源文件夹缺失时，在规则屏幕上隐藏警告。编辑此规则时仍会显示。不适用于目标文件夹或访问丢失的情况。</string>
+    <string name="rule_toggle_tip_show_help">显示帮助</string>
+    <string name="rule_section_operation_title">操作</string>
+    <string name="rule_operation_mode_label">模式</string>
+    <string name="operation_move">移动</string>
+    <string name="operation_copy">复制</string>
+    <string name="operation_delete">删除</string>
+    <string name="file_operation_incomplete_copy">目标文件未接收到所有源数据</string>
+    <string name="file_operation_source_changed_after_confirmation">删除确认后文件已被更改，因此未执行删除</string>
+    <string name="file_operation_source_delete_failed">复制后无法删除源文件</string>
+    <string name="rule_operation_delete_warning">注意：文件将被永久删除，且无法撤销。</string>
+    <string name="rule_delete_confirmation_scan_failed">无法验证哪些文件会被删除。未进行任何更改。</string>
+    <string name="delete_run_confirm_title">永久删除文件？</string>
+    <string name="delete_run_confirm_button">永久删除</string>
+    <plurals name="delete_run_confirm_message">
+        <item quantity="one">%1$d 个文件将被永久删除。此操作无法撤销。</item>
+        <item quantity="other">%1$d 个文件将被永久删除。此操作无法撤销。</item>
+    </plurals>
+    <string name="delete_run_confirm_more">…以及 %1$d 个更多</string>
+    <string name="rule_conflict_policy_label">如果文件已存在</string>
+    <string name="conflict_skip">跳过</string>
+    <string name="conflict_overwrite">覆盖</string>
+    <string name="conflict_rename">重命名</string>
+
+    <!-- 预览表单 -->
+    <string name="preview_title">预览</string>
+    <string name="preview_title_for_rule">预览 — %1$s</string>
+    <plurals name="preview_title_selected_rules">
+        <item quantity="one">预览 — 已选择 %1$d 个规则</item>
+        <item quantity="other">预览 — 已选择 %1$d 个规则</item>
+    </plurals>
+    <string name="preview_selected_rules">预览所选</string>
+    <string name="preview_run">运行</string>
+    <string name="preview_empty">在所选源文件夹中未找到匹配的文件</string>
+    <string name="preview_would_skip">将跳过</string>
+    <string name="preview_would_overwrite">将覆盖</string>
+    <string name="preview_destination_path">至：%1$s</string>
+    <plurals name="preview_files_would_move">
+        <item quantity="one">%1$d 个文件将被移动</item>
+        <item quantity="other">%1$d 个文件将被移动</item>
+    </plurals>
+    <plurals name="preview_files_would_copy">
+        <item quantity="one">%1$d 个文件将被复制</item>
+        <item quantity="other">%1$d 个文件将被复制</item>
+    </plurals>
+    <plurals name="preview_files_would_delete">
+        <item quantity="one">%1$d 个文件将被删除</item>
+        <item quantity="other">%1$d 个文件将被删除</item>
+    </plurals>
+
+    <!-- 模板选择器 -->
+
+    <!-- 设置 — 历史部分 -->
+    <string name="settings_log_retention">保留历史记录</string>
+    <string name="settings_log_retention_hint">较早的记录会被自动删除</string>
+    <string name="log_retention_7_days">7 天</string>
+    <string name="log_retention_14_days">14 天</string>
+    <string name="log_retention_30_days">30 天</string>
+    <string name="log_retention_90_days">90 天</string>
+    <string name="log_retention_never">永久</string>
+
+    <!-- 通知操作 -->
+    <string name="notification_action_undo">撤销</string>
+
+    <!-- 通知 — 运行摘要 -->
+    <string name="notification_summary_channel_name">运行摘要</string>
+    <string name="notification_summary_channel_desc">每次规则运行完成后显示摘要</string>
+    <string name="notification_summary_title">%s 已完成</string>
+    <plurals name="notification_summary_body_partial">
+        <item quantity="one">%1$d 个已移动，%2$d 个失败</item>
+        <item quantity="other">%1$d 个已移动，%2$d 个失败</item>
+    </plurals>
+    <plurals name="notification_summary_body_partial_copied">
+        <item quantity="one">%1$d 个已复制，%2$d 个失败</item>
+        <item quantity="other">%1$d 个已复制，%2$d 个失败</item>
+    </plurals>
+
+    <!-- 高级筛选部分 -->
+    <string name="advanced_section_title">高级筛选</string>
+    <string name="advanced_section_subtitle">用于缩小匹配文件范围的可选筛选器</string>
+    <string name="advanced_section_filters_active">筛选器已启用</string>
+    <string name="advanced_filename_pattern_label">文件名模式，用逗号分隔</string>
+    <string name="advanced_filename_pattern_placeholder">例如：Screenshot_*</string>
+    <string name="advanced_filename_pattern_regex_chip">正则</string>
+    <string name="advanced_filename_pattern_regex_label">文件名正则表达式模式</string>
+    <string name="advanced_filename_pattern_regex_placeholder">例如：^IMG_\\d{4}\\.(jpg|png)$</string>
+    <string name="advanced_filename_pattern_regex_error">正则表达式语法无效</string>
+    <string name="advanced_min_size_label">最小大小（MB）</string>
+    <string name="advanced_max_size_label">最大大小（MB）</string>
+    <string name="advanced_min_age_label">最小存在时长（天）</string>
+    <string name="advanced_max_age_label">最大存在时长（天）</string>
+    <string name="rule_error_age_out_of_range">时长必须在 1 到 %1$d 天之间</string>
+    <string name="rule_error_minimum_age_exceeds_maximum">最小时长不能大于最大时长</string>
+    <string name="advanced_exclude_patterns_label">排除模式，用逗号分隔</string>
+    <string name="advanced_exclude_placeholder">例如：.nomedia</string>
+    <string name="advanced_exclude_patterns_regex_label">排除正则模式</string>
+    <string name="advanced_exclude_patterns_regex_placeholder">例如：\\.nomedia|.*\\.tmp</string>
+    <string name="advanced_exclude_patterns_regex_error">排除模式中的正则表达式语法无效</string>
+    <string name="advanced_orientation_label">方向</string>
+    <string name="advanced_orientation_any">任意方向</string>
+    <string name="advanced_orientation_portrait">纵向</string>
+    <string name="advanced_orientation_landscape">横向</string>
+
+    <!-- 文件夹书签 -->
+    <string name="bookmark_toggle_cd">切换书签</string>
+    <string name="bookmarks_choose">书签</string>
+
+    <!-- 常见问题 -->
+    <string name="faq_title">帮助与常见问题</string>
+    <string name="faq_expand_all_cd">展开所有主题</string>
+    <string name="faq_collapse_all_cd">折叠所有主题</string>
+    <string name="faq_quick_action_folder_access">文件夹访问设置</string>
+    <string name="faq_quick_action_notifications">通知设置</string>
+    <string name="faq_search_hint">搜索帮助主题</string>
+    <string name="faq_clear_search">清除搜索</string>
+    <string name="faq_no_results_title">未找到匹配的帮助主题</string>
+    <string name="faq_no_results_body">尝试更简单的搜索，或浏览下方分区</string>
+    <string name="faq_action_switch_full_access">在设置中切换模式</string>
+    <string name="faq_action_notification_settings">打开通知设置</string>
+
+    <!-- 文件类型对话框字符串 -->
+    <string name="file_type_dialog_title">添加文件类型</string>
+    <string name="file_type_dialog_label">文件扩展名</string>
+    <string name="file_type_dialog_placeholder">jpg, png, mp3</string>
+    <string name="file_type_dialog_supporting_text">用逗号分隔扩展名</string>
+    <string name="file_type_dialog_add">添加</string>
+    <string name="file_type_add_type">添加类型</string>
+    <string name="file_type_use_template">使用模板</string>
+    <string name="file_type_remove_content_description">移除 %1$s</string>
+    <string name="file_type_all_files">所有文件</string>
+    <string name="file_type_no_extension">无扩展名</string>
+    <string name="rule_all_files_warning">此规则将针对所选源文件夹中的所有文件。</string>
+    <string name="rule_conflict_no_ext_pattern">警告：此规则针对「无扩展名」，但文件名模式需要「.%1$s」。不会有文件匹配。</string>
+    <string name="rule_conflict_ext_mismatch">警告：文件名模式需要「.%1$s」，这不在你选择的文件类型中。不会有文件匹配。</string>
+    <string name="rule_conflict_invalid_size">警告：最小文件大小大于最大文件大小。不会有文件匹配。</string>
+    <string name="rule_conflict_invalid_age">警告：最小文件时长大于最大文件时长。不会有文件匹配。</string>
+    <string name="rule_conflict_exclude_all">警告：排除模式「%1$s」将排除所有文件。不会有文件匹配。</string>
+</resources>
