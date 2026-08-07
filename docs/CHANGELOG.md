@@ -1,3 +1,18 @@
+## v3.9.8 Misc polish
+
+### 🛠 Improved Features
+- Haptic feedback is cleaner and preference-gated.
+- Backups that use raw folders with All Files Access restore more reliably.
+- Sharing diagnostic logs is smoother and less likely to freeze the UI.
+- Preview or beta builds are correctly treated as older than the matching stable version when checking for updates.
+
+### 🐛 Bug Fixes
+- Failed backup exports no longer leave a half-written backup file behind.
+- Swipe actions on rules no longer get stuck after the first swipe.
+- Jumping into a Settings section from Help lands on the right place.
+
+---
+
 ## v3.9.7 Run history improvements
 
 ### 🛠 Improved Features

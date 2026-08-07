@@ -58,7 +58,7 @@ jobs:
           echo "Using release tag: $tag"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.release.outputs.tag }}
 

@@ -2,6 +2,29 @@
 
 <img alt="FilePipe Banner" src="fastlane/metadata/android/en-US/images/featureGraphic.jpg" />
 
+<br/>
+
+<p align="center">
+  <!-- Stack / Technical Chips -->
+  <img alt="Android API" src="https://img.shields.io/badge/Api%2031+-50f270?logo=android&logoColor=black&style=for-the-badge"/>
+  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-a503fc?logo=kotlin&logoColor=white&style=for-the-badge"/>
+  <img alt="Jetpack Compose" src="https://img.shields.io/static/v1?style=for-the-badge&message=Jetpack+Compose&color=4285F4&logo=Jetpack+Compose&logoColor=FFFFFF&label="/>
+  <img alt="Material You" src="https://custom-icon-badges.demolab.com/badge/material%20you-lightblue?style=for-the-badge&logoColor=333&logo=material-you"/>
+  <br/>
+  <!-- Dynamic Lines of Code Badge -->
+  <img alt="Lines of Code" src="https://img.shields.io/endpoint?url=https%3A%2F%2Ftokei.kojix2.net%2Fbadge%2Fgithub%2Fbikram-agarwal%2FFilePipe%2Flines&style=for-the-badge&color=aeff4d&labelColor=4b731a&label=Lines%20of%20code"/>
+  <!-- Forks -->
+  <a href="https://github.com/bikram-agarwal/FilePipe/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/bikram-agarwal/FilePipe?color=DAA520&style=for-the-badge&labelColor=664D0F"/></a>
+  <!-- Stars -->
+  <a href="https://github.com/bikram-agarwal/FilePipe/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/bikram-agarwal/FilePipe?color=ffff00&style=for-the-badge&labelColor=a1a116"/></a>
+  <a href="https://github.com/bikram-agarwal/FilePipe/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/bikram-agarwal/FilePipe/total?color=00bcd4&style=for-the-badge&labelColor=006064"/></a>
+  <br/>
+  <!-- Distribution Badges -->
+  <a href="https://github.com/bikram-agarwal/FilePipe/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/bikram-agarwal/FilePipe?color=a1168e&include_prereleases&logo=github&style=for-the-badge&labelColor=700f63"/></a>
+  <a href="https://play.google.com/store/apps/details?id=dev.bikram.filepipe"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v3.9.7-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
+  <a href="https://f-droid.org/packages/dev.bikram.filepipe.gh"><img alt="F-Droid" src="https://img.shields.io/f-droid/v/dev.bikram.filepipe.gh?color=a1168e&logo=FDROID&style=for-the-badge&labelColor=700f63"/></a>
+</p>
+
 FilePipe turns your chaotic storage into a perfectly organized library — automatically.
 
 Ever wish your Downloads folder would just sort itself? Or that all your videos would gather in one place regardless of which app saved them?
