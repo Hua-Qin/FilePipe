@@ -8,7 +8,6 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 
 @Composable
 fun FilePipeSwitch(
@@ -24,18 +23,9 @@ fun FilePipeSwitch(
     colors: SwitchColors = SwitchDefaults.colors(checkedIconColor = MaterialTheme.colorScheme.primary),
     interactionSource: MutableInteractionSource? = null,
 ) {
-    val playTap = rememberPlayTapSound()
     Switch(
         checked = checked,
-        onCheckedChange =
-            if (onCheckedChange != null) {
-                {
-                    playTap()
-                    onCheckedChange(it)
-                }
-            } else {
-                null
-            },
+        onCheckedChange = onCheckedChange,
         modifier = modifier,
         thumbContent =
             if (checked) {

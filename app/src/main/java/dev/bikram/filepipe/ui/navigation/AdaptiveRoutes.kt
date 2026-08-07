@@ -59,7 +59,7 @@ import dagger.hilt.android.EntryPointAccessors
 import dev.bikram.filepipe.di.SettingsDependenciesEntryPoint
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.isSmallLandscape
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.screens.devoptions.DevOptionsScreen
 import dev.bikram.filepipe.ui.screens.settings.FilePipeUpdateViewModel
 import dev.bikram.filepipe.ui.screens.settings.SettingsScreen
@@ -149,7 +149,7 @@ private fun SettingsSectionListRow(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
-                .tapSoundClickable(
+                .appClickable(
                     onClick = onClick,
                     indication = null,
                 ),

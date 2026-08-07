@@ -87,7 +87,7 @@ import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.components.displayPath
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList
 import dev.bikram.filepipe.ui.navigation.DEV_OPTIONS_SHARED_BOUNDS_KEY
 import dev.bikram.filepipe.ui.navigation.LocalNavAnimatedVisibilityScope

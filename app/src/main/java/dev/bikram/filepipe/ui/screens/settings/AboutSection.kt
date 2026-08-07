@@ -68,8 +68,8 @@ import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
-import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
+import dev.bikram.filepipe.ui.feedback.appCombinedClickable
 import dev.bikram.filepipe.ui.theme.compactControlShape
 import dev.bikram.filepipe.ui.theme.pillShape
 import kotlinx.coroutines.launch
@@ -211,7 +211,7 @@ private fun AboutAppStoreButton(
             Modifier
                 .fillMaxWidth()
                 .clip(shape)
-                .tapSoundCombinedClickable(
+                .appCombinedClickable(
                     onClick = { openAboutAppRoute(context, route) },
                     onLongClick = { copyLinkToClipboard(route.copyUrl) },
                     role = Role.Button,
@@ -284,7 +284,7 @@ private fun AboutTextLink(
         text = label,
         modifier =
             modifier
-                .tapSoundCombinedClickable(
+                .appCombinedClickable(
                     onClick = { openAboutUrl(context, url) },
                     onLongClick = { copyLinkToClipboard(url) },
                     role = Role.Button,
@@ -650,7 +650,7 @@ private fun AboutSettingsBlock(
                                 Modifier
                                     .size(if (isSmallLandscape) 64.dp else 84.dp)
                                     .clip(RoundedCornerShape(percent = 25))
-                                    .tapSoundClickable(onClick = onOpenIntro),
+                                    .appClickable(onClick = onOpenIntro),
                         )
                         Spacer(Modifier.width(if (isSmallLandscape) 16.dp else 20.dp))
                         AboutAuthorPhoto(
@@ -658,7 +658,7 @@ private fun AboutSettingsBlock(
                                 Modifier
                                     .size(if (isSmallLandscape) 64.dp else 84.dp)
                                     .clip(RoundedCornerShape(16.dp))
-                                    .tapSoundClickable {
+                                    .appClickable {
                                         runCatching {
                                             context.startActivity(
                                                 Intent(Intent.ACTION_VIEW, authorGithubProfileUrl.toUri()),
@@ -691,7 +691,7 @@ private fun AboutSettingsBlock(
                                 modifier =
                                     Modifier
                                         .clip(aboutPillShape)
-                                        .tapSoundCombinedClickable(
+                                        .appCombinedClickable(
                                             onClick = {
                                                 runCatching {
                                                     context.startActivity(
@@ -737,7 +737,7 @@ private fun AboutSettingsBlock(
                                     modifier =
                                         Modifier
                                             .clip(aboutPillShape)
-                                            .tapSoundCombinedClickable(
+                                            .appCombinedClickable(
                                                 onClick = {
                                                     val repoUrl = "https://github.com/$githubRepoForSourceLink"
                                                     runCatching {
@@ -786,7 +786,7 @@ private fun AboutSettingsBlock(
                                     modifier =
                                         Modifier
                                             .clip(aboutPillShape)
-                                            .tapSoundCombinedClickable(
+                                            .appCombinedClickable(
                                                 onClick = {
                                                     runCatching {
                                                         context.startActivity(
@@ -831,7 +831,7 @@ private fun AboutSettingsBlock(
                                     modifier =
                                         Modifier
                                             .clip(aboutPillShape)
-                                            .tapSoundCombinedClickable(
+                                            .appCombinedClickable(
                                                 onClick = {
                                                     if (hostActivity != null) {
                                                         onLaunchPlayReview { playStoreAboutUsesListingOnly = true }
@@ -873,7 +873,7 @@ private fun AboutSettingsBlock(
                                     modifier =
                                         Modifier
                                             .clip(aboutPillShape)
-                                            .tapSoundCombinedClickable(
+                                            .appCombinedClickable(
                                                 onClick = {
                                                     val repoUrl = "https://github.com/$githubRepoForSourceLink"
                                                     runCatching {

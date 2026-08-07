@@ -34,7 +34,7 @@ import dev.bikram.filepipe.data.preferences.SwipeAction
 import dev.bikram.filepipe.data.preferences.materialSymbolName
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.theme.swipeActionAccent
 
 internal enum class SwipeDirectionCue(
@@ -190,7 +190,7 @@ internal fun SwipeExecuteActionPicker(
                     .fillMaxWidth()
                     .height(48.dp)
                     .clip(shape)
-                    .tapSoundClickable(role = Role.Button) { expanded = true },
+                    .appClickable(role = Role.Button) { expanded = true },
             shape = shape,
             color = action.settingsSwipeTileColor(),
             border = BorderStroke(1.dp, actionAccent.copy(alpha = 0.55f)),

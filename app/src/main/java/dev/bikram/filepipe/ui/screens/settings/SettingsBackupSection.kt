@@ -38,7 +38,7 @@ import dev.bikram.filepipe.ui.components.FilePipeDropdownMenuItem
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.displayPath
-import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.filepipe.ui.feedback.appCombinedClickable
 
 @Composable
 internal fun BackupFolderPickerItem(
@@ -51,7 +51,7 @@ internal fun BackupFolderPickerItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundCombinedClickable(
+                .appCombinedClickable(
                     onClick = onClick,
                     onLongClick = onLongClick,
                 ).padding(horizontal = 16.dp, vertical = 10.dp),

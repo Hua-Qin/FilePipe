@@ -98,7 +98,6 @@ import dev.bikram.filepipe.ui.components.RuleCard
 import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyHistoryIllustration
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyTrashIllustration
-import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
@@ -848,14 +847,12 @@ private fun SwipeToDismissTrashRuleCard(
     modifier: Modifier = Modifier,
     isActiveInDetailPane: Boolean = false,
 ) {
-    val hapticEnabled = LocalHapticEnabled.current
     val cardShape = MaterialTheme.shapes.medium
     DeliberateSwipeRevealCard(
         commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
         cardShape = cardShape,
         onSwipeStartToEnd = onRestore,
         onSwipeEndToStart = onDeleteForever,
-        hapticEnabled = hapticEnabled,
         backgroundContent = { fromStart, revealProgress ->
             val action = if (fromStart) SwipeAction.PREVIEW else SwipeAction.DELETE
             val background by animateColorAsState(
@@ -1028,14 +1025,12 @@ private fun SwipeToDismissHistoryCard(
     isActiveInDetailPane: Boolean = false,
     rule: Rule? = null,
 ) {
-    val hapticEnabled = LocalHapticEnabled.current
     val cardShape = MaterialTheme.shapes.medium
     DeliberateSwipeRevealCard(
         commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
         cardShape = cardShape,
         onSwipeStartToEnd = { },
         onSwipeEndToStart = onDelete,
-        hapticEnabled = hapticEnabled,
         allowSwipeStartToEnd = false,
         allowSwipeEndToStart = true,
         backgroundContent = { fromStart, revealProgress ->

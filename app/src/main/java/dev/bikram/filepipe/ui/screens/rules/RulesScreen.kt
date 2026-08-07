@@ -103,7 +103,6 @@ import dev.bikram.filepipe.ui.components.SwipeDismissCardDefaults
 import dev.bikram.filepipe.ui.components.ThemeColoredEmptyRulesIllustration
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.previewSourceFolderDisplayPath
-import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.Screen
@@ -1010,7 +1009,6 @@ private fun SwipeToDismissRuleCard(
                 )
             }
 
-    val hapticEnabled = LocalHapticEnabled.current
     DeliberateSwipeRevealCard(
         commitThresholdFraction = SwipeDismissCardDefaults.COMMIT_THRESHOLD_FRACTION,
         cardShape = cardShape,
@@ -1036,7 +1034,6 @@ private fun SwipeToDismissRuleCard(
                 )
             }
         },
-        hapticEnabled = hapticEnabled,
         allowSwipeStartToEnd = !isMockRule || !swipeStartToEnd.isBlockedForMockRule(),
         allowSwipeEndToStart = !isMockRule || !swipeEndToStart.isBlockedForMockRule(),
         backgroundContent = { fromStart, revealProgress ->

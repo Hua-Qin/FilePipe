@@ -115,9 +115,9 @@ import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.components.hueFromHexColor
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
+import dev.bikram.filepipe.ui.feedback.appClickable
+import dev.bikram.filepipe.ui.feedback.appCombinedClickable
 import dev.bikram.filepipe.ui.feedback.performRejectHaptic
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
-import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.filepipe.ui.theme.normalizeCustomSeedHexOrNull
 import dev.bikram.filepipe.ui.theme.normalizeSeedHexOrNull
 import dev.bikram.filepipe.ui.theme.parseCustomTriplet
@@ -192,7 +192,7 @@ fun ThemeAccentRow(
                             width = if (isSelected) 3.dp else 1.dp,
                             color = borderColor,
                             shape = CircleShape,
-                        ).tapSoundClickable(
+                        ).appClickable(
                             onClick = { onSelectPreset(source) },
                             indication = ripple(bounded = true),
                             interactionSource = remember { MutableInteractionSource() },
@@ -223,7 +223,7 @@ fun ThemeAccentRow(
                             width = if (isSelected) 3.dp else 1.dp,
                             color = borderColor,
                             shape = CircleShape,
-                        ).tapSoundCombinedClickable(
+                        ).appCombinedClickable(
                             onClick = { onSelectCustomHex(storedHex) },
                             onLongClick = { onCustomHexLongPress(storedHex) },
                             indication = ripple(bounded = true),
@@ -257,7 +257,7 @@ fun ThemeAccentRow(
                         .clip(CircleShape)
                         .border(width = 1.dp, color = addBorder, shape = CircleShape)
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
-                        .tapSoundClickable(
+                        .appClickable(
                             onClick = onAddCustomHexClick,
                             indication = ripple(bounded = true),
                             interactionSource = remember { MutableInteractionSource() },
@@ -582,7 +582,7 @@ private fun CustomFontSettingsRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable { showImportDialog = true }
+                .appClickable { showImportDialog = true }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -653,7 +653,7 @@ private fun AppearanceThemeControls(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .tapSoundClickable { onUseBlackTheme(!useBlackTheme) },
+                            .appClickable { onUseBlackTheme(!useBlackTheme) },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -1004,7 +1004,7 @@ private fun EditableHexValue(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.outlineVariant,
                         shape = shape,
-                    ).tapSoundCombinedClickable(onClick = onStartEditing)
+                    ).appCombinedClickable(onClick = onStartEditing)
                     .padding(horizontal = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -1273,63 +1273,78 @@ private fun ThemeModeSegmentedRow(
     selected: AppThemeMode,
     onSelect: (AppThemeMode) -> Unit,
 ) {
-    val colors =
-        ToggleButtonDefaults.toggleButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
-    val labels = themePickerOrder.map { mode -> themeModeLabel(mode) }
-    val shapes =
-        themePickerOrder.mapIndexed { index, _ ->
-            when (index) {
-                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-            }
-        }
-    ButtonGroup(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-        overflowIndicator = { menuState ->
-            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
-        },
-    ) {
-        themePickerOrder.forEachIndexed { index, mode ->
-            val label = labels[index]
-            customItem(
-                buttonGroupContent = {
-                    FilePipeToggleButton(
-                        checked = selected == mode,
-                        onCheckedChange = { checked -> if (checked) onSelect(mode) },
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .semantics { role = Role.RadioButton },
-                        shapes = shapes[index],
-                        colors = colors,
-                    ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                },
-                menuContent = { menuState ->
-                    FilePipeDropdownMenuItem(
-                        text = { Text(label) },
-                        onClick = {
-                            onSelect(mode)
-                            menuState.dismiss()
-                        },
-                    )
-                },
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 340.dp
+        val ultraCompact = maxWidth < 300.dp
+        val colors =
+            ToggleButtonDefaults.toggleButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             )
+        val labels = themePickerOrder.map { mode -> themeModeLabel(mode) }
+        val shapes =
+            themePickerOrder.mapIndexed { index, _ ->
+                when (index) {
+                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                }
+            }
+        ButtonGroup(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            overflowIndicator = { menuState ->
+                ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+            },
+        ) {
+            themePickerOrder.forEachIndexed { index, mode ->
+                val label = labels[index]
+                customItem(
+                    buttonGroupContent = {
+                        FilePipeToggleButton(
+                            checked = selected == mode,
+                            onCheckedChange = { checked -> if (checked) onSelect(mode) },
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .semantics { role = Role.RadioButton },
+                            shapes = shapes[index],
+                            colors = colors,
+                            contentPadding =
+                                androidx.compose.foundation.layout.PaddingValues(
+                                    horizontal = if (compact) 4.dp else 8.dp,
+                                    vertical = 8.dp,
+                                ),
+                        ) {
+                            Text(
+                                text = label,
+                                style =
+                                    if (ultraCompact) {
+                                        MaterialTheme.typography.labelSmall
+                                    } else {
+                                        MaterialTheme.typography.labelMedium
+                                    },
+                                textAlign = TextAlign.Center,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    },
+                    menuContent = { menuState ->
+                        FilePipeDropdownMenuItem(
+                            text = { Text(label) },
+                            onClick = {
+                                onSelect(mode)
+                                menuState.dismiss()
+                            },
+                        )
+                    },
+                )
+            }
         }
     }
 }
@@ -1349,7 +1364,7 @@ private fun AppearanceToggleItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundCombinedClickable(onClick = {
+                .appCombinedClickable(onClick = {
                     if (enabled) {
                         onCheckedChange(!checked)
                     } else {
@@ -1397,7 +1412,7 @@ private fun AppearanceToggleItem(
                         Modifier
                             .matchParentSize()
                             .clip(MaterialTheme.shapes.extraExtraLarge)
-                            .tapSoundCombinedClickable(onClick = { onDisabledClick() }),
+                            .appCombinedClickable(onClick = { onDisabledClick() }),
                 )
             }
         }
@@ -1552,7 +1567,7 @@ private fun AccentChip(
 ) {
     val chipModifier =
         if (isInteractive) {
-            modifier.tapSoundClickable(onClick = onClick)
+            modifier.appClickable(onClick = onClick)
         } else {
             modifier
         }

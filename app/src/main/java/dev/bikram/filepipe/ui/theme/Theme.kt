@@ -56,7 +56,6 @@ import dev.bikram.filepipe.data.preferences.blackThemeEligible
 import dev.bikram.filepipe.data.preferences.effectiveDarkTheme
 import dev.bikram.filepipe.ui.common.responsiveTextScaleForWidth
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
-import dev.bikram.filepipe.ui.feedback.LocalTapSound
 
 private const val MAX_APP_DISPLAY_SCALE = 1.15f
 
@@ -386,9 +385,6 @@ fun FilePipeTheme(
 
     val view = LocalView.current
     SideEffect {
-        view.isSoundEffectsEnabled = true
-    }
-    SideEffect {
         var context: Context? = view.context
         var hostingActivity: Activity? = null
         while (context != null) {
@@ -404,8 +400,6 @@ fun FilePipeTheme(
             isAppearanceLightNavigationBars = !darkTheme
         }
     }
-    val noopSound = remember { {} }
-    val playTapSound = noopSound
     val wallpaperTint = rememberWallpaperTintColor(context, enabled = effectiveUseGradientBackground)
     val gradientTop =
         wallpaperTint?.let { tint ->
@@ -441,7 +435,6 @@ fun FilePipeTheme(
         LocalGradientBackgroundColors provides gradientBackgroundColors,
         LocalProgressiveBlurEnabled provides progressiveBlurEnabled,
         LocalReducedMotion provides reducedMotion,
-        LocalTapSound provides playTapSound,
         LocalHapticEnabled provides hapticFeedbackEnabled,
         LocalDensity provides appDensity,
     ) {

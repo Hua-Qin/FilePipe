@@ -86,7 +86,7 @@ import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.StatusChip
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.formatTime
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
 import dev.bikram.filepipe.ui.theme.LocalUseGradientBackground
@@ -460,7 +460,7 @@ private fun FileMovedCard(
                 .fillMaxWidth()
                 .then(
                     if (isSuccess) {
-                        Modifier.tapSoundClickable {
+                        Modifier.appClickable {
                             openFileWithDefaultApp(context, file.destinationUri)
                         }
                     } else {

@@ -70,8 +70,8 @@ import dev.bikram.filepipe.domain.model.ScheduleType
 import dev.bikram.filepipe.domain.model.formatExtensionLabel
 import dev.bikram.filepipe.domain.usecase.RuleConflictDetector
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
-import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
+import dev.bikram.filepipe.ui.feedback.appCombinedClickable
 import dev.bikram.filepipe.ui.theme.elevatedCardColors
 import dev.bikram.filepipe.ui.theme.pillShape
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
@@ -134,13 +134,13 @@ private fun Modifier.ruleCardBodyGestures(
 ): Modifier =
     then(reorderModifier).then(
         if (suppressLongClickForReorder) {
-            Modifier.tapSoundClickable(
+            Modifier.appClickable(
                 onClick = onClick,
                 onClickLabel = clickLabel,
                 role = Role.Button,
             )
         } else {
-            Modifier.tapSoundCombinedClickable(
+            Modifier.appCombinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
                 onClickLabel = clickLabel,
@@ -394,7 +394,7 @@ private fun CompactContent(
                                 } ?: Modifier,
                         ).then(
                             if (onLeadingLongClick != null) {
-                                Modifier.tapSoundCombinedClickable(
+                                Modifier.appCombinedClickable(
                                     onClick = onClick,
                                     onLongClick = onLeadingLongClick,
                                     onClickLabel = clickLabel,
@@ -586,7 +586,7 @@ private fun ExpandedContent(
                         modifier =
                             Modifier.then(
                                 if (onLeadingLongClick != null) {
-                                    Modifier.tapSoundCombinedClickable(
+                                    Modifier.appCombinedClickable(
                                         onClick = onClick,
                                         onLongClick = onLeadingLongClick,
                                         onClickLabel = clickLabel,
@@ -714,7 +714,7 @@ private fun ExpandedContent(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .tapSoundClickable(
+                                .appClickable(
                                     onClickLabel = stringResource(R.string.edit_rule),
                                     role = Role.Button,
                                     onClick = onStaleWarningClick,

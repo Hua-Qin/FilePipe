@@ -64,7 +64,6 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.ui.common.isSmallLandscape
 import dev.bikram.filepipe.ui.feedback.LocalHapticEnabled
 import dev.bikram.filepipe.ui.feedback.performLongPressHaptic
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 
 @Composable
 fun rememberResponsiveActionButtonSize(
@@ -136,11 +135,6 @@ fun FilePipeIconButton(
     tooltipLabel: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
-    val clickAction = {
-        playTap()
-        onClick()
-    }
     if (tooltipLabel != null) {
         val tooltipState = rememberTooltipState()
         val hapticEnabled = LocalHapticEnabled.current
@@ -165,7 +159,7 @@ fun FilePipeIconButton(
             state = tooltipState,
         ) {
             IconButton(
-                onClick = clickAction,
+                onClick = onClick,
                 modifier = modifier,
                 enabled = enabled,
                 colors = colors,
@@ -180,7 +174,7 @@ fun FilePipeIconButton(
         }
     } else {
         IconButton(
-            onClick = clickAction,
+            onClick = onClick,
             modifier = modifier,
             enabled = enabled,
             colors = colors,
@@ -201,11 +195,6 @@ fun FilePipeFilledIconButton(
     tooltipLabel: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
-    val clickAction = {
-        playTap()
-        onClick()
-    }
     if (tooltipLabel != null) {
         val tooltipState = rememberTooltipState()
         val hapticEnabled = LocalHapticEnabled.current
@@ -230,7 +219,7 @@ fun FilePipeFilledIconButton(
             state = tooltipState,
         ) {
             FilledIconButton(
-                onClick = clickAction,
+                onClick = onClick,
                 modifier = modifier,
                 enabled = enabled,
                 shape = shape,
@@ -246,7 +235,7 @@ fun FilePipeFilledIconButton(
         }
     } else {
         FilledIconButton(
-            onClick = clickAction,
+            onClick = onClick,
             modifier = modifier,
             enabled = enabled,
             shape = shape,
@@ -268,11 +257,6 @@ fun FilePipeFilledTonalIconButton(
     tooltipLabel: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
-    val clickAction = {
-        playTap()
-        onClick()
-    }
     if (tooltipLabel != null) {
         val tooltipState = rememberTooltipState()
         val hapticEnabled = LocalHapticEnabled.current
@@ -297,7 +281,7 @@ fun FilePipeFilledTonalIconButton(
             state = tooltipState,
         ) {
             FilledTonalIconButton(
-                onClick = clickAction,
+                onClick = onClick,
                 modifier = modifier,
                 enabled = enabled,
                 shape = shape,
@@ -313,7 +297,7 @@ fun FilePipeFilledTonalIconButton(
         }
     } else {
         FilledTonalIconButton(
-            onClick = clickAction,
+            onClick = onClick,
             modifier = modifier,
             enabled = enabled,
             shape = shape,
@@ -337,12 +321,8 @@ fun FilePipeButton(
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     androidx.compose.material3.Button(
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -368,12 +348,8 @@ fun FilePipeTextButton(
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     TextButton(
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -399,12 +375,8 @@ fun FilePipeOutlinedButton(
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     OutlinedButton(
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -430,12 +402,8 @@ fun FilePipeFilledTonalButton(
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     FilledTonalButton(
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -454,7 +422,7 @@ fun FilePipeToggleButton(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapes(),
+    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapesFor(ButtonDefaults.MinHeight),
     colors: ToggleButtonColors = ToggleButtonDefaults.toggleButtonColors(),
     elevation: ButtonElevation? = null,
     border: BorderStroke? = null,
@@ -462,13 +430,9 @@ fun FilePipeToggleButton(
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     ToggleButton(
         checked = checked,
-        onCheckedChange = { selected ->
-            playTap()
-            onCheckedChange(selected)
-        },
+        onCheckedChange = onCheckedChange,
         modifier = modifier,
         enabled = enabled,
         shapes = shapes,
@@ -526,12 +490,8 @@ fun FilePipeFloatingActionButton(
         } else {
             Modifier
         }
-    val playTap = rememberPlayTapSound()
-    val clickAction = {
-        if (enabled) {
-            playTap()
-            onClick()
-        }
+    val guardedOnClick = {
+        if (enabled) onClick()
     }
     if (tooltipLabel != null) {
         val tooltipState = rememberTooltipState()
@@ -557,7 +517,7 @@ fun FilePipeFloatingActionButton(
             state = tooltipState,
         ) {
             FloatingActionButton(
-                onClick = clickAction,
+                onClick = guardedOnClick,
                 modifier = modifier.then(sizeModifier),
                 shape = shape,
                 containerColor = containerColor,
@@ -574,7 +534,7 @@ fun FilePipeFloatingActionButton(
         }
     } else {
         FloatingActionButton(
-            onClick = clickAction,
+            onClick = guardedOnClick,
             modifier = modifier.then(sizeModifier),
             shape = shape,
             containerColor = containerColor,
@@ -599,14 +559,10 @@ fun FilePipeExtendedFloatingActionButton(
     elevation: FloatingActionButtonElevation = FloatingActionButtonDefaults.elevation(),
     interactionSource: MutableInteractionSource? = null,
 ) {
-    val playTap = rememberPlayTapSound()
     ExtendedFloatingActionButton(
         text = text,
         icon = icon,
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         expanded = expanded,
         shape = shape,
@@ -631,12 +587,8 @@ fun FilePipeSurface(
     interactionSource: MutableInteractionSource? = null,
     content: @Composable () -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     Surface(
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -661,12 +613,8 @@ fun FilePipeElevatedCard(
     interactionSource: MutableInteractionSource? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     ElevatedCard(
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -689,12 +637,8 @@ fun FilePipeOutlinedCard(
     interactionSource: MutableInteractionSource? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val playTap = rememberPlayTapSound()
     OutlinedCard(
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -727,13 +671,9 @@ fun FilePipeFilterChip(
             .filterChipBorder(enabled, selected),
     interactionSource: MutableInteractionSource? = null,
 ) {
-    val playTap = rememberPlayTapSound()
     FilterChip(
         selected = selected,
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         label = label,
         modifier = modifier,
         enabled = enabled,
@@ -769,13 +709,9 @@ fun FilePipeInputChip(
             .inputChipBorder(enabled, selected),
     interactionSource: MutableInteractionSource? = null,
 ) {
-    val playTap = rememberPlayTapSound()
     InputChip(
         selected = selected,
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         label = label,
         modifier = modifier,
         enabled = enabled,
@@ -804,13 +740,9 @@ fun FilePipeDropdownMenuItem(
     contentPadding: PaddingValues = androidx.compose.material3.MenuDefaults.DropdownMenuItemContentPadding,
     interactionSource: MutableInteractionSource? = null,
 ) {
-    val playTap = rememberPlayTapSound()
     DropdownMenuItem(
         text = text,
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         leadingIcon = leadingIcon,
         trailingIcon = trailingIcon,
@@ -833,13 +765,9 @@ fun FilePipeTab(
     unselectedContentColor: Color = selectedContentColor,
     interactionSource: MutableInteractionSource? = null,
 ) {
-    val playTap = rememberPlayTapSound()
     Tab(
         selected = selected,
-        onClick = {
-            playTap()
-            onClick()
-        },
+        onClick = onClick,
         modifier = modifier,
         enabled = enabled,
         text = text,

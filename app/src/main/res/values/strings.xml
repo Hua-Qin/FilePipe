@@ -801,7 +801,7 @@
     <string name="onboarding_lets_begin">Let\'s begin</string>
     <string name="onboarding_byline">by Bikram Agarwal</string>
     <!-- Feedback / new settings -->
-    <string name="settings_touch_sound_section">Touch &amp; Sound</string>
+    <string name="settings_touch_sound_section">Haptics</string>
     <string name="settings_swipe_gestures_section">Swipe gestures</string>
     <string name="settings_swipe_right">Swipe right</string>
     <string name="settings_swipe_left">Swipe left</string>
@@ -809,7 +809,7 @@
     <string name="settings_swipe_action_history">History</string>
     <string name="settings_swipe_execute_hint">Each swipe runs one action. Tap to change the action.</string>
     <string name="settings_haptic_feedback">Haptic feedback</string>
-    <string name="settings_haptic_feedback_desc">Tap sounds and swipe vibrations</string>
+    <string name="settings_haptic_feedback_desc">Vibration on long-press and swipe actions</string>
     <string name="settings_progressive_blur">Progressive blur</string>
     <string name="settings_progressive_blur_desc">Frosted glass blur effect at places</string>
     <string name="settings_custom_font_title">Font in use</string>

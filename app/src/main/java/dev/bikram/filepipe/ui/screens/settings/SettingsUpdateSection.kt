@@ -60,7 +60,7 @@ import dev.bikram.filepipe.ui.components.FilePipeOutlinedButton
 import dev.bikram.filepipe.ui.components.FilePipeTextButton
 import dev.bikram.filepipe.ui.components.ToggleLabelHelpDropdown
 import dev.bikram.filepipe.ui.components.text.SimpleMarkdown
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.theme.compactControlShape
 import dev.bikram.filepipe.ui.theme.pillShape
 import dev.bikram.filepipe.update.UpdateInfo
@@ -403,7 +403,7 @@ internal fun UpdateCheckBottomSheetContent(
                                         Modifier
                                             .size(32.dp)
                                             .clip(CircleShape)
-                                            .tapSoundClickable(
+                                            .appClickable(
                                                 enabled = canGoBack,
                                                 onClick = {
                                                     pagerCoroutineScope.launch {
@@ -450,7 +450,7 @@ internal fun UpdateCheckBottomSheetContent(
                                         Modifier
                                             .size(32.dp)
                                             .clip(CircleShape)
-                                            .tapSoundClickable(
+                                            .appClickable(
                                                 enabled = canGoForward,
                                                 onClick = {
                                                     pagerCoroutineScope.launch {

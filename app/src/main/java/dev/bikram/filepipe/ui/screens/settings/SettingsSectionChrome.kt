@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.components.FilePipeExpandableSectionHeader
 import dev.bikram.filepipe.ui.components.FilePipeSwitch
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.navigation.DEV_OPTIONS_SHARED_BOUNDS_KEY
 import dev.bikram.filepipe.ui.navigation.LocalNavAnimatedVisibilityScope
 import dev.bikram.filepipe.ui.navigation.LocalSharedTransitionScope
@@ -125,7 +125,7 @@ internal fun SettingsStandaloneNavigationRow(
                 .then(sharedBoundsModifier)
                 .clip(RoundedCornerShape(28.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .tapSoundClickable(
+                .appClickable(
                     onClick = onClick,
                     indication = null,
                 ).padding(horizontal = 12.dp, vertical = 8.dp),
@@ -216,7 +216,7 @@ internal fun SettingsToggleRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable {
+                .appClickable {
                     if (!switchEnabled) {
                         onDisabledInteraction?.invoke()
                     } else {

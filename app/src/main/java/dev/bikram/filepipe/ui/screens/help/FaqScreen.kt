@@ -76,7 +76,7 @@ import dev.bikram.filepipe.ui.components.FilePipeFilledTonalIconButton
 import dev.bikram.filepipe.ui.components.FilePipeIconButton
 import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer
 import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
@@ -138,7 +138,7 @@ private fun FaqTopicListItem(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .tapSoundClickable { onToggle() }
+                        .appClickable { onToggle() }
                         .padding(horizontal = 16.dp, vertical = 14.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,

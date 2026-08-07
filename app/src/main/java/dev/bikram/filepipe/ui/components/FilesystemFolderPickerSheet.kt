@@ -49,7 +49,7 @@ import dev.bikram.filepipe.data.storage.isFilesystemFolderPathAllowedForRules
 import dev.bikram.filepipe.data.storage.normalizeFilesystemFolderPath
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
 import dev.bikram.filepipe.ui.common.isLandscape
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -400,8 +400,8 @@ fun FilesystemFolderPickerSheetContent(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier =
-                        Modifier.tapSoundClickable {
-                            val target = normalizeFilesystemFolderPath(segment.path) ?: return@tapSoundClickable
+                        Modifier.appClickable {
+                            val target = normalizeFilesystemFolderPath(segment.path) ?: return@appClickable
                             if (target == "/storage" || (
                                     File(target).isDirectory &&
                                         File(target).canRead() &&
@@ -456,7 +456,7 @@ fun FilesystemFolderPickerSheetContent(
                                 )
                             },
                             modifier =
-                                Modifier.tapSoundClickable {
+                                Modifier.appClickable {
                                     currentPath = entry.path
                                 },
                         ) {

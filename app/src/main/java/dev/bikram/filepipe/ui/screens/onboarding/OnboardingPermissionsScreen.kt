@@ -594,6 +594,10 @@ private fun AccessModeSwitcher(
     val scheme = MaterialTheme.colorScheme
     val allFilesSelected = selected == FolderAccessMode.ALL_FILES_PREFERRED
     val stateBAccentColor = scheme.surfaceContainerHighest
+    // The unselected outline must NOT reuse stateBAccentColor: that is a surface tone, so a border
+    // drawn in it is near-invisible against the card behind this switcher. stateBAccentColor stays
+    // the checked *fill*; the outline gets a real outline role.
+    val stateBOutlineColor = scheme.outline
     val allFilesActiveFillColor = scheme.primary
     val transparentInactiveColors =
         ToggleButtonDefaults.toggleButtonColors(
@@ -625,7 +629,15 @@ private fun AccessModeSwitcher(
                         .fillMaxWidth()
                         .heightIn(min = 54.dp)
                         .semantics { role = Role.RadioButton },
-                shapes = ToggleButtonDefaults.shapes(pillShape),
+                // Compose M3 1.5.0-alpha25 removed ToggleButtonDefaults.shapes(shape) (deprecated
+                // HIDDEN), so the resting pill is applied by overriding the resting shape on the
+                // app-default shape set. Keeping shapesFor(MinHeight) as the base means the
+                // pressed/checked morph matches every other toggle in the app, which is what the
+                // old shapes(pillShape) call did by leaving those two arguments at their defaults.
+                shapes =
+                    ToggleButtonDefaults
+                        .shapesFor(ButtonDefaults.MinHeight)
+                        .copy(shape = pillShape),
                 colors =
                     if (allFilesSelected) {
                         ToggleButtonDefaults.toggleButtonColors()
@@ -657,7 +669,15 @@ private fun AccessModeSwitcher(
                         .fillMaxWidth()
                         .heightIn(min = 54.dp)
                         .semantics { role = Role.RadioButton },
-                shapes = ToggleButtonDefaults.shapes(pillShape),
+                // Compose M3 1.5.0-alpha25 removed ToggleButtonDefaults.shapes(shape) (deprecated
+                // HIDDEN), so the resting pill is applied by overriding the resting shape on the
+                // app-default shape set. Keeping shapesFor(MinHeight) as the base means the
+                // pressed/checked morph matches every other toggle in the app, which is what the
+                // old shapes(pillShape) call did by leaving those two arguments at their defaults.
+                shapes =
+                    ToggleButtonDefaults
+                        .shapesFor(ButtonDefaults.MinHeight)
+                        .copy(shape = pillShape),
                 colors =
                     if (allFilesSelected) {
                         transparentInactiveColors
@@ -666,7 +686,7 @@ private fun AccessModeSwitcher(
                     },
                 border =
                     if (allFilesSelected) {
-                        BorderStroke(1.5.dp, stateBAccentColor)
+                        BorderStroke(1.5.dp, stateBOutlineColor)
                     } else {
                         null
                     },
@@ -762,7 +782,7 @@ private fun AccessModeSwitcher(
                             },
                         border =
                             if (allFilesSelected) {
-                                BorderStroke(1.5.dp, stateBAccentColor)
+                                BorderStroke(1.5.dp, stateBOutlineColor)
                             } else {
                                 null
                             },

@@ -168,8 +168,8 @@ import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.text.SimpleMarkdown
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
-import dev.bikram.filepipe.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
+import dev.bikram.filepipe.ui.feedback.appCombinedClickable
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurScrollableList
 import dev.bikram.filepipe.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.filepipe.ui.navigation.DEV_OPTIONS_SHARED_BOUNDS_KEY
@@ -190,28 +190,67 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-/**
- * Indices of the first unconditional [LazyColumn] items (Appearance, Folder access, Touch & sound, …)
- * before the optional Updates block. Used to scroll from Help quick actions.
- */
-private const val SETTINGS_LIST_INDEX_FOLDER_ACCESS = 1
-private const val SETTINGS_LIST_INDEX_SCHEDULE = 2
 private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
 
 enum class SettingsSectionKey(
     val routeKey: String,
     val iconName: String,
     @StringRes val titleRes: Int,
+    /**
+     * Historic [routeKey] values. [routeKey] is a *stored identifier*: it is persisted in the
+     * collapsed-sections preference and accepted from deep links. Renaming one would orphan that
+     * stored state, so move the old value here rather than deleting it and everything keeps
+     * resolving.
+     *
+     * This has nothing to do with [titleRes]. The displayed heading is never persisted or compared,
+     * so section labels in `strings.xml` can be reworded freely with no effect anywhere else.
+     */
+    val legacyRouteKeys: List<String> = emptyList(),
 ) {
     Appearance("appearance", "palette", R.string.settings_appearance_section),
     FolderAccess("folder_access", "folder_open", R.string.settings_folder_access_section),
-    Schedule("schedule", "calendar_clock", R.string.settings_schedule_section),
+    Schedule("schedule", "calendar_clock", R.string.settings_schedule_section, legacyRouteKeys = listOf("notifications")),
     TouchSound("touch_sound", "vibration", R.string.settings_touch_sound_section),
     SwipeActions("swipe_actions", "swipe_left", R.string.settings_swipe_gestures_section),
     Backup("backup", "save", R.string.settings_backup_section),
     Updates("updates", "system_update", R.string.settings_updates_section),
     About("about", "info", R.string.settings_about_section),
     DeveloperOptions("developer_options", "developer_board", R.string.settings_developer_options_section),
+}
+
+/**
+ * Resolves a stored or deep-linked route key - current or historic - to its section's current
+ * [SettingsSectionKey.routeKey]. Returns null when the key matches no section.
+ */
+fun canonicalSettingsSectionRouteKey(storedKey: String): String? =
+    SettingsSectionKey.entries
+        .firstOrNull { section -> section.routeKey == storedKey || storedKey in section.legacyRouteKeys }
+        ?.routeKey
+
+/**
+ * Index of a section's item within the settings [LazyColumn], derived from declaration order and the
+ * sections actually rendered.
+ *
+ * These were hardcoded index constants, which silently pointed at the wrong section whenever the
+ * list changed - and were always wrong in the single-section pane, where [shouldRenderSection]
+ * renders only the selected section so the target is index 0. Deriving it means adding, removing or
+ * hiding a section cannot leave it stale.
+ *
+ * About and DeveloperOptions are rendered after a non-section item, so they are not scroll targets.
+ */
+private fun settingsSectionScrollIndex(
+    storedRouteKey: String,
+    isRendered: (SettingsSectionKey) -> Boolean,
+): Int? {
+    val canonicalRouteKey = canonicalSettingsSectionRouteKey(storedRouteKey) ?: return null
+    val target =
+        SettingsSectionKey.entries.firstOrNull { section -> section.routeKey == canonicalRouteKey }
+            ?: return null
+    if (target == SettingsSectionKey.About || target == SettingsSectionKey.DeveloperOptions) return null
+    if (!isRendered(target)) return null
+    return SettingsSectionKey.entries
+        .takeWhile { section -> section != target }
+        .count { section -> isRendered(section) }
 }
 
 val settingsPaneSections: List<SettingsSectionKey>
@@ -221,18 +260,15 @@ val settingsPaneSections: List<SettingsSectionKey>
                 (sectionKey != SettingsSectionKey.Updates || BuildConfig.SHOW_UPDATES)
         }
 
-fun settingsSectionKeyForHighlight(highlightSectionKey: String?): SettingsSectionKey? =
-    when (highlightSectionKey?.substringBefore(".")) {
-        "appearance" -> SettingsSectionKey.Appearance
-        "folder_access" -> SettingsSectionKey.FolderAccess
-        "notifications", "schedule" -> SettingsSectionKey.Schedule
-        "touch_sound" -> SettingsSectionKey.TouchSound
-        "swipe_actions" -> SettingsSectionKey.SwipeActions
-        "backup" -> SettingsSectionKey.Backup
-        "updates" -> SettingsSectionKey.Updates.takeIf { BuildConfig.SHOW_UPDATES }
-        "about" -> SettingsSectionKey.About
-        else -> null
+// Resolved from the enum rather than a hand-maintained `when`, so a routeKey has exactly one home.
+// settingsPaneSections already excludes DeveloperOptions and hides Updates unless SHOW_UPDATES,
+// which is precisely the set this used to accept.
+fun settingsSectionKeyForHighlight(highlightSectionKey: String?): SettingsSectionKey? {
+    val routeKey = highlightSectionKey?.substringBefore(".") ?: return null
+    return settingsPaneSections.firstOrNull { section ->
+        section.routeKey == routeKey || routeKey in section.legacyRouteKeys
     }
+}
 
 private enum class BackupFolderTarget {
     Local,
@@ -340,29 +376,30 @@ fun SettingsScreen(
             } ?: Modifier
         }
 
+    // Derived from the enum, not a duplicate hardcoded list. When this was hand-maintained, renaming
+    // a routeKey made the stored key fail this filter and updateCollapsedSettingsSectionKeys wrote
+    // the filtered set back - permanently discarding that section's collapsed state.
     val settingsExpandableSectionKeys =
         remember {
-            buildSet {
-                add("appearance")
-                add("folder_access")
-                add("schedule")
-                add("touch_sound")
-                add("swipe_actions")
-                add("backup")
-                if (BuildConfig.SHOW_UPDATES) add("updates")
-            }
+            settingsPaneSections
+                .filter { sectionKey -> sectionKey != SettingsSectionKey.About }
+                .map { sectionKey -> sectionKey.routeKey }
+                .toSet()
         }
     var collapsedSettingsSectionKeys by rememberSaveable {
         mutableStateOf<Set<String>?>(null)
     }
+    // Stored keys are canonicalised first so a key written under an older routeKey still resolves.
     val currentCollapsedSectionKeys =
         collapsedSettingsSectionKeys
             ?: preferences.settingsCollapsedSectionKeys
+                .mapNotNull { storedKey -> canonicalSettingsSectionRouteKey(storedKey) }
                 .filter { it in settingsExpandableSectionKeys }
                 .toSet()
     LaunchedEffect(preferences.settingsCollapsedSectionKeys, settingsExpandableSectionKeys) {
         collapsedSettingsSectionKeys =
             preferences.settingsCollapsedSectionKeys
+                .mapNotNull { storedKey -> canonicalSettingsSectionRouteKey(storedKey) }
                 .filter { sectionKey -> sectionKey in settingsExpandableSectionKeys }
                 .toSet()
     }
@@ -384,40 +421,29 @@ fun SettingsScreen(
     val highlightSection = highlightSectionKey?.substringBefore(".")
     LaunchedEffect(highlightSectionKey) {
         val key = highlightSection ?: return@LaunchedEffect
-        val settingsSectionKey =
-            when (key) {
-                "notifications" -> "schedule"
-                else -> key
-            }
+        // Resolved through the enum's legacyRouteKeys rather than a local alias table, so "notifications"
+        // (Schedule's old routeKey) keeps working without the mapping living in two places.
+        val settingsSectionKey = canonicalSettingsSectionRouteKey(key) ?: key
         val wasCollapsed = settingsSectionKey in currentCollapsedSectionKeys
         updateCollapsedSettingsSectionKeys(currentCollapsedSectionKeys - settingsSectionKey)
         if (wasCollapsed) delay(SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS)
         val targetIndex =
-            when (key) {
-                "folder_access" -> {
-                    SETTINGS_LIST_INDEX_FOLDER_ACCESS
-                }
-
-                "notifications" -> {
-                    SETTINGS_LIST_INDEX_SCHEDULE
-                }
-
-                else -> {
+            settingsSectionScrollIndex(settingsSectionKey) { sectionKey -> shouldRenderSection(sectionKey) }
+                ?: run {
                     onHighlightHandled()
                     return@LaunchedEffect
                 }
-            }
         if (settingsLazyListState.layoutInfo.totalItemsCount > targetIndex) {
             settingsLazyListState.animateScrollToItem(targetIndex)
         }
         val highlightExpiresAtMillis = SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
-        when (key) {
-            "folder_access" -> {
+        when (settingsSectionKey) {
+            SettingsSectionKey.FolderAccess.routeKey -> {
                 folderAccessHighlight = true
                 folderAccessHighlightExpiresAtMillis = highlightExpiresAtMillis
             }
 
-            "notifications" -> {
+            SettingsSectionKey.Schedule.routeKey -> {
                 notificationsHighlight = true
                 notificationsHighlightExpiresAtMillis = highlightExpiresAtMillis
             }
@@ -926,7 +952,7 @@ fun SettingsScreen(
                                             )
                                         },
                                         modifier =
-                                            Modifier.tapSoundClickable {
+                                            Modifier.appClickable {
                                                 applyFolderAccessMode(FolderAccessMode.SAF_ONLY)
                                             },
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -946,7 +972,7 @@ fun SettingsScreen(
                                             )
                                         },
                                         modifier =
-                                            Modifier.tapSoundClickable {
+                                            Modifier.appClickable {
                                                 applyFolderAccessMode(FolderAccessMode.ALL_FILES_PREFERRED)
                                             },
                                         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
@@ -1006,7 +1032,7 @@ fun SettingsScreen(
                                     modifier =
                                         Modifier
                                             .padding(start = 8.dp)
-                                            .tapSoundClickable(onClick = onOpenFaqStorageSection),
+                                            .appClickable(onClick = onOpenFaqStorageSection),
                                 )
                             }
                             val showAllFilesActionButton =
@@ -1347,7 +1373,7 @@ fun SettingsScreen(
                                             )
                                         },
                                         modifier =
-                                            Modifier.tapSoundClickable {
+                                            Modifier.appClickable {
                                                 onUpdateCheckStarted()
                                                 updateVm.openSheetFromSettingsRow()
                                             },

@@ -38,7 +38,7 @@ import dev.bikram.filepipe.ui.components.containers.GroupPosition
 import dev.bikram.filepipe.ui.components.containers.GroupedListColumn
 import dev.bikram.filepipe.ui.components.containers.GroupedListItem
 import dev.bikram.filepipe.ui.components.displayPath
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -239,7 +239,7 @@ internal fun BackupSection(
                         modifier =
                             Modifier
                                 .matchParentSize()
-                                .tapSoundClickable(onClick = onLaunchImportReplace),
+                                .appClickable(onClick = onLaunchImportReplace),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(

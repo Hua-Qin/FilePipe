@@ -159,7 +159,6 @@ import dev.bikram.filepipe.ui.components.ThemeColoredEmptyTrashIllustration
 import dev.bikram.filepipe.ui.components.UpdateChromeState
 import dev.bikram.filepipe.ui.components.UpdateFloatingBar
 import dev.bikram.filepipe.ui.components.alertChromeSummary
-import dev.bikram.filepipe.ui.feedback.rememberPlayTapSound
 import dev.bikram.filepipe.ui.screens.devoptions.DevOptionsScreen
 import dev.bikram.filepipe.ui.screens.help.FaqScreen
 import dev.bikram.filepipe.ui.screens.history.HistoryScreen
@@ -247,7 +246,6 @@ fun AppNavigation(
     preferences: AppPreferences = AppPreferences(),
     pendingShortcutRepository: PendingShortcutRepository,
 ) {
-    val playTap = rememberPlayTapSound()
     val navController = rememberNavController()
     val pendingOpenHistory by pendingShortcutRepository.pendingOpenHistory.collectAsStateWithLifecycle()
     val pendingHistoryId by pendingShortcutRepository.pendingHistoryDetailId.collectAsStateWithLifecycle()
@@ -1064,7 +1062,19 @@ fun AppNavigation(
                             ) { backStackEntry ->
                                 val focusSection =
                                     backStackEntry.arguments?.getString(Screen.Faq.ARG_FOCUS_SECTION).orEmpty()
-                                val goToSettingsFromFaq: () -> Unit = {
+
+                                /**
+                                 * Open the Settings section a help deep link points at, dismissing
+                                 * the help screen on the way.
+                                 *
+                                 * Identical to Remember's `goToSettingsFromHelp` - Settings is a
+                                 * real destination in both apps, so the same pop-else-navigate works
+                                 * in both. The fallback branch pops explicitly because the
+                                 * observable result must be that the target section is selected AND
+                                 * the help screen is gone; a bare `navigate` would leave help on the
+                                 * back stack under the Settings tab.
+                                 */
+                                val goToSettingsFromHelp: () -> Unit = {
                                     val poppedToExistingSettings =
                                         navController.popBackStack(Screen.Settings.route, inclusive = false)
                                     if (!poppedToExistingSettings) {
@@ -1074,7 +1084,7 @@ fun AppNavigation(
                                 }
                                 val openFolderAccessInSettings: () -> Unit = {
                                     settingsHighlightSection = "folder_access"
-                                    goToSettingsFromFaq()
+                                    goToSettingsFromHelp()
                                 }
                                 FaqScreen(
                                     initialFocusSectionId = focusSection,
@@ -1082,7 +1092,7 @@ fun AppNavigation(
                                     onOpenFolderAccessInSettings = openFolderAccessInSettings,
                                     onOpenSettingsNotifications = {
                                         settingsHighlightSection = "notifications"
-                                        goToSettingsFromFaq()
+                                        goToSettingsFromHelp()
                                     },
                                     onOpenAppNotificationSettings = {
                                         settingsVm.openAppNotificationSettings()
@@ -1152,7 +1162,6 @@ fun AppNavigation(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                             ) {
-                                playTap()
                                 alertBarsExpanded = false
                             },
                     )
@@ -1275,7 +1284,6 @@ fun AppNavigation(
                         NavigationRailItem(
                             selected = selected,
                             onClick = {
-                                playTap()
                                 navController.navigate(navItem.screen.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true

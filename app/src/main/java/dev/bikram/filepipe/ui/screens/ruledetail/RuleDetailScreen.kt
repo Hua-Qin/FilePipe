@@ -106,7 +106,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -179,7 +181,7 @@ import dev.bikram.filepipe.ui.components.absoluteStoragePathToOpenTreeInitialUri
 import dev.bikram.filepipe.ui.components.displayPath
 import dev.bikram.filepipe.ui.components.previewSourceFolderDisplayPath
 import dev.bikram.filepipe.ui.components.rememberMaxLabelMinWidth
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.modifiers.progressiveBlurFullBleedLayer
 import dev.bikram.filepipe.ui.navigation.Screen
 import dev.bikram.filepipe.ui.theme.LocalProgressiveBlurStyle
@@ -1121,7 +1123,7 @@ fun RuleDetailScreen(
                                         modifier =
                                             Modifier
                                                 .weight(1f)
-                                                .tapSoundClickable(enabled = !isReadOnly) {
+                                                .appClickable(enabled = !isReadOnly) {
                                                     launchFolderPicker(FolderPickIntent.ReplaceSource(path), path)
                                                 },
                                     )
@@ -1384,7 +1386,7 @@ fun RuleDetailScreen(
                                     modifier =
                                         Modifier
                                             .weight(1f)
-                                            .tapSoundClickable(enabled = isDestinationEnabled) {
+                                            .appClickable(enabled = isDestinationEnabled) {
                                                 launchFolderPicker(
                                                     FolderPickIntent.SetDestination,
                                                     state.destinationFolderPath,
@@ -1528,7 +1530,13 @@ fun RuleDetailScreen(
                                     OperationMode.DELETE -> stringResource(R.string.operation_delete)
                                 }
                             }
-                        val operationMinWidth = rememberMaxLabelMinWidth(operationLabels)
+                        // Measure in the same style the labels below actually render in, or the
+                        // reserved min width is sized for larger text than is drawn.
+                        val operationMinWidth =
+                            rememberMaxLabelMinWidth(
+                                operationLabels,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
                         val toggleColors =
                             ToggleButtonDefaults.toggleButtonColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -1541,8 +1549,8 @@ fun RuleDetailScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            operationModes.forEach { mode ->
-                                val label = operationLabels[operationModes.indexOf(mode)]
+                            operationModes.forEachIndexed { index, mode ->
+                                val label = operationLabels[index]
                                 FilePipeToggleButton(
                                     checked = state.operationMode == mode,
                                     onCheckedChange = { checked -> if (checked) viewModel.setOperationMode(mode) },
@@ -1551,9 +1559,18 @@ fun RuleDetailScreen(
                                     modifier =
                                         Modifier
                                             .widthIn(min = operationMinWidth)
-                                            .weight(1f),
+                                            .weight(1f)
+                                            .semantics { role = Role.RadioButton },
                                 ) {
-                                    Text(label, maxLines = 1, softWrap = false)
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
                                 }
                             }
                         }
@@ -1610,14 +1627,18 @@ fun RuleDetailScreen(
                                     ConflictPolicy.RENAME_SUFFIX -> stringResource(R.string.conflict_rename)
                                 }
                             }
-                        val conflictMinWidth = rememberMaxLabelMinWidth(conflictLabels)
+                        val conflictMinWidth =
+                            rememberMaxLabelMinWidth(
+                                conflictLabels,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            conflictPolicies.forEach { policy ->
-                                val label = conflictLabels[conflictPolicies.indexOf(policy)]
+                            conflictPolicies.forEachIndexed { index, policy ->
+                                val label = conflictLabels[index]
                                 FilePipeToggleButton(
                                     checked = state.conflictPolicy == policy,
                                     onCheckedChange = { checked -> if (checked) viewModel.setConflictPolicy(policy) },
@@ -1626,9 +1647,18 @@ fun RuleDetailScreen(
                                     modifier =
                                         Modifier
                                             .widthIn(min = conflictMinWidth)
-                                            .weight(1f),
+                                            .weight(1f)
+                                            .semantics { role = Role.RadioButton },
                                 ) {
-                                    Text(label, maxLines = 1, softWrap = false)
+                                    Text(
+                                        text = label,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
                                 }
                             }
                         }
@@ -1735,7 +1765,7 @@ fun RuleDetailScreen(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
-                                        .tapSoundClickable(
+                                        .appClickable(
                                             onClick = { userToggledAdvanced = !advancedExpanded },
                                             interactionSource = advancedHeaderInteractionSource,
                                             indication = null,

@@ -9,7 +9,7 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 
-fun Modifier.tapSoundClickable(
+fun Modifier.appClickable(
     enabled: Boolean = true,
     onClickLabel: String? = null,
     role: Role? = null,
@@ -17,23 +17,17 @@ fun Modifier.tapSoundClickable(
     indication: androidx.compose.foundation.Indication? = null,
     onClick: () -> Unit,
 ): Modifier =
-    composed {
-        val playTap = LocalTapSound.current
-        clickable(
-            enabled = enabled,
-            onClickLabel = onClickLabel,
-            role = role,
-            interactionSource = interactionSource,
-            indication = indication,
-            onClick = {
-                playTap()
-                onClick()
-            },
-        )
-    }
+    clickable(
+        enabled = enabled,
+        onClickLabel = onClickLabel,
+        role = role,
+        interactionSource = interactionSource,
+        indication = indication,
+        onClick = onClick,
+    )
 
 @OptIn(ExperimentalFoundationApi::class)
-fun Modifier.tapSoundCombinedClickable(
+fun Modifier.appCombinedClickable(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
     enabled: Boolean = true,
@@ -44,7 +38,6 @@ fun Modifier.tapSoundCombinedClickable(
     indication: androidx.compose.foundation.Indication? = null,
 ): Modifier =
     composed {
-        val playTap = LocalTapSound.current
         val hapticEnabled = LocalHapticEnabled.current
         val view = LocalView.current
         combinedClickable(
@@ -54,10 +47,7 @@ fun Modifier.tapSoundCombinedClickable(
             role = role,
             interactionSource = interactionSource,
             indication = indication,
-            onClick = {
-                playTap()
-                onClick()
-            },
+            onClick = onClick,
             onLongClick =
                 if (onLongClick != null) {
                     {

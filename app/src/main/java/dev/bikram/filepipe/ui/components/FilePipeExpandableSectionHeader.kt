@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.filepipe.R
 import dev.bikram.filepipe.ui.common.FilePipeMaterialRoundedSymbol
-import dev.bikram.filepipe.ui.feedback.tapSoundClickable
+import dev.bikram.filepipe.ui.feedback.appClickable
 import dev.bikram.filepipe.ui.theme.reducedMotionAwareSpec
 
 @Composable
@@ -116,7 +116,7 @@ internal fun FilePipeExpandableSectionHeader(
                     shape = RoundedCornerShape(headerCorner.coerceAtLeast(0.dp)),
                 ).clip(MaterialTheme.shapes.extraLargeIncreased)
                 .semantics { contentDescription = if (collapsed) cdExpand else cdCollapse }
-                .tapSoundClickable(
+                .appClickable(
                     onClick = onToggle,
                     indication = LocalIndication.current,
                     interactionSource = interactionSource,
