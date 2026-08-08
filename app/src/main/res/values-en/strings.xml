@@ -1,0 +1,1022 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FilePipe</string>
+
+    <!-- Bottom nav labels -->
+    <string name="nav_rules">Rules</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Rules screen -->
+    <string name="rules_empty_title">No rules yet</string>
+    <string name="rules_empty_subtitle">Tap \"Add rule\" to create your first organizing rule</string>
+    <string name="rules_add_rule">Add rule</string>
+    <string name="rules_two_pane_empty_title">No rule selected</string>
+    <string name="rules_two_pane_empty_message">Create or select a rule to see its details here.</string>
+    <string name="rules_two_pane_empty_action">Create rule</string>
+    <string name="rule_card_types_none">None</string>
+    <string name="rule_card_from">From</string>
+    <string name="rule_card_from_none">No sources</string>
+    <string name="rule_card_more_count">+%1$d</string>
+    <string name="rule_card_destination_not_set">Not set</string>
+    <string name="rule_card_to">To</string>
+    <string name="rule_card_expand_cd">Expand %1$s</string>
+    <string name="rule_card_collapse_cd">Collapse %1$s</string>
+    <string name="rule_card_select_cd">Select %1$s</string>
+    <string name="rule_card_deselect_cd">Deselect %1$s</string>
+    <string name="rule_card_stale_folder_warning">One or more conditions need attention</string>
+    <string name="rule_card_progress_moving_file">Moving %1$s (%2$d / %3$d)</string>
+    <string name="rule_card_progress_copying_file">Copying %1$s (%2$d / %3$d)</string>
+    <string name="rule_card_progress_deleting_file">Deleting %1$s (%2$d / %3$d)</string>
+    <plurals name="rule_card_progress_files_moved_summary">
+        <item quantity="one">%1$d / %2$d file moved</item>
+        <item quantity="other">%1$d / %2$d files moved</item>
+    </plurals>
+    <plurals name="rule_card_progress_files_copied_summary">
+        <item quantity="one">%1$d / %2$d file copied</item>
+        <item quantity="other">%1$d / %2$d files copied</item>
+    </plurals>
+    <plurals name="rule_card_progress_files_deleted_summary">
+        <item quantity="one">%1$d / %2$d file deleted</item>
+        <item quantity="other">%1$d / %2$d files deleted</item>
+    </plurals>
+    <string name="rule_card_progress_error">Error: %1$s</string>
+    <string name="rule_card_progress_no_matching_files">No matching files found</string>
+    <string name="rule_card_progress_scanning">Scanning…</string>
+    <string name="rule_card_progress_unknown_file">Unknown file</string>
+    <string name="shortcut_run_rule_label">Run: %1$s</string>
+
+    <!-- Rule detail screen -->
+    <string name="rule_detail_redundant_subfolder_removed">Removed redundant subfolder(s): %1$s</string>
+    <string name="new_rule">New rule</string>
+    <string name="edit_rule">Edit rule</string>
+    <string name="rule_details">Rule details</string>
+    <string name="rule_name_label">Rule name</string>
+    <string name="rule_name_placeholder">e.g. Photos backup</string>
+    <string name="rule_detail_folder_access_summary_unavailable">One or more folders are missing or no longer available. Tap the highlighted paths above to fix them.</string>
+    <string name="rule_detail_folder_access_summary_permission">One or more folders need access again. Tap the highlighted paths above and re-grant access.</string>
+    <string name="rule_detail_folder_access_summary_filesystem">One or more folders need access again or require \"All files access\". Tap the highlighted paths above or change access mode in Settings.</string>
+    <string name="rule_detail_open_faq">FAQ</string>
+    <string name="rule_open_all_files_settings">Open All files access settings</string>
+    <string name="filesystem_folder_picker_title">Choose folder</string>
+    <string name="filesystem_folder_picker_devices">Devices</string>
+    <string name="filesystem_folder_picker_internal_storage">Internal storage</string>
+    <string name="filesystem_folder_picker_sd_card">SD card</string>
+    <string name="filesystem_folder_picker_cancel">Cancel</string>
+    <string name="filesystem_folder_picker_use_folder">Use this folder</string>
+    <string name="filesystem_folder_picker_empty">No subfolders here. You can still use this folder.</string>
+    <string name="filesystem_folder_picker_new_folder">New folder</string>
+    <string name="filesystem_folder_picker_new_folder_title">Create folder</string>
+    <string name="filesystem_folder_picker_new_folder_name_label">Folder name</string>
+    <string name="filesystem_folder_picker_new_folder_create">Create</string>
+    <string name="filesystem_folder_picker_new_folder_error_empty">Enter a folder name</string>
+    <string name="filesystem_folder_picker_new_folder_error_invalid">That name is not allowed</string>
+    <string name="filesystem_folder_picker_new_folder_error_exists">A folder with that name already exists</string>
+    <string name="filesystem_folder_picker_new_folder_error_cannot_write">Cannot create a folder here</string>
+    <string name="filesystem_folder_picker_new_folder_error_failed">Could not create the folder</string>
+    <string name="source_folders_label">Source folders</string>
+    <string name="add_source_folder">Pick folders</string>
+    <string name="destination_label">Destination folder</string>
+    <string name="pick_folder">Pick folder</string>
+    <string name="change_destination">Change folder</string>
+    <string name="rule_icon_picker_cd">Choose rule icon</string>
+    <string name="rule_icon_label_default">Default</string>
+    <string name="rule_icon_label_image">Images</string>
+    <string name="rule_icon_label_screenshot">Screenshots</string>
+    <string name="rule_icon_label_video">Video</string>
+    <string name="rule_icon_label_music">Music</string>
+    <string name="rule_icon_label_download">Downloads</string>
+    <string name="rule_icon_label_document">Documents</string>
+    <string name="rule_icon_label_installable">Installables</string>
+    <string name="rule_section_extensions_title">File extensions</string>
+    <string name="rule_section_extensions_subtitle">Which file types this rule applies to</string>
+    <string name="rule_section_source_subtitle">Scan files from these folders</string>
+    <string name="rule_section_destination_subtitle">Matching files go here</string>
+    <string name="rule_section_schedule_subtitle">Optional automatic runs</string>
+    <string name="remove_schedule">Remove schedule</string>
+    <string name="add_schedule_chip">Add schedule</string>
+    <string name="unsaved_changes_title">Unsaved changes</string>
+    <string name="unsaved_changes_message">What would you like to do?</string>
+    <string name="discard_changes">Discard</string>
+    <string name="keep_editing">Keep editing</string>
+    <string name="save_and_exit">Save &amp; exit</string>
+    <string name="schedule_label">Schedule (optional)</string>
+    <string name="schedule_card_label">Run</string>
+    <string name="schedule_frequency">Frequency</string>
+    <string name="schedule_daily">Daily</string>
+    <string name="schedule_weekly">Weekly</string>
+    <string name="schedule_day">Day of week</string>
+    <string name="schedule_time">Time</string>
+    <string name="schedule_dialog_title">Set schedule</string>
+    <string name="schedule_hourly">Hourly</string>
+    <string name="schedule_interval_hours">Every (hours)</string>
+    <string name="schedule_interval_hours_helper">1-24 hours. For anything longer, use \"Days\".</string>
+    <string name="schedule_interval_days_helper">1-365 days.</string>
+    <string name="schedule_interval_weeks_helper">1-52 weeks.</string>
+    <string name="schedule_remove_short">Remove</string>
+    <string name="schedule_every">Every</string>
+    <string name="schedule_unit_hours">Hours</string>
+    <string name="schedule_unit_days">Days</string>
+    <string name="schedule_unit_weeks">Weeks</string>
+    <string name="schedule_choose_start_time">Choose start time</string>
+    <string name="schedule_start_time">Start time</string>
+    <string name="schedule_every_hour">Every hour</string>
+    <string name="schedule_every_hours">Every %1$d hours</string>
+    <string name="schedule_every_hour_starting">Every hour starting at %1$s</string>
+    <string name="schedule_every_hours_starting">Every %1$d hours starting at %2$s</string>
+    <string name="schedule_daily_at">Daily at %1$s</string>
+    <string name="schedule_every_days_at">Every %1$d days at %2$s</string>
+    <string name="schedule_weekly_on">Weekly on %1$s at %2$s</string>
+    <string name="schedule_every_weeks_on">Every %1$d weeks on %2$s at %3$s</string>
+    <string name="day_sun">Sun</string>
+    <string name="day_mon">Mon</string>
+    <string name="day_tue">Tue</string>
+    <string name="day_wed">Wed</string>
+    <string name="day_thu">Thu</string>
+    <string name="day_fri">Fri</string>
+    <string name="day_sat">Sat</string>
+    <string name="schedule_pick_time">Choose time</string>
+    <string name="schedule_time_picker_title">Pick time</string>
+    <string name="schedule_time_input_mode_cd">Type time with keyboard</string>
+    <string name="schedule_time_dial_mode_cd">Pick time with clock dial</string>
+    <string name="rule_icon_sheet_title">Rule icon</string>
+    <string name="rule_icon_emoji_section">Emoji</string>
+    <string name="rule_icon_preset_section">Preset icons</string>
+    <string name="rule_icon_custom_slot_cd">Custom emoji</string>
+    <string name="rule_icon_apply_emoji_cd">Apply custom emoji</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="close">Close</string>
+    <string name="delete">Delete</string>
+    <string name="delete_forever">Delete forever</string>
+    <string name="restore">Restore</string>
+    <string name="move_to_trash">Move to Trash</string>
+    <string name="undo">Undo</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_expand">Expand</string>
+    <string name="action_collapse">Collapse</string>
+    <string name="action_expand_collapse">Expand / collapse</string>
+    <string name="action_duplicate">Duplicate</string>
+    <string name="nav_back">Back</string>
+    <string name="delete_rule">Delete rule</string>
+    <string name="duplicate_rule">Duplicate rule</string>
+    <string name="view_history">View history</string>
+    <string name="rules_expand_all">Expand all</string>
+    <string name="rules_collapse_all">Collapse all</string>
+
+    <!-- Run screen -->
+    <string name="run_select_all">Select all</string>
+    <string name="run_deselect_all">Deselect all</string>
+    <string name="run_cancel_selection">Cancel selection</string>
+    <string name="run_button">Run selected</string>
+    <string name="run_now">Run now</string>
+
+    <!-- History screen -->
+    <string name="history_no_files_affected">No files affected</string>
+    <string name="history_detail_title">Run details</string>
+    <string name="history_detail_files_header">Files (%1$d)</string>
+    <string name="history_detail_no_file_records">No file records for this run.</string>
+    <string name="history_run_interrupted">The run was interrupted when the app process ended.</string>
+    <string name="history_detail_run_summary">Run summary</string>
+    <string name="history_detail_trigger_label">Trigger</string>
+    <string name="history_detail_started_label">Started</string>
+    <string name="history_detail_completed_label">Completed</string>
+    <string name="history_detail_duration_label">Duration</string>
+    <string name="history_detail_duration_seconds">%1$d s</string>
+    <string name="history_detail_error_label">Error</string>
+    <string name="history_detail_summary_label">%1$s: </string>
+    <string name="history_detail_source_path">From: %1$s</string>
+    <string name="history_detail_file_skipped">Skipped</string>
+    <string name="history_two_pane_empty_title">No run selected</string>
+    <string name="history_two_pane_empty_message">Run details will appear here when history is available.</string>
+    <string name="history_two_pane_trash_title">Trash selected</string>
+    <string name="history_two_pane_trash_message">Trashed rules stay in the list. Run details appear when you switch back to Runs.</string>
+    <string name="history_detail_files_moved_label">Files moved</string>
+    <string name="history_detail_files_copied_label">Files copied</string>
+    <string name="history_detail_files_deleted_label">Files deleted</string>
+    <plurals name="history_detail_undo_files">
+        <item quantity="one">Undo (%d file)</item>
+        <item quantity="other">Undo (%d files)</item>
+    </plurals>
+    <string name="history_detail_not_processed_cancelled_label">Not processed (cancelled)</string>
+    <string name="history_empty_title">No history yet</string>
+    <string name="history_empty_subtitle">Run some rules to see your file move history here</string>
+    <string name="history_filter_rule_header">Showing runs for this rule only</string>
+    <string name="history_date_today">Today</string>
+    <string name="history_date_yesterday">Yesterday</string>
+    <string name="history_section_runs">Runs</string>
+    <string name="history_section_trash">Trash</string>
+    <string name="history_trash_empty_title">Trash is empty</string>
+    <string name="history_trash_empty_subtitle">Deleted rules land here first and stay for 30 days</string>
+    <string name="history_trash_retention_notice">Items in the trash are permanently deleted after 30 days</string>
+    <string name="history_trash_restore_rule">Restore rule</string>
+    <string name="history_expires_today">Expires today</string>
+    <plurals name="history_days_left">
+        <item quantity="one">%1$d day left</item>
+        <item quantity="other">%1$d days left</item>
+    </plurals>
+    <string name="history_trash_delete_forever_confirm_title">Delete rule forever?</string>
+    <string name="history_trash_delete_forever_confirm_message">\"%1$s\" will be permanently deleted and cannot be recovered.</string>
+    <string name="history_trash_empty_action">Empty Trash</string>
+    <string name="history_trash_empty_confirm_title">Delete all rules forever?</string>
+    <string name="history_trash_empty_confirm_message">All rules in Trash will be permanently deleted and cannot be recovered.</string>
+    <string name="rule_moved_to_trash">\"%1$s\" moved to Trash</string>
+    <plurals name="rules_moved_to_trash">
+        <item quantity="one">%1$d rule moved to Trash</item>
+        <item quantity="other">%1$d rules moved to Trash</item>
+    </plurals>
+    <plurals name="rules_move_to_trash_confirm_title">
+        <item quantity="one">Move %1$d rule to Trash?</item>
+        <item quantity="other">Move %1$d rules to Trash?</item>
+    </plurals>
+    <plurals name="rules_selection_count">
+        <item quantity="one">%1$d selected rule</item>
+        <item quantity="other">%1$d selected rules</item>
+    </plurals>
+    <string name="rules_move_to_trash_confirm_message">Scheduled runs for the selected rules will be paused. You can restore them from History -&gt; Trash within 30 days.</string>
+    <string name="history_triggered_manual">Manual</string>
+    <string name="history_triggered_scheduled">Scheduled</string>
+    <plurals name="history_files_moved">
+        <item quantity="one">%d file moved</item>
+        <item quantity="other">%d files moved</item>
+    </plurals>
+    <plurals name="history_files_copied">
+        <item quantity="one">%d file copied</item>
+        <item quantity="other">%d files copied</item>
+    </plurals>
+    <plurals name="history_files_deleted">
+        <item quantity="one">%d file deleted</item>
+        <item quantity="other">%d files deleted</item>
+    </plurals>
+    <plurals name="history_files_failed">
+        <item quantity="one">%d failed</item>
+        <item quantity="other">%d failed</item>
+    </plurals>
+    <plurals name="history_files_cancelled_remaining">
+        <item quantity="one">%d not processed (cancelled)</item>
+        <item quantity="other">%d not processed (cancelled)</item>
+    </plurals>
+    <string name="history_clear">Clear history</string>
+    <string name="history_clear_confirm_title">Clear all history?</string>
+    <string name="history_clear_confirm_message">This removes all run records and file move details. Rules are not affected.</string>
+    <string name="history_clear_filtered_confirm_title">Clear filtered history?</string>
+    <string name="history_clear_filtered_confirm_message">This removes matching run records and file move details. Other history records and rules are not affected.</string>
+    <string name="history_file_location_unavailable">File location not available</string>
+    <string name="history_file_open_no_app">No app found to open this file type</string>
+    <string name="history_file_open_failed">Couldn\'t open this file</string>
+
+    <!-- Status labels -->
+    <string name="status_success">Success</string>
+    <string name="status_partial">Partial</string>
+    <string name="status_failed">Failed</string>
+    <string name="status_in_progress">Running</string>
+    <string name="status_cancelled">Cancelled</string>
+    <string name="status_undone">Undone</string>
+    <string name="status_partially_undone">Partially undone</string>
+    <string name="status_no_changes">No changes</string>
+
+    <plurals name="undo_success_restored">
+        <item quantity="one">%d file restored to the original folder</item>
+        <item quantity="other">%d files restored to the original folder</item>
+    </plurals>
+    <plurals name="undo_success_deleted_destination">
+        <item quantity="one">%d file deleted at destination</item>
+        <item quantity="other">%d files deleted at destination</item>
+    </plurals>
+    <plurals name="undo_partial_restored">
+        <item quantity="one">Partial undo: %1$d restored, %2$d failed</item>
+        <item quantity="other">Partial undo: %1$d restored, %2$d failed</item>
+    </plurals>
+    <plurals name="undo_partial_deleted_destination">
+        <item quantity="one">Partial undo: %1$d deleted at destination, %2$d failed</item>
+        <item quantity="other">Partial undo: %1$d deleted at destination, %2$d failed</item>
+    </plurals>
+    <string name="undo_failed_prefix">Undo failed: %s</string>
+    <string name="undo_unknown_error">Unknown error</string>
+    <string name="undo_original_source_conflict">A file already exists at the original location</string>
+    <string name="history_detail_run_undone">This run has been undone</string>
+
+    <!-- Permission screen -->
+
+    <!-- Notification -->
+    <string name="notification_channel_name">FilePipe</string>
+    <string name="notification_channel_desc">Shows progress when organizing files</string>
+    <string name="notification_running">Running: %s</string>
+    <plurals name="notification_running_batch">
+        <item quantity="one">Running %d rule…</item>
+        <item quantity="other">Running %d rules…</item>
+    </plurals>
+    <string name="notification_preparing">Preparing…</string>
+    <string name="notification_working">Working…</string>
+    <string name="notification_finishing">Finishing…</string>
+    <string name="notification_run_stopped_early">Stopped early — some files weren\'t processed</string>
+    <string name="notification_run_failed_abbr">Stopped: %1$s</string>
+    <string name="notification_moving_n_of_m">Moving %1$d of %2$d</string>
+    <string name="notification_copying_n_of_m">Copying %1$d of %2$d</string>
+    <string name="notification_deleting_n_of_m">Deleting %1$d of %2$d</string>
+    <string name="notification_batch_rule_file">%1$s · %2$s</string>
+
+    <!-- Rule search -->
+    <!-- History search / filter -->
+    <string name="history_sort_menu">Sort</string>
+    <string name="history_sort_last_ran_newest">Last run (newest first)</string>
+    <string name="history_sort_last_ran_oldest">Last run (oldest first)</string>
+    <string name="history_sort_rule_name_az">Rule name (A to Z)</string>
+    <string name="history_sort_rule_name_za">Rule name (Z to A)</string>
+    <string name="rules_sort_my_order">My order</string>
+    <string name="history_filter_all">All</string>
+    <string name="history_group_menu">Group runs</string>
+    <string name="history_group_by_date">Group by date</string>
+    <string name="history_group_by_rule">Group by rule</string>
+    <string name="history_group_by_status">Group by status</string>
+    <string name="history_status_header_in_progress">In progress</string>
+    <!-- Onboarding folder access -->
+    <string name="onboarding_permissions_learn_more">Learn more</string>
+    <string name="onboarding_permissions_change_anytime_footer">You can change this anytime in Settings</string>
+    <string name="onboarding_permissions_instruction_heading">On the next screen:</string>
+    <string name="onboarding_permissions_instruction_step1">Enable \"Allow access to manage all files\"</string>
+    <string name="onboarding_permissions_instruction_step2">Return to this app</string>
+    <string name="onboarding_permissions_open_settings">Open system settings</string>
+    <string name="onboarding_permissions_access_not_granted">Access not granted yet</string>
+    <string name="onboarding_permissions_mode_all_files">All-files (Recommended)</string>
+    <string name="onboarding_permissions_mode_selective">Selective access</string>
+    <string name="onboarding_permissions_allow_all_files">Use all files access</string>
+    <string name="onboarding_permissions_grant_all_files">Grant all files access</string>
+    <string name="onboarding_permissions_use_selective_access">Use selective access</string>
+    <string name="onboarding_permissions_all_files_pitch_title">One permission, every folder</string>
+    <string name="onboarding_permissions_all_files_pitch_subtitle">FilePipe needs all-files access to sort across Download, storage root, and the rest.</string>
+    <string name="onboarding_permissions_all_files_hook_once">Set it once</string>
+    <string name="onboarding_permissions_all_files_rest_once">- no permission prompts later</string>
+    <string name="onboarding_permissions_all_files_hook_everywhere">Works everywhere</string>
+    <string name="onboarding_permissions_all_files_rest_everywhere">- Download, SD card, storage root, app folders</string>
+    <string name="onboarding_permissions_all_files_hook_device">Stays on this device</string>
+    <string name="onboarding_permissions_all_files_rest_device">- FilePipe never uploads your files</string>
+    <string name="onboarding_permissions_all_files_hook_fast">Faster</string>
+    <string name="onboarding_permissions_all_files_rest_fast">- quicker scans and moves, even for large libraries</string>
+    <string name="onboarding_permissions_selective_pitch_title">Your choices, folder by folder</string>
+    <string name="onboarding_permissions_selective_pitch_subtitle">FilePipe will use Android\'s basic access to sort across folders you grant one by one.</string>
+    <string name="onboarding_permissions_selective_hook_privacy">More privacy</string>
+    <string name="onboarding_permissions_selective_rest_privacy">- App sees folders you choose</string>
+    <string name="onboarding_permissions_selective_hook_control">You control access</string>
+    <string name="onboarding_permissions_selective_rest_control">- Every folder access requires its own approval</string>
+    <string name="onboarding_permissions_selective_hook_limits">System limits</string>
+    <string name="onboarding_permissions_selective_rest_limits">- Android blocks selecting the Download folder and storage root</string>
+    <string name="onboarding_permissions_selective_hook_speed">Slower</string>
+    <string name="onboarding_permissions_selective_rest_speed">- for large libraries and big files</string>
+    <string name="onboarding_permissions_sheet_footer_tip">💡 Not sure? Choose \"All files access\" - it works best for most setups. You can change this anytime in Settings.</string>
+
+    <!-- Onboarding wizard -->
+    <string name="onboarding_wizard_title">Create your first rule</string>
+    <string name="onboarding_wizard_subtitle">Pick a template, start blank, or skip and set things up yourself</string>
+    <string name="onboarding_wizard_back_to_permissions">Back</string>
+    <string name="onboarding_wizard_skip">Skip</string>
+    <string name="onboarding_wizard_start_blank">Start blank</string>
+    <string name="onboarding_wizard_start_blank_desc">Choose your own file types</string>
+
+    <!-- Settings -->
+    <string name="settings_export_folder_permission_failed">Could not acquire persistent permission for the selected folder</string>
+    <string name="settings_cloud_backup_configuration_failed">The backup was exported once, but automatic cloud backups could not be configured</string>
+    <string name="settings_folder_access_section">Folder access</string>
+    <string name="settings_folder_access_saf_only">Selective access</string>
+    <string name="settings_folder_access_all_files">All files access</string>
+    <string name="settings_folder_access_all_files_status_granted_unused">All files access: on (not used)</string>
+    <string name="settings_folder_access_all_files_status_granted_used">All files access: On</string>
+    <string name="settings_folder_access_all_files_status_not_granted_required">All files access: not granted (required)</string>
+    <string name="settings_folder_access_all_files_status_not_granted_idle">All files access: Off</string>
+    <string name="settings_folder_access_switched_selective_zero_rules">Switched to \"Selective access\" mode</string>
+    <plurals name="settings_folder_access_switched_selective_snackbar">
+        <item quantity="one">Switched to \"Selective access\" mode.\n%1$d rule will need folder access updated</item>
+        <item quantity="other">Switched to \"Selective access\" mode.\n%1$d rules will need folder access updated</item>
+    </plurals>
+    <string name="settings_folder_access_open_manage">Manage \"All files access\"</string>
+    <string name="settings_folder_access_grant_all_files">Grant \"All files access\"</string>
+    <string name="settings_folder_access_switch_to_saf_title">Switch to \"Selective access\"?</string>
+    <string name="settings_folder_access_switch_to_saf_body">Existing rules will stop working. You\'ll need to re-select each folder they use. You can switch back to \"All files access\" anytime.</string>
+    <string name="settings_folder_access_switch_confirm">Switch</string>
+    <string name="settings_appearance_section">Appearance</string>
+    <string name="settings_section_expand_cd">Expand %1$s section</string>
+    <string name="settings_section_collapse_cd">Collapse %1$s section</string>
+    <string name="settings_expand_all_sections_cd">Expand all settings sections</string>
+    <string name="settings_collapse_all_sections_cd">Collapse all settings sections</string>
+    <string name="settings_gradient_background">Gradient background</string>
+    <string name="settings_gradient_background_desc">Tinted background using your theme color</string>
+    <string name="settings_enhanced_shading">Enhanced shading</string>
+    <string name="settings_enhanced_shading_desc">Makes cards darker in dark mode and lighter in light mode</string>
+    <string name="settings_surface_shading">Surface shading</string>
+    <string name="settings_surface_shading_desc">Adjust how strongly theme colors tint surfaces</string>
+    <string name="settings_use_black_theme">Use pure black dark theme</string>
+    <string name="settings_black_theme_effect_disabled">Can not enable in black theme</string>
+    <string name="settings_backup_section">Backup &amp; restore</string>
+    <string name="settings_choose_local_backup_folder">Choose local backup folder</string>
+    <string name="settings_choose_cloud_backup_file">Choose cloud backup folder</string>
+    <string name="settings_local_backup_folder_hint">Local folder for exporting backups (notes, lists, settings)</string>
+    <string name="settings_cloud_backup_folder_hint">Cloud folder for exporting backups (notes, lists, settings)</string>
+    <string name="settings_local_backup_folder_cleared">Local backup folder reset</string>
+    <string name="settings_cloud_backup_file_cleared">Cloud backup folder reset</string>
+    <string name="settings_export_select_folder_first">Select a local or cloud backup folder first</string>
+    <string name="settings_export_success">%1$s exported</string>
+    <string name="settings_backup_export_success">Backup exported</string>
+    <string name="settings_backup_export_success_to">Backup exported to %1$s</string>
+    <string name="settings_backup_export_failed">Export failed: %1$s</string>
+    <string name="settings_export_now">Export backup</string>
+    <string name="cloud_provider_google_drive">Google Drive</string>
+    <string name="cloud_provider_onedrive">OneDrive</string>
+    <string name="cloud_provider_dropbox">Dropbox</string>
+    <string name="cloud_provider_box">Box</string>
+    <string name="cloud_provider_folder_path">%1$s / %2$s</string>
+    <string name="settings_fab_open_help">Help and FAQs</string>
+    <string name="settings_import_rules">Import backup</string>
+    <string name="settings_restore_backup">Restore backup</string>
+    <string name="settings_backup_import_failed">Import failed: %1$s</string>
+    <string name="settings_backup_restore_failed">Restore failed: %1$s</string>
+    <string name="settings_backup_invalid_rule_regex">The backup contains an invalid filename or exclusion pattern in: %1$s</string>
+    <string name="settings_backup_import_restore_help_title">Import vs restore</string>
+    <string name="settings_backup_import_restore_help_body">Import adds new rules from the file and updates rules that have the same name. Your run history and app settings stay as they are.\n\nRestore replaces everything in the app with the contents of the file: all rules, run history, and settings. Useful when moving to a new device.</string>
+    <string name="settings_backup_help_icon_cd">Explain import and restore</string>
+    <plurals name="settings_import_merge_success">
+        <item quantity="one">Rules imported: %1$d added, %2$d updated</item>
+        <item quantity="other">Rules imported: %1$d added, %2$d updated</item>
+    </plurals>
+    <string name="settings_restore_success">Backup restored (%1$s)</string>
+    <plurals name="settings_restore_part_rules">
+        <item quantity="one">%1$d rule</item>
+        <item quantity="other">%1$d rules</item>
+    </plurals>
+    <plurals name="settings_restore_part_history_runs">
+        <item quantity="one">%1$d history run</item>
+        <item quantity="other">%1$d history runs</item>
+    </plurals>
+    <string name="settings_restore_part_settings">settings</string>
+    <plurals name="settings_restore_folders_need_reselection">
+        <item quantity="one">%1$d restored folder could not be accessed. Select it again in settings.</item>
+        <item quantity="other">%1$d restored folders could not be accessed. Select them again in settings.</item>
+    </plurals>
+    <string name="settings_restore_automation_disabled_no_folder">Automatic backups were turned off because no accessible backup folder was restored.</string>
+    <string name="settings_auto_export_on_change">Auto-export on app exit</string>
+    <string name="settings_auto_export_on_change_hint">Saves a full backup to configured backup folders when you exit after making changes</string>
+    <string name="settings_scheduled_export">Daily scheduled backup</string>
+    <string name="settings_scheduled_export_hint">Automatically backs up once a day to configured backup folders</string>
+    <plurals name="settings_backup_exported_to_destinations">
+        <item quantity="one">Backup exported to %1$d folder</item>
+        <item quantity="other">Backup exported to %1$d folders</item>
+    </plurals>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">System</string>
+    <string name="theme_material_you">Material You</string>
+    <string name="theme_color_forest">Forest</string>
+    <string name="theme_color_ember">Ember</string>
+    <string name="theme_color_grove">Grove</string>
+    <string name="theme_color_honey">Honey</string>
+    <string name="theme_color_ocean">Ocean</string>
+    <string name="theme_color_iris">Iris</string>
+    <string name="theme_color_dusk">Dusk</string>
+    <string name="theme_color_berry">Berry</string>
+    <string name="theme_color_custom">Custom</string>
+    <string name="settings_palette_style">Palette style</string>
+    <string name="settings_palette">Palette</string>
+    <string name="settings_theme_preview_named">Preview · %1$s</string>
+    <string name="settings_theme_preview_customize">Customize</string>
+    <string name="settings_theme_preview_surface_ladder">Surface ladder</string>
+    <string name="settings_theme_preview_accent_containers">Accent containers</string>
+    <string name="settings_theme_preview_label_lowest">lowest</string>
+    <string name="settings_theme_preview_label_surface">surface</string>
+    <string name="settings_theme_preview_label_low">low</string>
+    <string name="settings_theme_preview_label_base">base</string>
+    <string name="settings_theme_preview_label_high">high</string>
+    <string name="settings_theme_preview_label_highest">highest</string>
+    <string name="settings_theme_preview_label_primary">primary</string>
+    <string name="settings_theme_preview_label_secondary">secondary</string>
+    <string name="settings_theme_preview_label_tertiary">tertiary</string>
+    <string name="settings_theme_preview_sample">Aa</string>
+    <string name="settings_custom_seed_slider_title">Select primary color</string>
+    <string name="settings_custom_seed_slider_title_secondary">Select a secondary color</string>
+    <string name="settings_custom_seed_slider_title_tertiary">Select a tertiary color</string>
+    <string name="settings_custom_seed_dialog_title">Add custom accent color</string>
+    <string name="settings_custom_seed_remove_title">Remove this color?</string>
+    <string name="settings_custom_seed_remove_message">It will be removed from your saved custom colors</string>
+    <string name="theme_palette_tonal_spot">Tonal spot</string>
+    <string name="theme_palette_neutral">Neutral</string>
+    <string name="theme_palette_vibrant">Vibrant</string>
+    <string name="theme_palette_expressive">Expressive</string>
+    <string name="theme_palette_rainbow">Rainbow</string>
+    <string name="theme_palette_fruit_salad">Fruit salad</string>
+    <string name="theme_palette_monochrome">Monochrome</string>
+    <string name="theme_palette_fidelity">Fidelity</string>
+    <string name="theme_palette_content">Content</string>
+    <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
+    <string name="settings_about_section">About</string>
+    <string name="app_version_format">%1$s v%2$s</string>
+    <string name="about_build_variant_format">%1$s, %2$s</string>
+    <string name="build_flavor_github">GitHub</string>
+    <string name="build_flavor_fdroid">F-Droid</string>
+    <string name="build_flavor_playstore">PlayStore</string>
+    <string name="build_type_debug">Debug</string>
+    <string name="build_type_dev_release">devRelease</string>
+    <string name="build_type_release">Release</string>
+    <string name="settings_rate_on_play_store">Rate on Play Store</string>
+    <string name="settings_star_on_github">Star on GitHub</string>
+    <string name="settings_share_app">Share</string>
+    <string name="settings_about_other_apps">More from Bikram</string>
+    <string name="settings_about_remember_name">Remember</string>
+    <string name="settings_about_remember_tagline">Notes, tasks, reminders - done right</string>
+    <string name="settings_about_obtainx_name">ObtainX</string>
+    <string name="settings_about_obtainx_tagline">Get app updates straight from the source</string>
+    <string name="settings_about_website">Website</string>
+    <string name="settings_about_privacy_policy">Privacy policy</string>
+    <string name="settings_about_terms">Terms</string>
+    <string name="settings_about_filepipe_website_url" translatable="false">https://bikram-agarwal.github.io/filepipe/</string>
+    <string name="settings_about_filepipe_privacy_url" translatable="false">https://bikram-agarwal.github.io/filepipe/privacy/</string>
+    <string name="settings_about_filepipe_terms_url" translatable="false">https://bikram-agarwal.github.io/filepipe/terms/</string>
+    <string name="settings_about_remember_play_store_url" translatable="false">https://play.google.com/store/apps/details?id=dev.bikram.remember</string>
+    <string name="settings_about_remember_website_url" translatable="false">https://bikram-agarwal.github.io/remember</string>
+    <string name="settings_about_obtainx_website_url" translatable="false">https://bikram-agarwal.github.io/obtainx</string>
+    <string name="settings_share_diagnostics">Share diagnostic log</string>
+    <string name="settings_share_diagnostics_chooser">Share diagnostic log</string>
+    <string name="settings_share_diagnostics_subject">FilePipe diagnostic log</string>
+    <string name="settings_share_diagnostics_failed">Couldn\'t share diagnostic log</string>
+    <string name="settings_developer_options_section">Developer options</string>
+    <string name="settings_developer_options_unlocked">Developer options enabled</string>
+    <string name="settings_developer_options_disabled">Developer options disabled</string>
+    <plurals name="settings_developer_options_taps_remaining">
+        <item quantity="one">%1$d tap remaining</item>
+        <item quantity="other">%1$d taps remaining</item>
+    </plurals>
+    <string name="dev_options_title">Developer options</string>
+    <string name="dev_options_back">Back</string>
+    <string name="dev_options_mode_subtitle">Disable to hide this page from Settings</string>
+    <string name="dev_options_warning">These are developer tools, not real app features. Do not use unless you know what you\'re doing. Some actions permanently change app state.</string>
+    <string name="dev_options_section_overview">Overview</string>
+    <string name="dev_options_section_info">Info</string>
+    <string name="dev_options_section_permissions_storage">Permissions &amp; storage</string>
+    <string name="dev_options_section_database">Database</string>
+    <string name="dev_options_section_workers">Workers &amp; scheduling</string>
+    <string name="dev_options_section_saf_access_grants">Folder access grants</string>
+    <string name="dev_options_section_mock_operations">Mock operations</string>
+    <string name="dev_options_section_diagnostics">Diagnostics</string>
+    <string name="dev_options_section_settings">Settings</string>
+    <string name="dev_options_section_settings_reset">Reset</string>
+    <string name="dev_options_action_open_app_details">App details</string>
+    <string name="dev_options_action_notification_settings">Notification settings</string>
+    <string name="dev_options_action_manage_all_files_access">Manage all files access</string>
+    <string name="dev_options_action_battery_optimization">Battery optimization</string>
+    <string name="dev_options_action_sync_scheduled_rules">Sync scheduled rules</string>
+    <string name="dev_options_action_sync_update_checks">Sync update checks</string>
+    <string name="dev_options_action_sync_log_pruning">Sync log pruning</string>
+    <string name="dev_options_action_add_mock_large_file_move_rule">Add a mock rule</string>
+    <string name="dev_options_action_add_mock_saf_permission_lost_rule">Add SAF permission-lost rule</string>
+    <string name="dev_options_action_add_mock_saf_download_rule">Add SAF Download access rule</string>
+    <string name="dev_options_action_remove_mock_rules">Remove mock rules and history</string>
+    <string name="dev_options_action_arm_update_promo">Mock update flow</string>
+    <string name="dev_options_action_start_play_bar">Mock PlayStore update flow</string>
+    <string name="dev_options_action_post_mock_update_notification">Mock update notification</string>
+    <string name="dev_options_action_post_mock_file_operation_notification">Mock file move notification</string>
+    <string name="dev_options_action_reset_github_ack">Reset skipped update version</string>
+    <string name="dev_options_action_clear_update_dedupe">Clear update notification dedupe</string>
+    <string name="dev_options_action_delete_cached_update_apk">Delete cached update APK</string>
+    <string name="dev_options_action_share_diagnostics">Export diagnostic logs</string>
+    <string name="dev_options_action_copy_diagnostics">Copy diagnostic logs</string>
+    <string name="dev_options_action_clear_diagnostics_log">Clear diagnostic logs</string>
+    <string name="dev_options_action_force_crash">Force crash</string>
+    <string name="dev_options_action_reset_first_launch_flag">Reset first-launch flag</string>
+    <string name="dev_options_action_reset_settings_preferences">Reset all preferences</string>
+    <string name="dev_options_dialog_force_crash_title">Force crash?</string>
+    <string name="dev_options_dialog_force_crash_message">FilePipe will crash immediately so crash handling can be tested.</string>
+    <string name="dev_options_dialog_force_crash_confirm">Crash now</string>
+    <string name="dev_options_dialog_reset_settings_title">Reset all preferences?</string>
+    <string name="dev_options_dialog_reset_settings_message">This resets the preferences shown on the Settings page and hides Developer Options again. Your rules, history, bookmarks, folder access mode, and moved-file records stay where they are.</string>
+    <string name="dev_options_dialog_reset_settings_confirm">Reset settings</string>
+    <string name="dev_options_info_version">Version</string>
+    <string name="dev_options_info_package">Package</string>
+    <string name="dev_options_info_variant">Variant</string>
+    <string name="dev_options_info_installer">Installer</string>
+    <string name="dev_options_info_android">Android</string>
+    <string name="dev_options_info_device">Device</string>
+    <string name="dev_options_info_target_sdk">Target SDK</string>
+    <string name="dev_options_info_database">Database</string>
+    <string name="dev_options_info_first_install">First install</string>
+    <string name="dev_options_info_last_update">Last update</string>
+    <string name="dev_options_info_folder_access_mode">Folder access mode</string>
+    <string name="dev_options_info_all_files_access">All files access</string>
+    <string name="dev_options_info_notifications_enabled">Notifications enabled</string>
+    <string name="dev_options_info_battery_optimization">Battery optimization</string>
+    <string name="dev_options_info_backup_destinations">Backup destinations</string>
+    <string name="dev_options_info_exact_alarm_access">Exact alarm access</string>
+    <string name="dev_options_info_rules">Rules</string>
+    <string name="dev_options_info_enabled_rules">Enabled rules</string>
+    <string name="dev_options_info_scheduled_rules">Scheduled rules</string>
+    <string name="dev_options_info_history_runs">History runs</string>
+    <string name="dev_options_info_history_in_progress">History in progress</string>
+    <string name="dev_options_info_history_success">History success</string>
+    <string name="dev_options_info_history_partial_failure">History partial failure</string>
+    <string name="dev_options_info_history_failed">History failed</string>
+    <string name="dev_options_info_history_cancelled">History cancelled</string>
+    <string name="dev_options_info_history_undone">History undone</string>
+    <string name="dev_options_info_history_partially_undone">History partially undone</string>
+    <string name="dev_options_info_moved_file_rows">Moved-file rows</string>
+    <string name="dev_options_info_database_file_size">Database file size</string>
+    <string name="dev_options_info_cached_update_apk">Cached update APK</string>
+    <string name="dev_options_info_cache_free_space">Cache free space</string>
+    <string name="dev_options_info_files_free_space">Files free space</string>
+    <string name="dev_options_info_log_prune">Log prune</string>
+    <string name="dev_options_info_update_checks">Update checks</string>
+    <string name="dev_options_info_scheduled_exports">Scheduled exports</string>
+    <string name="dev_options_info_scheduled_rule_workers">Scheduled rule workers</string>
+    <string name="dev_options_value_unknown">unknown</string>
+    <string name="dev_options_value_ignored">Ignored</string>
+    <string name="dev_options_value_active">Active</string>
+    <string name="dev_options_value_not_cached">Not cached</string>
+    <string name="dev_options_value_not_scheduled">Not scheduled</string>
+    <string name="dev_options_value_no_scheduled_rules">No scheduled rules</string>
+    <string name="dev_options_value_variant_format">%1$s · %2$s</string>
+    <string name="dev_options_value_version_format">%1$s (%2$d)</string>
+    <string name="dev_options_value_device_format">%1$s %2$s</string>
+    <string name="dev_options_value_android_format">%1$s (SDK %2$d)</string>
+    <string name="dev_options_value_database_format">%1$s / v%2$d</string>
+    <plurals name="dev_options_value_configured_count_format">
+        <item quantity="one">%1$d configured</item>
+        <item quantity="other">%1$d configured</item>
+    </plurals>
+    <plurals name="dev_options_value_total_count_format">
+        <item quantity="one">%1$d total</item>
+        <item quantity="other">%1$d total</item>
+    </plurals>
+    <string name="dev_options_value_worker_state_count_format">%1$s: %2$d</string>
+    <plurals name="dev_options_value_no_per_rule_workers_format">
+        <item quantity="one">%1$d configured, no per-rule workers found</item>
+        <item quantity="other">%1$d configured, no per-rule workers found</item>
+    </plurals>
+    <plurals name="dev_options_value_configured_worker_states_format">
+        <item quantity="one">%1$d configured; %2$s</item>
+        <item quantity="other">%1$d configured; %2$s</item>
+    </plurals>
+    <string name="dev_options_saf_access_empty">No rules or persisted SAF access grants</string>
+    <string name="dev_options_saf_access_read">Read</string>
+    <string name="dev_options_saf_access_write">Write</string>
+    <string name="dev_options_saf_access_read_write">Read/write</string>
+    <string name="dev_options_saf_access_none">None</string>
+    <string name="dev_options_folder_access_granted">Granted</string>
+    <string name="dev_options_folder_access_missing">Missing</string>
+    <string name="dev_options_folder_access_source">Source</string>
+    <string name="dev_options_folder_access_source_format">Source %1$d</string>
+    <string name="dev_options_folder_access_target">Target</string>
+    <string name="dev_options_folder_access_unassociated_title">Unassociated grants</string>
+    <string name="dev_options_folder_access_unassociated_grant_format">Grant %1$d</string>
+    <string name="dev_options_folder_access_type_saf">SAF</string>
+    <string name="dev_options_folder_access_type_all_files">All Files</string>
+    <string name="dev_options_folder_access_no_folders">No source or target folders configured</string>
+    <string name="dev_options_saf_grant_uri_format">%1$s</string>
+    <string name="dev_options_bytes_gb_format">%1$.2f GB</string>
+    <string name="dev_options_bytes_mb_format">%1$.2f MB</string>
+    <string name="dev_options_bytes_kb_format">%1$.1f KB</string>
+    <string name="dev_options_bytes_b_format">%1$d B</string>
+    <string name="dev_options_mock_update_release_notes">Developer options mock update</string>
+    <string name="dev_options_diagnostics_clip_label">FilePipe diagnostics</string>
+    <string name="dev_options_diagnostics_copied">Diagnostics copied</string>
+    <string name="dev_options_event_scheduled_rules_synced">Scheduled rules synced</string>
+    <string name="dev_options_event_update_check_worker_synced">Update check worker synced</string>
+    <string name="dev_options_event_log_prune_worker_synced">Log prune worker synced</string>
+    <string name="dev_options_event_updates_hidden">Updates are hidden for this build</string>
+    <string name="dev_options_event_mock_update_notification_requested">Mock update notification requested</string>
+    <string name="dev_options_event_mock_file_operation_notification_requested">Mock file operation notification requested</string>
+    <string name="dev_options_event_mock_large_file_rule_added">Mock rule added</string>
+    <string name="dev_options_event_mock_large_file_rule_exists">Mock rule already exists</string>
+    <string name="dev_options_event_mock_saf_permission_lost_rule_added">SAF permission-lost mock rule added</string>
+    <string name="dev_options_event_mock_saf_download_rule_added">SAF Download access mock rule added</string>
+    <string name="dev_options_event_mock_folder_issue_rule_exists">Folder issue mock rule already exists</string>
+    <string name="dev_options_event_mock_rules_removed">Mock rules and history removed</string>
+    <string name="dev_options_event_github_ack_reset">Skipped GitHub release acknowledgement reset</string>
+    <string name="dev_options_event_update_dedupe_cleared">Update notification dedupe cleared</string>
+    <string name="dev_options_event_cached_update_apk_deleted">Cached update APK deleted</string>
+    <string name="dev_options_event_no_cached_update_apk">No cached update APK found</string>
+    <string name="dev_options_event_diagnostics_log_cleared">Diagnostic logs cleared</string>
+    <string name="dev_options_event_settings_preferences_reset">Settings preferences reset</string>
+    <string name="dev_options_event_first_launch_flag_reset">First-launch flag reset</string>
+    <string name="dev_options_forced_crash_message">Developer options forced crash</string>
+    <string name="dev_options_mock_file_operation_rule_name">Mock file cleanup</string>
+    <string name="dev_options_mock_large_file_rule_name">Mock move</string>
+    <string name="dev_options_mock_saf_permission_lost_rule_name">Mock SAF permission lost</string>
+    <string name="dev_options_mock_saf_download_rule_name">Mock SAF Download blocked</string>
+    <string name="dev_options_mock_file_operation_large_file_name">archive-video-100mb.mp4</string>
+    <string name="dev_options_mock_file_operation_progress">%1$s - %2$d%% of 100 MB</string>
+    <string name="dev_options_mock_file_operation_file_2">invoice.pdf</string>
+    <string name="dev_options_mock_file_operation_file_3">camera-video.mp4</string>
+    <string-array name="dev_options_mock_large_file_names">
+        <item>conference-recording-01.mp4</item>
+        <item>camera-roll-raw-01.mov</item>
+        <item>family-photo-archive.jpg</item>
+        <item>screenshot-home-screen.png</item>
+        <item>podcast-mixdown.mp3</item>
+        <item>ambient-session.flac</item>
+        <item>invoice-march.pdf</item>
+        <item>project-brief.docx</item>
+        <item>backup-bundle.zip</item>
+        <item>unknown-import.dat</item>
+    </string-array>
+    <string name="diagnostics_title">FilePipe diagnostics</string>
+    <string name="diagnostics_generated_format">Generated: %1$s</string>
+    <string name="diagnostics_package_format">Package: %1$s</string>
+    <string name="diagnostics_version_format">Version: %1$s (%2$d)</string>
+    <string name="diagnostics_flavor_format">Flavor: %1$s</string>
+    <string name="diagnostics_build_type_format">Build type: %1$s</string>
+    <string name="diagnostics_device_format">Device: %1$s %2$s</string>
+    <string name="diagnostics_android_format">Android: %1$s (SDK %2$d)</string>
+    <string name="diagnostics_section_environment">Environment</string>
+    <string name="diagnostics_locale_format">Locale: %1$s</string>
+    <string name="diagnostics_timezone_format">Timezone: %1$s</string>
+    <string name="diagnostics_uptime_format">Uptime: %1$d ms</string>
+    <string name="diagnostics_elapsed_realtime_format">Elapsed realtime: %1$d ms</string>
+    <string name="diagnostics_font_scale_format">Font scale: %1$.2f</string>
+    <string name="diagnostics_screen_dp_format">Screen dp: %1$d x %2$d, smallest=%3$d</string>
+    <string name="diagnostics_display_pixels_format">Display pixels: %1$d x %2$d</string>
+    <string name="diagnostics_display_density_format">Display density: density=%1$.2f, scaledDensity=%2$.2f, dpi=%3$d</string>
+    <string name="diagnostics_target_sdk_format">Target SDK: %1$s</string>
+    <string name="diagnostics_first_install_format">First install: %1$s</string>
+    <string name="diagnostics_last_update_format">Last update: %1$s</string>
+    <string name="diagnostics_installer_format">Installer: %1$s</string>
+    <string name="diagnostics_launcher_package_format">Launcher package: %1$s</string>
+    <plurals name="diagnostics_files_dir_space_format">
+        <item quantity="one">Files dir usable space: %1$d byte</item>
+        <item quantity="other">Files dir usable space: %1$d bytes</item>
+    </plurals>
+    <plurals name="diagnostics_cache_dir_space_format">
+        <item quantity="one">Cache dir usable space: %1$d byte</item>
+        <item quantity="other">Cache dir usable space: %1$d bytes</item>
+    </plurals>
+    <string name="diagnostics_external_storage_state_format">External storage state: %1$s</string>
+    <string name="diagnostics_section_permissions_app_access">Permissions and app access</string>
+    <string name="diagnostics_notifications_enabled_format">Notifications enabled: %1$s</string>
+    <string name="diagnostics_post_notifications_granted_format">POST_NOTIFICATIONS granted: %1$s</string>
+    <string name="diagnostics_all_files_access_granted_format">All files access granted: %1$s</string>
+    <string name="diagnostics_ignoring_battery_optimizations_format">Ignoring battery optimizations: %1$s</string>
+    <string name="diagnostics_exact_alarms_allowed_format">Exact alarms allowed: %1$s</string>
+    <string name="diagnostics_section_settings">FilePipe settings</string>
+    <string name="diagnostics_settings_snapshot_unavailable">Settings snapshot unavailable.</string>
+    <string name="diagnostics_theme_mode_format">Theme mode: %1$s</string>
+    <string name="diagnostics_color_source_format">Color source: %1$s</string>
+    <string name="diagnostics_palette_style_format">Palette style: %1$s</string>
+    <string name="diagnostics_saved_custom_seeds_format">Saved custom seeds: %1$d</string>
+    <string name="diagnostics_active_custom_seed_format">Active custom seed set: %1$s</string>
+    <string name="diagnostics_gradient_background_format">Gradient background: %1$s</string>
+    <string name="diagnostics_surface_shading_format">Surface shading: %1$s</string>
+    <string name="diagnostics_folder_access_mode_format">Folder access mode: %1$s</string>
+    <string name="diagnostics_log_retention_days_format">Log retention days: %1$d</string>
+    <string name="diagnostics_auto_export_rule_change_format">Auto export on rule change: %1$s</string>
+    <string name="diagnostics_scheduled_export_enabled_format">Scheduled export enabled: %1$s</string>
+    <string name="diagnostics_local_backup_folder_format">Local backup folder: %1$s</string>
+    <string name="diagnostics_cloud_backup_folder_format">Cloud backup folder: %1$s</string>
+    <string name="diagnostics_update_check_schedule_format">Update check schedule: %1$s</string>
+    <string name="diagnostics_notify_new_updates_format">Notify on new updates: %1$s</string>
+    <string name="diagnostics_save_apk_downloads_format">Save GitHub APK to Downloads: %1$s</string>
+    <string name="diagnostics_apk_downloads_copy_succeeded_format">APK Downloads copy succeeded: %1$s</string>
+    <string name="diagnostics_haptics_enabled_format">Haptics enabled: %1$s</string>
+    <string name="diagnostics_progressive_blur_enabled_format">Progressive blur enabled: %1$s</string>
+    <string name="diagnostics_swipe_start_to_end_format">Swipe start-to-end: %1$s</string>
+    <string name="diagnostics_swipe_end_to_start_format">Swipe end-to-start: %1$s</string>
+    <string name="diagnostics_bookmarked_folders_format">Bookmarked folders: %1$d</string>
+    <string name="diagnostics_intro_seen_format">Intro seen: %1$s</string>
+    <string name="diagnostics_in_app_review_never_ask_again_format">In-app review never ask again: %1$s</string>
+    <string name="diagnostics_persisted_uri_permissions_format">Persisted URI permissions: %1$d</string>
+    <string name="diagnostics_persisted_uri_read_grants_format">Persisted URI read grants: %1$d</string>
+    <string name="diagnostics_persisted_uri_write_grants_format">Persisted URI write grants: %1$d</string>
+    <string name="diagnostics_persisted_tree_grants_format">Persisted tree grants: %1$d</string>
+    <string name="diagnostics_section_notification_channels">Notification channels</string>
+    <string name="diagnostics_no_channels_registered">No channels registered.</string>
+    <string name="diagnostics_notification_channel_format">%1$s: importance=%2$d, sound=%3$s, vibrate=%4$s, lights=%5$s, bypassDnd=%6$s, lockscreenVisibility=%7$d</string>
+    <string name="diagnostics_section_app_log">App log</string>
+    <string name="diagnostics_no_app_log_entries">No app log entries captured yet.\n</string>
+    <string name="diagnostics_uncaught_exception_format">Uncaught exception on %1$s</string>
+    <string name="diagnostics_value_unknown">unknown</string>
+    <string name="diagnostics_value_not_required">not required</string>
+    <string name="diagnostics_value_not_configured">not configured</string>
+    <string name="diagnostics_value_configured_content_uri">configured: content URI</string>
+    <string name="diagnostics_value_configured_filesystem_path">configured: filesystem path</string>
+    <string name="diagnostics_value_configured_reference_format">configured: %1$s reference</string>
+    <string name="about_share_text">Finally found a solid app to auto-organize my phone\'s storage. %1$s. Check it out: %2$s</string>
+    <string name="toast_about_link_copied">Link copied</string>
+    <string name="about_author_github_profile_url" translatable="false">https://bikram-agarwal.github.io/</string>
+
+    <!-- Onboarding -->
+    <string name="app_tagline">Organize your files automatically</string>
+    <string name="onboarding_lets_begin">Let\'s begin</string>
+    <string name="onboarding_byline">by Bikram Agarwal</string>
+    <!-- Feedback / new settings -->
+    <string name="settings_touch_sound_section">Haptics</string>
+    <string name="settings_swipe_gestures_section">Swipe gestures</string>
+    <string name="settings_swipe_right">Swipe right</string>
+    <string name="settings_swipe_left">Swipe left</string>
+    <string name="settings_swipe_action_trash">Trash</string>
+    <string name="settings_swipe_action_history">History</string>
+    <string name="settings_swipe_execute_hint">Each swipe runs one action. Tap to change the action.</string>
+    <string name="settings_haptic_feedback">Haptic feedback</string>
+    <string name="settings_haptic_feedback_desc">Vibration on long-press and swipe actions</string>
+    <string name="settings_progressive_blur">Progressive blur</string>
+    <string name="settings_progressive_blur_desc">Frosted glass blur effect at places</string>
+    <string name="settings_custom_font_title">Font in use</string>
+    <string name="settings_custom_font_default">Default system font</string>
+    <string name="settings_custom_font_choose">Import font</string>
+    <string name="settings_custom_font_choose_explanation">Select a custom font file (.ttf or .otf) from your storage to apply to the user interface.</string>
+    <string name="settings_custom_font_success">Custom font applied successfully.</string>
+    <string name="settings_custom_font_reset_success">Reverted to default system font.</string>
+    <string name="settings_custom_font_error_invalid">Failed to load: invalid or corrupted font file.</string>
+    <string name="settings_schedule_section">Schedule</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_desc">Run summaries and reminders</string>
+    <string name="settings_reliable_schedules">Reliable schedules</string>
+    <string name="settings_reliable_schedules_desc_enabled">Scheduled rules can run at the selected time</string>
+    <string name="settings_reliable_schedules_desc_disabled">Enable to run scheduled rules close to their set time</string>
+    <string name="theme_black">Black (OLED)</string>
+
+    <!-- Settings – Updates (GitHub builds) -->
+    <string name="settings_updates_section">Updates</string>
+    <string name="settings_update_check_frequency">Automatically check for updates</string>
+    <string name="settings_update_schedule_app_start">At startup: when the app starts</string>
+    <string name="settings_update_schedule_daily_21">Daily: every day at 9 PM</string>
+    <string name="settings_update_schedule_monday_21">Weekly: every Monday at 9 PM</string>
+    <string name="settings_update_schedule_never">Never</string>
+    <string name="settings_notify_new_updates">Get notification for new updates</string>
+    <string name="settings_notify_updates_need_auto_check">Enable \"Automatically check for updates\" first</string>
+    <string name="settings_notify_updates_enable_notifications">Allow notifications for FilePipe</string>
+    <string name="settings_update_available_button">Update available - %1$s</string>
+    <string name="settings_update_skip_version">Skip version</string>
+    <string name="settings_update_sheet_false_positive_tooltip">Installed an update from outside the app? This screen might still show the update. Tap Skip version — you won\'t be prompted again until a new release is available.</string>
+    <string name="notification_channel_updates_name">App updates</string>
+    <string name="notification_channel_updates_description">Alerts when a new app version is available</string>
+    <string name="notification_update_available_title">Update available</string>
+    <string name="notification_update_available_text">Version %1$s is ready to install</string>
+    <string name="settings_save_update_apk_to_downloads">Save update APK to Download folder</string>
+    <string name="settings_update_apk_save_to_downloads_failed">Update downloaded, but saving a copy to Download failed</string>
+    <string name="settings_update_check_failed">Couldn\'t check for updates</string>
+    <string name="settings_update_download_failed">Could not download update</string>
+    <string name="settings_check_for_updates">Check for updates</string>
+    <string name="settings_open_fdroid">Open F-Droid</string>
+    <string name="settings_download_install">Download update (v%1$s)</string>
+    <string name="settings_downloading">Downloading…</string>
+    <string name="settings_downloading_percent">Downloading %1$d%%</string>
+    <string name="settings_installing">Installing…</string>
+    <string name="settings_update_available">v%1$s available</string>
+    <string name="settings_up_to_date">You\'re up to date</string>
+    <string name="settings_changelog_load_failed">Could not load changelog</string>
+    <string name="settings_changelog_previous">Previous</string>
+    <string name="settings_changelog_next">Next</string>
+    <string name="settings_changelog_page_indicator">%1$d of %2$d</string>
+    <string name="settings_play_in_app_update_failed">Could not start the update. Try \"Check for updates\" again.</string>
+    <string name="settings_play_in_app_update_canceled">Update was canceled. You can try again from Updates in Settings.</string>
+    <string name="update_bar_available_title">Update available</string>
+    <string name="update_bar_available_action">Check</string>
+    <string name="update_fab_label">Update</string>
+    <string name="main_alert_fab_label">Alerts</string>
+    <string name="play_update_bar_downloading_title">Downloading update</string>
+    <string name="play_update_bar_downloading">from Play Store…</string>
+    <string name="play_update_bar_downloading_bytes">%1$s of %2$s</string>
+    <string name="play_update_bar_install_title">New version ready</string>
+    <string name="play_update_bar_install_subtitle">Restart to apply</string>
+    <string name="play_update_bar_install_action">Install &amp; restart</string>
+    <string name="settings_update_play_in_progress_body">An update from Google Play is already in progress. Continue to open Play and finish downloading or installing.</string>
+    <string name="settings_update_resume_play">Continue update</string>
+
+    <!-- Rule detail — new fields -->
+    <string name="preview_rule">Preview matching files</string>
+    <string name="rule_scan_subdirs_label">Scan subfolders</string>
+    <string name="rule_scan_subdirs_support">Subfolders will be scanned up to 32 levels deep for matching files</string>
+    <string name="rule_recreate_subfolders_label">Mirror subfolders to destination</string>
+    <string name="rule_recreate_subfolders_support">Replicate the source folder hierarchy at the destination, instead of saving all matched files directly at the destination folder</string>
+    <string name="rule_suppress_missing_source_card_label">Hide missing source folder warnings</string>
+    <string name="rule_suppress_missing_source_card_support">When a source folder is missing, hide the warning on the rules screen. You will still see it while editing this rule. Doesn\'t apply to the destination folder or lost access.</string>
+    <string name="rule_toggle_tip_show_help">Show help</string>
+    <string name="rule_section_operation_title">Operation</string>
+    <string name="rule_operation_mode_label">Mode</string>
+    <string name="operation_move">Move</string>
+    <string name="operation_copy">Copy</string>
+    <string name="operation_delete">Delete</string>
+    <string name="file_operation_incomplete_copy">The destination file did not receive all source data</string>
+    <string name="file_operation_source_changed_after_confirmation">The file changed after deletion was confirmed, so it was not deleted</string>
+    <string name="file_operation_source_delete_failed">The source file could not be deleted after it was copied</string>
+    <string name="rule_operation_delete_warning">CAUTION: FILES WILL BE PERMANENTLY DELETED, WITH NO UNDO OPTION ANYWHERE.</string>
+    <string name="rule_delete_confirmation_scan_failed">Couldn\'t verify which files would be deleted. Nothing was changed.</string>
+    <string name="delete_run_confirm_title">Permanently delete files?</string>
+    <string name="delete_run_confirm_button">Delete permanently</string>
+    <plurals name="delete_run_confirm_message">
+        <item quantity="one">%1$d file will be permanently deleted. This cannot be undone.</item>
+        <item quantity="other">%1$d files will be permanently deleted. This cannot be undone.</item>
+    </plurals>
+    <string name="delete_run_confirm_more">…and %1$d more</string>
+    <string name="rule_conflict_policy_label">If file already exists</string>
+    <string name="conflict_skip">Skip</string>
+    <string name="conflict_overwrite">Overwrite</string>
+    <string name="conflict_rename">Rename</string>
+
+    <!-- Preview sheet -->
+    <string name="preview_title">Preview</string>
+    <string name="preview_title_for_rule">Preview — %1$s</string>
+    <plurals name="preview_title_selected_rules">
+        <item quantity="one">Preview — %1$d selected rule</item>
+        <item quantity="other">Preview — %1$d selected rules</item>
+    </plurals>
+    <string name="preview_selected_rules">Preview selected</string>
+    <string name="preview_run">Run</string>
+    <string name="preview_empty">No matching files found in the selected source folders</string>
+    <string name="preview_would_skip">Would skip</string>
+    <string name="preview_would_overwrite">Would overwrite</string>
+    <string name="preview_destination_path">To: %1$s</string>
+    <plurals name="preview_files_would_move">
+        <item quantity="one">%1$d file would be moved</item>
+        <item quantity="other">%1$d files would be moved</item>
+    </plurals>
+    <plurals name="preview_files_would_copy">
+        <item quantity="one">%1$d file would be copied</item>
+        <item quantity="other">%1$d files would be copied</item>
+    </plurals>
+    <plurals name="preview_files_would_delete">
+        <item quantity="one">%1$d file would be deleted</item>
+        <item quantity="other">%1$d files would be deleted</item>
+    </plurals>
+
+    <!-- Template picker -->
+
+    <!-- Settings — history section -->
+    <string name="settings_log_retention">Keep history for</string>
+    <string name="settings_log_retention_hint">Older records are deleted automatically</string>
+    <string name="log_retention_7_days">7 days</string>
+    <string name="log_retention_14_days">14 days</string>
+    <string name="log_retention_30_days">30 days</string>
+    <string name="log_retention_90_days">90 days</string>
+    <string name="log_retention_never">Forever</string>
+
+    <!-- Notification actions -->
+    <string name="notification_action_undo">Undo</string>
+
+    <!-- Notification — run summary -->
+    <string name="notification_summary_channel_name">Run summary</string>
+    <string name="notification_summary_channel_desc">Shows a summary after each rule run completes</string>
+    <string name="notification_summary_title">%s complete</string>
+    <plurals name="notification_summary_body_partial">
+        <item quantity="one">%1$d moved, %2$d failed</item>
+        <item quantity="other">%1$d moved, %2$d failed</item>
+    </plurals>
+    <plurals name="notification_summary_body_partial_copied">
+        <item quantity="one">%1$d copied, %2$d failed</item>
+        <item quantity="other">%1$d copied, %2$d failed</item>
+    </plurals>
+
+    <!-- Advanced filters section -->
+    <string name="advanced_section_title">Advanced filters</string>
+    <string name="advanced_section_subtitle">Optional filters to narrow matching files</string>
+    <string name="advanced_section_filters_active">Filters active</string>
+    <string name="advanced_filename_pattern_label">Filename patterns, comma separated</string>
+    <string name="advanced_filename_pattern_placeholder">e.g. Screenshot_*</string>
+    <string name="advanced_filename_pattern_regex_chip">RegEx</string>
+    <string name="advanced_filename_pattern_regex_label">Filename RegEx pattern</string>
+    <string name="advanced_filename_pattern_regex_placeholder">e.g. ^IMG_\\d{4}\\.(jpg|png)$</string>
+    <string name="advanced_filename_pattern_regex_error">Invalid regular expression syntax</string>
+    <string name="advanced_min_size_label">Min size (MB)</string>
+    <string name="advanced_max_size_label">Max size (MB)</string>
+    <string name="advanced_min_age_label">Min age (days)</string>
+    <string name="advanced_max_age_label">Max age (days)</string>
+    <string name="rule_error_age_out_of_range">Age must be between 1 and %1$d days</string>
+    <string name="rule_error_minimum_age_exceeds_maximum">Minimum age cannot be greater than maximum age</string>
+    <string name="advanced_exclude_patterns_label">Exclude patterns, comma separated</string>
+    <string name="advanced_exclude_placeholder">e.g. .nomedia</string>
+    <string name="advanced_exclude_patterns_regex_label">Exclude RegEx pattern</string>
+    <string name="advanced_exclude_patterns_regex_placeholder">e.g. \\.nomedia|.*\\.tmp</string>
+    <string name="advanced_exclude_patterns_regex_error">Invalid regular expression syntax in exclude pattern</string>
+    <string name="advanced_orientation_label">Orientation</string>
+    <string name="advanced_orientation_any">Any orientation</string>
+    <string name="advanced_orientation_portrait">Portrait</string>
+    <string name="advanced_orientation_landscape">Landscape</string>
+
+    <!-- Folder bookmarks -->
+    <string name="bookmark_toggle_cd">Toggle bookmark</string>
+    <string name="bookmarks_choose">Bookmarks</string>
+
+    <!-- FAQ -->
+    <string name="faq_title">Help &amp; FAQs</string>
+    <string name="faq_expand_all_cd">Expand all topics</string>
+    <string name="faq_collapse_all_cd">Collapse all topics</string>
+    <string name="faq_quick_action_folder_access">Folder access settings</string>
+    <string name="faq_quick_action_notifications">Notification settings</string>
+    <string name="faq_search_hint">Search help topics</string>
+    <string name="faq_clear_search">Clear search</string>
+    <string name="faq_no_results_title">No matching help topics</string>
+    <string name="faq_no_results_body">Try a simpler search, or browse the sections below without a filter</string>
+    <string name="faq_action_switch_full_access">Switch mode in Settings</string>
+    <string name="faq_action_notification_settings">Open notification settings</string>
+
+    <!-- File type dialog strings -->
+    <string name="file_type_dialog_title">Add file type</string>
+    <string name="file_type_dialog_label">File extensions</string>
+    <string name="file_type_dialog_placeholder">jpg, png, mp3</string>
+    <string name="file_type_dialog_supporting_text">Separate extensions with commas</string>
+    <string name="file_type_dialog_add">Add</string>
+    <string name="file_type_add_type">Add type</string>
+    <string name="file_type_use_template">Use template</string>
+    <string name="file_type_remove_content_description">Remove %1$s</string>
+    <string name="file_type_all_files">All files</string>
+    <string name="file_type_no_extension">No extension</string>
+    <string name="rule_all_files_warning">This rule will target ALL files in the selected source folders.</string>
+    <string name="rule_conflict_no_ext_pattern">Warning: This rule targets \"No extension\", but the filename pattern requires \".%1$s\". No files will match.</string>
+    <string name="rule_conflict_ext_mismatch">Warning: Filename pattern requires \".%1$s\", which is not in your selected file types. No files will match.</string>
+    <string name="rule_conflict_invalid_size">Warning: Minimum file size is greater than Maximum file size. No files will match.</string>
+    <string name="rule_conflict_invalid_age">Warning: Minimum file age is greater than Maximum file age. No files will match.</string>
+    <string name="rule_conflict_exclude_all">Warning: Exclude pattern \"%1$s\" will exclude all files. No files will match.</string>
+</resources>

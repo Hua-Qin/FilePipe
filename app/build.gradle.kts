@@ -184,7 +184,7 @@ extensions.configure<ApplicationExtension>("android") {
     }
 
     androidResources {
-        localeFilters += setOf("en")
+        localeFilters += setOf("en", "zh-rCN")
     }
 
     lint {
