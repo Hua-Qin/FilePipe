@@ -1180,11 +1180,36 @@ fun RuleDetailScreen(
                             }
                         }
                         if (!isReadOnly) {
-                            val unusedBookmarks =
+                            var unusedBookmarks =
                                 bookmarkedFolders.filter {
                                     it.startsWith("content://") && it !in state.sourceFolderPaths
                                 }
                             var bookmarkDropdownExpanded by remember { mutableStateOf(false) }
+                            var showManualPathDialog by remember { mutableStateOf(false) }
+
+                            if (showManualPathDialog) {
+                                ManualSourceFolderDialog(
+                                    onDismiss = { showManualPathDialog = false },
+                                    onConfirm = { text ->
+                                        val (added, duplicates) = viewModel.addSourceFoldersFromText(text)
+                                        showManualPathDialog = false
+                                        if (added > 0) {
+                                            val msg = resources.getString(R.string.manual_source_folder_added_count, added)
+                                            val fullMsg = if (duplicates > 0) {
+                                                "$msg\n${resources.getString(R.string.manual_source_folder_duplicates_skipped, duplicates)}"
+                                            } else msg
+                                            Toast.makeText(context, fullMsg, Toast.LENGTH_SHORT).show()
+                                        } else if (duplicates > 0) {
+                                            Toast.makeText(
+                                                context,
+                                                resources.getString(R.string.manual_source_folder_duplicates_skipped, duplicates),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        }
+                                    },
+                                )
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1194,6 +1219,24 @@ fun RuleDetailScreen(
                                     onClick = { launchFolderPicker(FolderPickIntent.AddSource, null) },
                                     modifier = Modifier.weight(1f),
                                 )
+                                FilePipeOutlinedButton(
+                                    onClick = { showManualPathDialog = true },
+                                    modifier = Modifier.weight(1f),
+                                    shape = compactControlShape,
+                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 8.dp),
+                                ) {
+                                    FilePipeMaterialRoundedSymbol(
+                                        name = "edit",
+                                        contentDescription = null,
+                                        size = 18.dp,
+                                    )
+                                    Text(
+                                        text = "  ${stringResource(R.string.add_source_folder_manual)}",
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
                                 Box(modifier = Modifier.weight(1f)) {
                                     FilePipeOutlinedButton(
                                         onClick = { if (unusedBookmarks.isNotEmpty()) bookmarkDropdownExpanded = true },
@@ -2849,4 +2892,67 @@ fun RuleDetailScreen(
             }
         }
     }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ManualSourceFolderDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var text by remember { mutableStateOf("") }
+    var isError by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.manual_source_folder_dialog_title))
+        },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = {
+                        text = it
+                        isError = false
+                    },
+                    label = { Text(stringResource(R.string.source_folders_label)) },
+                    supportingText = {
+                        Text(stringResource(R.string.manual_source_folder_dialog_hint))
+                    },
+                    isError = isError,
+                    minLines = 3,
+                    maxLines = 8,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (isError) {
+                    Text(
+                        text = stringResource(R.string.manual_source_folder_empty),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            FilePipeButton(
+                onClick = {
+                    val trimmed = text.trim()
+                    if (trimmed.isEmpty()) {
+                        isError = true
+                    } else {
+                        onConfirm(trimmed)
+                    }
+                },
+            ) {
+                Text(stringResource(R.string.manual_source_folder_dialog_add))
+            }
+        },
+        dismissButton = {
+            FilePipeTextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.filesystem_folder_picker_cancel))
+            }
+        },
+    )
+}
 }
