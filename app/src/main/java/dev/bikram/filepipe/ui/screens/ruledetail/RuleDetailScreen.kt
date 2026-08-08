@@ -2892,6 +2892,7 @@ fun RuleDetailScreen(
             }
         }
     }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
