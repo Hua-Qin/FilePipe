@@ -43,16 +43,6 @@ jobs:
             gradle-${{ runner.os }}-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}-
             gradle-${{ runner.os }}-
 
-      - name: Cache Android SDK
-        uses: actions/cache@v4
-        with:
-          path: |
-            ${{ env.ANDROID_SDK_ROOT }}
-            ${{ env.ANDROID_HOME }}
-          key: android-sdk-${{ runner.os }}-compile37
-          restore-keys: |
-            android-sdk-${{ runner.os }}-
-
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
         shell: bash
