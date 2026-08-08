@@ -2956,4 +2956,3 @@ private fun ManualSourceFolderDialog(
         },
     )
 }
-}
