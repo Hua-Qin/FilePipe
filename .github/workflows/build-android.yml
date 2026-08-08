@@ -48,7 +48,7 @@ jobs:
         shell: bash
 
       - name: Build ARM64 Debug APK (github flavor)
-        run: ./gradlew assembleGithubDebug -Pandroid.injected.build.abi=arm64-v8a --build-cache --parallel --no-daemon --stacktrace
+        run: ./gradlew assembleGithubDebug --build-cache --parallel --no-daemon --stacktrace
         shell: bash
         env:
           JAVA_TOOL_OPTIONS: "-Xmx4g"
@@ -57,7 +57,6 @@ jobs:
         run: |
           echo "=== APK outputs ==="
           ls -lhR app/build/outputs/apk/ || true
-          ls -lhR app/build/outputs/ || true
         shell: bash
 
       - name: Upload ARM64 Debug APK
