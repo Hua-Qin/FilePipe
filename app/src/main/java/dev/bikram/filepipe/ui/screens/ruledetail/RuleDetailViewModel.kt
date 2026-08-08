@@ -439,6 +439,25 @@ class RuleDetailViewModel
             scheduleFolderAccessRecompute()
         }
 
+        fun addSourceFoldersFromText(text: String): Pair<Int, Int> {
+            val existingPaths = _uiState.value.sourceFolderPaths.toSet()
+            val parsedPaths = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
+            val newPaths = parsedPaths.filter { it !in existingPaths }
+            val duplicatesSkipped = parsedPaths.size - newPaths.size
+            if (newPaths.isEmpty()) return 0 to duplicatesSkipped
+            _uiState.update { state ->
+                val combined = state.sourceFolderPaths + newPaths
+                if (state.scanSubdirectories) {
+                    val (kept, removed) = removeRedundantPaths(combined)
+                    state.copy(sourceFolderPaths = kept, removedRedundantFolders = removed)
+                } else {
+                    state.copy(sourceFolderPaths = combined, removedRedundantFolders = emptyList())
+                }
+            }
+            scheduleFolderAccessRecompute()
+            return newPaths.size to duplicatesSkipped
+        }
+
         fun removeSourceFolder(path: String) {
             _uiState.update {
                 it.copy(sourceFolderPaths = it.sourceFolderPaths - path)
