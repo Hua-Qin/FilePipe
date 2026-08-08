@@ -76,6 +76,13 @@
     <string name="filesystem_folder_picker_new_folder_error_failed">无法创建文件夹</string>
     <string name="source_folders_label">来源文件夹</string>
     <string name="add_source_folder">选择文件夹</string>
+    <string name="add_source_folder_manual">手动输入路径</string>
+    <string name="manual_source_folder_dialog_title">手动输入来源文件夹路径</string>
+    <string name="manual_source_folder_dialog_hint">每行输入一个文件夹路径\n例如：\n/storage/emulated/0/Download\n/storage/emulated/0/Pictures</string>
+    <string name="manual_source_folder_dialog_add">添加</string>
+    <string name="manual_source_folder_empty">请输入至少一个有效路径</string>
+    <string name="manual_source_folder_added_count">已添加 %1$d 个来源文件夹</string>
+    <string name="manual_source_folder_duplicates_skipped">已跳过 %1$d 个重复路径</string>
     <string name="destination_label">目标文件夹</string>
     <string name="pick_folder">选择文件夹</string>
     <string name="change_destination">更改文件夹</string>
