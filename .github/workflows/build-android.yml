@@ -56,7 +56,8 @@ jobs:
       - name: List build outputs
         run: |
           echo "=== APK outputs ==="
-          find app/build/outputs/apk -name '*.apk' -exec ls -lh {} \;
+          ls -lhR app/build/outputs/apk/ || true
+          ls -lhR app/build/outputs/ || true
         shell: bash
 
       - name: Upload ARM64 Debug APK
