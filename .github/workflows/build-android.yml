@@ -1,0 +1,79 @@
+name: Android CI - ARM64 Debug Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.configuration-cache=true"
+
+jobs:
+  build:
+    name: Build ARM64 Debug APK
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout (shallow)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Cache Gradle caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            .gradle
+           key: gradle-${{ runner.os }}-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-${{ hashFiles('gradle/wrapper/gradle-wrapper.properties') }}-
+            gradle-${{ runner.os }}-
+
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.ANDROID_SDK_ROOT }}
+            ${{ env.ANDROID_HOME }}
+          key: android-sdk-${{ runner.os }}-compile37
+          restore-keys: |
+            android-sdk-${{ runner.os }}-
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+        shell: bash
+
+      - name: Build ARM64 Debug APK (github flavor)
+        run: ./gradlew assembleGithubDebug -Pandroid.injected.build.abi=arm64-v8a --build-cache --parallel --no-daemon --stacktrace
+        shell: bash
+        env:
+          JAVA_TOOL_OPTIONS: "-Xmx4g"
+
+      - name: List build outputs
+        run: |
+          echo "=== APK outputs ==="
+          find app/build/outputs/apk -name '*.apk' -exec ls -lh {} \;
+        shell: bash
+
+      - name: Upload ARM64 Debug API
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-arm64-v8a-debug
+          path: app/build/outputs/apk/github/debug/*.apk
+          if-no-files-found: error
+          compression-level: 6
+          retention-days: 30
